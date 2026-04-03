@@ -1,0 +1,47 @@
+{
+  "name": "university-timetable-system",
+  "version": "1.0.0",
+  "description": "University Timetable Management System - Monorepo with NestJS backend and Next.js frontend",
+  "private": true,
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd frontend && npm run start",
+    "postinstall": "cd frontend && npm install && npx prisma generate",
+    "backend:install": "cd backend && npm install",
+    "backend:dev": "cd backend && npm run start:dev",
+    "backend:build": "cd backend && npm run build",
+    "backend:start": "cd backend && npm run start:prod",
+    "backend:migrate": "cd backend && npm run prisma:migrate",
+    "backend:seed": "cd backend && npm run prisma:seed",
+    "backend:studio": "cd backend && npm run prisma:studio",
+    "frontend:install": "cd frontend && npm install",
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build",
+    "frontend:start": "cd frontend && npm run start",
+    "install:all": "npm run backend:install && npm run frontend:install",
+    "dev:all": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "build:all": "npm run backend:build && npm run frontend:build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.17",
+    "@nestjs/config": "^4.0.3",
+    "@nestjs/core": "^11.1.17",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/passport": "^11.0.5",
+    "@prisma/client": "^7.6.0",
+    "@vercel/analytics": "^2.0.1",
+    "bcrypt": "^6.0.0",
+    "class-validator": "^0.15.1",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.2.1",
+    "lucide-react": "^1.7.0",
+    "next": "^16.2.2",
+    "next-themes": "^0.4.6",
+    "passport-jwt": "^4.0.1",
+    "react": "^19.2.4"
+  }
+}

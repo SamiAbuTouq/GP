@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "course" ADD COLUMN IF NOT EXISTS "sections" INTEGER NOT NULL DEFAULT 1;

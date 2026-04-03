@@ -1,0 +1,20 @@
+﻿app/api/auth/forgot-password/route.ts(4,24): error TS7016: Could not find a declaration file for module 'nodemailer'. 'D:/downloads/Caludeee/frontend/node_modules/nodemailer/lib/nodemailer.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/nodemailer` if it exists or add a new declaration (.d.ts) file containing `declare module 'nodemailer';`
+app/api/courses/[id]/route.ts(34,7): error TS1117: An object literal cannot have multiple properties with the same name.
+app/api/courses/[id]/route.ts(137,7): error TS1117: An object literal cannot have multiple properties with the same name.
+app/schedule/page.tsx(107,64): error TS2339: Property 'building' does not exist on type '{ id: string; type: string; capacity: number; isAvailable: boolean; }'.
+app/schedule/page.tsx(119,57): error TS2339: Property 'building' does not exist on type '{ id: string; type: string; capacity: number; isAvailable: boolean; }'.
+app/schedule/page.tsx(135,49): error TS2339: Property 'building' does not exist on type '{ id: string; type: string; capacity: number; isAvailable: boolean; }'.
+app/schedule/page.tsx(529,87): error TS2339: Property 'building' does not exist on type '{ id: string; type: string; capacity: number; isAvailable: boolean; }'.
+app/schedule/page.tsx(609,183): error TS2339: Property 'building' does not exist on type '{ id: string; type: string; capacity: number; isAvailable: boolean; }'.
+app/schedule/page.tsx(707,175): error TS2339: Property 'building' does not exist on type '{ id: string; type: string; capacity: number; isAvailable: boolean; }'.
+app/what-if/page.tsx(169,50): error TS2352: Conversion of type 'Scenario' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'Scenario'.
+app/what-if/page.tsx(371,52): error TS2352: Conversion of type 'Scenario' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'Scenario'.
+app/what-if/page.tsx(400,61): error TS2352: Conversion of type 'Scenario' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'Scenario'.
+app/what-if/page.tsx(414,48): error TS2352: Conversion of type 'Scenario' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'Scenario'.
+app/what-if/page.tsx(455,50): error TS2352: Conversion of type 'Scenario' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'Scenario'.

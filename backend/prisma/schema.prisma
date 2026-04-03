@@ -1,0 +1,342 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  LECTURER
+}
+
+// ─────────────────────────────────────────────
+// USER
+// ─────────────────────────────────────────────
+
+model User {
+  user_id          Int      @id @default(autoincrement())
+  email            String   @unique @db.VarChar(100)
+  password_hash    String   @db.VarChar(255)
+  first_name       String   @db.VarChar(50)
+  last_name        String   @db.VarChar(50)
+  avatar_url       String?  @db.VarChar(500)
+  role_name        Role
+  theme_preference String?  @db.VarChar(20)
+  date_format      String?  @db.VarChar(20)
+  time_format      String?  @db.VarChar(20)
+
+  // Relations
+  refresh_tokens   RefreshToken[]
+  lecturer         Lecturer?
+  notifications    Notification[]
+
+  // Password Reset
+  reset_token        String?   @unique @db.VarChar(255)
+  reset_token_expiry DateTime?
+
+  @@map("user")
+}
+
+// ─────────────────────────────────────────────
+// REFRESH TOKEN
+// ─────────────────────────────────────────────
+
+model RefreshToken {
+  id         Int       @id @default(autoincrement())
+  token_hash String    @db.VarChar(255)
+  user_id    Int
+  expires_at DateTime
+  created_at DateTime  @default(now())
+  revoked_at DateTime?
+
+  user       User      @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("refresh_token")
+}
+
+// ─────────────────────────────────────────────
+// DEPARTMENT
+// ─────────────────────────────────────────────
+
+model Department {
+  dept_id   Int      @id @default(autoincrement())
+  dept_name String   @db.VarChar(100)
+
+  lecturers Lecturer[]
+  courses   Course[]
+
+  @@map("department")
+}
+
+// ─────────────────────────────────────────────
+// LECTURER
+// ─────────────────────────────────────────────
+
+model Lecturer {
+  user_id      Int     @id
+  dept_id      Int
+  max_workload Int
+  is_available Boolean
+
+  user         User       @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  department   Department @relation(fields: [dept_id], references: [dept_id])
+
+  lecturer_preferences      LecturerPreference[]
+  lecturer_can_teach_course LecturerCanTeachCourse[]
+  lecturer_office_hours     LecturerOfficeHours[]
+  section_schedule_entries  SectionScheduleEntry[]
+
+  @@map("lecturer")
+}
+
+// ─────────────────────────────────────────────
+// COURSE
+// ─────────────────────────────────────────────
+
+model Course {
+  course_id      Int    @id @default(autoincrement())
+  dept_id        Int
+  course_code    String @unique @db.VarChar(20)
+  course_name    String @db.VarChar(100)
+  academic_level Int
+  credit_hours   Int
+  delivery_mode  String @db.VarChar(30)
+  sections       Int    @default(1)
+
+  department   Department @relation(fields: [dept_id], references: [dept_id])
+
+  prerequisites             CoursePrerequisite[] @relation("CourseToPrerequisite")
+  prerequisite_for          CoursePrerequisite[] @relation("PrerequisiteToCourse")
+  lecturer_can_teach_course LecturerCanTeachCourse[]
+  section_schedule_entries  SectionScheduleEntry[]
+
+  @@map("course")
+}
+
+// ─────────────────────────────────────────────
+// COURSE PREREQUISITE
+// ─────────────────────────────────────────────
+
+model CoursePrerequisite {
+  course_id       Int
+  prerequisite_id Int
+
+  course       Course @relation("CourseToPrerequisite", fields: [course_id], references: [course_id], onDelete: Cascade)
+  prerequisite Course @relation("PrerequisiteToCourse", fields: [prerequisite_id], references: [course_id], onDelete: Cascade)
+
+  @@id([course_id, prerequisite_id])
+  @@map("course_prerequisite")
+}
+
+// ─────────────────────────────────────────────
+// ROOM
+// ─────────────────────────────────────────────
+
+model Room {
+  room_id      Int     @id @default(autoincrement())
+  room_number  String  @db.VarChar(30)
+  room_type    Int
+  capacity     Int
+  is_available Boolean
+
+  section_schedule_entries SectionScheduleEntry[]
+
+  @@map("room")
+}
+
+// ─────────────────────────────────────────────
+// TIMESLOT
+// ─────────────────────────────────────────────
+
+model Timeslot {
+  slot_id   Int    @id @default(autoincrement())
+  start_time DateTime @db.Time()
+  end_time   DateTime @db.Time()
+  days_mask  Int
+  slot_type  String @db.VarChar(30)
+
+  lecturer_preferences  LecturerPreference[]
+  lecturer_office_hours LecturerOfficeHours[]
+  section_schedule_entries SectionScheduleEntry[]
+
+  @@map("timeslot")
+}
+
+// ─────────────────────────────────────────────
+// SEMESTER
+// ─────────────────────────────────────────────
+
+model Semester {
+  semester_id   Int      @id @default(autoincrement())
+  semester_type Int
+  academic_year String   @db.VarChar(9)
+  start_date    DateTime @db.Date()
+  end_date      DateTime @db.Date()
+
+  timetables Timetable[]
+
+  @@map("semester")
+}
+
+// ─────────────────────────────────────────────
+// SCENARIO
+// ─────────────────────────────────────────────
+
+model Scenario {
+  scenario_id Int    @id @default(autoincrement())
+  name        String @db.VarChar(100)
+  status      String @db.VarChar(30)
+  description String @db.Text
+
+  scenario_produces_timetables ScenarioProducesTimetable[]
+
+  @@map("scenario")
+}
+
+// ─────────────────────────────────────────────
+// TIMETABLE
+// ─────────────────────────────────────────────
+
+model Timetable {
+  timetable_id    Int      @id @default(autoincrement())
+  semester_id     Int
+  generated_at    DateTime @default(now())
+  status          String   @db.VarChar(30)
+  generation_type String   @db.VarChar(30)
+  version_number  Int
+
+  semester   Semester @relation(fields: [semester_id], references: [semester_id])
+
+  timetable_metrics            TimetableMetrics?
+  scenario_produces_timetables ScenarioProducesTimetable[]
+  section_schedule_entries     SectionScheduleEntry[]
+
+  @@map("timetable")
+}
+
+// ─────────────────────────────────────────────
+// TIMETABLE METRICS
+// ─────────────────────────────────────────────
+
+model TimetableMetrics {
+  timetable_id          Int     @id
+  room_utilization_rate Decimal @db.Decimal(5, 2)
+  soft_constraints_score Decimal @db.Decimal(5, 2)
+  fitness_score         Decimal @db.Decimal(5, 2)
+  is_valid              Boolean
+  total_students        Int
+
+  timetable Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)
+
+  @@map("timetable_metrics")
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATION
+// ─────────────────────────────────────────────
+
+model Notification {
+  notification_id Int      @id @default(autoincrement())
+  user_id         Int
+  message_title   String   @db.VarChar(100)
+  message         String   @db.Text
+  is_read         Boolean  @default(false)
+  created_at      DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@map("notification")
+}
+
+// ─────────────────────────────────────────────
+// LECTURER PREFERENCE
+// ─────────────────────────────────────────────
+
+model LecturerPreference {
+  user_id      Int
+  slot_id      Int
+  is_preferred Boolean
+
+  lecturer Lecturer @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  timeslot Timeslot @relation(fields: [slot_id], references: [slot_id])
+
+  @@id([user_id, slot_id])
+  @@map("lecturer_preference")
+}
+
+// ─────────────────────────────────────────────
+// LECTURER CAN TEACH COURSE
+// ─────────────────────────────────────────────
+
+model LecturerCanTeachCourse {
+  user_id   Int
+  course_id Int
+
+  lecturer Lecturer @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  course   Course   @relation(fields: [course_id], references: [course_id])
+
+  @@id([user_id, course_id])
+  @@map("lecturer_can_teach_course")
+}
+
+// ─────────────────────────────────────────────
+// LECTURER OFFICE HOURS
+// ─────────────────────────────────────────────
+
+model LecturerOfficeHours {
+  user_id Int
+  slot_id Int
+
+  lecturer Lecturer @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  timeslot Timeslot @relation(fields: [slot_id], references: [slot_id])
+
+  @@id([user_id, slot_id])
+  @@map("lecturer_office_hours")
+}
+
+// ─────────────────────────────────────────────
+// SECTION SCHEDULE ENTRY
+// ─────────────────────────────────────────────
+
+model SectionScheduleEntry {
+  entry_id            Int    @id @default(autoincrement())
+  user_id             Int
+  slot_id             Int
+  course_id           Int
+  timetable_id        Int
+  room_id             Int
+  registered_students Int
+  section_number      String @db.VarChar(10)
+
+  lecturer   Lecturer  @relation(fields: [user_id], references: [user_id])
+  timeslot   Timeslot  @relation(fields: [slot_id], references: [slot_id])
+  course     Course    @relation(fields: [course_id], references: [course_id])
+  timetable  Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)
+  room       Room      @relation(fields: [room_id], references: [room_id])
+
+  @@map("section_schedule_entry")
+}
+
+// ─────────────────────────────────────────────
+// SCENARIO PRODUCES TIMETABLE
+// ─────────────────────────────────────────────
+
+model ScenarioProducesTimetable {
+  timetable_id Int @id
+  scenario_id  Int
+
+  timetable Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)
+  scenario  Scenario  @relation(fields: [scenario_id], references: [scenario_id], onDelete: Cascade)
+
+  @@map("scenario_produces_timetable")
+}
