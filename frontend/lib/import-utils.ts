@@ -79,11 +79,38 @@ export function parseExcel(buffer: ArrayBuffer): ParsedRow[] {
   })
 }
 
+export function parseJSON(text: string): ParsedRow[] {
+  try {
+    const data = JSON.parse(text)
+    if (!Array.isArray(data)) {
+      throw new Error("JSON file must contain an array of objects.")
+    }
+    return data.map((item) => {
+      if (typeof item !== "object" || item === null) return {}
+      const parsed: ParsedRow = {}
+      for (const [key, value] of Object.entries(item)) {
+        parsed[key] = String(value ?? "").trim()
+      }
+      return parsed
+    })
+  } catch (error) {
+    if (error instanceof Error && error.message === "JSON file must contain an array of objects.") {
+      throw error
+    }
+    throw new Error("Invalid JSON format.")
+  }
+}
+
 /**
- * Read a File and return parsed rows, detecting CSV vs Excel by extension.
+ * Read a File and return parsed rows, detecting CSV vs Excel vs JSON by extension.
  */
 export async function parseFile(file: File): Promise<ParsedRow[]> {
   const name = file.name.toLowerCase()
+
+  if (name.endsWith(".json")) {
+    const text = await file.text()
+    return parseJSON(text)
+  }
 
   if (name.endsWith(".csv")) {
     const text = await file.text()
@@ -95,7 +122,7 @@ export async function parseFile(file: File): Promise<ParsedRow[]> {
     return parseExcel(buffer)
   }
 
-  throw new Error("Unsupported file format. Please upload a CSV or Excel (.xlsx/.xls) file.")
+  throw new Error("Unsupported file format. Please upload a CSV, Excel (.xlsx/.xls), or JSON file.")
 }
 
 /**

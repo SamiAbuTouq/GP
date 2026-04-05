@@ -5,6 +5,7 @@ export declare class CreateCourseDto {
     academicLevel: number;
     deliveryMode: string;
     department: string;
+    sections?: number;
 }
 export declare class UpdateCourseDto {
     name?: string;
@@ -12,4 +13,5 @@ export declare class UpdateCourseDto {
     academicLevel?: number;
     deliveryMode?: string;
     department?: string;
+    sections?: number;
 }

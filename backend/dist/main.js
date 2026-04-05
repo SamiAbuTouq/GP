@@ -19,7 +19,10 @@ async function bootstrap() {
         transform: true,
     }));
     app.enableCors({
-        origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+        origin: [
+            "http://localhost:3000",
+            "https://placeholder.trycloudflare.com",
+        ],
         credentials: true,
     });
     app.setGlobalPrefix("api/v1");

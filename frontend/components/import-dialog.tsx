@@ -205,6 +205,7 @@ export function ImportDialog<T>({
   const getFileIcon = () => {
     if (!file) return <ImportIcon className="h-10 w-10" />
     const name = file.name.toLowerCase()
+    if (name.endsWith(".json")) return <FileText className="h-10 w-10 text-emerald-600" />
     if (name.endsWith(".csv")) return <FileText className="h-10 w-10 text-emerald-600" />
     return <FileSpreadsheet className="h-10 w-10 text-emerald-600" />
   }
@@ -249,12 +250,12 @@ export function ImportDialog<T>({
                 </button>
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Supports CSV, XLSX, and XLS files
+                Supports CSV, XLSX, XLS, and JSON files
               </p>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,.xlsx,.xls"
+                accept=".csv,.xlsx,.xls,.json"
                 className="hidden"
                 onChange={handleFileInput}
               />

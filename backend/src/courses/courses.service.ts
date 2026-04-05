@@ -10,9 +10,6 @@ export class CoursesService {
     const courses = await this.prisma.course.findMany({
       include: {
         department: true,
-        _count: {
-          select: { section_schedule_entries: true },
-        },
       },
       orderBy: { course_code: 'asc' },
     });
@@ -26,7 +23,7 @@ export class CoursesService {
       deliveryMode: course.delivery_mode,
       department: course.department.dept_name,
       departmentId: course.dept_id,
-      sections: course._count.section_schedule_entries,
+      sections: course.sections,
     }));
   }
 
@@ -35,9 +32,6 @@ export class CoursesService {
       where: { course_id: id },
       include: {
         department: true,
-        _count: {
-          select: { section_schedule_entries: true },
-        },
       },
     });
 
@@ -54,7 +48,7 @@ export class CoursesService {
       deliveryMode: course.delivery_mode,
       department: course.department.dept_name,
       departmentId: course.dept_id,
-      sections: course._count.section_schedule_entries,
+      sections: course.sections,
     };
   }
 
@@ -78,6 +72,7 @@ export class CoursesService {
         academic_level: dto.academicLevel,
         delivery_mode: dto.deliveryMode,
         dept_id: department.dept_id,
+        sections: dto.sections ?? 1,
       },
       include: {
         department: true,
@@ -93,7 +88,7 @@ export class CoursesService {
       deliveryMode: course.delivery_mode,
       department: course.department.dept_name,
       departmentId: course.dept_id,
-      sections: 0,
+      sections: course.sections,
     };
   }
 
@@ -128,12 +123,10 @@ export class CoursesService {
         academic_level: dto.academicLevel,
         delivery_mode: dto.deliveryMode,
         dept_id: deptId,
+        ...(dto.sections !== undefined ? { sections: dto.sections } : {}),
       },
       include: {
         department: true,
-        _count: {
-          select: { section_schedule_entries: true },
-        },
       },
     });
 
@@ -146,7 +139,7 @@ export class CoursesService {
       deliveryMode: course.delivery_mode,
       department: course.department.dept_name,
       departmentId: course.dept_id,
-      sections: course._count.section_schedule_entries,
+      sections: course.sections,
     };
   }
 

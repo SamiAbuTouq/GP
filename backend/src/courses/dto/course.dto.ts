@@ -26,6 +26,12 @@ export class CreateCourseDto {
   @IsString()
   @IsNotEmpty()
   department: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  sections?: number;
 }
 
 export class UpdateCourseDto {
@@ -52,4 +58,10 @@ export class UpdateCourseDto {
   @IsString()
   @IsOptional()
   department?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  sections?: number;
 }

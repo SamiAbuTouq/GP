@@ -2,13 +2,26 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcrypt'
 
+export const runtime = 'nodejs'
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { userId, currentPassword, newPassword } = body
+    const { userId: rawUserId, currentPassword, newPassword } = body
 
-    // Validate input
-    if (!userId || !currentPassword || !newPassword) {
+    const userId =
+      typeof rawUserId === 'number' && Number.isFinite(rawUserId)
+        ? rawUserId
+        : typeof rawUserId === 'string'
+          ? parseInt(rawUserId, 10)
+          : NaN
+
+    if (
+      !Number.isFinite(userId) ||
+      userId < 1 ||
+      !currentPassword ||
+      !newPassword
+    ) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

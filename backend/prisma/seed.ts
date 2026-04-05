@@ -28,6 +28,13 @@ async function main(): Promise<void> {
       last_name: 'Abu Touq',
       role_name: Role.LECTURER,
     },
+    {
+      email: 'yazanbedair@gmail.com',
+      password: 'Lecturer@123456',
+      first_name: 'Yazan',
+      last_name: 'Bedair',
+      role_name: Role.LECTURER,
+    },
   ];
 
   for (const user of predefinedUsers) {

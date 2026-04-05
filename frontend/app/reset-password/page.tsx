@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -41,6 +41,12 @@ function ResetPasswordForm() {
   ];
 
   const passwordValid = rules.every((r) => r.test(password));
+
+  useEffect(() => {
+    if (!isSuccess) return;
+    const t = setTimeout(() => router.push("/login"), 3000);
+    return () => clearTimeout(t);
+  }, [isSuccess, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,10 +90,6 @@ function ResetPasswordForm() {
   };
 
   if (isSuccess) {
-    setTimeout(() => {
-      router.push("/login");
-    }, 3000);
-
     return (
       <div className="text-center space-y-6">
         <div className="flex justify-center">

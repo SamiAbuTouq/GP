@@ -24,10 +24,18 @@ async function bootstrap(): Promise<void> {
   );
 
   // CORS configuration
+  // app.enableCors({
+  //   origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  //   credentials: true,
+  // });
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+    origin: [
+      "http://localhost:3000",
+      "https://placeholder.trycloudflare.com",
+    ],
     credentials: true,
   });
+  
 
   // API prefix
   app.setGlobalPrefix("api/v1");

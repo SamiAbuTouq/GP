@@ -46,6 +46,13 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], CreateCourseDto.prototype, "department", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    (0, class_validator_1.Max)(20),
+    __metadata("design:type", Number)
+], CreateCourseDto.prototype, "sections", void 0);
 class UpdateCourseDto {
 }
 exports.UpdateCourseDto = UpdateCourseDto;
@@ -78,4 +85,11 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], UpdateCourseDto.prototype, "department", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    (0, class_validator_1.Max)(20),
+    __metadata("design:type", Number)
+], UpdateCourseDto.prototype, "sections", void 0);
 //# sourceMappingURL=course.dto.js.map

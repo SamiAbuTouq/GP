@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import { ApiClient } from "./api-client";
 
 interface User {
@@ -12,7 +13,8 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  isLoading: boolean;
+  /** True until the initial session restore (refresh token) finishes */
+  authLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -24,11 +26,39 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Routes that don't require authentication
 const publicRoutes = ["/", "/login", "/forgot-password", "/reset-password", "/help"];
 
+export function isAuthPublicPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return publicRoutes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  const { setTheme } = useTheme();
+  const themeSynced = useRef(false);
+
+  // Sync user theme preference from backend when user logs in
+  useEffect(() => {
+    if (!user?.id) {
+      themeSynced.current = false;
+      return;
+    }
+
+    if (!themeSynced.current) {
+      ApiClient.getProfile().then(profile => {
+        if (profile.theme_preference) {
+          setTheme(profile.theme_preference);
+          themeSynced.current = true;
+        }
+      }).catch(() => {
+        // Silently fail if profile can't be loaded
+      });
+    }
+  }, [user?.id]);
 
   /**
    * Decode JWT to extract user info
@@ -37,8 +67,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const decodeToken = useCallback((token: string): User | null => {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
+      const id =
+        typeof payload.sub === "number"
+          ? payload.sub
+          : parseInt(String(payload.sub), 10);
+      if (!Number.isFinite(id) || id < 1) return null;
       return {
-        id: payload.sub,
+        id,
         email: payload.email,
         role: payload.role,
       };
@@ -76,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const refreshAuth = useCallback(async (): Promise<boolean> => {
     const result = await restoreSession();
-    setIsLoading(false);
+    setAuthLoading(false);
     return result;
   }, [restoreSession]);
 
@@ -91,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(decodedUser);
     }
     
-    setIsLoading(false);
+    setAuthLoading(false);
     router.push("/dashboard");
   }, [decodeToken, router]);
 
@@ -128,16 +163,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     const initAuth = async () => {
-      // Check if we're on a public route - if so, still try to restore but don't block
-      const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
-      
       try {
         await restoreSession();
       } catch {
         // Session restoration failed, that's ok
       } finally {
         if (mounted) {
-          setIsLoading(false);
+          setAuthLoading(false);
         }
       }
     };
@@ -151,9 +183,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Handle route protection after auth state is determined
   useEffect(() => {
-    if (!isLoading) {
-      const isPublicRoute = publicRoutes.some(route => pathname === route || pathname.startsWith(route + "/"));
-      
+    if (!authLoading) {
+      const isPublicRoute = isAuthPublicPath(pathname);
+
       if (!user && !isPublicRoute) {
         // Not authenticated and trying to access protected route
         router.push("/login");
@@ -162,13 +194,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         router.push("/dashboard");
       }
     }
-  }, [user, isLoading, pathname, router]);
+  }, [user, authLoading, pathname, router]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        isLoading,
+        authLoading,
         isAuthenticated: !!user,
         login,
         logout,
