@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Sidebar } from "@/components/sidebar"
+import { SidebarProvider } from "@/lib/sidebar-context"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -60,6 +61,7 @@ export default function HelpPage() {
   )
 
   return (
+    <SidebarProvider>
     <div className="flex h-screen">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -199,5 +201,6 @@ export default function HelpPage() {
         </main>
       </div>
     </div>
+    </SidebarProvider>
   )
 }

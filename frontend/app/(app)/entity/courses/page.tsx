@@ -19,13 +19,29 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, Search, Edit, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Loader2,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+} from "lucide-react"
 import { ImportIcon } from "@/components/custom-icons"
 import { departments, deliveryModes, type Department, type DeliveryMode } from "@/lib/data"
+import { academicLevelFromCourseCode } from "@/lib/academic-level"
 import { ImportDialog } from "@/components/import-dialog"
 import { findColumn, type ParsedRow } from "@/lib/import-utils"
 import { ExportDropdownWithDialog } from "@/components/export-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
 
 type Course = {
   id?: number
@@ -38,8 +54,95 @@ type Course = {
   sections: number
 }
 
+const parseNumber = (value: unknown, fallback: number) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value === "string") {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return fallback
+}
+
+const normalizeDeliveryMode = (value: unknown): DeliveryMode => {
+  if (typeof value !== "string") return "On-Campus"
+  const normalized = value.trim().toLowerCase()
+  if (normalized === "online") return "Online"
+  if (normalized === "blended") return "Blended"
+  if (normalized === "face-to-face" || normalized === "on-campus" || normalized === "on campus") return "On-Campus"
+  return "On-Campus"
+}
+
+/** One row per course from `GET /api/courses/catalog` (distinct `course_code`). */
+function mapCatalogRow(raw: unknown): Course | null {
+  const item = (raw ?? {}) as Record<string, unknown>
+  const code = String(item.code ?? "").trim()
+  const name = String(item.name ?? "").trim()
+  if (!code && !name) return null
+  const parsedId = parseNumber(item.id, Number.NaN)
+  return {
+    id: Number.isFinite(parsedId) ? parsedId : undefined,
+    code,
+    name,
+    creditHours: parseNumber(item.creditHours, 0),
+    academicLevel: academicLevelFromCourseCode(code),
+    deliveryMode: normalizeDeliveryMode(item.deliveryMode),
+    department: String(item.department ?? "Computer Science") as Department,
+    sections: parseNumber(item.sections, 0),
+  }
+}
+
+type SortableColumn =
+  | "code"
+  | "name"
+  | "creditHours"
+  | "academicLevel"
+  | "deliveryMode"
+  | "sections"
+
+function sortCoursesCopy(
+  list: Course[],
+  sortColumn: SortableColumn | null,
+  sortDirection: "asc" | "desc",
+): Course[] {
+  const copy = [...list]
+  if (!sortColumn) return copy
+  const mult = sortDirection === "asc" ? 1 : -1
+  copy.sort((a, b) => {
+    let cmp = 0
+    switch (sortColumn) {
+      case "code":
+        cmp = a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: "base" })
+        break
+      case "name":
+        cmp = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })
+        break
+      case "creditHours":
+        cmp = a.creditHours - b.creditHours
+        break
+      case "academicLevel":
+        cmp = a.academicLevel - b.academicLevel
+        break
+      case "deliveryMode":
+        cmp = a.deliveryMode.localeCompare(b.deliveryMode)
+        break
+      case "sections":
+        cmp = a.sections - b.sections
+        break
+      default:
+        break
+    }
+    if (cmp !== 0) return cmp * mult
+    if (sortColumn === "code") return a.name.localeCompare(b.name) * mult
+    if (sortColumn === "name") return a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: "base" }) * mult
+    return a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: "base" }) * mult
+  })
+  return copy
+}
+
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([])
+  /** Human-readable source for the Sections column (latest DB semester). */
+  const [sectionCountSource, setSectionCountSource] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -57,6 +160,8 @@ export default function CoursesPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [sortColumn, setSortColumn] = useState<SortableColumn | null>(null)
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const { toast } = useToast()
 
   // Fetch courses from API
@@ -64,13 +169,27 @@ export default function CoursesPage() {
     fetchCourses()
   }, [])
 
-  const fetchCourses = async () => {
+  const fetchCourses = async (options?: { showFullLoading?: boolean }) => {
+    const showFullLoading = options?.showFullLoading !== false
     try {
-      setLoading(true)
-      const response = await fetch('/api/courses')
+      if (showFullLoading) setLoading(true)
+      const response = await fetch('/api/courses/catalog', { cache: 'no-store' })
       if (!response.ok) throw new Error('Failed to fetch courses')
-      const data = await response.json()
-      setCourses(data)
+      const body = (await response.json()) as {
+        courses?: unknown[]
+        lastSemester?: { academicYear?: string; semester?: string } | null
+      }
+      const rows = Array.isArray(body.courses) ? body.courses : []
+      const normalizedCourses = rows
+        .map(mapCatalogRow)
+        .filter((c): c is Course => c != null)
+      setCourses(normalizedCourses)
+      const ls = body.lastSemester
+      if (ls?.academicYear && ls?.semester) {
+        setSectionCountSource(`${ls.academicYear} · ${ls.semester}`)
+      } else {
+        setSectionCountSource(null)
+      }
     } catch (error) {
       console.error('Error fetching courses:', error)
       toast({
@@ -79,26 +198,62 @@ export default function CoursesPage() {
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      if (showFullLoading) setLoading(false)
     }
   }
 
-  const filteredCourses = useMemo(
-    () =>
-      courses.filter(
-        (course) =>
-          course.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          course.department.toLowerCase().includes(searchQuery.toLowerCase())
-      ),
-    [courses, searchQuery]
+  const filteredCourses = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+    if (!normalizedQuery) return courses
+
+    const toSearchableText = (value: unknown) => (typeof value === "string" ? value.toLowerCase() : "")
+
+    return courses.filter((course) => {
+      const code = toSearchableText(course.code)
+      const name = toSearchableText(course.name)
+      const department = toSearchableText(course.department)
+
+      return (
+        code.includes(normalizedQuery) ||
+        name.includes(normalizedQuery) ||
+        department.includes(normalizedQuery)
+      )
+    })
+  }, [courses, searchQuery])
+
+  const sortedFilteredCourses = useMemo(
+    () => sortCoursesCopy(filteredCourses, sortColumn, sortDirection),
+    [filteredCourses, sortColumn, sortDirection],
   )
 
-  const totalPages = Math.ceil(filteredCourses.length / pageSize)
+  const sortedAllCourses = useMemo(
+    () => sortCoursesCopy(courses, sortColumn, sortDirection),
+    [courses, sortColumn, sortDirection],
+  )
+
+  const totalPages = Math.ceil(sortedFilteredCourses.length / pageSize)
+  const maxPage = totalPages || 1
   const paginatedCourses = useMemo(() => {
     const start = (currentPage - 1) * pageSize
-    return filteredCourses.slice(start, start + pageSize)
-  }, [filteredCourses, currentPage, pageSize])
+    return sortedFilteredCourses.slice(start, start + pageSize)
+  }, [sortedFilteredCourses, currentPage, pageSize])
+
+  const handleSortColumn = (col: SortableColumn) => {
+    setCurrentPage(1)
+    if (sortColumn !== col) {
+      setSortColumn(col)
+      setSortDirection("asc")
+    } else {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"))
+    }
+  }
+
+  const getCourseRowKey = (course: Course, index: number) => {
+    if (course.id != null) return `course-id-${course.id}`
+    const normalizedCode = course.code?.trim()
+    if (normalizedCode) return `course-code-${normalizedCode}-${index}`
+    return `course-row-${index}`
+  }
 
   const handleAddCourse = async () => {
     if (!newCourse.code.trim()) {
@@ -129,7 +284,7 @@ export default function CoursesPage() {
         return
       }
 
-      setCourses([...courses, data])
+      await fetchCourses({ showFullLoading: false })
       setNewCourse({
         code: "",
         name: "",
@@ -186,7 +341,7 @@ export default function CoursesPage() {
         return
       }
 
-      setCourses(courses.map((c) => (c.id === editingCourse.id ? data : c)))
+      await fetchCourses({ showFullLoading: false })
       setEditingCourse(null)
       toast({
         title: "Success",
@@ -221,7 +376,7 @@ export default function CoursesPage() {
         return
       }
 
-      setCourses(courses.filter((c) => c.id !== course.id))
+      await fetchCourses({ showFullLoading: false })
       toast({
         title: "Success",
         description: "Course deleted successfully.",
@@ -243,7 +398,7 @@ export default function CoursesPage() {
     { key: "academicLevel" as const, label: "Academic Level" },
     { key: "deliveryMode" as const, label: "Delivery Mode" },
     { key: "department" as const, label: "Department" },
-    { key: "sections" as const, label: "Sections" },
+    { key: "sections" as const, label: "Sections (latest term)" },
   ]
 
   const getDeliveryModeColor = (mode: DeliveryMode) => {
@@ -295,22 +450,37 @@ export default function CoursesPage() {
     <EntityLayout title="Course Management" description="Add, edit, and manage course catalog.">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Courses ({filteredCourses.length})</CardTitle>
+          <div className="space-y-1">
+            <CardTitle>Courses ({sortedFilteredCourses.length})</CardTitle>
+            {sectionCountSource ? (
+              <p className="text-sm font-normal text-muted-foreground">
+                Sections column counts distinct sections per course in {sectionCountSource}.
+              </p>
+            ) : (
+              <p className="text-sm font-normal text-muted-foreground">
+                No semester data — section counts are 0.
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="bg-transparent" onClick={() => setIsImportDialogOpen(true)}>
               <ImportIcon className="mr-2 h-4 w-4" />
               Import
             </Button>
             <ExportDropdownWithDialog
-              allData={courses}
+              allData={sortedAllCourses}
               filteredData={paginatedCourses}
               columns={courseColumns}
               filenamePrefix="courses"
               pdfTitle="Courses"
               totalLabel={`${courses.length}`}
               filteredLabel={`${paginatedCourses.length}`}
-              isFiltered={searchQuery !== ""}
-              filterDescription={searchQuery ? `search: "${searchQuery}"` : undefined}
+              isFiltered={searchQuery !== "" || sortColumn != null}
+              filterDescription={
+                [searchQuery ? `search: "${searchQuery}"` : null, sortColumn ? `sort: ${sortColumn} ${sortDirection}` : null]
+                  .filter(Boolean)
+                  .join(" · ") || undefined
+              }
             />
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
@@ -331,8 +501,15 @@ export default function CoursesPage() {
                       <Input
                         id="course-code"
                         value={newCourse.code}
-                        onChange={(e) => setNewCourse({ ...newCourse, code: e.target.value })}
-                        placeholder="CS401"
+                        onChange={(e) => {
+                          const code = e.target.value
+                          setNewCourse({
+                            ...newCourse,
+                            code,
+                            academicLevel: academicLevelFromCourseCode(code),
+                          })
+                        }}
+                        placeholder="e.g. 13432"
                       />
                     </div>
                     <div className="space-y-2">
@@ -361,17 +538,20 @@ export default function CoursesPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="course-level">Academic Level</Label>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        From the 3rd digit of the code (updates when you change the code).
+                      </p>
                       <Select
                         value={newCourse.academicLevel.toString()}
-                        onValueChange={(v) => setNewCourse({ ...newCourse, academicLevel: Number.parseInt(v) || 1 })}
+                        disabled
                       >
-                        <SelectTrigger id="course-level">
-                          <SelectValue placeholder="Select level" />
+                        <SelectTrigger id="course-level" className="disabled:opacity-100">
+                          <SelectValue placeholder="Enter a code with 3+ digits" />
                         </SelectTrigger>
                         <SelectContent>
-                          {[1, 2, 3, 4, 5].map((level) => (
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((level) => (
                             <SelectItem key={level} value={level.toString()}>
-                              Year {level}
+                              Level {level}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -464,13 +644,133 @@ export default function CoursesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-center">Credit Hours</TableHead>
-                  <TableHead className="text-center">Academic Level</TableHead>
-                  <TableHead>Delivery Mode</TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "code" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => handleSortColumn("code")}
+                    >
+                      Code
+                      {sortColumn === "code" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "name" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => handleSortColumn("name")}
+                    >
+                      Name
+                      {sortColumn === "name" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex w-full items-center justify-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "creditHours" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => handleSortColumn("creditHours")}
+                    >
+                      Credit Hours
+                      {sortColumn === "creditHours" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex w-full items-center justify-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "academicLevel" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => handleSortColumn("academicLevel")}
+                    >
+                      Academic Level
+                      {sortColumn === "academicLevel" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "deliveryMode" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => handleSortColumn("deliveryMode")}
+                    >
+                      Delivery Mode
+                      {sortColumn === "deliveryMode" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
                   <TableHead>Department</TableHead>
-                  <TableHead className="text-center">Sections</TableHead>
+                  <TableHead className="text-center">
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex w-full items-center justify-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "sections" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => handleSortColumn("sections")}
+                    >
+                      Sections (latest)
+                      {sortColumn === "sections" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
                   <TableHead className="w-[70px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -482,8 +782,8 @@ export default function CoursesPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedCourses.map((course) => (
-                    <TableRow key={course.id || course.code}>
+                  paginatedCourses.map((course, index) => (
+                    <TableRow key={getCourseRowKey(course, index)}>
                       <TableCell className="font-mono font-medium">{course.code}</TableCell>
                       <TableCell>{course.name}</TableCell>
                       <TableCell className="text-center">{course.creditHours}</TableCell>
@@ -503,7 +803,14 @@ export default function CoursesPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setEditingCourse({ ...course })}>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setEditingCourse({
+                                  ...course,
+                                  academicLevel: academicLevelFromCourseCode(course.code),
+                                })
+                              }
+                            >
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
@@ -546,14 +853,25 @@ export default function CoursesPage() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages || 1}
+                Page {currentPage} of {maxPage}
               </span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage <= 1}
+                aria-label="Go to first page"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
               <Button
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage <= 1}
+                aria-label="Go to previous page"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -561,10 +879,21 @@ export default function CoursesPage() {
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(maxPage, p + 1))}
+                disabled={currentPage >= maxPage}
+                aria-label="Go to next page"
               >
                 <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setCurrentPage(maxPage)}
+                disabled={currentPage >= maxPage}
+                aria-label="Go to last page"
+              >
+                <ChevronsRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -608,17 +937,15 @@ export default function CoursesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Academic Level</Label>
-                  <Select
-                    value={editingCourse.academicLevel.toString()}
-                    onValueChange={(v) => setEditingCourse({ ...editingCourse, academicLevel: Number.parseInt(v) || 1 })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select level" />
+                  <p className="text-xs text-muted-foreground mb-1">From the 3rd digit of the course code.</p>
+                  <Select value={editingCourse.academicLevel.toString()} disabled>
+                    <SelectTrigger className="disabled:opacity-100">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {[1, 2, 3, 4, 5].map((level) => (
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((level) => (
                         <SelectItem key={level} value={level.toString()}>
-                          Year {level}
+                          Level {level}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -696,7 +1023,7 @@ export default function CoursesPage() {
         description="Upload a CSV, Excel, or JSON file with course data."
         exampleHeaders={["code", "name", "creditHours", "academicLevel", "deliveryMode", "department", "numberOfSections"]}
         columns={courseColumns}
-        getRowKey={(row) => row.code.toLowerCase()}
+        getRowKey={(row) => (typeof row.code === "string" ? row.code.toLowerCase() : "")}
         mapRow={(row: ParsedRow) => {
           const code = findColumn(row, "code", "course_code", "coursecode")
           if (!code) return null
@@ -708,7 +1035,7 @@ export default function CoursesPage() {
             code,
             name: findColumn(row, "name", "course_name", "coursename") ?? "",
             creditHours: parseInt(findColumn(row, "creditHours", "credit_hours", "credithours", "credits") ?? "3", 10) || 3,
-            academicLevel: parseInt(findColumn(row, "academicLevel", "academic_level", "academiclevel", "level") ?? "1", 10) || 1,
+            academicLevel: academicLevelFromCourseCode(code),
             deliveryMode: (findColumn(row, "deliveryMode", "delivery_mode", "deliverymode", "delivery") ?? "On-Campus") as DeliveryMode,
             department: dept as Department,
             sections: parseInt(findColumn(row, "numberOfSections", "sections", "section_count", "sectioncount") ?? "1", 10) || 1,
@@ -726,8 +1053,6 @@ export default function CoursesPage() {
                 body: JSON.stringify(course),
               })
               if (response.ok) {
-                const created = await response.json()
-                setCourses((prev) => [...prev, created])
                 added++
               } else if (response.status === 409) {
                 duplicates++
@@ -739,6 +1064,7 @@ export default function CoursesPage() {
               errors++
             }
           }
+          if (added > 0) await fetchCourses({ showFullLoading: false })
           return { added, duplicates, errors }
         }}
       />

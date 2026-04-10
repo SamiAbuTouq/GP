@@ -1,7 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./course-analytics.css";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant ca-dark (&:is(.course-analytics-root.dark *));
 
 /* Add font-sans and font-mono configuration for JetBrains Mono numbers */
 @theme inline {

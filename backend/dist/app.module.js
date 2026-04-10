@@ -17,6 +17,8 @@ const courses_module_1 = require("./courses/courses.module");
 const lecturers_module_1 = require("./lecturers/lecturers.module");
 const rooms_module_1 = require("./rooms/rooms.module");
 const timeslots_module_1 = require("./timeslots/timeslots.module");
+const semesters_module_1 = require("./semesters/semesters.module");
+const timetables_module_1 = require("./timetables/timetables.module");
 const jwt_auth_guard_1 = require("./common/guards/jwt-auth.guard");
 const roles_guard_1 = require("./common/guards/roles.guard");
 const app_controller_1 = require("./app.controller");
@@ -38,6 +40,8 @@ exports.AppModule = AppModule = __decorate([
             lecturers_module_1.LecturersModule,
             rooms_module_1.RoomsModule,
             timeslots_module_1.TimeslotsModule,
+            semesters_module_1.SemestersModule,
+            timetables_module_1.TimetablesModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [

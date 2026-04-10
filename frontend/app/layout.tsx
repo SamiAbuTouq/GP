@@ -1,9 +1,9 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter, JetBrains_Mono } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/lib/auth-context"
+import { SidebarProvider } from "@/lib/sidebar-context"
 import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 
@@ -33,11 +33,12 @@ export default function RootLayout({
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
-            {children}
-            <Toaster />
+            <SidebarProvider>
+              {children}
+              <Toaster />
+            </SidebarProvider>
           </AuthProvider>
         </ThemeProvider>
-        <Analytics />
       </body>
     </html>
   )

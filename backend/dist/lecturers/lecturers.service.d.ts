@@ -3,6 +3,9 @@ import { CreateLecturerDto, UpdateLecturerDto } from './dto/lecturer.dto';
 export declare class LecturersService {
     private prisma;
     constructor(prisma: PrismaService);
+    private resolveCurrentTimetableId;
+    private teachingLoadByUserIdForTimetable;
+    private teachingLoadForUserOnTimetable;
     findAll(): Promise<{
         id: string;
         databaseId: number;

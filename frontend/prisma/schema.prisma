@@ -1,54 +1,45 @@
-// prisma/schema.prisma
+// Mirror of website/backend/prisma/schema.prisma — keep in sync when the backend schema changes.
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
 }
 
-// ─────────────────────────────────────────────
-// ENUMS
-// ─────────────────────────────────────────────
-
 enum Role {
   ADMIN
   LECTURER
 }
 
-// ─────────────────────────────────────────────
-// USER
-// ─────────────────────────────────────────────
+enum DeliveryMode {
+  ONLINE
+  BLENDED
+  FACE_TO_FACE
+}
 
 model User {
-  user_id          Int     @id @default(autoincrement())
-  email            String  @unique @db.VarChar(100)
-  password_hash    String  @db.VarChar(255)
-  first_name       String  @db.VarChar(50)
-  last_name        String  @db.VarChar(50)
-  avatar_url       String? @db.VarChar(500)
+  user_id          Int      @id @default(autoincrement())
+  email            String   @unique @db.VarChar(100)
+  password_hash    String   @db.VarChar(255)
+  first_name       String   @db.VarChar(50)
+  last_name        String   @db.VarChar(50)
+  avatar_url       String?  @db.VarChar(500)
   role_name        Role
-  theme_preference String? @db.VarChar(20)
-  date_format      String? @db.VarChar(20)
-  time_format      String? @db.VarChar(20)
+  theme_preference String?  @db.VarChar(20)
+  date_format      String?  @db.VarChar(20)
+  time_format      String?  @db.VarChar(20)
 
-  // Relations
-  refresh_tokens RefreshToken[]
-  lecturer       Lecturer?
-  notifications  Notification[]
+  refresh_tokens   RefreshToken[]
+  lecturer         Lecturer?
+  notifications    Notification[]
 
-  // Password Reset
   reset_token        String?   @unique @db.VarChar(255)
   reset_token_expiry DateTime?
 
   @@map("user")
 }
-
-// ─────────────────────────────────────────────
-// REFRESH TOKEN
-// ─────────────────────────────────────────────
 
 model RefreshToken {
   id         Int       @id @default(autoincrement())
@@ -64,13 +55,9 @@ model RefreshToken {
   @@map("refresh_token")
 }
 
-// ─────────────────────────────────────────────
-// DEPARTMENT
-// ─────────────────────────────────────────────
-
 model Department {
   dept_id   Int    @id @default(autoincrement())
-  dept_name String @unique @db.VarChar(100)
+  dept_name String @db.VarChar(100)
 
   lecturers Lecturer[]
   courses   Course[]
@@ -78,18 +65,14 @@ model Department {
   @@map("department")
 }
 
-// ─────────────────────────────────────────────
-// LECTURER
-// ─────────────────────────────────────────────
-
 model Lecturer {
   user_id      Int     @id
   dept_id      Int
   max_workload Int
   is_available Boolean
 
-  user       User       @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
-  department Department @relation(fields: [dept_id], references: [dept_id])
+  user         User       @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  department   Department @relation(fields: [dept_id], references: [dept_id])
 
   lecturer_preferences      LecturerPreference[]
   lecturer_can_teach_course LecturerCanTeachCourse[]
@@ -99,19 +82,15 @@ model Lecturer {
   @@map("lecturer")
 }
 
-// ─────────────────────────────────────────────
-// COURSE
-// ─────────────────────────────────────────────
-
 model Course {
-  course_id      Int    @id @default(autoincrement())
+  course_id      Int          @id @default(autoincrement())
   dept_id        Int
-  course_code    String @unique @db.VarChar(20)
-  course_name    String @db.VarChar(100)
+  course_code    String       @unique @db.VarChar(20)
+  course_name    String       @db.VarChar(100)
   academic_level Int
   credit_hours   Int
-  delivery_mode  String @db.VarChar(30)
-  sections       Int    @default(1)
+  delivery_mode  DeliveryMode
+  sections       Int          @default(1)
 
   department Department @relation(fields: [dept_id], references: [dept_id])
 
@@ -122,10 +101,6 @@ model Course {
 
   @@map("course")
 }
-
-// ─────────────────────────────────────────────
-// COURSE PREREQUISITE
-// ─────────────────────────────────────────────
 
 model CoursePrerequisite {
   course_id       Int
@@ -138,25 +113,17 @@ model CoursePrerequisite {
   @@map("course_prerequisite")
 }
 
-// ─────────────────────────────────────────────
-// ROOM
-// ─────────────────────────────────────────────
-
 model Room {
   room_id      Int     @id @default(autoincrement())
-  room_number  String  @unique @db.VarChar(30)
-  room_type    Int     @default(0)
+  room_number  String  @db.VarChar(30)
+  room_type    Int
   capacity     Int
-  is_available Boolean @default(true)
+  is_available Boolean
 
   section_schedule_entries SectionScheduleEntry[]
 
   @@map("room")
 }
-
-// ─────────────────────────────────────────────
-// TIMESLOT
-// ─────────────────────────────────────────────
 
 model Timeslot {
   slot_id    Int      @id @default(autoincrement())
@@ -169,28 +136,23 @@ model Timeslot {
   lecturer_office_hours    LecturerOfficeHours[]
   section_schedule_entries SectionScheduleEntry[]
 
+  @@unique([start_time, end_time, days_mask])
   @@map("timeslot")
 }
 
-// ─────────────────────────────────────────────
-// SEMESTER
-// ─────────────────────────────────────────────
-
 model Semester {
-  semester_id   Int      @id @default(autoincrement())
-  semester_type Int
-  academic_year String   @db.VarChar(9)
-  start_date    DateTime @db.Date()
-  end_date      DateTime @db.Date()
+  semester_id    Int      @id @default(autoincrement())
+  semester_type  Int
+  academic_year  String   @db.VarChar(9)
+  total_students Int?
+  start_date     DateTime @db.Date()
+  end_date       DateTime @db.Date()
 
   timetables Timetable[]
 
+  @@unique([academic_year, semester_type])
   @@map("semester")
 }
-
-// ─────────────────────────────────────────────
-// SCENARIO
-// ─────────────────────────────────────────────
 
 model Scenario {
   scenario_id Int    @id @default(autoincrement())
@@ -202,10 +164,6 @@ model Scenario {
 
   @@map("scenario")
 }
-
-// ─────────────────────────────────────────────
-// TIMETABLE
-// ─────────────────────────────────────────────
 
 model Timetable {
   timetable_id    Int      @id @default(autoincrement())
@@ -221,12 +179,9 @@ model Timetable {
   scenario_produces_timetables ScenarioProducesTimetable[]
   section_schedule_entries     SectionScheduleEntry[]
 
+  @@index([semester_id])
   @@map("timetable")
 }
-
-// ─────────────────────────────────────────────
-// TIMETABLE METRICS
-// ─────────────────────────────────────────────
 
 model TimetableMetrics {
   timetable_id           Int     @id
@@ -241,10 +196,6 @@ model TimetableMetrics {
   @@map("timetable_metrics")
 }
 
-// ─────────────────────────────────────────────
-// NOTIFICATION
-// ─────────────────────────────────────────────
-
 model Notification {
   notification_id Int      @id @default(autoincrement())
   user_id         Int
@@ -255,12 +206,9 @@ model Notification {
 
   user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
+  @@index([user_id])
   @@map("notification")
 }
-
-// ─────────────────────────────────────────────
-// LECTURER PREFERENCE
-// ─────────────────────────────────────────────
 
 model LecturerPreference {
   user_id      Int
@@ -274,10 +222,6 @@ model LecturerPreference {
   @@map("lecturer_preference")
 }
 
-// ─────────────────────────────────────────────
-// LECTURER CAN TEACH COURSE
-// ─────────────────────────────────────────────
-
 model LecturerCanTeachCourse {
   user_id   Int
   course_id Int
@@ -288,10 +232,6 @@ model LecturerCanTeachCourse {
   @@id([user_id, course_id])
   @@map("lecturer_can_teach_course")
 }
-
-// ─────────────────────────────────────────────
-// LECTURER OFFICE HOURS
-// ─────────────────────────────────────────────
 
 model LecturerOfficeHours {
   user_id Int
@@ -304,19 +244,17 @@ model LecturerOfficeHours {
   @@map("lecturer_office_hours")
 }
 
-// ─────────────────────────────────────────────
-// SECTION SCHEDULE ENTRY
-// ─────────────────────────────────────────────
-
 model SectionScheduleEntry {
-  entry_id            Int    @id @default(autoincrement())
+  entry_id            Int     @id @default(autoincrement())
   user_id             Int
   slot_id             Int
   course_id           Int
   timetable_id        Int
   room_id             Int
+  is_lab              Boolean @default(false)
   registered_students Int
-  section_number      String @db.VarChar(10)
+  section_capacity    Int
+  section_number      String  @db.VarChar(10)
 
   lecturer  Lecturer  @relation(fields: [user_id], references: [user_id])
   timeslot  Timeslot  @relation(fields: [slot_id], references: [slot_id])
@@ -324,19 +262,20 @@ model SectionScheduleEntry {
   timetable Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)
   room      Room      @relation(fields: [room_id], references: [room_id])
 
+  @@index([timetable_id])
+  @@index([course_id])
+  @@index([user_id])
+  @@unique([timetable_id, course_id, section_number, slot_id])
   @@map("section_schedule_entry")
 }
 
-// ─────────────────────────────────────────────
-// SCENARIO PRODUCES TIMETABLE
-// ─────────────────────────────────────────────
-
 model ScenarioProducesTimetable {
-  timetable_id Int @id
+  timetable_id Int
   scenario_id  Int
 
   timetable Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)
   scenario  Scenario  @relation(fields: [scenario_id], references: [scenario_id], onDelete: Cascade)
 
+  @@id([timetable_id, scenario_id])
   @@map("scenario_produces_timetable")
 }

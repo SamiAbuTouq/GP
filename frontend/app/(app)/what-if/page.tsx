@@ -26,14 +26,10 @@ import {
   Play,
   Trash2,
   GitCompare,
-  TrendingUp,
-  TrendingDown,
   AlertTriangle,
   CheckCircle,
   Copy,
   Eye,
-  ArrowRight,
-  Minus,
 } from "lucide-react"
 
 interface Scenario {

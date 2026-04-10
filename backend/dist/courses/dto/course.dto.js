@@ -33,7 +33,7 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
-    (0, class_validator_1.Max)(5),
+    (0, class_validator_1.Max)(9),
     __metadata("design:type", Number)
 ], CreateCourseDto.prototype, "academicLevel", void 0);
 __decorate([
@@ -71,7 +71,7 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
-    (0, class_validator_1.Max)(5),
+    (0, class_validator_1.Max)(9),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Number)
 ], UpdateCourseDto.prototype, "academicLevel", void 0);

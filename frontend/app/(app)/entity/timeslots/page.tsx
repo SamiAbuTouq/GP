@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { EntityLayout } from "@/components/entity-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -19,7 +19,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Trash2, MoreHorizontal, Edit, Loader2 } from "lucide-react"
+import {
+  Plus,
+  Trash2,
+  MoreHorizontal,
+  Edit,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+} from "lucide-react"
 import { ImportIcon } from "@/components/custom-icons"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { slotTypes, type SlotType } from "@/lib/data"
@@ -27,6 +40,7 @@ import { ImportDialog } from "@/components/import-dialog"
 import { findColumn, type ParsedRow } from "@/lib/import-utils"
 import { ExportDropdownWithDialog } from "@/components/export-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
 
 type TimeSlot = {
   id: number
@@ -37,6 +51,8 @@ type TimeSlot = {
 }
 
 const allDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"]
+type SortField = "days" | "duration"
+type SortDirection = "asc" | "desc"
 
 export default function TimeSlotsPage() {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
@@ -52,6 +68,10 @@ export default function TimeSlotsPage() {
     slotType: "Lecture",
   })
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [sortField, setSortField] = useState<SortField | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
   const { toast } = useToast()
 
   // Fetch timeslots from API
@@ -277,6 +297,61 @@ export default function TimeSlotsPage() {
     return `${hours} hr${hours !== 1 ? "s" : ""} ${minutes} min`
   }
 
+  const getDurationMinutes = (start: string, end: string) => {
+    const [startH, startM] = start.split(":").map(Number)
+    const [endH, endM] = end.split(":").map(Number)
+    return endH * 60 + endM - (startH * 60 + startM)
+  }
+
+  const getDaySortValue = (days: string[]) => {
+    const dayIndexes = days.map((d) => allDays.indexOf(d)).filter((i) => i >= 0)
+    const firstIndex = dayIndexes.length > 0 ? Math.min(...dayIndexes) : Number.MAX_SAFE_INTEGER
+    return { firstIndex, count: days.length, label: [...days].sort().join(",") }
+  }
+
+  const handleSort = (field: SortField) => {
+    setCurrentPage(1)
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
+      return
+    }
+    setSortField(field)
+    setSortDirection("asc")
+  }
+
+  const sortedTimeSlots = useMemo(() => {
+    if (!sortField) return timeSlots
+
+    return [...timeSlots].sort((a, b) => {
+      let comparison = 0
+
+      if (sortField === "duration") {
+        comparison = getDurationMinutes(a.start, a.end) - getDurationMinutes(b.start, b.end)
+        if (comparison === 0) {
+          const aDays = getDaySortValue(a.days)
+          const bDays = getDaySortValue(b.days)
+          comparison = aDays.firstIndex - bDays.firstIndex
+          if (comparison === 0) comparison = aDays.count - bDays.count
+          if (comparison === 0) comparison = aDays.label.localeCompare(bDays.label)
+        }
+        if (comparison === 0) comparison = a.start.localeCompare(b.start)
+        if (comparison === 0) comparison = a.id - b.id
+      } else {
+        const aDays = getDaySortValue(a.days)
+        const bDays = getDaySortValue(b.days)
+        comparison = aDays.firstIndex - bDays.firstIndex
+        if (comparison === 0) comparison = aDays.count - bDays.count
+        if (comparison === 0) comparison = aDays.label.localeCompare(bDays.label)
+        if (comparison === 0)
+          comparison = getDurationMinutes(a.start, a.end) - getDurationMinutes(b.start, b.end)
+        if (comparison === 0) comparison = a.start.localeCompare(b.start)
+        if (comparison === 0) comparison = a.id - b.id
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison
+    })
+  }, [timeSlots, sortField, sortDirection])
+
   // Group slots by days for weekly overview
   const slotsByDayPattern = timeSlots.reduce(
     (acc, slot) => {
@@ -287,6 +362,17 @@ export default function TimeSlotsPage() {
     },
     {} as Record<string, typeof timeSlots>
   )
+
+  const totalPages = Math.ceil(sortedTimeSlots.length / pageSize)
+  const maxPage = totalPages || 1
+  const paginatedTimeSlots = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return sortedTimeSlots.slice(start, start + pageSize)
+  }, [sortedTimeSlots, currentPage, pageSize])
+
+  useEffect(() => {
+    setCurrentPage((prev) => Math.min(prev, maxPage))
+  }, [maxPage])
 
   if (loading) {
     return (
@@ -305,15 +391,15 @@ export default function TimeSlotsPage() {
       <div className="flex flex-col gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle>Time Slots ({timeSlots.length})</CardTitle>
+            <CardTitle>Time Slots ({sortedTimeSlots.length})</CardTitle>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" className="bg-transparent" onClick={() => setIsImportDialogOpen(true)}>
                 <ImportIcon className="mr-2 h-4 w-4" />
                 Import
               </Button>
               <ExportDropdownWithDialog
-                allData={timeSlots.map((s) => ({ ...s, days: s.days.join(", ") }))}
-                filteredData={timeSlots.map((s) => ({ ...s, days: s.days.join(", ") }))}
+                allData={sortedTimeSlots.map((s) => ({ ...s, days: s.days.join(", ") }))}
+                filteredData={paginatedTimeSlots.map((s) => ({ ...s, days: s.days.join(", ") }))}
                 columns={[
                   { key: "days" as const, label: "Days" },
                   { key: "start" as const, label: "Start" },
@@ -323,7 +409,11 @@ export default function TimeSlotsPage() {
                 filenamePrefix="timeslots"
                 pdfTitle="Time Slots"
                 totalLabel={`${timeSlots.length}`}
-                filteredLabel={`${timeSlots.length}`}
+                filteredLabel={`${paginatedTimeSlots.length}`}
+                isFiltered={sortField != null}
+                filterDescription={
+                  sortField ? `sort: ${sortField} ${sortDirection}` : undefined
+                }
               />
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
@@ -425,23 +515,63 @@ export default function TimeSlotsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Days</TableHead>
+                    <TableHead>
+                      <button
+                        type="button"
+                        className={cn(
+                          "inline-flex items-center gap-1 font-medium hover:text-foreground",
+                          sortField === "days" ? "text-foreground" : "text-muted-foreground",
+                        )}
+                        onClick={() => handleSort("days")}
+                      >
+                        Days
+                        {sortField === "days" ? (
+                          sortDirection === "asc" ? (
+                            <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          ) : (
+                            <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                        )}
+                      </button>
+                    </TableHead>
                     <TableHead>Start</TableHead>
                     <TableHead>End</TableHead>
-                    <TableHead>Duration</TableHead>
+                    <TableHead>
+                      <button
+                        type="button"
+                        className={cn(
+                          "inline-flex items-center gap-1 font-medium hover:text-foreground",
+                          sortField === "duration" ? "text-foreground" : "text-muted-foreground",
+                        )}
+                        onClick={() => handleSort("duration")}
+                      >
+                        Duration
+                        {sortField === "duration" ? (
+                          sortDirection === "asc" ? (
+                            <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          ) : (
+                            <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                        )}
+                      </button>
+                    </TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead className="w-[70px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {timeSlots.length === 0 ? (
+                  {sortedTimeSlots.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         No time slots found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    timeSlots.map((slot) => (
+                    paginatedTimeSlots.map((slot) => (
                       <TableRow key={slot.id}>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
@@ -482,6 +612,76 @@ export default function TimeSlotsPage() {
                   )}
                 </TableBody>
               </Table>
+            </div>
+
+            <div className="flex items-center justify-between pt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Rows per page</span>
+                <Select
+                  value={pageSize.toString()}
+                  onValueChange={(v) => {
+                    setPageSize(Number(v))
+                    setCurrentPage(1)
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[80px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[10, 15, 25, 50, 100].map((size) => (
+                      <SelectItem key={size} value={size.toString()}>
+                        {size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Page {currentPage} of {maxPage}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage <= 1}
+                  aria-label="Go to first page"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                  aria-label="Go to previous page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage((p) => Math.min(maxPage, p + 1))}
+                  disabled={currentPage >= maxPage}
+                  aria-label="Go to next page"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(maxPage)}
+                  disabled={currentPage >= maxPage}
+                  aria-label="Go to last page"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

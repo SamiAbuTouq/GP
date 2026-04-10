@@ -1,0 +1,193 @@
+/* Scoped PSUT course analytics theme (standalone from main app shell) */
+
+.course-analytics-root {
+  --background: oklch(0.98 0.005 245);
+  --foreground: oklch(0.15 0.01 245);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.01 245);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.01 245);
+  --primary: #005dbd;
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.94 0.005 245);
+  --secondary-foreground: oklch(0.25 0.01 245);
+  --muted: oklch(0.94 0.005 245);
+  --muted-foreground: oklch(0.45 0.01 245);
+  --accent: #005dbd;
+  --accent-foreground: oklch(0.98 0 0);
+  --destructive: oklch(0.55 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.88 0.005 245);
+  --input: oklch(0.92 0.005 245);
+  --ring: #005dbd;
+  --chart-1: #005dbd;
+  --chart-2: #0891b2;
+  --chart-3: #059669;
+  --chart-4: #d97706;
+  --chart-5: #7c3aed;
+  --radius: 0.75rem;
+  --sidebar: oklch(0.96 0.005 245);
+  --sidebar-foreground: oklch(0.15 0.01 245);
+  --sidebar-primary: #005dbd;
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.92 0.005 245);
+  --sidebar-accent-foreground: oklch(0.15 0.01 245);
+  --sidebar-border: oklch(0.88 0.005 245);
+  --sidebar-ring: #005dbd;
+  /* Tailwind v4 color tokens used by utilities like bg-background/text-foreground */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.course-analytics-root.dark {
+  --background: oklch(0.12 0.005 245);
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(0.16 0.005 245);
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.16 0.005 245);
+  --popover-foreground: oklch(0.95 0 0);
+  --primary: #005dbd;
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.22 0.005 245);
+  --secondary-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.22 0.005 245);
+  --muted-foreground: oklch(0.6 0 0);
+  --accent: #005dbd;
+  --accent-foreground: oklch(0.98 0 0);
+  --destructive: oklch(0.55 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.25 0.005 245);
+  --input: oklch(0.22 0.005 245);
+  --ring: #005dbd;
+  --chart-1: #3b82f6;
+  --chart-2: #22d3ee;
+  --chart-3: #34d399;
+  --chart-4: #fbbf24;
+  --chart-5: #a78bfa;
+  --sidebar: oklch(0.14 0.005 245);
+  --sidebar-foreground: oklch(0.95 0 0);
+  --sidebar-primary: #005dbd;
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.22 0.005 245);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(0.25 0.005 245);
+  --sidebar-ring: #005dbd;
+  /* Ensure Tailwind --color-* tokens follow the scoped dark palette */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@keyframes course-analytics-mesh {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.course-analytics-root .mesh-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  background: linear-gradient(
+    -45deg,
+    var(--background),
+    rgba(100, 100, 255, 0.05),
+    var(--background),
+    rgba(200, 100, 255, 0.05)
+  );
+  background-size: 400% 400%;
+  animation: course-analytics-mesh 15s ease infinite;
+}
+
+.course-analytics-root.dark .mesh-background {
+  background: linear-gradient(
+    -45deg,
+    oklch(0.12 0.005 245),
+    oklch(0.15 0.02 245),
+    oklch(0.12 0.01 245),
+    oklch(0.18 0.02 245)
+  );
+}
+
+.course-analytics-root.dark .animate-shimmer::after {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.02) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}

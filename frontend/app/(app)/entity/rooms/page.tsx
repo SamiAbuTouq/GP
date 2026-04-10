@@ -20,12 +20,27 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, Search, Edit, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Loader2,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+} from "lucide-react"
 import { ImportIcon } from "@/components/custom-icons"
 import { ImportDialog } from "@/components/import-dialog"
 import { findColumn, type ParsedRow } from "@/lib/import-utils"
 import { ExportDropdownWithDialog } from "@/components/export-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
 
 type Room = {
   id: string
@@ -33,6 +48,27 @@ type Room = {
   type: string
   capacity: number
   isAvailable: boolean
+}
+
+type RoomSortColumn = "capacity"
+
+function sortRoomsCopy(
+  list: Room[],
+  sortColumn: RoomSortColumn | null,
+  sortDirection: "asc" | "desc",
+): Room[] {
+  const copy = [...list]
+  if (!sortColumn) return copy
+  const mult = sortDirection === "asc" ? 1 : -1
+  copy.sort((a, b) => {
+    let cmp = 0
+    if (sortColumn === "capacity") {
+      cmp = a.capacity - b.capacity
+    }
+    if (cmp !== 0) return cmp * mult
+    return a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: "base" }) * mult
+  })
+  return copy
 }
 
 export default function RoomsPage() {
@@ -46,6 +82,8 @@ export default function RoomsPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [sortColumn, setSortColumn] = useState<RoomSortColumn | null>(null)
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const { toast } = useToast()
 
   // Fetch rooms from API
@@ -82,11 +120,32 @@ export default function RoomsPage() {
     [rooms, searchQuery]
   )
 
-  const totalPages = Math.ceil(filteredRooms.length / pageSize)
+  const sortedFilteredRooms = useMemo(
+    () => sortRoomsCopy(filteredRooms, sortColumn, sortDirection),
+    [filteredRooms, sortColumn, sortDirection],
+  )
+
+  const sortedAllRooms = useMemo(
+    () => sortRoomsCopy(rooms, sortColumn, sortDirection),
+    [rooms, sortColumn, sortDirection],
+  )
+
+  const totalPages = Math.ceil(sortedFilteredRooms.length / pageSize)
+  const maxPage = totalPages || 1
   const paginatedRooms = useMemo(() => {
     const start = (currentPage - 1) * pageSize
-    return filteredRooms.slice(start, start + pageSize)
-  }, [filteredRooms, currentPage, pageSize])
+    return sortedFilteredRooms.slice(start, start + pageSize)
+  }, [sortedFilteredRooms, currentPage, pageSize])
+
+  const handleSortCapacity = () => {
+    setCurrentPage(1)
+    if (sortColumn !== "capacity") {
+      setSortColumn("capacity")
+      setSortDirection("asc")
+    } else {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"))
+    }
+  }
 
   const handleAddRoom = async () => {
     if (!newRoom.id.trim()) {
@@ -274,22 +333,26 @@ export default function RoomsPage() {
     <EntityLayout title="Room Management" description="Add, edit, and manage classrooms and labs.">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Rooms ({filteredRooms.length})</CardTitle>
+          <CardTitle>Rooms ({sortedFilteredRooms.length})</CardTitle>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="bg-transparent" onClick={() => setIsImportDialogOpen(true)}>
               <ImportIcon className="mr-2 h-4 w-4" />
               Import
             </Button>
             <ExportDropdownWithDialog
-              allData={rooms.map((r) => ({ ...r, isAvailable: r.isAvailable ? "Yes" : "No" }))}
+              allData={sortedAllRooms.map((r) => ({ ...r, isAvailable: r.isAvailable ? "Yes" : "No" }))}
               filteredData={paginatedRooms.map((r) => ({ ...r, isAvailable: r.isAvailable ? "Yes" : "No" }))}
               columns={roomColumns}
               filenamePrefix="rooms"
               pdfTitle="Rooms"
               totalLabel={`${rooms.length}`}
               filteredLabel={`${paginatedRooms.length}`}
-              isFiltered={searchQuery !== ""}
-              filterDescription={searchQuery ? `search: "${searchQuery}"` : undefined}
+              isFiltered={searchQuery !== "" || sortColumn != null}
+              filterDescription={
+                [searchQuery ? `search: "${searchQuery}"` : null, sortColumn ? `sort: capacity ${sortDirection}` : null]
+                  .filter(Boolean)
+                  .join(" · ") || undefined
+              }
             />
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
@@ -381,7 +444,27 @@ export default function RoomsPage() {
                 <TableRow>
                   <TableHead>Room Number</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Capacity</TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "capacity" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={handleSortCapacity}
+                    >
+                      Capacity
+                      {sortColumn === "capacity" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
                   <TableHead>Available</TableHead>
                   <TableHead className="w-[70px]">Actions</TableHead>
                 </TableRow>
@@ -457,14 +540,25 @@ export default function RoomsPage() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages || 1}
+                Page {currentPage} of {maxPage}
               </span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage <= 1}
+                aria-label="Go to first page"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
               <Button
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage <= 1}
+                aria-label="Go to previous page"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -472,10 +566,21 @@ export default function RoomsPage() {
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(maxPage, p + 1))}
+                disabled={currentPage >= maxPage}
+                aria-label="Go to next page"
               >
                 <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setCurrentPage(maxPage)}
+                disabled={currentPage >= maxPage}
+                aria-label="Go to last page"
+              >
+                <ChevronsRight className="h-4 w-4" />
               </Button>
             </div>
           </div>

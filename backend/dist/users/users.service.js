@@ -12,15 +12,25 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UsersService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
+const config_1 = require("@nestjs/config");
 const cloudinary_1 = require("cloudinary");
-cloudinary_1.v2.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 let UsersService = class UsersService {
-    constructor(prisma) {
+    constructor(prisma, configService) {
         this.prisma = prisma;
+        this.configService = configService;
+    }
+    configureCloudinary() {
+        const cloudName = this.configService.get('CLOUDINARY_CLOUD_NAME');
+        const apiKey = this.configService.get('CLOUDINARY_API_KEY');
+        const apiSecret = this.configService.get('CLOUDINARY_API_SECRET');
+        if (!cloudName || !apiKey || !apiSecret) {
+            throw new common_1.BadRequestException('Cloudinary is not configured. Missing CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, or CLOUDINARY_API_SECRET.');
+        }
+        cloudinary_1.v2.config({
+            cloud_name: cloudName,
+            api_key: apiKey,
+            api_secret: apiSecret,
+        });
     }
     async findById(user_id) {
         const user = await this.prisma.user.findUnique({
@@ -67,6 +77,7 @@ let UsersService = class UsersService {
         let uploadedAvatarUrl = undefined;
         if (dto.avatar_base64) {
             try {
+                this.configureCloudinary();
                 const result = await cloudinary_1.v2.uploader.upload(dto.avatar_base64, {
                     folder: 'avatars',
                 });
@@ -74,7 +85,10 @@ let UsersService = class UsersService {
             }
             catch (error) {
                 console.error('Error uploading avatar to cloudinary:', error);
-                throw new common_1.BadRequestException('Failed to upload avatar to Cloudinary. Please check Cloudinary configuration.');
+                const cloudinaryMessage = error instanceof Error
+                    ? error.message
+                    : 'Unknown Cloudinary upload error';
+                throw new common_1.BadRequestException(`Failed to upload avatar to Cloudinary: ${cloudinaryMessage}`);
             }
         }
         const user = await this.prisma.user.update({
@@ -113,6 +127,7 @@ let UsersService = class UsersService {
 exports.UsersService = UsersService;
 exports.UsersService = UsersService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        config_1.ConfigService])
 ], UsersService);
 //# sourceMappingURL=users.service.js.map

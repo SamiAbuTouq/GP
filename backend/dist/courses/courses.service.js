@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CoursesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
+const academic_level_util_1 = require("./academic-level.util");
 let CoursesService = class CoursesService {
     constructor(prisma) {
         this.prisma = prisma;
@@ -28,7 +29,7 @@ let CoursesService = class CoursesService {
             code: course.course_code,
             name: course.course_name,
             creditHours: course.credit_hours,
-            academicLevel: course.academic_level,
+            academicLevel: (0, academic_level_util_1.academicLevelFromCourseCode)(course.course_code),
             deliveryMode: course.delivery_mode,
             department: course.department.dept_name,
             departmentId: course.dept_id,
@@ -50,7 +51,7 @@ let CoursesService = class CoursesService {
             code: course.course_code,
             name: course.course_name,
             creditHours: course.credit_hours,
-            academicLevel: course.academic_level,
+            academicLevel: (0, academic_level_util_1.academicLevelFromCourseCode)(course.course_code),
             deliveryMode: course.delivery_mode,
             department: course.department.dept_name,
             departmentId: course.dept_id,
@@ -66,12 +67,13 @@ let CoursesService = class CoursesService {
                 data: { dept_name: dto.department },
             });
         }
-        const course = await this.prisma.course.create({
+        const level = (0, academic_level_util_1.academicLevelFromCourseCode)(dto.code);
+        const course = (await this.prisma.course.create({
             data: {
                 course_code: dto.code,
                 course_name: dto.name,
                 credit_hours: dto.creditHours,
-                academic_level: dto.academicLevel,
+                academic_level: level,
                 delivery_mode: dto.deliveryMode,
                 dept_id: department.dept_id,
                 sections: dto.sections ?? 1,
@@ -79,13 +81,13 @@ let CoursesService = class CoursesService {
             include: {
                 department: true,
             },
-        });
+        }));
         return {
             id: course.course_id,
             code: course.course_code,
             name: course.course_name,
             creditHours: course.credit_hours,
-            academicLevel: course.academic_level,
+            academicLevel: level,
             deliveryMode: course.delivery_mode,
             department: course.department.dept_name,
             departmentId: course.dept_id,
@@ -111,26 +113,29 @@ let CoursesService = class CoursesService {
             }
             deptId = department.dept_id;
         }
-        const course = await this.prisma.course.update({
+        const syncedLevel = (0, academic_level_util_1.academicLevelFromCourseCode)(existing.course_code);
+        const course = (await this.prisma.course.update({
             where: { course_id: id },
             data: {
-                course_name: dto.name,
-                credit_hours: dto.creditHours,
-                academic_level: dto.academicLevel,
-                delivery_mode: dto.deliveryMode,
+                ...(dto.name !== undefined ? { course_name: dto.name } : {}),
+                ...(dto.creditHours !== undefined ? { credit_hours: dto.creditHours } : {}),
+                academic_level: syncedLevel,
+                ...(dto.deliveryMode !== undefined
+                    ? { delivery_mode: dto.deliveryMode }
+                    : {}),
                 dept_id: deptId,
                 ...(dto.sections !== undefined ? { sections: dto.sections } : {}),
             },
             include: {
                 department: true,
             },
-        });
+        }));
         return {
             id: course.course_id,
             code: course.course_code,
             name: course.course_name,
             creditHours: course.credit_hours,
-            academicLevel: course.academic_level,
+            academicLevel: syncedLevel,
             deliveryMode: course.delivery_mode,
             department: course.department.dept_name,
             departmentId: course.dept_id,

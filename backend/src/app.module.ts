@@ -9,6 +9,8 @@ import { CoursesModule } from './courses/courses.module';
 import { LecturersModule } from './lecturers/lecturers.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { TimeslotsModule } from './timeslots/timeslots.module';
+import { SemestersModule } from './semesters/semesters.module';
+import { TimetablesModule } from './timetables/timetables.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AppController } from './app.controller';
@@ -29,6 +31,8 @@ import { AppService } from './app.service';
     LecturersModule,
     RoomsModule,
     TimeslotsModule,
+    SemestersModule,
+    TimetablesModule,
   ],
   controllers: [AppController],
   providers: [

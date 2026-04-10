@@ -38,7 +38,6 @@ import {
   User,
   Bell,
   Shield,
-  Database,
   Upload,
   RotateCw,
   ZoomIn,
@@ -70,6 +69,8 @@ function AvatarCropDialog({
   imageSrc: string;
   onCropComplete: (croppedImage: string) => void;
 }) {
+  const CROP_SIZE = 280;
+  const CROP_RADIUS = CROP_SIZE / 2;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [zoom, setZoom] = useState([1]);
   const [rotation, setRotation] = useState(0);
@@ -78,6 +79,47 @@ function AvatarCropDialog({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const imageRef = useRef<HTMLImageElement | null>(null);
 
+  const getBaseImageSize = useCallback(() => {
+    const img = imageRef.current;
+    if (!img) return null;
+    const baseScale = Math.max(CROP_SIZE / img.width, CROP_SIZE / img.height);
+    return {
+      width: img.width * baseScale,
+      height: img.height * baseScale,
+    };
+  }, []);
+
+  const getMinScale = useCallback(() => {
+    const base = getBaseImageSize();
+    if (!base) return 1;
+    return Math.max(CROP_SIZE / base.width, CROP_SIZE / base.height);
+  }, [getBaseImageSize]);
+
+  const clampOffset = useCallback(
+    (candidateOffset: { x: number; y: number }, targetZoom: number, targetRotation: number) => {
+      const base = getBaseImageSize();
+      if (!base) return candidateOffset;
+
+      const halfW = (base.width * targetZoom) / 2;
+      const halfH = (base.height * targetZoom) / 2;
+      const theta = (targetRotation * Math.PI) / 180;
+      const cos = Math.abs(Math.cos(theta));
+      const sin = Math.abs(Math.sin(theta));
+
+      const extentX = cos * halfW + sin * halfH;
+      const extentY = sin * halfW + cos * halfH;
+
+      const maxOffsetX = Math.max(0, extentX - CROP_RADIUS);
+      const maxOffsetY = Math.max(0, extentY - CROP_RADIUS);
+
+      return {
+        x: Math.min(Math.max(candidateOffset.x, -maxOffsetX), maxOffsetX),
+        y: Math.min(Math.max(candidateOffset.y, -maxOffsetY), maxOffsetY),
+      };
+    },
+    [getBaseImageSize],
+  );
+
   useEffect(() => {
     if (!imageSrc || !open) return;
     const img = new Image();
@@ -85,11 +127,11 @@ function AvatarCropDialog({
     img.onload = () => {
       imageRef.current = img;
       setOffset({ x: 0, y: 0 });
-      setZoom([1]);
+      setZoom([Math.max(1, getMinScale())]);
       setRotation(0);
     };
     img.src = imageSrc;
-  }, [imageSrc, open]);
+  }, [imageSrc, open, getMinScale]);
 
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -98,7 +140,7 @@ function AvatarCropDialog({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const CANVAS_SIZE = 1024;
-    const DISPLAY_SIZE = 280;
+    const DISPLAY_SIZE = CROP_SIZE;
     const scaleFactor = CANVAS_SIZE / DISPLAY_SIZE;
     
     canvas.width = CANVAS_SIZE;
@@ -135,14 +177,24 @@ function AvatarCropDialog({
     if (!dragging) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    setOffset({ x: clientX - dragStart.x, y: clientY - dragStart.y });
+    setOffset(
+      clampOffset(
+        { x: clientX - dragStart.x, y: clientY - dragStart.y },
+        zoom[0],
+        rotation,
+      ),
+    );
   };
   const handleMouseUp = () => setDragging(false);
 
   const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
     setZoom((prev) => {
+      const minScale = getMinScale();
       const newZoom = prev[0] - e.deltaY * 0.002;
-      return [Math.min(Math.max(0.5, newZoom), 3)];
+      const clampedZoom = Math.min(Math.max(minScale, newZoom), 3);
+      setOffset((prevOffset) => clampOffset(prevOffset, clampedZoom, rotation));
+      return [clampedZoom];
     });
   };
 
@@ -203,8 +255,13 @@ function AvatarCropDialog({
               <ZoomOut className="h-4 w-4 text-muted-foreground shrink-0" />
               <Slider
                 value={zoom}
-                onValueChange={setZoom}
-                min={0.5}
+                onValueChange={(value) => {
+                  const minScale = getMinScale();
+                  const nextZoom = Math.min(Math.max(minScale, value[0] ?? minScale), 3);
+                  setZoom([nextZoom]);
+                  setOffset((prevOffset) => clampOffset(prevOffset, nextZoom, rotation));
+                }}
+                min={getMinScale()}
                 max={3}
                 step={0.05}
                 className="flex-1 cursor-pointer"
@@ -215,7 +272,13 @@ function AvatarCropDialog({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setRotation((r) => r + 90)}
+                onClick={() => {
+                  setRotation((r) => {
+                    const nextRotation = r + 90;
+                    setOffset((prevOffset) => clampOffset(prevOffset, zoom[0], nextRotation));
+                    return nextRotation;
+                  });
+                }}
                 className="gap-2 rounded-full px-5 hover:bg-secondary transition-colors"
               >
                 <RotateCw className="h-4 w-4" />
@@ -243,8 +306,67 @@ const settingsTabs = [
   { id: "preferences", label: "Preferences", icon: SlidersHorizontal },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "security", label: "Security", icon: Shield },
-  { id: "system", label: "System", icon: Database },
 ];
+
+function SettingRow({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="space-y-0.5">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      <div className="sm:min-w-[180px]">{children}</div>
+    </div>
+  );
+}
+
+function PasswordField({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  shown,
+  onToggleShown,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  shown: boolean;
+  onToggleShown: () => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type={shown ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+        />
+        <button
+          type="button"
+          onClick={onToggleShown}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+        >
+          {shown ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function SettingsContent() {
   const { toast } = useToast();
@@ -277,6 +399,9 @@ function SettingsContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+  const [preferencesSaveState, setPreferencesSaveState] = useState<
+    "idle" | "saving" | "saved"
+  >("idle");
   const preferencesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Profile state (fetched from API)
@@ -310,7 +435,6 @@ function SettingsContent() {
     confirm: false,
   });
   const [isSavingPassword, setIsSavingPassword] = useState(false);
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
   // Password validation
   const passwordValidation = {
@@ -396,9 +520,9 @@ function SettingsContent() {
   };
 
   const handleSaveProfile = async () => {
+    const isNewAvatar = avatarSrc && avatarSrc.startsWith("data:");
     try {
       setIsSavingProfile(true);
-      const isNewAvatar = avatarSrc && avatarSrc.startsWith("data:");
       const updated = await ApiClient.updateProfile({
         first_name: editableProfile.first_name,
         last_name: editableProfile.last_name,
@@ -411,33 +535,35 @@ function SettingsContent() {
         description: "Your profile has been saved successfully.",
       });
     } catch (error) {
-      // Update local state even if API fails (for demo/preview purposes)
-      const isNewAvatar = avatarSrc && avatarSrc.startsWith("data:");
+      // Avatar updates must be persisted via backend (Cloudinary + DB), not local-only.
+      if (isNewAvatar) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Could not upload your avatar. Please check backend/Cloudinary setup and try again.";
+        toast({
+          title: "Avatar save failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // For name-only edits, keep local fallback behavior.
       const mockUpdate = {
         first_name: editableProfile.first_name,
         last_name: editableProfile.last_name,
-        ...(isNewAvatar ? { avatar_url: avatarSrc } : {}),
       };
-      
-      setProfile((prev) =>
-        prev
-          ? {
-              ...prev,
-              ...mockUpdate,
-            }
-          : null,
-      );
-      
+
+      setProfile((prev) => (prev ? { ...prev, ...mockUpdate } : null));
       ApiClient.notifyProfileUpdate(mockUpdate);
-      
-      if (isNewAvatar) setAvatarSrc(null);
-      
+
       toast({
         title: "Profile updated locally",
         description:
-          "Changes saved locally. Backend sync will occur when available.",
+          "Name changes were saved locally. Backend sync will occur when available.",
       });
-      console.log("[v0] Profile saved locally - backend may not be running");
+      console.log("[v0] Name changes saved locally - backend may not be running");
     } finally {
       setIsSavingProfile(false);
     }
@@ -446,16 +572,19 @@ function SettingsContent() {
   const handleSavePreferences = async () => {
     try {
       setIsSavingPreferences(true);
+      setPreferencesSaveState("saving");
       await ApiClient.updatePreferences({
         theme_preference: theme || "system",
         date_format: preferences.dateFormat,
         time_format: preferences.timeFormat,
       });
+      setPreferencesSaveState("saved");
     } catch (error) {
       // Save locally even if API fails (for demo/preview purposes)
       console.log(
         "[v0] Preferences saved locally - backend may not be running",
       );
+      setPreferencesSaveState("saved");
     } finally {
       setIsSavingPreferences(false);
     }
@@ -464,6 +593,7 @@ function SettingsContent() {
   // Auto-save preferences when they change
   useEffect(() => {
     if (!mounted || isLoading) return;
+    setPreferencesSaveState("idle");
     
     // Clear existing timeout
     if (preferencesDebounceRef.current) {
@@ -520,7 +650,7 @@ function SettingsContent() {
   const currentTheme = mounted ? theme : "light";
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-gradient-to-b from-background to-muted/20">
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
@@ -532,9 +662,9 @@ function SettingsContent() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-6 lg:flex-row">
+          <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
             {/* Left Sidebar Navigation */}
-            <Card className="lg:w-64 shrink-0">
+            <Card className="shrink-0 border shadow-sm lg:sticky lg:top-6 lg:h-fit lg:w-64">
               <CardContent className="p-2">
                 <nav className="flex flex-row lg:flex-col gap-1">
                   {settingsTabs.map((tab) => {
@@ -543,13 +673,22 @@ function SettingsContent() {
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors w-full text-left ${
+                        className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 ${
                           activeTab === tab.id
-                            ? "bg-primary/10 text-primary"
+                            ? "bg-primary/10 text-primary shadow-sm"
                             : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         }`}
                       >
-                        <Icon className="h-4 w-4 shrink-0" />
+                        {activeTab === tab.id ? (
+                          <span className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-primary" />
+                        ) : null}
+                        <span
+                          className={`grid h-7 w-7 place-items-center rounded-md ${
+                            activeTab === tab.id ? "bg-primary/15" : "bg-transparent"
+                          }`}
+                        >
+                          <Icon className="h-4 w-4 shrink-0" />
+                        </span>
                         <span className="hidden sm:inline">{tab.label}</span>
                       </button>
                     );
@@ -562,7 +701,7 @@ function SettingsContent() {
             <div className="flex-1 min-w-0">
               {/* Profile Tab */}
               {activeTab === "profile" && (
-                <Card>
+                <Card className="border shadow-sm">
                   <CardHeader>
                     <CardTitle>Profile Information</CardTitle>
                     <CardDescription>
@@ -703,12 +842,23 @@ function SettingsContent() {
 
               {/* Preferences Tab */}
               {activeTab === "preferences" && (
-                <Card>
+                <Card className="border shadow-sm">
                   <CardHeader>
-                    <CardTitle>Application Preferences</CardTitle>
-                    <CardDescription>
-                      Customize how the application looks and behaves.
-                    </CardDescription>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <CardTitle>Application Preferences</CardTitle>
+                        <CardDescription>
+                          Customize how the application looks and behaves.
+                        </CardDescription>
+                      </div>
+                      <div className="pt-0.5 text-xs text-muted-foreground">
+                        {preferencesSaveState === "saving"
+                          ? "Saving..."
+                          : preferencesSaveState === "saved"
+                            ? "Saved"
+                            : "Autosave enabled"}
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {isLoading ? (
@@ -717,9 +867,11 @@ function SettingsContent() {
                       </div>
                     ) : (
                       <>
-                        <div className="grid gap-6 sm:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label>Theme</Label>
+                        <div className="space-y-4">
+                          <SettingRow
+                            title="Theme"
+                            description="Choose how the application appears."
+                          >
                             <Select
                               value={currentTheme}
                               onValueChange={(v) => setTheme(v)}
@@ -748,9 +900,11 @@ function SettingsContent() {
                                 </SelectItem>
                               </SelectContent>
                             </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Date Format</Label>
+                          </SettingRow>
+                          <SettingRow
+                            title="Date Format"
+                            description="Control how calendar dates are displayed."
+                          >
                             <Select
                               value={preferences.dateFormat}
                               onValueChange={(v) =>
@@ -775,9 +929,11 @@ function SettingsContent() {
                                 </SelectItem>
                               </SelectContent>
                             </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Time Format</Label>
+                          </SettingRow>
+                          <SettingRow
+                            title="Time Format"
+                            description="Switch between 24-hour and 12-hour time."
+                          >
                             <Select
                               value={preferences.timeFormat}
                               onValueChange={(v) =>
@@ -795,7 +951,7 @@ function SettingsContent() {
                                 <SelectItem value="12">12 Hour</SelectItem>
                               </SelectContent>
                             </Select>
-                          </div>
+                          </SettingRow>
                         </div>
 
                       </>
@@ -806,7 +962,7 @@ function SettingsContent() {
 
               {/* Notifications Tab */}
               {activeTab === "notifications" && (
-                <Card>
+                <Card className="border shadow-sm">
                   <CardHeader>
                     <CardTitle>Notification Preferences</CardTitle>
                     <CardDescription>
@@ -832,16 +988,11 @@ function SettingsContent() {
                           desc: "Notify when timetable generation finishes",
                         },
                       ].map((item) => (
-                        <div
+                        <SettingRow
                           key={item.key}
-                          className="flex items-center justify-between rounded-lg border p-4"
+                          title={item.label}
+                          description={item.desc}
                         >
-                          <div className="space-y-0.5">
-                            <Label>{item.label}</Label>
-                            <p className="text-sm text-muted-foreground">
-                              {item.desc}
-                            </p>
-                          </div>
                           <Switch
                             checked={notifications[item.key]}
                             onCheckedChange={(v) =>
@@ -851,7 +1002,7 @@ function SettingsContent() {
                               })
                             }
                           />
-                        </div>
+                        </SettingRow>
                       ))}
                     </div>
                     <Button onClick={handleSave}>
@@ -864,7 +1015,7 @@ function SettingsContent() {
 
               {/* Security Tab */}
               {activeTab === "security" && (
-                <Card>
+                <Card className="border shadow-sm">
                   <CardHeader>
                     <CardTitle>Security Settings</CardTitle>
                     <CardDescription>
@@ -872,70 +1023,48 @@ function SettingsContent() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="space-y-4">
+                    <div className="space-y-4 rounded-xl border bg-muted/30 p-4">
                       <h4 className="font-medium">Change Password</h4>
-                      <div className="space-y-2">
-                        <Label htmlFor="current-password">
-                          Current Password
-                        </Label>
-                        <div className="relative">
-                          <Input 
-                            id="current-password" 
-                            type={showPasswords.current ? "text" : "password"}
-                            value={passwordData.currentPassword}
-                            onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                            placeholder="Enter your current password"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </button>
-                        </div>
-                      </div>
+                      <PasswordField
+                        id="current-password"
+                        label="Current Password"
+                        value={passwordData.currentPassword}
+                        onChange={(value) =>
+                          setPasswordData((prev) => ({ ...prev, currentPassword: value }))
+                        }
+                        placeholder="Enter your current password"
+                        shown={showPasswords.current}
+                        onToggleShown={() =>
+                          setShowPasswords((prev) => ({ ...prev, current: !prev.current }))
+                        }
+                      />
                       <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="new-password">New Password</Label>
-                          <div className="relative">
-                            <Input 
-                              id="new-password" 
-                              type={showPasswords.new ? "text" : "password"}
-                              value={passwordData.newPassword}
-                              onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                              placeholder="Enter new password"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="confirm-password">
-                            Confirm Password
-                          </Label>
-                          <div className="relative">
-                            <Input 
-                              id="confirm-password" 
-                              type={showPasswords.confirm ? "text" : "password"}
-                              value={passwordData.confirmPassword}
-                              onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                              placeholder="Confirm new password"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                        </div>
+                        <PasswordField
+                          id="new-password"
+                          label="New Password"
+                          value={passwordData.newPassword}
+                          onChange={(value) =>
+                            setPasswordData((prev) => ({ ...prev, newPassword: value }))
+                          }
+                          placeholder="Enter new password"
+                          shown={showPasswords.new}
+                          onToggleShown={() =>
+                            setShowPasswords((prev) => ({ ...prev, new: !prev.new }))
+                          }
+                        />
+                        <PasswordField
+                          id="confirm-password"
+                          label="Confirm Password"
+                          value={passwordData.confirmPassword}
+                          onChange={(value) =>
+                            setPasswordData((prev) => ({ ...prev, confirmPassword: value }))
+                          }
+                          placeholder="Confirm new password"
+                          shown={showPasswords.confirm}
+                          onToggleShown={() =>
+                            setShowPasswords((prev) => ({ ...prev, confirm: !prev.confirm }))
+                          }
+                        />
                       </div>
                       
                       {/* Password Requirements */}
@@ -966,7 +1095,8 @@ function SettingsContent() {
                       )}
                     </div>
                     
-                    <Button 
+                    <Button
+                      className="w-full sm:w-auto"
                       onClick={async () => {
                         if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
                           toast({
@@ -1049,111 +1179,10 @@ function SettingsContent() {
                       Update Password
                     </Button>
                     
-                    <Separator />
-                    <div className="space-y-4">
-                      <h4 className="font-medium">Two-Factor Authentication</h4>
-                      <div className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <Label>Enable 2FA</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Add an extra layer of security
-                          </p>
-                        </div>
-                        <Switch 
-                          checked={twoFactorEnabled}
-                          onCheckedChange={setTwoFactorEnabled}
-                        />
-                      </div>
-                    </div>
                   </CardContent>
                 </Card>
               )}
 
-              {/* System Tab */}
-              {activeTab === "system" && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>System Configuration</CardTitle>
-                    <CardDescription>
-                      Configure system-wide settings for the timetabling system.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Default Semester Duration</Label>
-                        <Select defaultValue="16">
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="14">14 Weeks</SelectItem>
-                            <SelectItem value="15">15 Weeks</SelectItem>
-                            <SelectItem value="16">16 Weeks</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Class Duration</Label>
-                        <Select defaultValue="90">
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="50">50 Minutes</SelectItem>
-                            <SelectItem value="75">75 Minutes</SelectItem>
-                            <SelectItem value="90">90 Minutes</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Max GWO Iterations</Label>
-                        <Input type="number" defaultValue="1000" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>CBR Similarity Threshold</Label>
-                        <Input type="number" defaultValue="0.8" step="0.1" />
-                      </div>
-                    </div>
-                    <Separator />
-                    <div className="space-y-4">
-                      <h4 className="font-medium">Database</h4>
-                      <div className="rounded-lg border p-4 bg-muted/50">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Status</p>
-                            <p className="font-medium text-emerald-600 dark:text-emerald-400">
-                              Connected
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Type</p>
-                            <p className="font-medium text-foreground">
-                              PostgreSQL
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Last Backup</p>
-                            <p className="font-medium text-foreground">
-                              2024-01-17 03:00
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Size</p>
-                            <p className="font-medium text-foreground">
-                              245 MB
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <Button onClick={handleSave}>
-                      <Save className="mr-2 h-4 w-4" />
-                      Save Configuration
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
             </div>
           </div>
 
@@ -1168,7 +1197,7 @@ function SettingsContent() {
             <DialogContent className="max-w-[80vw] sm:max-w-3xl flex flex-col items-center justify-center p-6 bg-transparent border-none shadow-none">
               <DialogTitle className="sr-only">Profile picture preview</DialogTitle>
               <img
-                src={avatarSrc || profile?.avatar_url || ""}
+                src={avatarSrc || profile?.avatar_url || undefined}
                 alt=""
                 className="w-full h-auto max-w-2xl rounded-[40px] object-cover shadow-2xl"
               />

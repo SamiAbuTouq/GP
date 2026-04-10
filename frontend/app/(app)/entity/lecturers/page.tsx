@@ -23,7 +23,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Plus, Search, Edit, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, ChevronDown, Loader2 } from "lucide-react"
+import { Plus, Search, Edit, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Loader2 } from "lucide-react"
 import { ImportIcon } from "@/components/custom-icons"
 import { departments, type Department } from "@/lib/data"
 import { ImportDialog } from "@/components/import-dialog"
@@ -47,12 +47,23 @@ type CourseOption = {
   name: string
 }
 
+const normalizeCourseOption = (course: unknown): CourseOption | null => {
+  if (!course || typeof course !== "object") return null
+  const rawCode = (course as { code?: unknown }).code
+  const rawName = (course as { name?: unknown }).name
+  const code = typeof rawCode === "string" ? rawCode.trim() : ""
+  const name = typeof rawName === "string" ? rawName.trim() : ""
+  if (!code || !name) return null
+  return { code, name }
+}
+
 export default function LecturersPage() {
   const [lecturers, setLecturers] = useState<Lecturer[]>([])
   const [availableCourses, setAvailableCourses] = useState<CourseOption[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingLecturer, setEditingLecturer] = useState<Lecturer | null>(null)
   const [saving, setSaving] = useState(false)
   const [newLecturer, setNewLecturer] = useState<Lecturer>({
@@ -61,9 +72,11 @@ export default function LecturersPage() {
     email: "",
     department: "Computer Science",
     load: 0,
-    maxWorkload: 18,
+    maxWorkload: 15,
     courses: [],
   })
+  const [addCourseQuery, setAddCourseQuery] = useState("")
+  const [editCourseQuery, setEditCourseQuery] = useState("")
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -91,7 +104,9 @@ export default function LecturersPage() {
           const coursesData = await coursesRes.json()
           setAvailableCourses(
             Array.isArray(coursesData)
-              ? coursesData.map((c: { code: string; name: string }) => ({ code: c.code, name: c.name }))
+              ? coursesData
+                  .map(normalizeCourseOption)
+                  .filter((course): course is CourseOption => course !== null)
               : []
           )
         }
@@ -123,7 +138,26 @@ export default function LecturersPage() {
     [lecturers, searchQuery]
   )
 
+  const addCourseQueryLower = addCourseQuery.toLowerCase()
+  const filteredAddCourses = useMemo(
+    () =>
+      availableCourses.filter(
+        (c) => c.code.toLowerCase().includes(addCourseQueryLower) || c.name.toLowerCase().includes(addCourseQueryLower)
+      ),
+    [availableCourses, addCourseQueryLower]
+  )
+
+  const editCourseQueryLower = editCourseQuery.toLowerCase()
+  const filteredEditCourses = useMemo(
+    () =>
+      availableCourses.filter(
+        (c) => c.code.toLowerCase().includes(editCourseQueryLower) || c.name.toLowerCase().includes(editCourseQueryLower)
+      ),
+    [availableCourses, editCourseQueryLower]
+  )
+
   const totalPages = Math.ceil(filteredLecturers.length / pageSize)
+  const maxPage = totalPages || 1
   const paginatedLecturers = useMemo(() => {
     const start = (currentPage - 1) * pageSize
     return filteredLecturers.slice(start, start + pageSize)
@@ -167,7 +201,7 @@ export default function LecturersPage() {
         email: "",
         department: "Computer Science",
         load: 0,
-        maxWorkload: 18,
+        maxWorkload: 15,
         courses: [],
       })
       setIsAddDialogOpen(false)
@@ -205,7 +239,7 @@ export default function LecturersPage() {
       }
       
       setLecturers(lecturers.map((l) => (l.id === editingLecturer.id ? data : l)))
-      setEditingLecturer(null)
+      setIsEditDialogOpen(false)
       toast({ title: "Success", description: "Lecturer updated successfully." })
     } catch (error) {
       console.error('Error updating lecturer:', error)
@@ -347,54 +381,66 @@ export default function LecturersPage() {
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lecturer-dept">Department</Label>
-                    <Select
-                      value={newLecturer.department}
-                      onValueChange={(v) => setNewLecturer({ ...newLecturer, department: v as Department })}
-                    >
-                      <SelectTrigger id="lecturer-dept">
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept} value={dept}>
-                            {dept}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="lecturer-dept">Department</Label>
+                      <Select
+                        value={newLecturer.department}
+                        onValueChange={(v) => setNewLecturer({ ...newLecturer, department: v as Department })}
+                      >
+                        <SelectTrigger id="lecturer-dept">
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {departments.map((dept) => (
+                            <SelectItem key={dept} value={dept}>
+                              {dept}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lecturer-max">Max Workload (hrs)</Label>
+                      <Input
+                        id="lecturer-max"
+                        type="number"
+                        min="1"
+                        max="24"
+                        value={newLecturer.maxWorkload}
+                        onChange={(e) =>
+                          setNewLecturer({ ...newLecturer, maxWorkload: Number.parseInt(e.target.value) || 15 })
+                        }
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lecturer-max">Max Workload (hrs)</Label>
-                    <Input
-                      id="lecturer-max"
-                      type="number"
-                      min="1"
-                      max="24"
-                      value={newLecturer.maxWorkload}
-                      onChange={(e) =>
-                        setNewLecturer({ ...newLecturer, maxWorkload: Number.parseInt(e.target.value) || 18 })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <Label>Courses Can Teach</Label>
-                    <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto border rounded-md p-3">
-                      {availableCourses.map((course) => (
-                        <div key={course.code} className="flex items-center space-x-2">
+                    <Input 
+                      placeholder="Search courses..." 
+                      value={addCourseQuery}
+                      onChange={(e) => setAddCourseQuery(e.target.value)}
+                      className="h-8 mb-2"
+                    />
+                    <div className="flex flex-col gap-2 max-h-32 overflow-y-auto border rounded-md p-3">
+                      {filteredAddCourses.map((course) => (
+                        <div key={course.code} className="flex items-start space-x-2">
                           <Checkbox
                             id={`new-course-${course.code}`}
                             checked={newLecturer.courses.includes(course.code)}
                             onCheckedChange={() => toggleCourse(course.code, newLecturer, setNewLecturer)}
+                            className="mt-0.5"
                           />
-                          <label htmlFor={`new-course-${course.code}`} className="text-sm">
-                            {course.code}
+                          <label htmlFor={`new-course-${course.code}`} className="text-sm cursor-pointer leading-tight">
+                            <span className="font-semibold">{course.code}</span> - <span className="capitalize">{course.name}</span>
                           </label>
                         </div>
                       ))}
                       {availableCourses.length === 0 && (
-                        <span className="text-sm text-muted-foreground col-span-3">No courses available</span>
+                        <span className="text-sm text-muted-foreground text-center py-2">No courses available</span>
+                      )}
+                      {availableCourses.length > 0 && filteredAddCourses.length === 0 && (
+                        <span className="text-sm text-muted-foreground text-center py-2">No courses match search</span>
                       )}
                     </div>
                   </div>
@@ -474,25 +520,25 @@ export default function LecturersPage() {
                         ) : (
                           <Popover>
                             <PopoverTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-auto py-1 px-2 font-normal">
-                                <span className="text-sm">{lecturer.courses.length} course{lecturer.courses.length !== 1 ? 's' : ''}</span>
-                                <ChevronDown className="ml-1 h-3 w-3" />
+                              <Button variant="ghost" size="sm" className="h-auto py-1 px-2 font-normal data-[state=open]:bg-muted hover:bg-muted/80">
+                                <span className="text-sm font-medium">{lecturer.courses.length} course{lecturer.courses.length !== 1 ? 's' : ''}</span>
+                                <ChevronDown className="ml-1 h-3 w-3 text-muted-foreground" />
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-72 p-0" align="start">
-                              <div className="p-3 border-b">
-                                <p className="font-medium text-sm">Courses ({lecturer.courses.length})</p>
+                            <PopoverContent className="w-80 p-0 overflow-hidden border-border/50 shadow-md" align="end">
+                              <div className="bg-muted/30 p-3 border-b border-border/50">
+                                <p className="font-semibold text-sm text-foreground">Can Teach ({lecturer.courses.length})</p>
                               </div>
-                              <ScrollArea className="h-[200px]">
-                                <div className="p-2 space-y-1">
+                              <ScrollArea className="max-h-[280px]">
+                                <div className="p-1.5 space-y-0.5">
                                   {lecturer.courses.map((courseCode) => {
                                     const courseInfo = availableCourses.find(c => c.code === courseCode)
                                     return (
-                                      <div key={courseCode} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50">
-                                        <Badge variant="outline" className="text-xs shrink-0 mt-0.5">
+                                      <div key={courseCode} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/60 transition-colors">
+                                        <Badge variant="secondary" className="text-xs font-medium font-mono shrink-0 bg-primary/10 text-primary hover:bg-primary/20 border-0">
                                           {courseCode}
                                         </Badge>
-                                        <span className="text-sm text-muted-foreground">
+                                        <span className="text-sm font-medium text-foreground capitalize leading-tight">
                                           {courseInfo?.name || 'Unknown Course'}
                                         </span>
                                       </div>
@@ -512,7 +558,11 @@ export default function LecturersPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setEditingLecturer({ ...lecturer })}>
+                            <DropdownMenuItem onClick={() => {
+                              setEditingLecturer({ ...lecturer })
+                              setEditCourseQuery("")
+                              setIsEditDialogOpen(true)
+                            }}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
@@ -558,14 +608,25 @@ export default function LecturersPage() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages || 1}
+                Page {currentPage} of {maxPage}
               </span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage <= 1}
+                aria-label="Go to first page"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
               <Button
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage <= 1}
+                aria-label="Go to previous page"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -573,10 +634,21 @@ export default function LecturersPage() {
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(maxPage, p + 1))}
+                disabled={currentPage >= maxPage}
+                aria-label="Go to next page"
               >
                 <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setCurrentPage(maxPage)}
+                disabled={currentPage >= maxPage}
+                aria-label="Go to last page"
+              >
+                <ChevronsRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -584,7 +656,7 @@ export default function LecturersPage() {
       </Card>
 
       {/* Edit Dialog */}
-      <Dialog open={!!editingLecturer} onOpenChange={(open) => !open && setEditingLecturer(null)}>
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Lecturer</DialogTitle>
@@ -613,57 +685,72 @@ export default function LecturersPage() {
                   onChange={(e) => setEditingLecturer({ ...editingLecturer, name: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Department</Label>
-                <Select
-                  value={editingLecturer.department}
-                  onValueChange={(v) => setEditingLecturer({ ...editingLecturer, department: v as Department })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Department</Label>
+                  <Select
+                    value={editingLecturer.department}
+                    onValueChange={(v) => setEditingLecturer({ ...editingLecturer, department: v as Department })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept} value={dept}>
+                          {dept}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Workload (hrs)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="24"
+                    value={editingLecturer.maxWorkload}
+                    onChange={(e) =>
+                      setEditingLecturer({ ...editingLecturer, maxWorkload: Number.parseInt(e.target.value) || 15 })
+                    }
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Max Workload (hrs)</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="24"
-                  value={editingLecturer.maxWorkload}
-                  onChange={(e) =>
-                    setEditingLecturer({ ...editingLecturer, maxWorkload: Number.parseInt(e.target.value) || 18 })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label>Courses Can Teach</Label>
-                <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto border rounded-md p-3">
-                  {availableCourses.map((course) => (
-                    <div key={course.code} className="flex items-center space-x-2">
+                <Input 
+                  placeholder="Search courses..." 
+                  value={editCourseQuery}
+                  onChange={(e) => setEditCourseQuery(e.target.value)}
+                  className="h-8 mb-2"
+                />
+                <div className="flex flex-col gap-2 max-h-32 overflow-y-auto border rounded-md p-3">
+                  {filteredEditCourses.map((course) => (
+                    <div key={course.code} className="flex items-start space-x-2">
                       <Checkbox
                         id={`edit-course-${course.code}`}
                         checked={editingLecturer.courses.includes(course.code)}
                         onCheckedChange={() => toggleCourse(course.code, editingLecturer, setEditingLecturer)}
+                        className="mt-0.5"
                       />
-                      <label htmlFor={`edit-course-${course.code}`} className="text-sm">
-                        {course.code}
+                      <label htmlFor={`edit-course-${course.code}`} className="text-sm cursor-pointer leading-tight">
+                        <span className="font-semibold">{course.code}</span> - <span className="capitalize">{course.name}</span>
                       </label>
                     </div>
                   ))}
+                  {availableCourses.length === 0 && (
+                    <span className="text-sm text-muted-foreground text-center py-2">No courses available</span>
+                  )}
+                  {availableCourses.length > 0 && filteredEditCourses.length === 0 && (
+                    <span className="text-sm text-muted-foreground text-center py-2">No courses match search</span>
+                  )}
                 </div>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingLecturer(null)}>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
             </Button>
             <Button onClick={handleEditLecturer} disabled={saving}>
@@ -696,7 +783,7 @@ export default function LecturersPage() {
             email,
             department: dept as Department,
             load: 0,
-            maxWorkload: parseInt(findColumn(row, "maxWorkload", "max_workload", "workload") ?? "18", 10) || 18,
+            maxWorkload: parseInt(findColumn(row, "maxWorkload", "max_workload", "workload") ?? "15", 10) || 15,
             courses: (findColumn(row, "courses", "course_list", "can_teach") ?? "").split(",").map((c) => c.trim()).filter(Boolean),
           }
         }}

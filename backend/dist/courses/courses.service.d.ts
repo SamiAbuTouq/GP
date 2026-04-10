@@ -9,7 +9,7 @@ export declare class CoursesService {
         name: string;
         creditHours: number;
         academicLevel: number;
-        deliveryMode: string;
+        deliveryMode: import(".prisma/client").$Enums.DeliveryMode;
         department: string;
         departmentId: number;
         sections: number;
@@ -20,7 +20,7 @@ export declare class CoursesService {
         name: string;
         creditHours: number;
         academicLevel: number;
-        deliveryMode: string;
+        deliveryMode: import(".prisma/client").$Enums.DeliveryMode;
         department: string;
         departmentId: number;
         sections: number;
@@ -31,7 +31,7 @@ export declare class CoursesService {
         name: string;
         creditHours: number;
         academicLevel: number;
-        deliveryMode: string;
+        deliveryMode: import(".prisma/client").$Enums.DeliveryMode;
         department: string;
         departmentId: number;
         sections: number;
@@ -42,7 +42,7 @@ export declare class CoursesService {
         name: string;
         creditHours: number;
         academicLevel: number;
-        deliveryMode: string;
+        deliveryMode: import(".prisma/client").$Enums.DeliveryMode;
         department: string;
         departmentId: number;
         sections: number;

@@ -145,7 +145,8 @@ export const mockScheduleEntries = [
 ]
 
 export const mockKPIs = {
-  totalStudents: 1250,
+  /** Sum of all seeded `semester.total_students` (all terms) */
+  totalStudents: 38262,
   totalCourses: 48,
   totalSections: 124,
   totalLecturers: 35,
@@ -157,7 +158,7 @@ export const mockKPIs = {
 
 export const kpiDataBySemester: Record<string, typeof mockKPIs> = {
   "fall-2024": {
-    totalStudents: 1250,
+    totalStudents: 4462,
     totalCourses: 48,
     totalSections: 124,
     totalLecturers: 156,
@@ -167,7 +168,7 @@ export const kpiDataBySemester: Record<string, typeof mockKPIs> = {
     avgClassSize: 32,
   },
   "spring-2024": {
-    totalStudents: 1180,
+    totalStudents: 4236,
     totalCourses: 45,
     totalSections: 118,
     totalLecturers: 148,
@@ -177,7 +178,7 @@ export const kpiDataBySemester: Record<string, typeof mockKPIs> = {
     avgClassSize: 30,
   },
   "summer-2024": {
-    totalStudents: 620,
+    totalStudents: 1540,
     totalCourses: 28,
     totalSections: 65,
     totalLecturers: 82,
@@ -187,7 +188,7 @@ export const kpiDataBySemester: Record<string, typeof mockKPIs> = {
     avgClassSize: 24,
   },
   "fall-2023": {
-    totalStudents: 1150,
+    totalStudents: 4319,
     totalCourses: 46,
     totalSections: 120,
     totalLecturers: 142,
@@ -202,7 +203,7 @@ export const kpiDataByDepartment: Record<
   string,
   { students: number; courses: number; lecturers: number; utilization: number }
 > = {
-  all: { students: 1250, courses: 48, lecturers: 156, utilization: 78 },
+  all: { students: 38262, courses: 48, lecturers: 156, utilization: 78 },
   cs: { students: 420, courses: 14, lecturers: 45, utilization: 82 },
   se: { students: 280, courses: 10, lecturers: 32, utilization: 76 },
   ds: { students: 180, courses: 8, lecturers: 24, utilization: 71 },
@@ -214,7 +215,7 @@ export const kpiDataByCollege: Record<
   string,
   { students: number; courses: number; lecturers: number; utilization: number; conflictRate: number }
 > = {
-  all: { students: 1250, courses: 48, lecturers: 156, utilization: 78, conflictRate: 2.3 },
+  all: { students: 38262, courses: 48, lecturers: 156, utilization: 78, conflictRate: 2.3 },
   khscs: { students: 520, courses: 18, lecturers: 52, utilization: 85, conflictRate: 1.8 },
   kaiioe: { students: 380, courses: 15, lecturers: 48, utilization: 79, conflictRate: 2.5 },
   ktsbt: { students: 240, courses: 10, lecturers: 35, utilization: 72, conflictRate: 3.1 },

@@ -2,7 +2,6 @@
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -16,6 +15,12 @@ generator client {
 enum Role {
   ADMIN
   LECTURER
+}
+
+enum DeliveryMode {
+  ONLINE
+  BLENDED
+  FACE_TO_FACE
 }
 
 // ─────────────────────────────────────────────
@@ -104,14 +109,15 @@ model Lecturer {
 // ─────────────────────────────────────────────
 
 model Course {
-  course_id      Int    @id @default(autoincrement())
+  course_id      Int          @id @default(autoincrement())
   dept_id        Int
-  course_code    String @unique @db.VarChar(20)
-  course_name    String @db.VarChar(100)
+  course_code    String       @unique @db.VarChar(20)
+  course_name    String       @db.VarChar(100)
+  /// 1 = 100-level, 2 = 200-level … 9 = Graduate
   academic_level Int
   credit_hours   Int
-  delivery_mode  String @db.VarChar(30)
-  sections       Int    @default(1)
+  delivery_mode  DeliveryMode
+  sections       Int          @default(1)
 
   department   Department @relation(fields: [dept_id], references: [dept_id])
 
@@ -145,6 +151,7 @@ model CoursePrerequisite {
 model Room {
   room_id      Int     @id @default(autoincrement())
   room_number  String  @db.VarChar(30)
+  /// 1 = Lecture Hall, 2 = Lab, 3 = Studio, etc.
   room_type    Int
   capacity     Int
   is_available Boolean
@@ -159,16 +166,21 @@ model Room {
 // ─────────────────────────────────────────────
 
 model Timeslot {
-  slot_id   Int    @id @default(autoincrement())
+  slot_id    Int      @id @default(autoincrement())
   start_time DateTime @db.Time()
   end_time   DateTime @db.Time()
+  /// Bitmask – bit 0 = Sun, bit 1 = Mon, bit 2 = Tue, bit 3 = Wed, bit 4 = Thu, bit 5 = Sat
+  /// e.g. 0b00101 = 5  = Sun + Tue
+  ///      0b01010 = 10 = Mon + Wed
+  ///      0b10101 = 21 = Sun + Tue + Thu
   days_mask  Int
-  slot_type  String @db.VarChar(30)
+  slot_type  String   @db.VarChar(30)
 
-  lecturer_preferences  LecturerPreference[]
-  lecturer_office_hours LecturerOfficeHours[]
+  lecturer_preferences     LecturerPreference[]
+  lecturer_office_hours    LecturerOfficeHours[]
   section_schedule_entries SectionScheduleEntry[]
 
+  @@unique([start_time, end_time, days_mask])
   @@map("timeslot")
 }
 
@@ -178,13 +190,18 @@ model Timeslot {
 
 model Semester {
   semester_id   Int      @id @default(autoincrement())
+  /// 1 = First Semester, 2 = Second Semester, 3 = Summer Semester
   semester_type Int
+  /// Format: "YYYY-YYYY"  e.g. "2024-2025"
   academic_year String   @db.VarChar(9)
+  /// Total enrolled students in this semester (optional).
+  total_students Int?
   start_date    DateTime @db.Date()
   end_date      DateTime @db.Date()
 
   timetables Timetable[]
 
+  @@unique([academic_year, semester_type])
   @@map("semester")
 }
 
@@ -195,6 +212,7 @@ model Semester {
 model Scenario {
   scenario_id Int    @id @default(autoincrement())
   name        String @db.VarChar(100)
+  /// "draft" | "active" | "archived"
   status      String @db.VarChar(30)
   description String @db.Text
 
@@ -211,6 +229,7 @@ model Timetable {
   timetable_id    Int      @id @default(autoincrement())
   semester_id     Int
   generated_at    DateTime @default(now())
+  /// "draft" | "active" | "archived"
   status          String   @db.VarChar(30)
   generation_type String   @db.VarChar(30)
   version_number  Int
@@ -221,6 +240,7 @@ model Timetable {
   scenario_produces_timetables ScenarioProducesTimetable[]
   section_schedule_entries     SectionScheduleEntry[]
 
+  @@index([semester_id])
   @@map("timetable")
 }
 
@@ -229,12 +249,12 @@ model Timetable {
 // ─────────────────────────────────────────────
 
 model TimetableMetrics {
-  timetable_id          Int     @id
-  room_utilization_rate Decimal @db.Decimal(5, 2)
+  timetable_id           Int     @id
+  room_utilization_rate  Decimal @db.Decimal(5, 2)
   soft_constraints_score Decimal @db.Decimal(5, 2)
-  fitness_score         Decimal @db.Decimal(5, 2)
-  is_valid              Boolean
-  total_students        Int
+  fitness_score          Decimal @db.Decimal(5, 2)
+  is_valid               Boolean
+  total_students         Int
 
   timetable Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)
 
@@ -255,6 +275,7 @@ model Notification {
 
   user User @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 
+  @@index([user_id])
   @@map("notification")
 }
 
@@ -309,21 +330,31 @@ model LecturerOfficeHours {
 // ─────────────────────────────────────────────
 
 model SectionScheduleEntry {
-  entry_id            Int    @id @default(autoincrement())
+  entry_id            Int     @id @default(autoincrement())
   user_id             Int
   slot_id             Int
   course_id           Int
   timetable_id        Int
   room_id             Int
+  /// Whether this specific section is a lab offering (from CSV islab column).
+  is_lab              Boolean @default(false)
   registered_students Int
-  section_number      String @db.VarChar(10)
+  /// Capacity for this specific section offering (from CSV Room_Capacity).
+  /// Do NOT derive this from Room.capacity because capacity can vary by offering
+  /// (and "online" offerings share a synthetic room_id in the source data).
+  section_capacity    Int
+  section_number      String  @db.VarChar(10)
 
-  lecturer   Lecturer  @relation(fields: [user_id], references: [user_id])
-  timeslot   Timeslot  @relation(fields: [slot_id], references: [slot_id])
-  course     Course    @relation(fields: [course_id], references: [course_id])
-  timetable  Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)
-  room       Room      @relation(fields: [room_id], references: [room_id])
+  lecturer  Lecturer  @relation(fields: [user_id], references: [user_id])
+  timeslot  Timeslot  @relation(fields: [slot_id], references: [slot_id])
+  course    Course    @relation(fields: [course_id], references: [course_id])
+  timetable Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)
+  room      Room      @relation(fields: [room_id], references: [room_id])
 
+  @@index([timetable_id])
+  @@index([course_id])
+  @@index([user_id])
+  @@unique([timetable_id, course_id, section_number, slot_id])
   @@map("section_schedule_entry")
 }
 
@@ -332,11 +363,12 @@ model SectionScheduleEntry {
 // ─────────────────────────────────────────────
 
 model ScenarioProducesTimetable {
-  timetable_id Int @id
+  timetable_id Int
   scenario_id  Int
 
   timetable Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)
   scenario  Scenario  @relation(fields: [scenario_id], references: [scenario_id], onDelete: Cascade)
 
+  @@id([timetable_id, scenario_id])
   @@map("scenario_produces_timetable")
 }

@@ -7,7 +7,10 @@
  * - Refresh token: stored in HttpOnly cookie (set by backend)
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+const LOCAL_API_URL = "http://localhost:3001/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || LOCAL_API_URL;
+const PROFILE_CACHE_KEY = 'uts_profile_cache_v1';
+const AUTH_HINT_COOKIE = "uts_auth_hint";
 
 // In-memory token storage (not persisted, cleared on page refresh)
 let accessToken: string | null = null;
@@ -19,6 +22,44 @@ const tokenChangeCallbacks: Set<TokenChangeCallback> = new Set();
 // Callbacks for profile updates
 type ProfileUpdateCallback = (profile: Partial<UserProfile>) => void;
 const profileUpdateCallbacks: Set<ProfileUpdateCallback> = new Set();
+
+function readCachedProfile(): UserProfile | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as UserProfile;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedProfile(profile: UserProfile): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
+  } catch {
+    // Ignore cache write failures (e.g. private mode quota limits).
+  }
+}
+
+function clearCachedProfile(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(PROFILE_CACHE_KEY);
+  } catch {
+    // Ignore cache clear failures.
+  }
+}
+
+function setAuthHintCookie(isAuthenticated: boolean): void {
+  if (typeof document === "undefined") return;
+  if (isAuthenticated) {
+    document.cookie = `${AUTH_HINT_COOKIE}=1; Path=/; SameSite=Lax`;
+  } else {
+    document.cookie = `${AUTH_HINT_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+  }
+}
 
 export interface AccessTokenResponse {
   access_token: string;
@@ -45,6 +86,16 @@ export class ApiError extends Error {
 }
 
 export class ApiClient {
+  private static buildCandidateApiUrls(): string[] {
+    const normalizedPrimary = API_URL.replace(/\/+$/, "");
+    const normalizedLocal = LOCAL_API_URL.replace(/\/+$/, "");
+
+    // Try configured URL first, then localhost fallback when different.
+    return normalizedPrimary === normalizedLocal
+      ? [normalizedPrimary]
+      : [normalizedPrimary, normalizedLocal];
+  }
+
   // Subscribe to token changes
   static onTokenChange(callback: TokenChangeCallback): () => void {
     tokenChangeCallbacks.add(callback);
@@ -62,11 +113,23 @@ export class ApiClient {
   }
 
   static notifyProfileUpdate(profile: Partial<UserProfile>): void {
+    const existing = readCachedProfile();
+    if (existing) {
+      writeCachedProfile({ ...existing, ...profile });
+    }
     profileUpdateCallbacks.forEach(callback => callback(profile));
+  }
+
+  static getCachedProfile(): UserProfile | null {
+    return readCachedProfile();
   }
 
   private static setAccessToken(token: string | null): void {
     accessToken = token;
+    setAuthHintCookie(Boolean(token));
+    if (!token) {
+      clearCachedProfile();
+    }
     this.notifyTokenChange(token);
   }
 
@@ -75,7 +138,7 @@ export class ApiClient {
     options: RequestInit = {},
     skipAuthRedirect = false
   ): Promise<T> {
-    const url = `${API_URL}${endpoint}`;
+    const urls = this.buildCandidateApiUrls().map((baseUrl) => `${baseUrl}${endpoint}`);
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
@@ -86,21 +149,29 @@ export class ApiClient {
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
 
-    let response: Response;
-    
-    try {
-      response = await fetch(url, {
-        ...options,
-        headers,
-        credentials: 'include', // Important: include cookies for refresh token
-      });
-    } catch (error) {
+    let response: Response | null = null;
+    let lastNetworkError: unknown = null;
+
+    for (const url of urls) {
+      try {
+        response = await fetch(url, {
+          ...options,
+          headers,
+          credentials: 'include', // Important: include cookies for refresh token
+        });
+        break;
+      } catch (error) {
+        lastNetworkError = error;
+      }
+    }
+
+    if (!response) {
       // Network error (server not reachable, CORS, etc.)
       throw new ApiError(
         'Unable to connect to the server. Please check your internet connection and try again.',
         0,
         'NETWORK_ERROR',
-        error instanceof Error ? error.message : 'Unknown network error'
+        lastNetworkError instanceof Error ? lastNetworkError.message : 'Unknown network error'
       );
     }
 
@@ -247,7 +318,9 @@ export class ApiClient {
 
   // User Profile & Preferences
   static async getProfile(): Promise<UserProfile> {
-    return this.request<UserProfile>('/users/me');
+    const profile = await this.request<UserProfile>('/users/me');
+    writeCachedProfile(profile);
+    return profile;
   }
 
   static async updateProfile(data: UpdateProfileData): Promise<UserProfile> {
@@ -255,6 +328,7 @@ export class ApiClient {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
+    writeCachedProfile(updated);
     this.notifyProfileUpdate(updated);
     return updated;
   }

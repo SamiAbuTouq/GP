@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -24,7 +24,7 @@ interface ErrorState {
   type: "credentials" | "network" | "server" | "validation" | "unknown";
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -334,5 +334,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400">
+          Loading...
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }

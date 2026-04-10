@@ -22,7 +22,7 @@ import { ApiClient, UserProfile } from "@/lib/api-client"
 export function Header() {
   const router = useRouter()
   const { user, logout } = useAuth()
-  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(() => ApiClient.getCachedProfile())
 
   useEffect(() => {
     let mounted = true;
@@ -99,8 +99,11 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
               <Avatar className="h-10 w-10 border-2 border-border">
-                <AvatarImage src={profile?.avatar_url || ""} alt="User" />
-                <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-sm">
+                <AvatarImage src={profile?.avatar_url || undefined} alt="User" />
+                <AvatarFallback
+                  delayMs={700}
+                  className="bg-primary text-primary-foreground font-semibold text-sm"
+                >
                   {profile ? (
                     <>
                       {profile.first_name?.[0]}

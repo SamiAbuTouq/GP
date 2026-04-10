@@ -1,9 +1,12 @@
 import type { User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProfileDto, UpdatePreferencesDto } from './dto/update-user.dto';
+import { ConfigService } from '@nestjs/config';
 export declare class UsersService {
     private readonly prisma;
-    constructor(prisma: PrismaService);
+    private readonly configService;
+    constructor(prisma: PrismaService, configService: ConfigService);
+    private configureCloudinary;
     findById(user_id: number): Promise<User>;
     findByEmail(email: string): Promise<User | null>;
     getProfile(userId: number): Promise<{

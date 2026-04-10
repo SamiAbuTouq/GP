@@ -2,17 +2,33 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import type { User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProfileDto, UpdatePreferencesDto } from './dto/update-user.dto';
+import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private configureCloudinary() {
+    const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME');
+    const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY');
+    const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET');
+
+    if (!cloudName || !apiKey || !apiSecret) {
+      throw new BadRequestException(
+        'Cloudinary is not configured. Missing CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, or CLOUDINARY_API_SECRET.',
+      );
+    }
+
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+    });
+  }
 
   async findById(user_id: number): Promise<User> {
     const user = await this.prisma.user.findUnique({
@@ -67,13 +83,20 @@ export class UsersService {
     
     if (dto.avatar_base64) {
       try {
+        this.configureCloudinary();
         const result = await cloudinary.uploader.upload(dto.avatar_base64, {
           folder: 'avatars',
         });
         uploadedAvatarUrl = result.secure_url;
       } catch (error) {
         console.error('Error uploading avatar to cloudinary:', error);
-        throw new BadRequestException('Failed to upload avatar to Cloudinary. Please check Cloudinary configuration.');
+        const cloudinaryMessage =
+          error instanceof Error
+            ? error.message
+            : 'Unknown Cloudinary upload error';
+        throw new BadRequestException(
+          `Failed to upload avatar to Cloudinary: ${cloudinaryMessage}`,
+        );
       }
     }
 

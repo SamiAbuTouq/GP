@@ -67,37 +67,93 @@ export function exportToPDF<T extends Record<string, unknown>>(
   columns: { key: keyof T; label: string }[],
   title: string,
   subtitle?: string,
+  autoPrint = true,
 ) {
-  const thStyle = `padding:12px 16px;font-size:13px;font-weight:600;color:#991b1b;text-align:left;border-bottom:2px solid #991b1b;`
-  const tdStyle = `padding:12px 16px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#1a1a1a;`
+  const thStyle = `padding:11px 12px;font-size:12px;font-weight:700;color:#1e3a8a;text-align:left;border-bottom:2px solid #2563eb;background:#eff6ff;white-space:nowrap;`
+  const tdStyle = `padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#111827;vertical-align:top;`
 
   const headerRow = columns.map((c) => `<th style="${thStyle}">${c.label}</th>`).join("")
   const bodyRows = data
     .map(
-      (row) =>
-        `<tr>${columns.map((c) => `<td style="${tdStyle}">${String(row[c.key] ?? "")}</td>`).join("")}</tr>`,
+      (row, index) =>
+        `<tr style="background:${index % 2 ? "#fcfcfd" : "#ffffff"};">${columns.map((c) => `<td style="${tdStyle}">${String(row[c.key] ?? "")}</td>`).join("")}</tr>`,
     )
     .join("")
 
   const html = `<!DOCTYPE html><html><head><title>${title}</title>
     <style>
-      @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } @page { size: landscape; margin: 20mm; } }
-      body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; padding: 40px 48px; color: #1a1a1a; margin: 0; }
-      table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        @page { size: landscape; margin: 14mm; }
+      }
+      :root { color-scheme: light; }
+      body {
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        color: #111827;
+        margin: 0;
+        padding: 20px;
+        background: #f8fafc;
+      }
+      .sheet {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 18px 20px;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 12px;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 10px;
+      }
+      .title {
+        font-size: 20px;
+        font-weight: 700;
+        margin: 0;
+        color: #111827;
+        line-height: 1.2;
+      }
+      .subtitle {
+        margin: 4px 0 0;
+        color: #6b7280;
+        font-size: 13px;
+      }
+      .meta {
+        font-size: 11px;
+        color: #6b7280;
+        white-space: nowrap;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 14px;
+        border: 1px solid #e5e7eb;
+      }
+      thead { display: table-header-group; }
+      tr { page-break-inside: avoid; break-inside: avoid; }
     </style>
-  </head><body>
-    <h1 style="font-size:20px;font-weight:700;margin:0 0 4px 0;color:#111827;">${title}</h1>
-    <p style="color:#6b7280;margin:0;font-size:14px;font-style:italic;">${subtitle || `${data.length} records`}</p>
-    <table>
-      <thead><tr>${headerRow}</tr></thead>
-      <tbody>${bodyRows}</tbody>
-    </table>
+  </head><body${autoPrint ? ` onload="setTimeout(function(){ window.print(); }, 300)"` : ""}>
+    <div class="sheet">
+      <div class="header">
+        <div>
+          <h1 class="title">${title}</h1>
+          <p class="subtitle">${subtitle || `${data.length} records`}</p>
+        </div>
+        <div class="meta">Generated ${new Date().toLocaleString()}</div>
+      </div>
+      <table>
+        <thead><tr>${headerRow}</tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
   </body></html>`
 
   const printWindow = window.open("", "_blank")
   if (printWindow) {
     printWindow.document.write(html)
     printWindow.document.close()
-    setTimeout(() => { printWindow.print() }, 500)
+    printWindow.focus()
   }
 }

@@ -1,6 +1,20 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { DeliveryMode } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCourseDto, UpdateCourseDto } from './dto/course.dto';
+import { academicLevelFromCourseCode } from './academic-level.util';
+
+type CourseWithDepartment = {
+  course_id: number;
+  course_code: string;
+  course_name: string;
+  credit_hours: number;
+  academic_level: number;
+  delivery_mode: DeliveryMode;
+  dept_id: number;
+  sections: number;
+  department: { dept_name: string };
+};
 
 @Injectable()
 export class CoursesService {
@@ -19,7 +33,7 @@ export class CoursesService {
       code: course.course_code,
       name: course.course_name,
       creditHours: course.credit_hours,
-      academicLevel: course.academic_level,
+      academicLevel: academicLevelFromCourseCode(course.course_code),
       deliveryMode: course.delivery_mode,
       department: course.department.dept_name,
       departmentId: course.dept_id,
@@ -44,7 +58,7 @@ export class CoursesService {
       code: course.course_code,
       name: course.course_name,
       creditHours: course.credit_hours,
-      academicLevel: course.academic_level,
+      academicLevel: academicLevelFromCourseCode(course.course_code),
       deliveryMode: course.delivery_mode,
       department: course.department.dept_name,
       departmentId: course.dept_id,
@@ -64,27 +78,29 @@ export class CoursesService {
       });
     }
 
-    const course = await this.prisma.course.create({
+    const level = academicLevelFromCourseCode(dto.code);
+
+    const course = (await this.prisma.course.create({
       data: {
         course_code: dto.code,
         course_name: dto.name,
         credit_hours: dto.creditHours,
-        academic_level: dto.academicLevel,
-        delivery_mode: dto.deliveryMode,
+        academic_level: level,
+        delivery_mode: dto.deliveryMode as DeliveryMode,
         dept_id: department.dept_id,
         sections: dto.sections ?? 1,
       },
       include: {
         department: true,
       },
-    });
+    })) as CourseWithDepartment;
 
     return {
       id: course.course_id,
       code: course.course_code,
       name: course.course_name,
       creditHours: course.credit_hours,
-      academicLevel: course.academic_level,
+      academicLevel: level,
       deliveryMode: course.delivery_mode,
       department: course.department.dept_name,
       departmentId: course.dept_id,
@@ -115,27 +131,31 @@ export class CoursesService {
       deptId = department.dept_id;
     }
 
-    const course = await this.prisma.course.update({
+    const syncedLevel = academicLevelFromCourseCode(existing.course_code);
+
+    const course = (await this.prisma.course.update({
       where: { course_id: id },
       data: {
-        course_name: dto.name,
-        credit_hours: dto.creditHours,
-        academic_level: dto.academicLevel,
-        delivery_mode: dto.deliveryMode,
+        ...(dto.name !== undefined ? { course_name: dto.name } : {}),
+        ...(dto.creditHours !== undefined ? { credit_hours: dto.creditHours } : {}),
+        academic_level: syncedLevel,
+        ...(dto.deliveryMode !== undefined
+          ? { delivery_mode: dto.deliveryMode as DeliveryMode }
+          : {}),
         dept_id: deptId,
         ...(dto.sections !== undefined ? { sections: dto.sections } : {}),
       },
       include: {
         department: true,
       },
-    });
+    })) as CourseWithDepartment;
 
     return {
       id: course.course_id,
       code: course.course_code,
       name: course.course_name,
       creditHours: course.credit_hours,
-      academicLevel: course.academic_level,
+      academicLevel: syncedLevel,
       deliveryMode: course.delivery_mode,
       department: course.department.dept_name,
       departmentId: course.dept_id,
