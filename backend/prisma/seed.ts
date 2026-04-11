@@ -48,7 +48,7 @@ interface CsvRow {
   Room_ID: string;
   Registered_Students: string;
   Room_Capacity: string;
-  Online: string;            // "Online" | "No" | "Blended"
+  Online: string;            // CSV: "Online" | "No" (on-campus) | "Blended" → Prisma DeliveryMode in `deliveryMode()`
   Start_Time: string;        // e.g. "13:30"
   End_Time: string;          // e.g. "15:00"
   islab: string;             // "True" | "False"
@@ -377,13 +377,15 @@ async function main() {
   for (const r of rows) {
     const id = parseInt(r.Room_ID, 10);
     if (isNaN(id)) continue;
+    const roomName = r.Room?.trim() ?? "";
+    if (!roomName) continue;
     const cap = parseInt(r.Room_Capacity, 10) || 0;
     const rowIsLab = parseIsLab(r.islab);
     if (!roomMap.has(id)) {
       roomMap.set(id, {
-        name: r.Room,
+        name: roomName,
         capacity: cap,
-        type: rowIsLab ? 2 : roomType(r.Room),
+        type: rowIsLab ? 2 : roomType(roomName),
       });
     } else {
       // Keep the max capacity seen
@@ -415,17 +417,24 @@ async function main() {
 
   // ── 5. COURSES ───────────────────────────────────
   // Group by course_code and pick the most common delivery mode
-  const courseSet = new Map<string, { name: string; deptId: number; modes: DeliveryMode[] }>();
+  const courseSet = new Map<
+    string,
+    { name: string; deptId: number; modes: DeliveryMode[]; isLab: boolean }
+  >();
   for (const r of rows) {
     const code = r.Course_Number;
+    const rowIsLab = parseIsLab(r.islab);
     if (!courseSet.has(code)) {
       courseSet.set(code, {
         name: r.English_Name,
         deptId: parseInt(r.Department_ID, 10),
         modes: [deliveryMode(r.Online)],
+        isLab: rowIsLab,
       });
     } else {
-      courseSet.get(code)!.modes.push(deliveryMode(r.Online));
+      const cur = courseSet.get(code)!;
+      cur.modes.push(deliveryMode(r.Online));
+      if (rowIsLab) cur.isLab = true;
     }
   }
   console.log(`Seeding ${courseSet.size} courses...`);
@@ -461,6 +470,7 @@ async function main() {
         dept_id: info.deptId,
         academic_level: level,
         delivery_mode: mode,
+        is_lab: info.isLab,
         sections: avgSectionsPerSemester, // avg sections per semester (based on actual appearances)
       },
       create: {
@@ -470,6 +480,7 @@ async function main() {
         academic_level: level,
         credit_hours: 3, // default – CSV doesn't have this
         delivery_mode: mode,
+        is_lab: info.isLab,
         sections: avgSectionsPerSemester,
       },
     });
@@ -720,7 +731,7 @@ async function main() {
     const userId = lecturerUserIdMap.get(lecturerId);
     const roomId = parseInt(r.Room_ID, 10);
 
-    if (!timetableId || !courseId || !userId || isNaN(roomId)) {
+    if (!timetableId || !courseId || !userId || isNaN(roomId) || !roomMap.has(roomId)) {
       skippedCount++;
       continue;
     }
@@ -743,8 +754,6 @@ async function main() {
     }
 
     const registered = parseInt(r.Registered_Students, 10) || 0;
-    const sectionCapacity = parseInt(r.Room_Capacity, 10) || registered;
-    const isLab = parseIsLab(r.islab);
 
     await prisma.sectionScheduleEntry.upsert({
       where: {
@@ -761,17 +770,13 @@ async function main() {
         course_id: courseId,
         timetable_id: timetableId,
         room_id: roomId,
-        is_lab: isLab,
         registered_students: registered,
-        section_capacity: sectionCapacity,
         section_number: r.Section,
       },
       update: {
         user_id: userId,
         room_id: roomId,
-        is_lab: isLab,
         registered_students: registered,
-        section_capacity: sectionCapacity,
       },
     });
     entryCount++;

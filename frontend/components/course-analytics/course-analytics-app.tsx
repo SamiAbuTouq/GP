@@ -326,7 +326,7 @@ export default function CourseAnalyticsApp({
               <MiniStat label="Total Capacity" value={stats.totalCapacity.toLocaleString()} icon={Armchair} />
               <MiniStat label="Sections/Course" value={stats.avgSectionsPerCourse} icon={BarChart3} />
               <MiniStat label="Online" value={stats.onlineSections} icon={Laptop} />
-              <MiniStat label="In-Person" value={stats.inPersonSections} icon={Building2} />
+              <MiniStat label="On-Campus" value={stats.inPersonSections} icon={Building2} />
               <MiniStat label="Peak Hour" value={stats.peakHour || 'N/A'} icon={Clock} />
               <MiniStat label="Busiest Day" value={stats.busiestDay || 'N/A'} icon={Calendar} />
             </CardContent>

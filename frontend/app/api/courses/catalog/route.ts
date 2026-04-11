@@ -1,13 +1,6 @@
 import { NextResponse } from 'next/server'
-import type { DeliveryMode } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { academicLevelFromCourseCode } from '@/lib/academic-level'
-
-function deliveryModeLabel(mode: DeliveryMode): 'Online' | 'Blended' | 'On-Campus' {
-  if (mode === 'ONLINE') return 'Online'
-  if (mode === 'BLENDED') return 'Blended'
-  return 'On-Campus'
-}
 
 function decodeSemesterType(type: number): string {
   const map: Record<number, string> = {
@@ -99,9 +92,10 @@ export async function GET() {
       name: c.course_name,
       creditHours: c.credit_hours,
       academicLevel: academicLevelFromCourseCode(c.course_code),
-      deliveryMode: deliveryModeLabel(c.delivery_mode),
+      deliveryMode: c.delivery_mode,
       department: c.department.dept_name,
       sections: sectionSetsByCourseId.get(c.course_id)?.size ?? 0,
+      isLab: c.is_lab,
     }))
 
     return NextResponse.json(

@@ -8,6 +8,7 @@ export declare class TimetablesService {
         academicYear: string;
         semesterType: number;
         semester: string;
+        totalStudents: number | null;
         generatedAt: Date;
         status: string;
         generationType: string;
@@ -17,7 +18,6 @@ export declare class TimetablesService {
             softConstraintsScore: import("@prisma/client-runtime-utils").Decimal;
             fitnessScore: import("@prisma/client-runtime-utils").Decimal;
             isValid: boolean;
-            totalStudents: number;
         } | null;
     }[]>;
     listEntries(params: {

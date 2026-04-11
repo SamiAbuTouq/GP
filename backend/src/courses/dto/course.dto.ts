@@ -1,4 +1,5 @@
-import { IsString, IsInt, IsNotEmpty, Min, Max, IsOptional } from 'class-validator';
+import { IsString, IsInt, IsNotEmpty, Min, Max, IsOptional, IsBoolean, IsEnum } from 'class-validator';
+import { DeliveryMode } from '@prisma/client';
 
 export class CreateCourseDto {
   @IsString()
@@ -19,9 +20,9 @@ export class CreateCourseDto {
   @Max(9)
   academicLevel: number;
 
-  @IsString()
+  @IsEnum(DeliveryMode)
   @IsNotEmpty()
-  deliveryMode: string;
+  deliveryMode: DeliveryMode;
 
   @IsString()
   @IsNotEmpty()
@@ -32,6 +33,10 @@ export class CreateCourseDto {
   @Min(1)
   @Max(20)
   sections?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isLab?: boolean;
 }
 
 export class UpdateCourseDto {
@@ -51,9 +56,9 @@ export class UpdateCourseDto {
   @IsOptional()
   academicLevel?: number;
 
-  @IsString()
   @IsOptional()
-  deliveryMode?: string;
+  @IsEnum(DeliveryMode)
+  deliveryMode?: DeliveryMode;
 
   @IsString()
   @IsOptional()
@@ -64,4 +69,8 @@ export class UpdateCourseDto {
   @Min(1)
   @Max(20)
   sections?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isLab?: boolean;
 }

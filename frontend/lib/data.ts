@@ -19,8 +19,45 @@ export const departments = [
 
 export type Department = (typeof departments)[number]
 
-export const deliveryModes = ["Online", "Blended", "On-Campus"] as const
-export type DeliveryMode = (typeof deliveryModes)[number]
+/** Prisma `DeliveryMode` — API and client state use these values; use `formatDeliveryModeLabel` for display. */
+export const DELIVERY_MODE_VALUES = ["ONLINE", "BLENDED", "FACE_TO_FACE"] as const
+export type DeliveryMode = (typeof DELIVERY_MODE_VALUES)[number]
+
+export const deliveryModeOptions: readonly { value: DeliveryMode; label: string }[] = [
+  { value: "ONLINE", label: "Online" },
+  { value: "BLENDED", label: "Blended" },
+  { value: "FACE_TO_FACE", label: "On-Campus" },
+]
+
+export function formatDeliveryModeLabel(mode: DeliveryMode): string {
+  return deliveryModeOptions.find((o) => o.value === mode)?.label ?? mode
+}
+
+/** Normalize CSV/API/legacy UI strings to a Prisma `DeliveryMode`. */
+export function parseDeliveryMode(value: unknown): DeliveryMode {
+  if (typeof value !== "string") return "FACE_TO_FACE"
+  const raw = value.trim()
+  if (!raw) return "FACE_TO_FACE"
+  const canonical = raw.toUpperCase().replace(/-/g, "_").replace(/\s+/g, "_")
+  if (canonical === "ONLINE") return "ONLINE"
+  if (canonical === "BLENDED") return "BLENDED"
+  if (canonical === "FACE_TO_FACE" || canonical === "FACETOFACE") return "FACE_TO_FACE"
+  const n = raw.toLowerCase()
+  if (n === "online") return "ONLINE"
+  if (n === "blended") return "BLENDED"
+  if (n === "no" || n === "false") return "FACE_TO_FACE"
+  if (
+    n === "face_to_face" ||
+    n === "face-to-face" ||
+    n === "face to face" ||
+    n === "on-campus" ||
+    n === "on campus" ||
+    n === "in-person" ||
+    n === "in person"
+  )
+    return "FACE_TO_FACE"
+  return "FACE_TO_FACE"
+}
 
 export const slotTypes = ["Lecture", "Lab"] as const
 export type SlotType = (typeof slotTypes)[number]
@@ -33,12 +70,12 @@ export const mockLecturers = [
 ]
 
 export const mockCourses = [
-  { code: "CS101", name: "Introduction to Programming", creditHours: 3, academicLevel: 1, deliveryMode: "On-Campus" as DeliveryMode, department: "Computer Science" as Department, sections: 3 },
-  { code: "CS201", name: "Data Structures", creditHours: 3, academicLevel: 2, deliveryMode: "On-Campus" as DeliveryMode, department: "Computer Science" as Department, sections: 2 },
-  { code: "CS301", name: "Algorithms", creditHours: 3, academicLevel: 3, deliveryMode: "Blended" as DeliveryMode, department: "Computer Science" as Department, sections: 2 },
-  { code: "CS401", name: "Machine Learning", creditHours: 3, academicLevel: 4, deliveryMode: "On-Campus" as DeliveryMode, department: "Data Science" as Department, sections: 1 },
-  { code: "SE201", name: "Software Engineering", creditHours: 3, academicLevel: 2, deliveryMode: "On-Campus" as DeliveryMode, department: "Software Engineering" as Department, sections: 2 },
-  { code: "DS301", name: "Big Data Analytics", creditHours: 3, academicLevel: 3, deliveryMode: "Online" as DeliveryMode, department: "Data Science" as Department, sections: 1 },
+  { code: "CS101", name: "Introduction to Programming", creditHours: 3, academicLevel: 1, deliveryMode: "FACE_TO_FACE" as DeliveryMode, department: "Computer Science" as Department, sections: 3 },
+  { code: "CS201", name: "Data Structures", creditHours: 3, academicLevel: 2, deliveryMode: "FACE_TO_FACE" as DeliveryMode, department: "Computer Science" as Department, sections: 2 },
+  { code: "CS301", name: "Algorithms", creditHours: 3, academicLevel: 3, deliveryMode: "BLENDED" as DeliveryMode, department: "Computer Science" as Department, sections: 2 },
+  { code: "CS401", name: "Machine Learning", creditHours: 3, academicLevel: 4, deliveryMode: "FACE_TO_FACE" as DeliveryMode, department: "Data Science" as Department, sections: 1 },
+  { code: "SE201", name: "Software Engineering", creditHours: 3, academicLevel: 2, deliveryMode: "FACE_TO_FACE" as DeliveryMode, department: "Software Engineering" as Department, sections: 2 },
+  { code: "DS301", name: "Big Data Analytics", creditHours: 3, academicLevel: 3, deliveryMode: "ONLINE" as DeliveryMode, department: "Data Science" as Department, sections: 1 },
 ]
 
 export const mockRooms = [

@@ -88,6 +88,7 @@ model Course {
   course_code    String       @unique @db.VarChar(20)
   course_name    String       @db.VarChar(100)
   academic_level Int
+  is_lab         Boolean      @default(false)
   credit_hours   Int
   delivery_mode  DeliveryMode
   sections       Int          @default(1)
@@ -189,7 +190,6 @@ model TimetableMetrics {
   soft_constraints_score Decimal @db.Decimal(5, 2)
   fitness_score          Decimal @db.Decimal(5, 2)
   is_valid               Boolean
-  total_students         Int
 
   timetable Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)
 
@@ -251,9 +251,7 @@ model SectionScheduleEntry {
   course_id           Int
   timetable_id        Int
   room_id             Int
-  is_lab              Boolean @default(false)
   registered_students Int
-  section_capacity    Int
   section_number      String  @db.VarChar(10)
 
   lecturer  Lecturer  @relation(fields: [user_id], references: [user_id])

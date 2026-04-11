@@ -54,6 +54,14 @@ function isUndergraduateLevel(level: number): boolean {
   return level < 500
 }
 
+function sectionCapacityForEntry(e: {
+  course: { delivery_mode: string }
+  registered_students: number
+  room: { capacity: number }
+}): number {
+  return e.course.delivery_mode === "ONLINE" ? e.registered_students : e.room.capacity
+}
+
 export async function GET(request: Request) {
   try {
     const semesterId = Number(new URL(request.url).searchParams.get("semesterId"))
@@ -113,6 +121,7 @@ export async function GET(request: Request) {
         semesterLabel,
         academicYear: semester.academic_year,
         semesterTypeName,
+        totalStudents: semester.total_students,
         timetable: null,
         insights: {
           totalScheduleEntries: 0,
@@ -238,7 +247,7 @@ export async function GET(request: Request) {
         ra.onlineBlend++
       }
       if (e.course.delivery_mode === "FACE_TO_FACE" || e.course.delivery_mode === "BLENDED") {
-        const cap = Math.max(1, e.section_capacity)
+        const cap = Math.max(1, sectionCapacityForEntry(e))
         const fill = Math.min(100, (e.registered_students / cap) * 100)
         ra.seatFillSum += fill
         ra.seatFillN++
@@ -263,7 +272,7 @@ export async function GET(request: Request) {
       la.sections++
       la.courses.add(e.course_id)
       la.weeklyHours += wh
-      if (e.is_lab) la.labs++
+      if (e.course.is_lab) la.labs++
 
       const dname = e.course.department.dept_name
       if (!deptSchedule.has(dname)) {
@@ -412,6 +421,7 @@ export async function GET(request: Request) {
       semesterLabel,
       academicYear: semester.academic_year,
       semesterTypeName,
+      totalStudents: semester.total_students,
       timetable: {
         timetableId: selectedTimetable.timetable_id,
         status: selectedTimetable.status,
@@ -422,7 +432,6 @@ export async function GET(request: Request) {
         fitnessScore: metrics ? Number(metrics.fitness_score) : null,
         softConstraintsScore: metrics ? Number(metrics.soft_constraints_score) : null,
         isValid: metrics?.is_valid ?? null,
-        totalStudentsInMetrics: metrics?.total_students ?? null,
       },
       insights,
       roomRows,

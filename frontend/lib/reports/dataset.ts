@@ -5,6 +5,8 @@ export const ReportDatasetSchema = z.object({
   semesterLabel: z.string(),
   academicYear: z.string(),
   semesterTypeName: z.string(),
+  /** Semester enrollment headcount (`semester.total_students`). */
+  totalStudents: z.number().nullable(),
   timetable: z
     .object({
       timetableId: z.number(),
@@ -16,7 +18,6 @@ export const ReportDatasetSchema = z.object({
       fitnessScore: z.number().nullable(),
       softConstraintsScore: z.number().nullable(),
       isValid: z.boolean().nullable(),
-      totalStudentsInMetrics: z.number().nullable(),
     })
     .nullable(),
   insights: z.object({

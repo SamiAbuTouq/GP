@@ -188,10 +188,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!user && !isPublicRoute) {
         // Not authenticated and trying to access protected route
-        router.push("/login");
-      } else if (user && (pathname === "/login" || pathname === "/")) {
-        // Authenticated but on login page or root
-        router.push("/dashboard");
+        router.replace("/login");
+      } else if (user && pathname === "/login") {
+        // Authenticated users should not stay on login page.
+        router.replace("/dashboard");
       }
     }
   }, [user, authLoading, pathname, router]);

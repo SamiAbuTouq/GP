@@ -49,6 +49,8 @@ type TimetableDto = {
   academicYear: string
   semesterType: number
   semester: string
+  /** Semester enrollment headcount (`semester.total_students`). */
+  totalStudents: number | null
   generatedAt: string
   status: string
   generationType: string
@@ -58,7 +60,6 @@ type TimetableDto = {
     softConstraintsScore: number
     fitnessScore: number
     isValid: boolean
-    totalStudents: number
   }
 }
 

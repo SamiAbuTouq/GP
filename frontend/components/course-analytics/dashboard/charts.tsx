@@ -1465,7 +1465,7 @@ export function AcademicLevelStackedChart({ data }: AcademicLevelStackedChartPro
             />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
             <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }} />
-            <Bar dataKey="inPerson" stackId="a" fill={colors[0]} name="In-Person" radius={[0, 0, 0, 0]} isAnimationActive={true} />
+            <Bar dataKey="inPerson" stackId="a" fill={colors[0]} name="On-Campus" radius={[0, 0, 0, 0]} isAnimationActive={true} />
             <Bar dataKey="online" stackId="a" fill={colors[1]} name="Online" radius={[0, 0, 0, 0]} isAnimationActive={true} />
             <Bar dataKey="blended" stackId="a" fill={colors[2]} name="Blended" radius={[4, 4, 0, 0]} isAnimationActive={true} />
           </BarChart>

@@ -115,6 +115,7 @@ model Course {
   course_name    String       @db.VarChar(100)
   /// 1 = 100-level, 2 = 200-level … 9 = Graduate
   academic_level Int
+  is_lab              Boolean @default(false)
   credit_hours   Int
   delivery_mode  DeliveryMode
   sections       Int          @default(1)
@@ -254,7 +255,6 @@ model TimetableMetrics {
   soft_constraints_score Decimal @db.Decimal(5, 2)
   fitness_score          Decimal @db.Decimal(5, 2)
   is_valid               Boolean
-  total_students         Int
 
   timetable Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)
 
@@ -336,13 +336,7 @@ model SectionScheduleEntry {
   course_id           Int
   timetable_id        Int
   room_id             Int
-  /// Whether this specific section is a lab offering (from CSV islab column).
-  is_lab              Boolean @default(false)
   registered_students Int
-  /// Capacity for this specific section offering (from CSV Room_Capacity).
-  /// Do NOT derive this from Room.capacity because capacity can vary by offering
-  /// (and "online" offerings share a synthetic room_id in the source data).
-  section_capacity    Int
   section_number      String  @db.VarChar(10)
 
   lecturer  Lecturer  @relation(fields: [user_id], references: [user_id])

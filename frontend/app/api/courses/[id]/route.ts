@@ -23,6 +23,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       const n = Number(body.sections)
       payload.sections = Number.isFinite(n) ? Math.min(20, Math.max(1, Math.trunc(n))) : 1
     }
+    if (body.isLab !== undefined) payload.isLab = Boolean(body.isLab)
     return proxyToBackend(`/courses/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify(payload),

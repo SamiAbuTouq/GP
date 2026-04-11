@@ -10,6 +10,7 @@ type CourseWithDepartment = {
   course_name: string;
   credit_hours: number;
   academic_level: number;
+  is_lab: boolean;
   delivery_mode: DeliveryMode;
   dept_id: number;
   sections: number;
@@ -38,6 +39,7 @@ export class CoursesService {
       department: course.department.dept_name,
       departmentId: course.dept_id,
       sections: course.sections,
+      isLab: course.is_lab,
     }));
   }
 
@@ -63,6 +65,7 @@ export class CoursesService {
       department: course.department.dept_name,
       departmentId: course.dept_id,
       sections: course.sections,
+      isLab: course.is_lab,
     };
   }
 
@@ -86,9 +89,10 @@ export class CoursesService {
         course_name: dto.name,
         credit_hours: dto.creditHours,
         academic_level: level,
-        delivery_mode: dto.deliveryMode as DeliveryMode,
+        delivery_mode: dto.deliveryMode,
         dept_id: department.dept_id,
         sections: dto.sections ?? 1,
+        is_lab: dto.isLab ?? false,
       },
       include: {
         department: true,
@@ -105,6 +109,7 @@ export class CoursesService {
       department: course.department.dept_name,
       departmentId: course.dept_id,
       sections: course.sections,
+      isLab: course.is_lab,
     };
   }
 
@@ -139,11 +144,10 @@ export class CoursesService {
         ...(dto.name !== undefined ? { course_name: dto.name } : {}),
         ...(dto.creditHours !== undefined ? { credit_hours: dto.creditHours } : {}),
         academic_level: syncedLevel,
-        ...(dto.deliveryMode !== undefined
-          ? { delivery_mode: dto.deliveryMode as DeliveryMode }
-          : {}),
+        ...(dto.deliveryMode !== undefined ? { delivery_mode: dto.deliveryMode } : {}),
         dept_id: deptId,
         ...(dto.sections !== undefined ? { sections: dto.sections } : {}),
+        ...(dto.isLab !== undefined ? { is_lab: dto.isLab } : {}),
       },
       include: {
         department: true,
@@ -160,6 +164,7 @@ export class CoursesService {
       department: course.department.dept_name,
       departmentId: course.dept_id,
       sections: course.sections,
+      isLab: course.is_lab,
     };
   }
 

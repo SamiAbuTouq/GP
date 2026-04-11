@@ -546,7 +546,7 @@ export function getOnlineModeData(courses: Course[]): OnlineModeData[] {
   
   courses.forEach(course => {
     const mode = course.Online === 'Online' ? 'Online' : 
-                 course.Online === 'Blended' ? 'Blended' : 'In-Person'
+                 course.Online === 'Blended' ? 'Blended' : 'On-Campus'
     const existing = modeMap.get(mode) || { count: 0, students: 0 }
     existing.count += 1
     existing.students += course.Registered_Students

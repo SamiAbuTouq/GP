@@ -34,6 +34,7 @@ let CoursesService = class CoursesService {
             department: course.department.dept_name,
             departmentId: course.dept_id,
             sections: course.sections,
+            isLab: course.is_lab,
         }));
     }
     async findOne(id) {
@@ -56,6 +57,7 @@ let CoursesService = class CoursesService {
             department: course.department.dept_name,
             departmentId: course.dept_id,
             sections: course.sections,
+            isLab: course.is_lab,
         };
     }
     async create(dto) {
@@ -77,6 +79,7 @@ let CoursesService = class CoursesService {
                 delivery_mode: dto.deliveryMode,
                 dept_id: department.dept_id,
                 sections: dto.sections ?? 1,
+                is_lab: dto.isLab ?? false,
             },
             include: {
                 department: true,
@@ -92,6 +95,7 @@ let CoursesService = class CoursesService {
             department: course.department.dept_name,
             departmentId: course.dept_id,
             sections: course.sections,
+            isLab: course.is_lab,
         };
     }
     async update(id, dto) {
@@ -120,11 +124,10 @@ let CoursesService = class CoursesService {
                 ...(dto.name !== undefined ? { course_name: dto.name } : {}),
                 ...(dto.creditHours !== undefined ? { credit_hours: dto.creditHours } : {}),
                 academic_level: syncedLevel,
-                ...(dto.deliveryMode !== undefined
-                    ? { delivery_mode: dto.deliveryMode }
-                    : {}),
+                ...(dto.deliveryMode !== undefined ? { delivery_mode: dto.deliveryMode } : {}),
                 dept_id: deptId,
                 ...(dto.sections !== undefined ? { sections: dto.sections } : {}),
+                ...(dto.isLab !== undefined ? { is_lab: dto.isLab } : {}),
             },
             include: {
                 department: true,
@@ -140,6 +143,7 @@ let CoursesService = class CoursesService {
             department: course.department.dept_name,
             departmentId: course.dept_id,
             sections: course.sections,
+            isLab: course.is_lab,
         };
     }
     async remove(id) {

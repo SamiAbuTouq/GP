@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -248,13 +248,10 @@ function SidebarNavigation({
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { logout } = useAuth();
-  const { collapsed, toggle, setCollapsed } = useSidebar();
+  const { collapsed, toggle } = useSidebar();
 
   const handleNavigate = () => {
     onNavigate?.();
-    if (!collapsed) {
-      setCollapsed(true);
-    }
   };
 
   const handleLogout = async () => {
@@ -353,10 +350,17 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export function Sidebar() {
   const { collapsed } = useSidebar();
+  const [transitionsEnabled, setTransitionsEnabled] = useState(false);
+
+  useEffect(() => {
+    setTransitionsEnabled(true);
+  }, []);
+
   return (
     <aside
       className={cn(
-        "hidden border-r border-sidebar-border bg-sidebar lg:block transition-all duration-300 ease-in-out shrink-0",
+        "hidden border-r border-sidebar-border bg-sidebar lg:block shrink-0",
+        transitionsEnabled && "transition-all duration-300 ease-in-out",
         collapsed ? "w-12" : "w-56",
       )}
     >

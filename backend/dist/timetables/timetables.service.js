@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TimetablesService = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 function decodeSemesterType(type) {
     const map = {
@@ -62,6 +63,7 @@ let TimetablesService = class TimetablesService {
             academicYear: t.semester.academic_year,
             semesterType: t.semester.semester_type,
             semester: decodeSemesterType(t.semester.semester_type),
+            totalStudents: t.semester.total_students,
             generatedAt: t.generated_at,
             status: t.status,
             generationType: t.generation_type,
@@ -72,7 +74,6 @@ let TimetablesService = class TimetablesService {
                     softConstraintsScore: t.timetable_metrics.soft_constraints_score,
                     fitnessScore: t.timetable_metrics.fitness_score,
                     isValid: t.timetable_metrics.is_valid,
-                    totalStudents: t.timetable_metrics.total_students,
                 }
                 : null,
         }));
@@ -120,9 +121,11 @@ let TimetablesService = class TimetablesService {
             startTime: formatTimeHHmm(e.timeslot.start_time),
             endTime: formatTimeHHmm(e.timeslot.end_time),
             sectionNumber: e.section_number,
-            isLab: e.is_lab,
+            isLab: e.course.is_lab,
             registeredStudents: e.registered_students,
-            sectionCapacity: e.section_capacity,
+            sectionCapacity: e.course.delivery_mode === client_1.DeliveryMode.ONLINE
+                ? e.registered_students
+                : e.room.capacity,
         }));
     }
 };

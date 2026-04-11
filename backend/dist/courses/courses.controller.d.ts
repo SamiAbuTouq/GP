@@ -13,6 +13,7 @@ export declare class CoursesController {
         department: string;
         departmentId: number;
         sections: number;
+        isLab: boolean;
     }[]>;
     findOne(id: number): Promise<{
         id: number;
@@ -24,6 +25,7 @@ export declare class CoursesController {
         department: string;
         departmentId: number;
         sections: number;
+        isLab: boolean;
     }>;
     create(dto: CreateCourseDto): Promise<{
         id: number;
@@ -35,6 +37,7 @@ export declare class CoursesController {
         department: string;
         departmentId: number;
         sections: number;
+        isLab: boolean;
     }>;
     update(id: number, dto: UpdateCourseDto): Promise<{
         id: number;
@@ -46,6 +49,7 @@ export declare class CoursesController {
         department: string;
         departmentId: number;
         sections: number;
+        isLab: boolean;
     }>;
     remove(id: number): Promise<{
         message: string;

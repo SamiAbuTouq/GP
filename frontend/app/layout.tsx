@@ -1,5 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
+import { cookies } from "next/headers"
 import { Inter, JetBrains_Mono } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/lib/auth-context"
@@ -23,17 +24,21 @@ export const metadata: Metadata = {
   generator: "v0.app",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const cookieStore = await cookies()
+  const initialSidebarCollapsed =
+    cookieStore.get("psut-sidebar-collapsed")?.value === "true"
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
-            <SidebarProvider>
+            <SidebarProvider initialCollapsed={initialSidebarCollapsed}>
               {children}
               <Toaster />
             </SidebarProvider>

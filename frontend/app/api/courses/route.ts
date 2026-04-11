@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { proxyToBackend } from '@/lib/proxy-backend'
 
 function decodeSemesterType(type: number): string {
   const map: Record<number, string> = {
@@ -58,9 +59,7 @@ export async function GET(request: Request) {
         user_id: true,
         room_id: true,
         registered_students: true,
-        section_capacity: true,
         section_number: true,
-        is_lab: true,
         timeslot: true,
         timetable: {
           select: {
@@ -81,6 +80,7 @@ export async function GET(request: Request) {
             credit_hours: true,
             dept_id: true,
             delivery_mode: true,
+            is_lab: true,
             department: true,
           },
         },
@@ -107,16 +107,16 @@ export async function GET(request: Request) {
       Section_Capacity:
         entry.course.delivery_mode === 'ONLINE'
           ? entry.registered_students
-          : entry.section_capacity,
+          : entry.room.capacity,
       Online:
         entry.course.delivery_mode === 'ONLINE'
           ? 'Online'
           : entry.course.delivery_mode === 'BLENDED'
             ? 'Blended'
-            : 'Face-to-Face',
+            : 'On-Campus',
       Start_Time: formatTime(entry.timeslot.start_time),
       End_Time: formatTime(entry.timeslot.end_time),
-      islab: entry.is_lab,
+      islab: entry.course.is_lab,
       Department_ID: String(entry.course.dept_id),
     }))
 
@@ -132,4 +132,10 @@ export async function GET(request: Request) {
       { status: 500 },
     )
   }
+}
+
+/** Proxies catalog create to Nest (`CreateCourseDto` includes optional `isLab`). */
+export async function POST(request: Request) {
+  const body = await request.text()
+  return proxyToBackend('/courses', { method: 'POST', body })
 }

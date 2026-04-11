@@ -15,17 +15,19 @@ const SidebarContext = createContext<SidebarContextType>({
 });
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "psut-sidebar-collapsed";
+const SIDEBAR_COLLAPSED_COOKIE_KEY = "psut-sidebar-collapsed";
+const SIDEBAR_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
-export function SidebarProvider({ children }: { children: ReactNode }) {
+export function SidebarProvider({
+  children,
+  initialCollapsed = false,
+}: {
+  children: ReactNode;
+  initialCollapsed?: boolean;
+}) {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
-      return stored === "true";
-    } catch {
-      // Ignore storage failures and keep default UI state.
-      return false;
-    }
+    // Keep first server and client render consistent to avoid hydration mismatch.
+    return initialCollapsed;
   });
 
   useEffect(() => {
@@ -37,6 +39,8 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     } catch {
       // Ignore storage failures.
     }
+
+    document.cookie = `${SIDEBAR_COLLAPSED_COOKIE_KEY}=${collapsed ? "true" : "false"}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE_SECONDS}`;
   }, [collapsed]);
 
   return (

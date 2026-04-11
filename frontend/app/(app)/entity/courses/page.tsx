@@ -35,13 +35,21 @@ import {
   ArrowUpDown,
 } from "lucide-react"
 import { ImportIcon } from "@/components/custom-icons"
-import { departments, deliveryModes, type Department, type DeliveryMode } from "@/lib/data"
+import {
+  departments,
+  deliveryModeOptions,
+  formatDeliveryModeLabel,
+  parseDeliveryMode,
+  type Department,
+  type DeliveryMode,
+} from "@/lib/data"
 import { academicLevelFromCourseCode } from "@/lib/academic-level"
 import { ImportDialog } from "@/components/import-dialog"
 import { findColumn, type ParsedRow } from "@/lib/import-utils"
 import { ExportDropdownWithDialog } from "@/components/export-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { Checkbox } from "@/components/ui/checkbox"
 
 type Course = {
   id?: number
@@ -52,6 +60,7 @@ type Course = {
   deliveryMode: DeliveryMode
   department: Department
   sections: number
+  isLab: boolean
 }
 
 const parseNumber = (value: unknown, fallback: number) => {
@@ -61,15 +70,6 @@ const parseNumber = (value: unknown, fallback: number) => {
     if (Number.isFinite(parsed)) return parsed
   }
   return fallback
-}
-
-const normalizeDeliveryMode = (value: unknown): DeliveryMode => {
-  if (typeof value !== "string") return "On-Campus"
-  const normalized = value.trim().toLowerCase()
-  if (normalized === "online") return "Online"
-  if (normalized === "blended") return "Blended"
-  if (normalized === "face-to-face" || normalized === "on-campus" || normalized === "on campus") return "On-Campus"
-  return "On-Campus"
 }
 
 /** One row per course from `GET /api/courses/catalog` (distinct `course_code`). */
@@ -85,9 +85,10 @@ function mapCatalogRow(raw: unknown): Course | null {
     name,
     creditHours: parseNumber(item.creditHours, 0),
     academicLevel: academicLevelFromCourseCode(code),
-    deliveryMode: normalizeDeliveryMode(item.deliveryMode),
+    deliveryMode: parseDeliveryMode(item.deliveryMode),
     department: String(item.department ?? "Computer Science") as Department,
     sections: parseNumber(item.sections, 0),
+    isLab: typeof item.isLab === "boolean" ? item.isLab : false,
   }
 }
 
@@ -97,6 +98,7 @@ type SortableColumn =
   | "creditHours"
   | "academicLevel"
   | "deliveryMode"
+  | "isLab"
   | "sections"
 
 function sortCoursesCopy(
@@ -124,6 +126,9 @@ function sortCoursesCopy(
         break
       case "deliveryMode":
         cmp = a.deliveryMode.localeCompare(b.deliveryMode)
+        break
+      case "isLab":
+        cmp = Number(a.isLab) - Number(b.isLab)
         break
       case "sections":
         cmp = a.sections - b.sections
@@ -153,9 +158,10 @@ export default function CoursesPage() {
     name: "",
     creditHours: 3,
     academicLevel: 1,
-    deliveryMode: "On-Campus",
+    deliveryMode: "FACE_TO_FACE",
     department: "Computer Science",
     sections: 1,
+    isLab: false,
   })
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
@@ -212,11 +218,13 @@ export default function CoursesPage() {
       const code = toSearchableText(course.code)
       const name = toSearchableText(course.name)
       const department = toSearchableText(course.department)
+      const kind = course.isLab ? "lab" : "lecture"
 
       return (
         code.includes(normalizedQuery) ||
         name.includes(normalizedQuery) ||
-        department.includes(normalizedQuery)
+        department.includes(normalizedQuery) ||
+        kind.includes(normalizedQuery)
       )
     })
   }, [courses, searchQuery])
@@ -290,9 +298,10 @@ export default function CoursesPage() {
         name: "",
         creditHours: 3,
         academicLevel: 1,
-        deliveryMode: "On-Campus",
+        deliveryMode: "FACE_TO_FACE",
         department: "Computer Science",
         sections: 1,
+        isLab: false,
       })
       setIsAddDialogOpen(false)
       toast({
@@ -327,6 +336,7 @@ export default function CoursesPage() {
           deliveryMode: editingCourse.deliveryMode,
           department: editingCourse.department,
           sections: editingCourse.sections,
+          isLab: editingCourse.isLab,
         }),
       })
 
@@ -397,17 +407,18 @@ export default function CoursesPage() {
     { key: "creditHours" as const, label: "Credit Hours" },
     { key: "academicLevel" as const, label: "Academic Level" },
     { key: "deliveryMode" as const, label: "Delivery Mode" },
+    { key: "isLab" as const, label: "Lab" },
     { key: "department" as const, label: "Department" },
     { key: "sections" as const, label: "Sections (latest term)" },
   ]
 
   const getDeliveryModeColor = (mode: DeliveryMode) => {
     switch (mode) {
-      case "Online":
+      case "ONLINE":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-      case "Blended":
+      case "BLENDED":
         return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-      case "On-Campus":
+      case "FACE_TO_FACE":
         return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
       default:
         return "bg-muted text-muted-foreground"
@@ -583,9 +594,9 @@ export default function CoursesPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {deliveryModes.map((mode) => (
-                            <SelectItem key={mode} value={mode}>
-                              {mode}
+                          {deliveryModeOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -609,6 +620,16 @@ export default function CoursesPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="new-course-is-lab"
+                      checked={newCourse.isLab}
+                      onCheckedChange={(v) => setNewCourse({ ...newCourse, isLab: v === true })}
+                    />
+                    <Label htmlFor="new-course-is-lab" className="text-sm font-normal cursor-pointer">
+                      Lab course
+                    </Label>
                   </div>
                 </div>
                 <DialogFooter>
@@ -749,6 +770,27 @@ export default function CoursesPage() {
                       )}
                     </button>
                   </TableHead>
+                  <TableHead className="text-center">
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex w-full items-center justify-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "isLab" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => handleSortColumn("isLab")}
+                    >
+                      Lab
+                      {sortColumn === "isLab" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead className="text-center">
                     <button
@@ -777,7 +819,7 @@ export default function CoursesPage() {
               <TableBody>
                 {paginatedCourses.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No courses found
                     </TableCell>
                   </TableRow>
@@ -789,7 +831,12 @@ export default function CoursesPage() {
                       <TableCell className="text-center">{course.creditHours}</TableCell>
                       <TableCell className="text-center">{course.academicLevel}</TableCell>
                       <TableCell>
-                        <Badge className={getDeliveryModeColor(course.deliveryMode)}>{course.deliveryMode}</Badge>
+                        <Badge className={getDeliveryModeColor(course.deliveryMode)}>
+                          {formatDeliveryModeLabel(course.deliveryMode)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={course.isLab ? "default" : "secondary"}>{course.isLab ? "Yes" : "No"}</Badge>
                       </TableCell>
                       <TableCell>
                         <Badge className={getDepartmentColor(course.department)}>{course.department}</Badge>
@@ -975,9 +1022,9 @@ export default function CoursesPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {deliveryModes.map((mode) => (
-                        <SelectItem key={mode} value={mode}>
-                          {mode}
+                      {deliveryModeOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1002,6 +1049,16 @@ export default function CoursesPage() {
                   </Select>
                 </div>
               </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="edit-course-is-lab"
+                  checked={editingCourse.isLab}
+                  onCheckedChange={(v) => setEditingCourse({ ...editingCourse, isLab: v === true })}
+                />
+                <Label htmlFor="edit-course-is-lab" className="text-sm font-normal cursor-pointer">
+                  Lab course
+                </Label>
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -1021,7 +1078,16 @@ export default function CoursesPage() {
         onOpenChange={setIsImportDialogOpen}
         title="Import Courses"
         description="Upload a CSV, Excel, or JSON file with course data."
-        exampleHeaders={["code", "name", "creditHours", "academicLevel", "deliveryMode", "department", "numberOfSections"]}
+        exampleHeaders={[
+          "code",
+          "name",
+          "creditHours",
+          "academicLevel",
+          "deliveryMode",
+          "department",
+          "numberOfSections",
+          "isLab",
+        ]}
         columns={courseColumns}
         getRowKey={(row) => (typeof row.code === "string" ? row.code.toLowerCase() : "")}
         mapRow={(row: ParsedRow) => {
@@ -1031,14 +1097,24 @@ export default function CoursesPage() {
           const dept = findColumn(row, "department", "dept", "department_name")
           if (!dept || !departments.includes(dept as Department)) return null
 
+          const labRaw = findColumn(row, "isLab", "is_lab", "lab", "islab")
+          const isLab =
+            labRaw === "1" ||
+            labRaw?.toLowerCase() === "true" ||
+            labRaw?.toLowerCase() === "yes" ||
+            labRaw?.toLowerCase() === "y"
+
           return {
             code,
             name: findColumn(row, "name", "course_name", "coursename") ?? "",
             creditHours: parseInt(findColumn(row, "creditHours", "credit_hours", "credithours", "credits") ?? "3", 10) || 3,
             academicLevel: academicLevelFromCourseCode(code),
-            deliveryMode: (findColumn(row, "deliveryMode", "delivery_mode", "deliverymode", "delivery") ?? "On-Campus") as DeliveryMode,
+            deliveryMode: parseDeliveryMode(
+              findColumn(row, "deliveryMode", "delivery_mode", "deliverymode", "delivery") ?? "FACE_TO_FACE",
+            ),
             department: dept as Department,
             sections: parseInt(findColumn(row, "numberOfSections", "sections", "section_count", "sectioncount") ?? "1", 10) || 1,
+            isLab,
           }
         }}
         onImport={async (data) => {
