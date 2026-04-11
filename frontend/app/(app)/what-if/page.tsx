@@ -72,8 +72,8 @@ const mockScenarios: Scenario[] = [
   },
   {
     id: 3,
-    name: "Increase CS101 Sections",
-    description: "Add 2 more sections for CS101",
+    name: "Increase high-demand course sections",
+    description: "Add two sections for a course that is at capacity",
     status: "completed",
     conflicts: 4,
     utilization: 85,

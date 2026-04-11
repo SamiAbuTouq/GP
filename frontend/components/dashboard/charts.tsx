@@ -19,9 +19,6 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts"
-import { roomUtilizationData, weeklyDistribution, semesterComparison } from "@/lib/data"
-
-const COLORS = ["#0ea5e9", "#14b8a6", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6"]
 
 const departmentData = [
   { name: "CS", students: 420 },

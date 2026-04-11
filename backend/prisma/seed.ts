@@ -3,8 +3,8 @@
  *
  * Seeds the database with:
  *   1. Predefined users (admin + test lecturers)
- *   2. Schedule data from psut_courses_2023-2025_english.csv when present,
- *      otherwise psut_courses_cleaned.csv (legacy column layout)
+ *   2. Schedule data from psut_courses_with_credits.csv when present (includes Credit Hours),
+ *      otherwise psut_courses_2023-2025_english.csv, then psut_courses_cleaned.csv (legacy layout)
  *
  * Run with:  npm run prisma:seed  (from website/backend)
  */
@@ -53,6 +53,8 @@ interface CsvRow {
   End_Time: string;          // e.g. "15:00"
   islab: string;             // "True" | "False"
   Department_ID: string;
+  /** Present on psut_courses_with_credits.csv */
+  "Credit Hours"?: string;
 }
 
 function parseCsv(filePath: string): CsvRow[] {
@@ -193,6 +195,7 @@ function englishRecordsToCsvRows(records: Record<string, string>[]): CsvRow[] {
       End_Time: tr?.end ?? "",
       islab: String(isLab),
       Department_ID: String(deptIdByName.get(dept) ?? 0),
+      "Credit Hours": (r["Credit Hours"] ?? "").trim(),
     };
   });
 }
@@ -286,6 +289,31 @@ function truncate(str: string, max: number): string {
   return s.length > max ? s.slice(0, max) : s;
 }
 
+/** Read optional "Credit Hours" cell from any CSV row shape. */
+function parseCreditHoursCell(r: CsvRow | Record<string, string>): number | null {
+  const raw = String((r as Record<string, string>)["Credit Hours"] ?? "").trim();
+  if (!raw) return null;
+  const n = Math.round(parseFloat(raw));
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+/** Pick the most common value; tie-break toward the larger credit count. */
+function mostFrequentInt(values: number[], fallback: number): number {
+  if (!values.length) return fallback;
+  const counts = new Map<number, number>();
+  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
+  let best = values[0];
+  let bestCount = 0;
+  for (const [val, cnt] of counts) {
+    if (cnt > bestCount || (cnt === bestCount && val > best)) {
+      bestCount = cnt;
+      best = val;
+    }
+  }
+  return best;
+}
+
 // ────────────────────────────────────────────────────
 // MAIN SEED
 // ────────────────────────────────────────────────────
@@ -343,9 +371,14 @@ async function main() {
   console.log(`   Predefined users done\n`);
 
   // ── 2. CSV DATA ───────────────────────────────────
+  const withCreditsPath = path.resolve(__dirname, "..", "psut_courses_with_credits.csv");
   const englishPath = path.resolve(__dirname, "..", "psut_courses_2023-2025_english.csv");
   const legacyPath = path.resolve(__dirname, "..", "psut_courses_cleaned.csv");
-  const csvPath = fs.existsSync(englishPath) ? englishPath : legacyPath;
+  const csvPath = fs.existsSync(withCreditsPath)
+    ? withCreditsPath
+    : fs.existsSync(englishPath)
+      ? englishPath
+      : legacyPath;
   console.log(`Reading CSV from: ${csvPath}`);
   const rawRecords = parseCsvAsRecords(csvPath);
   const headers = Object.keys(rawRecords[0] ?? {});
@@ -419,22 +452,25 @@ async function main() {
   // Group by course_code and pick the most common delivery mode
   const courseSet = new Map<
     string,
-    { name: string; deptId: number; modes: DeliveryMode[]; isLab: boolean }
+    { name: string; deptId: number; modes: DeliveryMode[]; isLab: boolean; creditSamples: number[] }
   >();
   for (const r of rows) {
     const code = r.Course_Number;
     const rowIsLab = parseIsLab(r.islab);
+    const creditCell = parseCreditHoursCell(r);
     if (!courseSet.has(code)) {
       courseSet.set(code, {
         name: r.English_Name,
         deptId: parseInt(r.Department_ID, 10),
         modes: [deliveryMode(r.Online)],
         isLab: rowIsLab,
+        creditSamples: creditCell != null ? [creditCell] : [],
       });
     } else {
       const cur = courseSet.get(code)!;
       cur.modes.push(deliveryMode(r.Online));
       if (rowIsLab) cur.isLab = true;
+      if (creditCell != null) cur.creditSamples.push(creditCell);
     }
   }
   console.log(`Seeding ${courseSet.size} courses...`);
@@ -450,6 +486,7 @@ async function main() {
     }
 
     const level = academicLevel(code);
+    const creditHours = mostFrequentInt(info.creditSamples, 3);
     // Count unique sections across all semesters as a rough number
     const sectionCount = new Set(
       rows.filter((r) => r.Course_Number === code).map((r) => `${r.Year}-${r.Semester}-${r.Section}`)
@@ -469,6 +506,7 @@ async function main() {
         course_name: truncate(info.name, 100),
         dept_id: info.deptId,
         academic_level: level,
+        credit_hours: creditHours,
         delivery_mode: mode,
         is_lab: info.isLab,
         sections: avgSectionsPerSemester, // avg sections per semester (based on actual appearances)
@@ -478,7 +516,7 @@ async function main() {
         course_code: code,
         course_name: truncate(info.name, 100),
         academic_level: level,
-        credit_hours: 3, // default – CSV doesn't have this
+        credit_hours: creditHours,
         delivery_mode: mode,
         is_lab: info.isLab,
         sections: avgSectionsPerSemester,

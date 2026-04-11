@@ -5,6 +5,10 @@ const CourseSchema = z.object({
   Semester: z.string().default(''),
   Course_Number: z.string().default(''),
   English_Name: z.string().default(''),
+  /** Mirrors `course.academic_level` from the API (distinct sections may repeat the same value). */
+  academic_level: z.coerce.number().optional().default(1),
+  /** Mirrors `course.credit_hours` from the API. */
+  credit_hours: z.coerce.number().optional().default(0),
   Section: z.string().default(''),
   Lecturer_Name: z.string().default(''),
   Lecturer_ID: z.string().default(''),
