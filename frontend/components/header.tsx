@@ -51,11 +51,13 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:px-6">
+    <header
+      className="sticky top-0 z-50 flex h-14 items-center justify-between px-4 lg:px-6"
+    >
       <div className="flex items-center gap-3">
         <MobileSidebar />
-        <Separator orientation="vertical" className="h-6 hidden md:block" />
-        <h1 className="hidden md:block text-base font-semibold tracking-tight text-foreground">
+        <Separator orientation="vertical" className="hidden h-6 bg-slate-600/35 dark:bg-white/35 md:block" />
+        <h1 className="hidden text-base font-semibold tracking-tight text-slate-900 drop-shadow-sm dark:text-white md:block">
           University Timetabling System
         </h1>
       </div>
@@ -67,10 +69,10 @@ export function Header() {
             <Button
               variant="ghost"
               size="icon"
-              className="relative h-9 w-9 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="relative h-9 w-9 rounded-full text-slate-700 hover:bg-slate-900/10 hover:text-slate-900 dark:text-white/90 dark:hover:bg-white/15 dark:hover:text-white"
             >
               <Bell className="h-4 w-4" />
-              <Badge className="absolute -right-0.5 -top-0.5 h-4 w-4 rounded-full p-0 text-[10px] bg-primary text-primary-foreground border-2 border-card flex items-center justify-center">
+              <Badge className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-slate-900 text-[10px] text-white dark:border-card dark:bg-neutral-200 dark:text-black">
                 3
               </Badge>
               <span className="sr-only">View notifications</span>
@@ -97,12 +99,15 @@ export function Header() {
         {/* Profile Avatar */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
-              <Avatar className="h-10 w-10 border-2 border-border">
+            <Button
+              variant="ghost"
+              className="relative h-10 w-10 rounded-full p-0 text-slate-700 hover:bg-slate-900/10 hover:text-slate-900 dark:text-white/90 dark:hover:bg-white/15 dark:hover:text-white"
+            >
+              <Avatar className="h-10 w-10 border-2 border-slate-600/20 dark:border-white/35">
                 <AvatarImage src={profile?.avatar_url || undefined} alt="User" />
                 <AvatarFallback
                   delayMs={700}
-                  className="bg-primary text-primary-foreground font-semibold text-sm"
+                  className="bg-slate-900 text-white font-semibold text-sm dark:bg-neutral-200 dark:text-black"
                 >
                   {profile ? (
                     <>

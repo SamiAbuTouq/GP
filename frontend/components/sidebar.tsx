@@ -66,13 +66,18 @@ const entityNavItems = [
 
 const otherNavItems = [
   { title: "Reports", href: "/reports", icon: FileText },
-  { title: "Settings", href: "/settings", icon: Settings },
 ];
 
 const helpNavItem = {
   title: "Help & Support",
   href: "/help",
   icon: HelpCircle,
+};
+
+const settingsNavItem = {
+  title: "Settings",
+  href: "/settings",
+  icon: Settings,
 };
 
 function NavButton({
@@ -261,9 +266,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <TooltipProvider delayDuration={100}>
-      <div className="flex h-full flex-col bg-sidebar">
+      <div className="flex h-full flex-col bg-[linear-gradient(to_bottom,transparent_56px,hsl(var(--sidebar))_56px)]">
         {/* Logo Section */}
-        <div className={cn("flex h-16 items-center border-b border-sidebar-border", collapsed ? "justify-center px-2" : "gap-3 px-5")}>
+        <div
+          className={cn(
+            "flex h-14 items-center",
+            collapsed ? "justify-center px-2" : "gap-3 px-5",
+          )}
+        >
           <div className="flex h-9 w-9 shrink-0 items-center justify-center">
             <Image
               src="/images/psut-logo.png"
@@ -276,10 +286,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </div>
           {!collapsed && (
             <div className="flex flex-col min-w-0">
-              <span className="text-base font-bold text-sidebar-foreground">
+              <span className="text-base font-bold text-slate-900 dark:text-white">
                 PSUT
               </span>
-              <span className="text-xs text-muted-foreground truncate">
+              <span className="text-xs text-slate-700 dark:text-white/80 truncate">
                 Timetabling System
               </span>
             </div>
@@ -298,6 +308,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             icon={helpNavItem.icon}
             title={helpNavItem.title}
             isActive={pathname === helpNavItem.href}
+            collapsed={collapsed}
+            onClick={handleNavigate}
+          />
+          <NavButton
+            href={settingsNavItem.href}
+            icon={settingsNavItem.icon}
+            title={settingsNavItem.title}
+            isActive={pathname === settingsNavItem.href}
             collapsed={collapsed}
             onClick={handleNavigate}
           />
@@ -326,22 +344,23 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               <span>Logout</span>
             </Button>
           )}
-          {/* Collapse toggle */}
-          <div className={cn("pt-1", collapsed ? "flex justify-center" : "")}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              onClick={toggle}
-              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {collapsed ? (
-                <PanelLeftOpen className="h-4 w-4" />
-              ) : (
-                <PanelLeftClose className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
+        </div>
+
+        {/* Collapse toggle (separated; always last) */}
+        <div className={cn("border-t border-sidebar-border py-2", collapsed ? "flex justify-center" : "flex justify-end px-3 pr-[15px]")}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            onClick={toggle}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </Button>
         </div>
       </div>
     </TooltipProvider>
@@ -357,15 +376,19 @@ export function Sidebar() {
   }, []);
 
   return (
-    <aside
-      className={cn(
-        "hidden border-r border-sidebar-border bg-sidebar lg:block shrink-0",
-        transitionsEnabled && "transition-all duration-300 ease-in-out",
-        collapsed ? "w-12" : "w-56",
-      )}
-    >
-      <SidebarContent />
-    </aside>
+    <>
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-0 hidden h-14 border-b border-slate-300 dark:border-white/20 bg-[url('/images/background/C3.png')] bg-center bg-no-repeat bg-cover dark:bg-[image:linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)),url('/images/background/C3.png')] lg:block" />
+      <aside
+        className={cn(
+          "relative z-10 hidden lg:block shrink-0",
+          transitionsEnabled && "transition-all duration-300 ease-in-out",
+          collapsed ? "w-12" : "w-56",
+        )}
+      >
+        <div className="pointer-events-none absolute bottom-0 right-0 top-14 w-px bg-sidebar-border" />
+        <SidebarContent />
+      </aside>
+    </>
   );
 }
 
@@ -418,7 +441,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col bg-sidebar">
-      <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-5">
+      <div className="flex h-14 items-center gap-3 border-b border-slate-300 dark:border-white/20 bg-[url('/images/background/C3.png')] bg-center bg-no-repeat bg-cover dark:bg-[image:linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)),url('/images/background/C3.png')] px-5">
         <div className="flex h-9 w-9 items-center justify-center">
           <Image
             src="/images/psut-logo.png"
@@ -430,8 +453,8 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           />
         </div>
         <div className="flex flex-col">
-          <span className="text-base font-bold text-sidebar-foreground">PSUT</span>
-          <span className="text-xs text-muted-foreground">Timetabling System</span>
+          <span className="text-base font-bold text-slate-900 dark:text-white">PSUT</span>
+          <span className="text-xs text-slate-700 dark:text-white/80">Timetabling System</span>
         </div>
       </div>
 
@@ -507,6 +530,12 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <Button variant="ghost" className={getNavItemClasses(pathname === helpNavItem.href)}>
             <helpNavItem.icon className="h-5 w-5 shrink-0" />
             <span>{helpNavItem.title}</span>
+          </Button>
+        </Link>
+        <Link href={settingsNavItem.href} onClick={onNavigate} className="block w-full">
+          <Button variant="ghost" className={getNavItemClasses(pathname === settingsNavItem.href)}>
+            <settingsNavItem.icon className="h-5 w-5 shrink-0" />
+            <span>{settingsNavItem.title}</span>
           </Button>
         </Link>
         <Button

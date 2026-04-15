@@ -14,6 +14,7 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [devResetUrl, setDevResetUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,6 +36,7 @@ export default function ForgotPasswordPage() {
         });
         return;
       }
+      setDevResetUrl(typeof data.devResetUrl === "string" ? data.devResetUrl : null);
       setIsSubmitted(true);
     } catch(err) {
       toast({
@@ -136,6 +138,18 @@ export default function ForgotPasswordPage() {
                 , you will receive an email with instructions to reset your
                 password.
               </p>
+              {devResetUrl ? (
+                <div className="text-left text-sm text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 rounded-xl p-4 border border-amber-200 dark:border-amber-800">
+                  <p className="font-semibold mb-1">Email delivery failed in development.</p>
+                  <p className="mb-2">Use this reset link directly:</p>
+                  <Link
+                    href={devResetUrl}
+                    className="break-all underline text-blue-700 dark:text-blue-300"
+                  >
+                    {devResetUrl}
+                  </Link>
+                </div>
+              ) : null}
               <Button
                 asChild
                 className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base rounded-xl shadow-lg shadow-blue-600/25 transition-all hover:shadow-xl hover:shadow-blue-600/30"

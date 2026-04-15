@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
  
 import { formatName } from '@/lib/utils'
 import { useEffect, useState } from 'react'
@@ -23,11 +23,6 @@ import {
   Scatter,
   ScatterChart,
   ZAxis,
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/course-analytics-ui/card'
 import type { 
@@ -45,7 +40,6 @@ import type {
   FacultyWorkloadData,
   RoomTypeUtilization,
   AcademicLevelModeData,
-  AcademicFocusData
 } from '@/lib/course-analytics/course-data'
 
 
@@ -231,7 +225,7 @@ export function SemesterChart({ data }: SemesterChartProps) {
               fontSize={11} 
               tickLine={false} 
               axisLine={false}
-              tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+              tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value.toString()}
               tick={AXIS_TICK}
               label={{ value: 'Students', angle: -90, position: 'insideLeft', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
@@ -278,6 +272,10 @@ export function SemesterChart({ data }: SemesterChartProps) {
             />
           </ComposedChart>
         </ResponsiveContainer>
+        {/* Issue 9: clarify students axis always uses seat-enrollment, even when the KPI above shows HC */}
+        <p className="mt-2 text-[10px] text-muted-foreground text-center">
+          Student counts shown as seat-enrollment (sum of section registrations per semester).
+        </p>
       </CardContent>
     </Card>
   )
@@ -430,15 +428,16 @@ interface DayChartProps {
 
 export function DayChart({ data }: DayChartProps) {
   const colors = useChartColors()
+  const chartData = data.filter((d) => d.day !== 'Sat' && d.day !== 'Saturday')
   return (
     <Card>
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg font-semibold">Weekly Distribution</CardTitle>
-        <CardDescription>Section-days and student-seat-days by day</CardDescription>
+        <CardTitle className="text-lg font-semibold">Weekly Student-seat-days</CardTitle>
+        <CardDescription>Section-days and student-seat-days by day of week</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={280}>
-          <ComposedChart data={data} margin={{ left: 10, right: 10, top: 10, bottom: 20 }}>
+          <ComposedChart data={chartData} margin={{ left: 10, right: 10, top: 10, bottom: 20 }}>
             <XAxis 
               dataKey="day" 
               stroke={AXIS_STROKE}
@@ -466,9 +465,32 @@ export function DayChart({ data }: DayChartProps) {
               axisLine={false}
               tick={AXIS_TICK}
               tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v.toString()}
-              label={{ value: 'Student-Seat-Days', angle: 90, position: 'insideRight', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
+              label={{ value: 'Student-seat-days', angle: 90, position: 'insideRight', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip
+              content={({ active, payload, label }) => {
+                if (!active || !payload?.length) return null
+                const row = payload[0]?.payload as DayData
+                return (
+                  <div className="rounded-xl border border-white/20 bg-background/60 px-4 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-md ca-dark:border-white/10 ca-dark:bg-black/60">
+                    <p className="mb-2 text-sm font-semibold text-foreground">{label}</p>
+                    <div className="space-y-1.5 text-sm">
+                      <div className="flex items-center justify-between gap-6">
+                        <span className="text-muted-foreground">Section-days</span>
+                        <span className="font-medium tabular-nums text-foreground">{row.sections.toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-6">
+                        <span className="text-muted-foreground">Student-seat-days</span>
+                        <span className="font-medium tabular-nums text-foreground">{row.students.toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Student-seat-days counts each section meeting (students x meeting day), not unique students.
+                    </p>
+                  </div>
+                )
+              }}
+            />
             <Legend 
               wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }}
               iconType="circle"
@@ -797,61 +819,7 @@ export function SectionScatterChart({ data }: SectionScatterChartProps) {
   )
 }
 
-// Course Level Distribution
-interface CourseLevelData {
-  level: string
-  count: number
-  students: number
-}
 
-interface CourseLevelChartProps {
-  data: CourseLevelData[]
-}
-
-export function CourseLevelChart({ data }: CourseLevelChartProps) {
-  const colors = useChartColors()
-  return (
-    <Card>
-      <CardHeader className="pb-4">
-        <CardTitle className="text-lg font-semibold">Course Level Distribution</CardTitle>
-        <CardDescription>Sections by course level</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={data} margin={{ left: 10, right: 10, top: 10, bottom: 20 }}>
-            <XAxis 
-              dataKey="level" 
-              stroke={AXIS_STROKE}
-              fontSize={11} 
-              tickLine={false} 
-              axisLine={false}
-              tick={AXIS_TICK}
-              label={{ value: 'Course Level', position: 'bottom', offset: 0, fill: 'var(--color-muted-foreground)', fontSize: 10 }}
-            />
-            <YAxis 
-              stroke={AXIS_STROKE}
-              fontSize={11} 
-              tickLine={false} 
-              axisLine={false}
-              tick={AXIS_TICK}
-              label={{ value: 'Number of Sections', angle: -90, position: 'insideLeft', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
-            />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-            <Bar 
-              dataKey="count" 
-              fill={colors[4]}
-              radius={[6, 6, 0, 0]}
-              name="Sections"
-              isAnimationActive={true}
-              animationDuration={1500}
-              animationEasing="ease-out"
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
-  )
-}
 
 // Utilization Heatmap (simplified as bars for each day-hour combo)
 interface HeatmapData {
@@ -865,7 +833,8 @@ interface UtilizationHeatmapProps {
 }
 
 export function UtilizationHeatmap({ data }: UtilizationHeatmapProps) {
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Sat']
+  // Saturday excluded – matches DayChart filter (PSUT workweek is Sun–Thu)
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu']
   const hours = [...new Set(data.map(d => d.hour))].sort()
   
   const maxValue = Math.max(...data.map(d => d.value))
@@ -984,7 +953,7 @@ export function UnderenrolledAlert({ data, threshold = 10 }: UnderenrolledAlertP
           Underenrolled Sections
         </CardTitle>
         <CardDescription>
-          {data.length} sections with fewer than {threshold} students
+          {data.length} physical sections with fewer than {threshold} students enrolled (online excluded)
         </CardDescription>
       </CardHeader>
       <CardContent className="px-0 pb-0">
@@ -1142,7 +1111,7 @@ export function RoomWasteTable({ data, className }: { data: RoomWasteData[], cla
     <Card className={`flex flex-col h-full border-border/40 overflow-hidden ${className || ''}`}>
       <CardHeader className="pb-4 shrink-0">
         <CardTitle className="text-lg font-semibold text-destructive">Room Efficiency Analysis</CardTitle>
-        <CardDescription>Top rooms with highest number of unused seats</CardDescription>
+        <CardDescription>Top rooms by average unused seats per term</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden px-0 pb-0 min-h-0">
         <div className="h-full overflow-y-auto">
@@ -1150,9 +1119,9 @@ export function RoomWasteTable({ data, className }: { data: RoomWasteData[], cla
             <thead className="sticky top-0 bg-card/95 backdrop-blur">
               <tr className="border-b text-left">
                 <th className="px-6 py-2.5 font-medium text-muted-foreground text-xs uppercase tracking-wider">Room</th>
-                <th className="px-3 py-2.5 text-right font-medium text-muted-foreground text-xs uppercase tracking-wider">Unused</th>
+                <th className="px-3 py-2.5 text-right font-medium text-muted-foreground text-xs uppercase tracking-wider">Unused/Term</th>
                 <th className="px-3 py-2.5 text-right font-medium text-muted-foreground text-xs uppercase tracking-wider">Fill %</th>
-                <th className="px-6 py-2.5 text-right font-medium text-muted-foreground text-xs uppercase tracking-wider">Capacity</th>
+                <th className="px-6 py-2.5 text-right font-medium text-muted-foreground text-xs uppercase tracking-wider">Capacity/Term</th>
               </tr>
             </thead>
             <tbody>
@@ -1342,8 +1311,9 @@ export function FacultyWorkloadChart({ data }: FacultyWorkloadChartProps) {
   return (
     <Card>
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg font-semibold">Faculty Workload Distribution</CardTitle>
-        <CardDescription>Number of sections assigned per lecturer</CardDescription>
+        {/* Issue 4: updated title/description to reflect average-per-term bucketing */}
+        <CardTitle className="text-lg font-semibold">Faculty Avg Load Distribution</CardTitle>
+        <CardDescription>Lecturers grouped by their rounded average sections per term</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={280}>
@@ -1355,7 +1325,7 @@ export function FacultyWorkloadChart({ data }: FacultyWorkloadChartProps) {
               tickLine={false} 
               axisLine={false}
               tick={AXIS_TICK}
-              label={{ value: 'Sections Taught', position: 'bottom', offset: 0, fill: 'var(--color-muted-foreground)', fontSize: 10 }}
+              label={{ value: 'Avg Sections Per Term', position: 'bottom', offset: 0, fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
             <YAxis 
               stroke={AXIS_STROKE}
@@ -1469,75 +1439,6 @@ export function AcademicLevelStackedChart({ data }: AcademicLevelStackedChartPro
             <Bar dataKey="online" stackId="a" fill={colors[1]} name="Online" radius={[0, 0, 0, 0]} isAnimationActive={true} />
             <Bar dataKey="blended" stackId="a" fill={colors[2]} name="Blended" radius={[4, 4, 0, 0]} isAnimationActive={true} />
           </BarChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
-  )
-}
-
-export interface AcademicFocusRadarChartProps {
-  data: AcademicFocusData[]
-}
-
-export function AcademicFocusRadarChart({ data }: AcademicFocusRadarChartProps) {
-  const colors = useChartColors()
-  const mainColor = colors[0]
-
-  return (
-    <Card className="overflow-hidden bg-card/60 backdrop-blur-xl transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5">
-      <CardHeader className="pb-2">
-        <div>
-          <CardTitle className="text-lg font-bold tracking-tight">Academic Focus</CardTitle>
-          <CardDescription className="text-sm">Course distribution across levels</CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent className="h-[270px] p-0">
-        <ResponsiveContainer width="100%" height="100%">
-          <RadarChart cx="50%" cy="50%" outerRadius="75%" data={data} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
-            <PolarGrid 
-              stroke="var(--color-border)" 
-              strokeDasharray="4 4" 
-              gridType="polygon"
-            />
-            <PolarAngleAxis 
-              dataKey="level" 
-              tick={{ fill: 'var(--color-muted-foreground)', fontSize: 12, fontWeight: 500 }}
-            />
-            <PolarRadiusAxis 
-              angle={90} 
-              domain={[0, 'auto']} 
-              tick={false} 
-              axisLine={false} 
-            />
-            <Radar
-              name="Courses"
-              dataKey="count"
-              stroke={mainColor}
-              strokeWidth={3}
-              fill={mainColor}
-              fillOpacity={0.3}
-              dot={{ r: 4, fill: 'var(--background)', stroke: mainColor, strokeWidth: 2 }}
-              activeDot={{ r: 6, strokeWidth: 0 }}
-              isAnimationActive={true}
-              animationDuration={2000}
-              animationEasing="ease-in-out"
-            />
-            <Tooltip 
-              content={({ active, payload }) => {
-                if (!active || !payload?.length) return null
-                const item = payload[0].payload as AcademicFocusData
-                return (
-                  <div className="rounded-xl border border-white/20 bg-background/80 px-4 py-3 shadow-xl backdrop-blur-xl ca-dark:border-white/10 ca-dark:bg-black/80">
-                    <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">{item.level}</p>
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: mainColor }} />
-                      <p className="text-sm font-bold text-foreground">{item.count} <span className="font-normal text-muted-foreground">Sections</span></p>
-                    </div>
-                  </div>
-                )
-              }}
-            />
-          </RadarChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>

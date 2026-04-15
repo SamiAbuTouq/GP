@@ -3,4 +3,5 @@ export interface JwtPayload {
     sub: number;
     email: string;
     role: Role;
+    requires_password_change: boolean;
 }

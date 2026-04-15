@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/course-analytics-ui/card'
 import { Badge } from '@/components/course-analytics-ui/badge'
@@ -49,8 +49,9 @@ export function DepartmentsTab({ departmentData, scatterData }: DepartmentsTabPr
                       <td className="px-4 py-3 text-right text-muted-foreground">{dept.sections}</td>
                       <td className="px-4 py-3 text-right text-muted-foreground">{dept.courses}</td>
                       <td className="px-6 py-3 text-right">
+                        {/* Issue 5: unified thresholds — ≥90=full/default, ≥75=high/secondary, ≥60=medium/outline, <60=low/destructive */}
                         <Badge
-                          variant={dept.utilization >= 80 ? 'default' : dept.utilization >= 60 ? 'secondary' : 'outline'}
+                          variant={dept.utilization >= 90 ? 'default' : dept.utilization >= 75 ? 'secondary' : dept.utilization >= 60 ? 'outline' : 'destructive'}
                           className="font-mono text-xs"
                         >
                           {dept.utilization}%

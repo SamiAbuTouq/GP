@@ -39,5 +39,6 @@ export declare class TimetablesController {
         isLab: boolean;
         registeredStudents: number;
         sectionCapacity: number;
+        isOnline: boolean;
     }[]>;
 }

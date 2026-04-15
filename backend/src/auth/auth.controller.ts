@@ -22,6 +22,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 // Response type for login/refresh (only access_token in body)
 interface AccessTokenResponse {
   access_token: string;
+  requires_password_change: boolean;
 }
 
 @Controller('auth')
@@ -58,7 +59,10 @@ export class AuthController {
     this.setRefreshTokenCookie(res, tokens.refresh_token);
 
     // Only return access token in response body
-    return { access_token: tokens.access_token };
+    return {
+      access_token: tokens.access_token,
+      requires_password_change: tokens.requires_password_change,
+    };
   }
 
   /**
@@ -85,7 +89,10 @@ export class AuthController {
     this.setRefreshTokenCookie(res, tokens.refresh_token);
 
     // Only return access token in response body
-    return { access_token: tokens.access_token };
+    return {
+      access_token: tokens.access_token,
+      requires_password_change: tokens.requires_password_change,
+    };
   }
 
   /**
@@ -114,13 +121,24 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('check')
   @HttpCode(HttpStatus.OK)
-  async check(@CurrentUser() user: User): Promise<{ valid: boolean; user: { id: number; email: string; role: string } }> {
+  async check(
+    @CurrentUser() user: User,
+  ): Promise<{
+    valid: boolean;
+    user: {
+      id: number;
+      email: string;
+      role: string;
+      requires_password_change: boolean;
+    };
+  }> {
     return {
       valid: true,
       user: {
         id: user.user_id,
         email: user.email,
         role: user.role_name,
+        requires_password_change: user.must_change_password,
       },
     };
   }

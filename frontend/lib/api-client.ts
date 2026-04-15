@@ -63,6 +63,7 @@ function setAuthHintCookie(isAuthenticated: boolean): void {
 
 export interface AccessTokenResponse {
   access_token: string;
+  requires_password_change: boolean;
 }
 
 // Custom error class for API errors with detailed information
@@ -337,6 +338,13 @@ export class ApiClient {
     return this.request<UserPreferences>('/users/me/preferences', {
       method: 'PATCH',
       body: JSON.stringify(data),
+    });
+  }
+
+  static async updateMyPassword(newPassword: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>('/users/me/password', {
+      method: 'PATCH',
+      body: JSON.stringify({ new_password: newPassword }),
     });
   }
 }

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
  
 import { formatName } from '@/lib/utils'
 import {
@@ -81,14 +81,21 @@ export function TopCoursesTable({ data, className }: TopCoursesTableProps) {
 interface TopLecturersTableProps {
   data: LecturerData[]
   className?: string
+  /** Number of distinct terms in the current filtered dataset (from stats.uniqueSemesters).
+   *  When > 1 a disclaimer note is shown so users know section counts are cumulative. */
+  uniqueSemesters?: number
 }
 
-export function TopLecturersTable({ data, className }: TopLecturersTableProps) {
+export function TopLecturersTable({ data, className, uniqueSemesters = 1 }: TopLecturersTableProps) {
   return (
     <Card className={className}>
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Top Lecturers</CardTitle>
-        <CardDescription>Lecturers with most sections</CardDescription>
+        <CardDescription>
+          {uniqueSemesters > 1
+            ? `Sections & students are cumulative across ${uniqueSemesters} terms — not per-term averages`
+            : 'Lecturers with most sections'}
+        </CardDescription>
       </CardHeader>
       <CardContent className="px-0 pb-0">
         <ScrollArea className="h-[600px]">

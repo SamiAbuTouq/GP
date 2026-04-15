@@ -1,6 +1,7 @@
 import { UsersService } from "./users.service";
 import { UpdateProfileDto, UpdatePreferencesDto } from "./dto/update-user.dto";
 import type { User } from "@prisma/client";
+import { UpdatePasswordDto } from "./dto/update-password.dto";
 export declare class UsersController {
     private readonly usersService;
     constructor(usersService: UsersService);
@@ -28,5 +29,8 @@ export declare class UsersController {
         theme_preference: string;
         date_format: string;
         time_format: string;
+    }>;
+    updatePassword(user: User, dto: UpdatePasswordDto): Promise<{
+        success: boolean;
     }>;
 }

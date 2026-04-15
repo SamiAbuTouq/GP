@@ -23,13 +23,14 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Plus, Search, Edit, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Loader2 } from "lucide-react"
+import { Plus, Search, Edit, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Loader2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
 import { ImportIcon } from "@/components/custom-icons"
 import { departments, type Department } from "@/lib/data"
 import { ImportDialog } from "@/components/import-dialog"
 import { findColumn, type ParsedRow } from "@/lib/import-utils"
 import { ExportDropdownWithDialog } from "@/components/export-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
 
 type Lecturer = {
   id: string
@@ -45,6 +46,49 @@ type Lecturer = {
 type CourseOption = {
   code: string
   name: string
+}
+
+type LecturerSortColumn = "id" | "name" | "department" | "load" | "maxWorkload"
+
+const DEFAULT_MAX_WORKLOAD = 15
+const MAX_ALLOWED_WORKLOAD = 30
+
+const clampWorkload = (value: number): number =>
+  Math.min(MAX_ALLOWED_WORKLOAD, Math.max(1, value))
+
+function sortLecturersCopy(
+  list: Lecturer[],
+  sortColumn: LecturerSortColumn | null,
+  sortDirection: "asc" | "desc",
+): Lecturer[] {
+  const copy = [...list]
+  if (!sortColumn) return copy
+  const mult = sortDirection === "asc" ? 1 : -1
+  copy.sort((a, b) => {
+    let cmp = 0
+    switch (sortColumn) {
+      case "id":
+        cmp = a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: "base" })
+        break
+      case "name":
+        cmp = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })
+        break
+      case "department":
+        cmp = a.department.localeCompare(b.department, undefined, { numeric: true, sensitivity: "base" })
+        break
+      case "load":
+        cmp = a.load - b.load
+        break
+      case "maxWorkload":
+        cmp = a.maxWorkload - b.maxWorkload
+        break
+      default:
+        break
+    }
+    if (cmp !== 0) return cmp * mult
+    return a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: "base" }) * mult
+  })
+  return copy
 }
 
 const normalizeCourseOption = (course: unknown): CourseOption | null => {
@@ -80,6 +124,8 @@ export default function LecturersPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [sortColumn, setSortColumn] = useState<LecturerSortColumn | null>(null)
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const { toast } = useToast()
 
   // Fetch lecturers and courses from API
@@ -99,15 +145,18 @@ export default function LecturersPage() {
 
       // Fetch courses — optional; if it fails just leave the courses list empty
       try {
-        const coursesRes = await fetch('/api/courses')
+        // NOTE: `/api/courses` returns analytics (schedule-entry rows). For the lecturer UI
+        // we need the catalog list (code + name).
+        const coursesRes = await fetch('/api/courses/catalog')
         if (coursesRes.ok) {
           const coursesData = await coursesRes.json()
-          setAvailableCourses(
-            Array.isArray(coursesData)
-              ? coursesData
-                  .map(normalizeCourseOption)
-                  .filter((course): course is CourseOption => course !== null)
+          const rawCourses = Array.isArray(coursesData)
+            ? coursesData
+            : Array.isArray((coursesData as { courses?: unknown }).courses)
+              ? (coursesData as { courses: unknown[] }).courses
               : []
+          setAvailableCourses(
+            rawCourses.map(normalizeCourseOption).filter((course): course is CourseOption => course !== null)
           )
         }
       } catch {
@@ -127,15 +176,17 @@ export default function LecturersPage() {
     }
   }
 
+  const searchQueryLower = searchQuery.trim().toLowerCase()
   const filteredLecturers = useMemo(
     () =>
-      lecturers.filter(
-        (l) =>
-          l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          l.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          l.email.toLowerCase().includes(searchQuery.toLowerCase())
-      ),
-    [lecturers, searchQuery]
+      searchQueryLower === ""
+        ? lecturers
+        : lecturers.filter((l) => {
+            const id = (l.id ?? "").toString().toLowerCase()
+            const name = (l.name ?? "").toLowerCase()
+            return id.includes(searchQueryLower) || name.includes(searchQueryLower)
+          }),
+    [lecturers, searchQueryLower]
   )
 
   const addCourseQueryLower = addCourseQuery.toLowerCase()
@@ -156,12 +207,32 @@ export default function LecturersPage() {
     [availableCourses, editCourseQueryLower]
   )
 
-  const totalPages = Math.ceil(filteredLecturers.length / pageSize)
+  const sortedFilteredLecturers = useMemo(
+    () => sortLecturersCopy(filteredLecturers, sortColumn, sortDirection),
+    [filteredLecturers, sortColumn, sortDirection]
+  )
+
+  const sortedAllLecturers = useMemo(
+    () => sortLecturersCopy(lecturers, sortColumn, sortDirection),
+    [lecturers, sortColumn, sortDirection]
+  )
+
+  const totalPages = Math.ceil(sortedFilteredLecturers.length / pageSize)
   const maxPage = totalPages || 1
   const paginatedLecturers = useMemo(() => {
     const start = (currentPage - 1) * pageSize
-    return filteredLecturers.slice(start, start + pageSize)
-  }, [filteredLecturers, currentPage, pageSize])
+    return sortedFilteredLecturers.slice(start, start + pageSize)
+  }, [sortedFilteredLecturers, currentPage, pageSize])
+
+  const handleSortColumn = (col: LecturerSortColumn) => {
+    setCurrentPage(1)
+    if (sortColumn !== col) {
+      setSortColumn(col)
+      setSortDirection("asc")
+    } else {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"))
+    }
+  }
 
   const handleAddLecturer = async () => {
     if (!newLecturer.name.trim()) {
@@ -170,6 +241,14 @@ export default function LecturersPage() {
     }
     if (!newLecturer.email.trim()) {
       toast({ title: "Validation Error", description: "Email address is required.", variant: "destructive" })
+      return
+    }
+    if (newLecturer.maxWorkload > MAX_ALLOWED_WORKLOAD) {
+      toast({
+        title: "Validation Error",
+        description: `Max workload cannot be more than ${MAX_ALLOWED_WORKLOAD} hours.`,
+        variant: "destructive",
+      })
       return
     }
     
@@ -201,7 +280,7 @@ export default function LecturersPage() {
         email: "",
         department: "Computer Science",
         load: 0,
-        maxWorkload: 15,
+        maxWorkload: DEFAULT_MAX_WORKLOAD,
         courses: [],
       })
       setIsAddDialogOpen(false)
@@ -216,6 +295,14 @@ export default function LecturersPage() {
 
   const handleEditLecturer = async () => {
     if (!editingLecturer) return
+    if (editingLecturer.maxWorkload > MAX_ALLOWED_WORKLOAD) {
+      toast({
+        title: "Validation Error",
+        description: `Max workload cannot be more than ${MAX_ALLOWED_WORKLOAD} hours.`,
+        variant: "destructive",
+      })
+      return
+    }
     
     try {
       setSaving(true)
@@ -287,11 +374,19 @@ export default function LecturersPage() {
     { key: "courses" as const, label: "Courses" },
   ]
 
-  const getLoadColor = (load: number, maxWorkload: number) => {
-    const ratio = load / maxWorkload
-    if (ratio <= 0.6) return "bg-green-500"
-    if (ratio <= 0.85) return "bg-amber-500"
-    return "bg-red-500"
+  const getLoadRatio = (load: number, maxWorkload: number): number => {
+    const safeMax = maxWorkload > 0 ? maxWorkload : 15
+    return load / safeMax
+  }
+
+  const getLoadIndicatorStyle = (load: number, maxWorkload: number): React.CSSProperties => {
+    const cappedRatio = Math.min(Math.max(getLoadRatio(load, maxWorkload), 0), 1.2)
+    // Hue moves from green (120) to red (0) continuously for richer shades.
+    const startHue = Math.max(0, 120 - cappedRatio * 120)
+    const endHue = Math.max(0, startHue - 16)
+    return {
+      background: `linear-gradient(90deg, hsl(${startHue} 78% 42%), hsl(${endHue} 88% 52%))`,
+    }
   }
 
   const getDepartmentColor = (dept: Department) => {
@@ -330,22 +425,26 @@ export default function LecturersPage() {
     <EntityLayout title="Lecturer Management" description="Add, edit, and manage faculty members.">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Lecturers ({filteredLecturers.length})</CardTitle>
+          <CardTitle>Lecturers ({sortedFilteredLecturers.length})</CardTitle>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="bg-transparent" onClick={() => setIsImportDialogOpen(true)}>
               <ImportIcon className="mr-2 h-4 w-4" />
               Import
             </Button>
             <ExportDropdownWithDialog
-              allData={lecturers.map((l) => ({ ...l, courses: l.courses.join(", ") }))}
+              allData={sortedAllLecturers.map((l) => ({ ...l, courses: l.courses.join(", ") }))}
               filteredData={paginatedLecturers.map((l) => ({ ...l, courses: l.courses.join(", ") }))}
               columns={lecturerColumns}
               filenamePrefix="lecturers"
               pdfTitle="Lecturers"
               totalLabel={`${lecturers.length}`}
               filteredLabel={`${paginatedLecturers.length}`}
-              isFiltered={searchQuery !== ""}
-              filterDescription={searchQuery ? `search: "${searchQuery}"` : undefined}
+              isFiltered={searchQuery !== "" || sortColumn !== null}
+              filterDescription={
+                [searchQuery ? `search: "${searchQuery}"` : null, sortColumn ? `sort: ${sortColumn} ${sortDirection}` : null]
+                  .filter(Boolean)
+                  .join(" · ") || undefined
+              }
             />
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
@@ -406,11 +505,17 @@ export default function LecturersPage() {
                         id="lecturer-max"
                         type="number"
                         min="1"
-                        max="24"
+                        max={MAX_ALLOWED_WORKLOAD}
                         value={newLecturer.maxWorkload}
-                        onChange={(e) =>
-                          setNewLecturer({ ...newLecturer, maxWorkload: Number.parseInt(e.target.value) || 15 })
-                        }
+                        onChange={(e) => {
+                          const parsed = Number.parseInt(e.target.value, 10)
+                          setNewLecturer({
+                            ...newLecturer,
+                            maxWorkload: Number.isNaN(parsed)
+                              ? DEFAULT_MAX_WORKLOAD
+                              : clampWorkload(parsed),
+                          })
+                        }}
                       />
                     </div>
                   </div>
@@ -478,12 +583,112 @@ export default function LecturersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Name</TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "id" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => handleSortColumn("id")}
+                    >
+                      ID
+                      {sortColumn === "id" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "name" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => handleSortColumn("name")}
+                    >
+                      Name
+                      {sortColumn === "name" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Teaching Load</TableHead>
-                  <TableHead className="text-center">Max Workload</TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "department" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => handleSortColumn("department")}
+                    >
+                      Department
+                      {sortColumn === "department" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex items-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "load" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => handleSortColumn("load")}
+                    >
+                      Teaching Load
+                      {sortColumn === "load" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex w-full items-center justify-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "maxWorkload" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => handleSortColumn("maxWorkload")}
+                    >
+                      Max Workload
+                      {sortColumn === "maxWorkload" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
                   <TableHead>Courses</TableHead>
                   <TableHead className="w-[70px]">Actions</TableHead>
                 </TableRow>
@@ -507,8 +712,9 @@ export default function LecturersPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Progress
-                            value={(lecturer.load / lecturer.maxWorkload) * 100}
-                            className={`h-2 w-20 ${getLoadColor(lecturer.load, lecturer.maxWorkload)}`}
+                            value={Math.min(100, getLoadRatio(lecturer.load, lecturer.maxWorkload) * 100)}
+                            className="h-2 w-20 bg-muted"
+                            indicatorStyle={getLoadIndicatorStyle(lecturer.load, lecturer.maxWorkload)}
                           />
                           <span className="text-sm">{lecturer.load}h</span>
                         </div>
@@ -709,11 +915,17 @@ export default function LecturersPage() {
                   <Input
                     type="number"
                     min="1"
-                    max="24"
+                    max={MAX_ALLOWED_WORKLOAD}
                     value={editingLecturer.maxWorkload}
-                    onChange={(e) =>
-                      setEditingLecturer({ ...editingLecturer, maxWorkload: Number.parseInt(e.target.value) || 15 })
-                    }
+                    onChange={(e) => {
+                      const parsed = Number.parseInt(e.target.value, 10)
+                      setEditingLecturer({
+                        ...editingLecturer,
+                        maxWorkload: Number.isNaN(parsed)
+                          ? DEFAULT_MAX_WORKLOAD
+                          : clampWorkload(parsed),
+                      })
+                    }}
                   />
                 </div>
               </div>

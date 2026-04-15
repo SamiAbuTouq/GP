@@ -45,7 +45,7 @@ export function InsightsTab({ yearGrowth, underenrolled, highDemand, semesterYoY
                 Year-over-Year Growth Details
               </CardTitle>
               <CardDescription>
-                First-semester headcount from the registrar when available; section counts from schedule data
+                Growth compares one consistent metric per year pair: headcount only when both years have it, otherwise seat-enrollment totals for both
               </CardDescription>
             </CardHeader>
             <CardContent>

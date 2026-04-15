@@ -46,34 +46,44 @@ exports.LecturersService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const bcrypt = __importStar(require("bcrypt"));
+const crypto_1 = require("crypto");
+const mail_service_1 = require("../mail/mail.service");
 const STANDARD_MAX_WORKLOAD_HOURS = 15;
 let LecturersService = class LecturersService {
-    constructor(prisma) {
+    constructor(prisma, mailService) {
         this.prisma = prisma;
+        this.mailService = mailService;
     }
-    async resolveCurrentTimetableId() {
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        let semester = await this.prisma.semester.findFirst({
-            where: {
-                start_date: { lte: today },
-                end_date: { gte: today },
-            },
-            orderBy: { start_date: 'desc' },
-        });
-        if (!semester) {
-            semester = await this.prisma.semester.findFirst({
-                orderBy: { start_date: 'desc' },
-            });
-        }
-        if (!semester)
-            return null;
+    generateTemporaryPassword(length = 16) {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*';
+        const bytes = (0, crypto_1.randomBytes)(length);
+        return Array.from(bytes)
+            .map((byte) => chars[byte % chars.length])
+            .join('');
+    }
+    async resolveLatestTimetableId() {
         const timetables = await this.prisma.timetable.findMany({
-            where: { semester_id: semester.semester_id },
-            orderBy: [{ version_number: 'desc' }, { generated_at: 'desc' }],
+            include: {
+                _count: {
+                    select: { section_schedule_entries: true },
+                },
+            },
+            orderBy: [
+                { generated_at: 'desc' },
+                { version_number: 'desc' },
+                { timetable_id: 'desc' },
+            ],
         });
-        const timetable = timetables.find((t) => t.status === 'active') ?? timetables[0];
-        return timetable?.timetable_id ?? null;
+        if (timetables.length === 0)
+            return null;
+        const activeWithAssignments = timetables.find((t) => t.status === 'active' && t._count.section_schedule_entries > 0);
+        if (activeWithAssignments)
+            return activeWithAssignments.timetable_id;
+        const latestWithAssignments = timetables.find((t) => t._count.section_schedule_entries > 0);
+        if (latestWithAssignments)
+            return latestWithAssignments.timetable_id;
+        const latestActive = timetables.find((t) => t.status === 'active');
+        return latestActive?.timetable_id ?? timetables[0].timetable_id;
     }
     async teachingLoadByUserIdForTimetable(timetableId) {
         const rows = await this.prisma.sectionScheduleEntry.findMany({
@@ -100,7 +110,7 @@ let LecturersService = class LecturersService {
         return rows.reduce((acc, row) => acc + row.course.credit_hours, 0);
     }
     async findAll() {
-        const timetableId = await this.resolveCurrentTimetableId();
+        const timetableId = await this.resolveLatestTimetableId();
         const loadByUserId = timetableId
             ? await this.teachingLoadByUserIdForTimetable(timetableId)
             : new Map();
@@ -125,7 +135,7 @@ let LecturersService = class LecturersService {
                 department: lecturer.department.dept_name,
                 departmentId: lecturer.dept_id,
                 load: loadByUserId.get(lecturer.user_id) ?? 0,
-                maxWorkload: STANDARD_MAX_WORKLOAD_HOURS,
+                maxWorkload: lecturer.max_workload ?? STANDARD_MAX_WORKLOAD_HOURS,
                 courses: lecturer.lecturer_can_teach_course.map((c) => c.course.course_code),
                 isAvailable: lecturer.is_available,
             };
@@ -147,7 +157,7 @@ let LecturersService = class LecturersService {
         if (!lecturer) {
             throw new common_1.NotFoundException(`Lecturer with ID ${id} not found`);
         }
-        const timetableId = await this.resolveCurrentTimetableId();
+        const timetableId = await this.resolveLatestTimetableId();
         const load = timetableId !== null
             ? await this.teachingLoadForUserOnTimetable(timetableId, lecturer.user_id)
             : 0;
@@ -159,7 +169,7 @@ let LecturersService = class LecturersService {
             department: lecturer.department.dept_name,
             departmentId: lecturer.dept_id,
             load,
-            maxWorkload: STANDARD_MAX_WORKLOAD_HOURS,
+            maxWorkload: lecturer.max_workload ?? STANDARD_MAX_WORKLOAD_HOURS,
             courses: lecturer.lecturer_can_teach_course.map((c) => c.course.course_code),
             isAvailable: lecturer.is_available,
         };
@@ -173,7 +183,8 @@ let LecturersService = class LecturersService {
                 data: { dept_name: dto.department },
             });
         }
-        const hashedPassword = await bcrypt.hash('tempPassword123', 10);
+        const temporaryPassword = this.generateTemporaryPassword();
+        const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
         const nameParts = dto.name.split(' ');
         const firstName = nameParts[0] || '';
         const lastName = nameParts.slice(1).join(' ') || '';
@@ -181,6 +192,7 @@ let LecturersService = class LecturersService {
             data: {
                 email: dto.email,
                 password_hash: hashedPassword,
+                must_change_password: true,
                 first_name: firstName,
                 last_name: lastName,
                 role_name: 'LECTURER',
@@ -190,7 +202,7 @@ let LecturersService = class LecturersService {
             data: {
                 user_id: user.user_id,
                 dept_id: department.dept_id,
-                max_workload: STANDARD_MAX_WORKLOAD_HOURS,
+                max_workload: dto.maxWorkload ?? STANDARD_MAX_WORKLOAD_HOURS,
                 is_available: true,
             },
         });
@@ -205,6 +217,11 @@ let LecturersService = class LecturersService {
                 })),
             });
         }
+        await this.mailService.sendLecturerWelcomeEmail({
+            to: dto.email,
+            fullName: dto.name,
+            temporaryPassword,
+        });
         return {
             id: `LEC${String(lecturer.user_id).padStart(3, '0')}`,
             databaseId: lecturer.user_id,
@@ -213,7 +230,7 @@ let LecturersService = class LecturersService {
             department: dto.department,
             departmentId: department.dept_id,
             load: 0,
-            maxWorkload: STANDARD_MAX_WORKLOAD_HOURS,
+            maxWorkload: lecturer.max_workload ?? STANDARD_MAX_WORKLOAD_HOURS,
             courses: dto.courses || [],
             isAvailable: true,
         };
@@ -255,7 +272,7 @@ let LecturersService = class LecturersService {
             where: { user_id: id },
             data: {
                 dept_id: deptId,
-                max_workload: STANDARD_MAX_WORKLOAD_HOURS,
+                ...(dto.maxWorkload !== undefined ? { max_workload: dto.maxWorkload } : {}),
             },
         });
         if (dto.courses !== undefined) {
@@ -292,6 +309,7 @@ let LecturersService = class LecturersService {
 exports.LecturersService = LecturersService;
 exports.LecturersService = LecturersService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        mail_service_1.MailService])
 ], LecturersService);
 //# sourceMappingURL=lecturers.service.js.map

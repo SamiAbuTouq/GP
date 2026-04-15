@@ -2,44 +2,61 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLecturerDto, UpdateLecturerDto } from './dto/lecturer.dto';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
+import { MailService } from '../mail/mail.service';
 
 /** Policy max workload (hours) shown and stored for all lecturers. */
 const STANDARD_MAX_WORKLOAD_HOURS = 15;
 
 @Injectable()
 export class LecturersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly mailService: MailService,
+  ) {}
+
+  private generateTemporaryPassword(length = 16): string {
+    const chars =
+      'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*';
+    const bytes = randomBytes(length);
+    return Array.from(bytes)
+      .map((byte) => chars[byte % chars.length])
+      .join('');
+  }
 
   /**
-   * Timetable for the current academic term (by semester date range), else the most recently started term.
-   * Prefers an `active` timetable when several exist for that semester.
+   * Resolve the latest schedule stored in DB.
+   * Prefer an `active` timetable with section assignments; otherwise fall back
+   * to the newest timetable that contains section assignments.
    */
-  private async resolveCurrentTimetableId(): Promise<number | null> {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    let semester = await this.prisma.semester.findFirst({
-      where: {
-        start_date: { lte: today },
-        end_date: { gte: today },
-      },
-      orderBy: { start_date: 'desc' },
-    });
-
-    if (!semester) {
-      semester = await this.prisma.semester.findFirst({
-        orderBy: { start_date: 'desc' },
-      });
-    }
-
-    if (!semester) return null;
-
+  private async resolveLatestTimetableId(): Promise<number | null> {
     const timetables = await this.prisma.timetable.findMany({
-      where: { semester_id: semester.semester_id },
-      orderBy: [{ version_number: 'desc' }, { generated_at: 'desc' }],
+      include: {
+        _count: {
+          select: { section_schedule_entries: true },
+        },
+      },
+      orderBy: [
+        { generated_at: 'desc' },
+        { version_number: 'desc' },
+        { timetable_id: 'desc' },
+      ],
     });
-    const timetable = timetables.find((t) => t.status === 'active') ?? timetables[0];
-    return timetable?.timetable_id ?? null;
+
+    if (timetables.length === 0) return null;
+
+    const activeWithAssignments = timetables.find(
+      (t) => t.status === 'active' && t._count.section_schedule_entries > 0,
+    );
+    if (activeWithAssignments) return activeWithAssignments.timetable_id;
+
+    const latestWithAssignments = timetables.find(
+      (t) => t._count.section_schedule_entries > 0,
+    );
+    if (latestWithAssignments) return latestWithAssignments.timetable_id;
+
+    const latestActive = timetables.find((t) => t.status === 'active');
+    return latestActive?.timetable_id ?? timetables[0].timetable_id;
   }
 
   /**
@@ -80,7 +97,7 @@ export class LecturersService {
   }
 
   async findAll() {
-    const timetableId = await this.resolveCurrentTimetableId();
+    const timetableId = await this.resolveLatestTimetableId();
     const loadByUserId = timetableId
       ? await this.teachingLoadByUserIdForTimetable(timetableId)
       : new Map<number, number>();
@@ -107,7 +124,7 @@ export class LecturersService {
         department: lecturer.department.dept_name,
         departmentId: lecturer.dept_id,
         load: loadByUserId.get(lecturer.user_id) ?? 0,
-        maxWorkload: STANDARD_MAX_WORKLOAD_HOURS,
+        maxWorkload: lecturer.max_workload ?? STANDARD_MAX_WORKLOAD_HOURS,
         courses: lecturer.lecturer_can_teach_course.map((c) => c.course.course_code),
         isAvailable: lecturer.is_available,
       };
@@ -132,7 +149,7 @@ export class LecturersService {
       throw new NotFoundException(`Lecturer with ID ${id} not found`);
     }
 
-    const timetableId = await this.resolveCurrentTimetableId();
+    const timetableId = await this.resolveLatestTimetableId();
     const load =
       timetableId !== null
         ? await this.teachingLoadForUserOnTimetable(timetableId, lecturer.user_id)
@@ -146,7 +163,7 @@ export class LecturersService {
       department: lecturer.department.dept_name,
       departmentId: lecturer.dept_id,
       load,
-      maxWorkload: STANDARD_MAX_WORKLOAD_HOURS,
+      maxWorkload: lecturer.max_workload ?? STANDARD_MAX_WORKLOAD_HOURS,
       courses: lecturer.lecturer_can_teach_course.map((c) => c.course.course_code),
       isAvailable: lecturer.is_available,
     };
@@ -165,7 +182,8 @@ export class LecturersService {
     }
 
     // Create user first
-    const hashedPassword = await bcrypt.hash('tempPassword123', 10);
+    const temporaryPassword = this.generateTemporaryPassword();
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
     const nameParts = dto.name.split(' ');
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
@@ -174,6 +192,7 @@ export class LecturersService {
       data: {
         email: dto.email,
         password_hash: hashedPassword,
+        must_change_password: true,
         first_name: firstName,
         last_name: lastName,
         role_name: 'LECTURER',
@@ -185,7 +204,7 @@ export class LecturersService {
       data: {
         user_id: user.user_id,
         dept_id: department.dept_id,
-        max_workload: STANDARD_MAX_WORKLOAD_HOURS,
+        max_workload: dto.maxWorkload ?? STANDARD_MAX_WORKLOAD_HOURS,
         is_available: true,
       },
     });
@@ -204,6 +223,12 @@ export class LecturersService {
       });
     }
 
+    await this.mailService.sendLecturerWelcomeEmail({
+      to: dto.email,
+      fullName: dto.name,
+      temporaryPassword,
+    });
+
     return {
       id: `LEC${String(lecturer.user_id).padStart(3, '0')}`,
       databaseId: lecturer.user_id,
@@ -212,7 +237,7 @@ export class LecturersService {
       department: dto.department,
       departmentId: department.dept_id,
       load: 0,
-      maxWorkload: STANDARD_MAX_WORKLOAD_HOURS,
+      maxWorkload: lecturer.max_workload ?? STANDARD_MAX_WORKLOAD_HOURS,
       courses: dto.courses || [],
       isAvailable: true,
     };
@@ -263,7 +288,7 @@ export class LecturersService {
       where: { user_id: id },
       data: {
         dept_id: deptId,
-        max_workload: STANDARD_MAX_WORKLOAD_HOURS,
+        ...(dto.maxWorkload !== undefined ? { max_workload: dto.maxWorkload } : {}),
       },
     });
 

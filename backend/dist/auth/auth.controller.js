@@ -30,7 +30,10 @@ let AuthController = class AuthController {
     async login(dto, res) {
         const tokens = await this.authService.login(dto);
         this.setRefreshTokenCookie(res, tokens.refresh_token);
-        return { access_token: tokens.access_token };
+        return {
+            access_token: tokens.access_token,
+            requires_password_change: tokens.requires_password_change,
+        };
     }
     async refresh(req, res) {
         const refreshToken = req.cookies?.refresh_token;
@@ -39,7 +42,10 @@ let AuthController = class AuthController {
         }
         const tokens = await this.authService.refresh(refreshToken);
         this.setRefreshTokenCookie(res, tokens.refresh_token);
-        return { access_token: tokens.access_token };
+        return {
+            access_token: tokens.access_token,
+            requires_password_change: tokens.requires_password_change,
+        };
     }
     async logout(user, res) {
         await this.authService.logout(user.user_id);
@@ -52,6 +58,7 @@ let AuthController = class AuthController {
                 id: user.user_id,
                 email: user.email,
                 role: user.role_name,
+                requires_password_change: user.must_change_password,
             },
         };
     }

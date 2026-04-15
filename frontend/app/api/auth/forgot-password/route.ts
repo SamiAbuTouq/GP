@@ -201,6 +201,8 @@ export async function POST(req: Request) {
         return NextResponse.json({
           success: true,
           message: 'If an account exists, a reset link has been sent.',
+          devResetUrl: resetUrl,
+          emailDelivered: false,
         });
       }
       throw mailErr;
@@ -218,6 +220,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       message: 'If an account exists, a reset link has been sent.',
+      emailDelivered: true,
     });
   } catch (error: unknown) {
     console.error('Error in forgot-password API:', error);

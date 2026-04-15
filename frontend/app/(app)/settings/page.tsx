@@ -1153,6 +1153,10 @@ function SettingsContent() {
                             title: "Password updated",
                             description: "Your password has been changed successfully.",
                           });
+
+                          // Refresh access token so auth state reflects cleared
+                          // must_change_password flag without requiring re-login.
+                          await ApiClient.refresh();
                           
                           setPasswordData({
                             currentPassword: "",

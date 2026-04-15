@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { Card, CardContent } from '@/components/course-analytics-ui/card'
+import { Badge } from '@/components/course-analytics-ui/badge'
 import { cn } from '@/lib/utils'
 import type { LucideIcon } from 'lucide-react'
 
@@ -13,6 +14,10 @@ interface StatCardProps {
     value: number
     isPositive: boolean
   }
+  methodBadge?: {
+    label: string
+    title: string
+  }
   variant?: 'default' | 'primary' | 'success' | 'warning'
   className?: string
 }
@@ -23,6 +28,7 @@ export function StatCard({
   description, 
   icon: Icon,
   trend,
+  methodBadge,
   variant = 'default',
   className 
 }: StatCardProps) {
@@ -52,7 +58,17 @@ export function StatCard({
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-1">
-            <span className="text-sm font-medium text-muted-foreground">{title}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-muted-foreground">{title}</span>
+              {methodBadge && (
+                <Badge
+                  title={methodBadge.title}
+                  className="h-5 rounded-sm border-0 bg-primary/15 px-1.5 text-[10px] font-semibold tracking-wide text-primary"
+                >
+                  {methodBadge.label}
+                </Badge>
+              )}
+            </div>
             <span className={cn(
               "text-xl font-bold tracking-tight sm:text-2xl",
               valueStyles[variant]

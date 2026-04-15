@@ -104,10 +104,8 @@ export async function GET(request: Request) {
       Room: entry.room.room_number,
       Room_ID: String(entry.room_id),
       Registered_Students: entry.registered_students,
-      Section_Capacity:
-        entry.course.delivery_mode === 'ONLINE'
-          ? entry.registered_students
-          : entry.room.capacity,
+      Section_Capacity: entry.course.delivery_mode === 'ONLINE' ? 0 : entry.room.capacity,
+      isOnline: entry.course.delivery_mode === 'ONLINE',
       Online:
         entry.course.delivery_mode === 'ONLINE'
           ? 'Online'

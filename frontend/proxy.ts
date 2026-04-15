@@ -22,6 +22,13 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Always land on login when visiting root.
+  // Authenticated users will then be routed client-side to /dashboard or
+  // /first-login-password after session restore.
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
   // Check if the current path is public.
   // Root must be exact-match; other entries allow nested paths.
   const isPublicPath = publicPaths.some((path) =>
@@ -33,6 +40,9 @@ export function proxy(request: NextRequest) {
   // - uts_auth_hint: lightweight client cookie set on login/refresh, cleared on logout
   const refreshToken = request.cookies.get('refresh_token')?.value;
   const authHint = request.cookies.get('uts_auth_hint')?.value;
+  // Only a real refresh token should be treated as authenticated.
+  // The hint cookie can be stale and must not cause redirects from / to auth-only flows.
+  const hasRefreshToken = Boolean(refreshToken);
   const isLikelyAuthenticated = Boolean(refreshToken || authHint);
 
   // If trying to access protected route without refresh token, redirect to login
@@ -42,14 +52,9 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // If authenticated user tries to access public auth pages, redirect to dashboard
-  if ((pathname === '/' || pathname === '/login') && isLikelyAuthenticated) {
+  // If authenticated user tries to access login page directly, redirect to dashboard.
+  if (pathname === '/login' && hasRefreshToken) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
-
-  // If unauthenticated user visits root, redirect to login
-  if (pathname === '/' && !isLikelyAuthenticated) {
-    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   return NextResponse.next();

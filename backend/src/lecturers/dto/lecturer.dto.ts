@@ -15,7 +15,7 @@ export class CreateLecturerDto {
 
   @IsInt()
   @Min(1)
-  @Max(24)
+  @Max(30)
   maxWorkload: number;
 
   @IsArray()
@@ -39,7 +39,7 @@ export class UpdateLecturerDto {
 
   @IsInt()
   @Min(1)
-  @Max(24)
+  @Max(30)
   @IsOptional()
   maxWorkload?: number;
 

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { Clock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/course-analytics-ui/card'
@@ -34,7 +34,12 @@ export function ScheduleTab({ stats, timeSlotData, dayData, heatmapData }: Sched
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
               <MiniStat label="Busiest Hour" value={stats.peakHour || 'N/A'} icon={Clock} />
-              <MiniStat label="Busiest Day" value={stats.busiestDay || 'N/A'} icon={Clock} />
+              <MiniStat
+                label="Busiest Day (sessions)"
+                value={stats.busiestDay || 'N/A'}
+                subValue="Multi-day sections counted once per meeting day"
+                icon={Clock}
+              />
               <MiniStat label="Time slots used" value={timeSlotData.length} icon={Clock} />
               <MiniStat label="Active days" value={dayData.length} icon={Clock} />
             </div>

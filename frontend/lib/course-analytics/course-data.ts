@@ -19,6 +19,7 @@ const CourseSchema = z.object({
   Room_ID: z.string().default(''),
   Registered_Students: z.coerce.number().default(0),
   Section_Capacity: z.coerce.number().default(0),
+  isOnline: z.coerce.boolean().optional().default(false),
   Online: z.string().default(''),
   Start_Time: z.string().default(''),
   End_Time: z.string().default(''),
@@ -135,6 +136,11 @@ export interface DashboardStats {
   totalCourses: number
   totalSections: number
   totalStudents: number
+  /** Always seat-enrollment sum — never headcount. Use this for per-section averages. */
+  seatEnrollmentSum: number
+  /** Number of distinct Year|Semester combinations present in the current filtered dataset.
+   *  Use this to normalize cumulative sums into per-term averages. */
+  uniqueSemesters: number
   totalLecturers: number
   totalDepartments: number
   avgClassSize: number
@@ -150,7 +156,6 @@ export interface DashboardStats {
   busiestDay: string
   largestDepartment: string
   mostPopularCourse: string
-  studentLecturerRatio: number
   wastedFacultyHours: number
 }
 
@@ -226,12 +231,6 @@ export interface DayData {
   students: number
 }
 
-export interface RoomData {
-  room: string
-  sections: number
-  avgUtilization: number
-}
-
 export interface CourseData {
   name: string
   fullName: string
@@ -254,10 +253,12 @@ export interface FilterOptions {
   years: string[]
 }
 
-export interface CourseLevelData {
-  level: string
-  count: number
-  students: number
+function getAcademicLevelLabel(academicLevel?: number): string {
+  const level = Number(academicLevel)
+  if (!Number.isFinite(level)) return 'Prep/Other'
+  if (level >= 6) return 'Graduate'
+  if (level >= 1) return `${level * 100}-Level`
+  return 'Prep/Other'
 }
 
 export interface HeatmapData {
@@ -314,12 +315,31 @@ export function calculateStats(courses: Course[], opts?: CalculateStatsOptions):
       .map(c => c.Lecturer_ID),
   ).size
   const uniqueDepartments = new Set(courses.map(c => c.Department)).size
-  const avgClassSize = totalSections > 0 ? Math.round(totalStudents / totalSections) : 0
-  const totalCapacity = courses.reduce((sum, c) => sum + c.Section_Capacity, 0)
-  const utilizationRate = totalCapacity > 0 ? Math.round((totalStudents / totalCapacity) * 100) : 0
-  const emptySeats = Math.max(0, totalCapacity - totalStudents)
-  const fullSections = courses.filter(c => c.Registered_Students >= c.Section_Capacity).length
-  const avgSectionsPerCourse = uniqueCourses > 0 ? Math.round((totalSections / uniqueCourses) * 10) / 10 : 0
+  // Issue 1: always use seat-enrollment sum so avgClassSize is never contaminated by HC totals.
+  const avgClassSize = totalSections > 0 ? Math.round(seatEnrollmentSum / totalSections) : 0
+  // Capacity utilization must stay seat-based (section enrollments vs section capacities).
+  const utilizationEligibleCourses = courses.filter((c) => !c.isOnline && c.Section_Capacity > 0)
+  const totalCapacity = utilizationEligibleCourses.reduce((sum, c) => sum + c.Section_Capacity, 0)
+  const seatEnrollmentForCapacity = utilizationEligibleCourses.reduce(
+    (sum, c) => sum + c.Registered_Students,
+    0,
+  )
+  const utilizationRate =
+    totalCapacity > 0 ? Math.round((seatEnrollmentForCapacity / totalCapacity) * 100) : 0
+  const emptySeats = Math.max(0, totalCapacity - seatEnrollmentForCapacity)
+  const fullSections = utilizationEligibleCourses.filter(
+    (c) => c.Registered_Students >= c.Section_Capacity,
+  ).length
+  // Derive the number of distinct semesters in the current filtered data so cumulative sums
+  // can be normalized into per-term averages (avgSectionsPerCourse, wastedFacultyHours, etc.).
+  const uniqueSemesterCount = Math.max(
+    1,
+    new Set(courses.map(c => `${c.Year}|${c.Semester}`).filter(Boolean)).size
+  )
+  const avgSectionsPerCourse =
+    uniqueCourses > 0
+      ? Math.round((totalSections / uniqueSemesterCount / uniqueCourses) * 10) / 10
+      : 0
   const onlineSections = courses.filter(c => c.Online === 'Online').length
   const blendedSections = courses.filter(c => c.Online === 'Blended').length
   const inPersonSections = totalSections - onlineSections - blendedSections
@@ -364,12 +384,14 @@ export function calculateStats(courses: Course[], opts?: CalculateStatsOptions):
     return durationHours * meetingsPerWeek
   }
 
+  // Normalize by uniqueSemesterCount so the number reflects a typical weekly load per term
+  // rather than cumulating across every semester in scope.
   const wastedFacultyHours = Math.round(
     courses
-      .filter(c => c.Registered_Students < 10 && c.Section_Capacity > 0)
+      .filter(c => c.Registered_Students < 10)
       .reduce((sumHours, c) => {
         return sumHours + getSectionWeeklyHours(c)
-      }, 0),
+      }, 0) / uniqueSemesterCount,
   )
   
   // Find peak hour
@@ -438,12 +460,12 @@ export function calculateStats(courses: Course[], opts?: CalculateStatsOptions):
     }
   })
 
-  const studentLecturerRatio = uniqueLecturers > 0 ? Math.round((totalStudents / uniqueLecturers) * 10) / 10 : 0
-  
   return {
     totalCourses: uniqueCourses,
     totalSections,
     totalStudents,
+    seatEnrollmentSum,
+    uniqueSemesters: uniqueSemesterCount,
     totalLecturers: uniqueLecturers,
     totalDepartments: uniqueDepartments,
     avgClassSize,
@@ -459,7 +481,6 @@ export function calculateStats(courses: Course[], opts?: CalculateStatsOptions):
     busiestDay,
     largestDepartment: largestDepartment.length > 25 ? largestDepartment.substring(0, 23) + '...' : largestDepartment,
     mostPopularCourse: mostPopularCourse.length > 30 ? mostPopularCourse.substring(0, 28) + '...' : mostPopularCourse,
-    studentLecturerRatio,
     wastedFacultyHours
   }
 }
@@ -467,6 +488,7 @@ export function calculateStats(courses: Course[], opts?: CalculateStatsOptions):
 export function getDepartmentData(courses: Course[]): DepartmentData[] {
   const deptMap = new Map<string, { 
     students: number
+    utilizationStudents: number
     sections: number
     courses: Set<string>
     capacity: number 
@@ -475,14 +497,23 @@ export function getDepartmentData(courses: Course[]): DepartmentData[] {
   courses.forEach(course => {
     const existing = deptMap.get(course.Department) || { 
       students: 0, 
+      utilizationStudents: 0,
       sections: 0, 
       courses: new Set(),
       capacity: 0 
     }
+
+    // Keep students/sections/courses for all delivery modes.
     existing.students += course.Registered_Students
     existing.sections += 1
     existing.courses.add(course.Course_Number)
-    existing.capacity += course.Section_Capacity
+
+    // Keep utilization aligned with global formula: in-person/blended sections with capacity only.
+    if (!course.isOnline && course.Section_Capacity > 0) {
+      existing.utilizationStudents += course.Registered_Students
+      existing.capacity += course.Section_Capacity
+    }
+
     deptMap.set(course.Department, existing)
   })
   
@@ -494,13 +525,13 @@ export function getDepartmentData(courses: Course[]): DepartmentData[] {
       students: data.students,
       sections: data.sections,
       courses: data.courses.size,
-      utilization: data.capacity > 0 ? Math.round((data.students / data.capacity) * 100) : 0,
+      utilization: data.capacity > 0 ? Math.round((data.utilizationStudents / data.capacity) * 100) : 0,
       avgClassSize: data.sections > 0 ? Math.round(data.students / data.sections) : 0
     }))
     .sort((a, b) => b.students - a.students)
 }
 
-export function getSemesterData(courses: Course[], semesterTotals?: SemesterTotal[]): SemesterData[] {
+export function getSemesterData(courses: Course[]): SemesterData[] {
   const semMap = new Map<string, { students: number; sections: number; courses: Set<string> }>()
   
   courses.forEach(course => {
@@ -512,14 +543,6 @@ export function getSemesterData(courses: Course[], semesterTotals?: SemesterTota
     semMap.set(key, existing)
   })
 
-  const headcountBySemesterKey = new Map<string, number>()
-  if (semesterTotals && semesterTotals.length) {
-    semesterTotals.forEach((s) => {
-      const k = `${s.academicYear} - ${s.semester}`
-      if (s.totalStudents != null) headcountBySemesterKey.set(k, s.totalStudents)
-    })
-  }
-  
   return Array.from(semMap.entries())
     .map(([semester, data]) => {
       // Create short label for chart
@@ -535,9 +558,8 @@ export function getSemesterData(courses: Course[], semesterTotals?: SemesterTota
       return {
         semester: shortLabel,
         fullSemester: semester,
-        // Prefer unique student headcount if available (from Semester totals API),
-        // otherwise fall back to seat-enrollments derived from section rows.
-        students: headcountBySemesterKey.get(semester) ?? data.students,
+        // Always use section-level seat enrollments to keep bars comparable across semesters.
+        students: data.students,
         sections: data.sections,
         courses: data.courses.size
       }
@@ -569,20 +591,21 @@ export function getOnlineModeData(courses: Course[]): OnlineModeData[] {
 }
 
 export function getTopLecturers(courses: Course[], limit = 20): LecturerData[] {
-  const lecturerMap = new Map<string, { sections: number; students: number; department: string }>()
+  // Bug 2 fix: key by Lecturer_ID (not name) so two lecturers with the same full name don't get merged.
+  const lecturerMap = new Map<string, { name: string; sections: number; students: number; department: string }>()
   
   courses.forEach(course => {
-    if (!course.Lecturer_Name) return
-    const existing = lecturerMap.get(course.Lecturer_Name) || { sections: 0, students: 0, department: course.Department }
+    if (!course.Lecturer_Name || !course.Lecturer_ID) return
+    const existing = lecturerMap.get(course.Lecturer_ID) || { name: course.Lecturer_Name, sections: 0, students: 0, department: course.Department }
     existing.sections += 1
     existing.students += course.Registered_Students
-    lecturerMap.set(course.Lecturer_Name, existing)
+    lecturerMap.set(course.Lecturer_ID, existing)
   })
   
-  return Array.from(lecturerMap.entries())
-    .map(([name, data]) => ({
-      name: name.length > 18 ? name.substring(0, 16) + '...' : name,
-      fullName: name,
+  return Array.from(lecturerMap.values())
+    .map((data) => ({
+      name: data.name.length > 18 ? data.name.substring(0, 16) + '...' : data.name,
+      fullName: data.name,
       sections: data.sections,
       students: data.students,
       avgClassSize: data.sections > 0 ? Math.round(data.students / data.sections) : 0,
@@ -691,19 +714,22 @@ export function getTopCourses(courses: Course[], limit = 20): CourseData[] {
 }
 
 export function getCapacityDistribution(courses: Course[]): CapacityDistribution[] {
+  // Bug 1 fix: use exclusive upper bounds (<) so float utilization values (e.g. 25.5%, 75.3%) never
+  // fall into the gap between adjacent integer-labelled ranges. The last bucket has no upper bound.
   const ranges = [
-    { label: '0-25%', min: 0, max: 25 },
-    { label: '26-50%', min: 26, max: 50 },
-    { label: '51-75%', min: 51, max: 75 },
-    { label: '76-99%', min: 76, max: 99 },
-    { label: '100%+', min: 100, max: Infinity }
+    { label: '0-25%',  test: (u: number) => u < 25 },
+    { label: '25-50%', test: (u: number) => u >= 25 && u < 50 },
+    { label: '50-75%', test: (u: number) => u >= 50 && u < 75 },
+    { label: '75-99%', test: (u: number) => u >= 75 && u < 100 },
+    { label: '100%+',  test: (u: number) => u >= 100 },
   ]
   
-  const total = courses.length
+  const utilizationEligibleCourses = courses.filter(c => !c.isOnline && c.Section_Capacity > 0)
+  const total = utilizationEligibleCourses.length
   const distribution = ranges.map(range => {
-    const count = courses.filter(c => {
-      const util = c.Section_Capacity > 0 ? (c.Registered_Students / c.Section_Capacity) * 100 : 0
-      return util >= range.min && util <= range.max
+    const count = utilizationEligibleCourses.filter(c => {
+      const util = (c.Registered_Students / c.Section_Capacity) * 100
+      return range.test(util)
     }).length
     
     return {
@@ -714,29 +740,6 @@ export function getCapacityDistribution(courses: Course[]): CapacityDistribution
   })
   
   return distribution
-}
-
-export function getRoomUtilization(courses: Course[], limit = 10): RoomData[] {
-  const roomMap = new Map<string, { sections: number; totalUtil: number }>()
-  
-  courses.forEach(course => {
-    if (!isExcludedFromRoomUtilization(course.Room)) {
-      const existing = roomMap.get(course.Room) || { sections: 0, totalUtil: 0 }
-      const util = course.Section_Capacity > 0 ? (course.Registered_Students / course.Section_Capacity) * 100 : 0
-      existing.sections += 1
-      existing.totalUtil += util
-      roomMap.set(course.Room, existing)
-    }
-  })
-  
-  return Array.from(roomMap.entries())
-    .map(([room, data]) => ({
-      room: room.length > 15 ? room.substring(0, 13) + '...' : room,
-      sections: data.sections,
-      avgUtilization: Math.round(data.totalUtil / data.sections)
-    }))
-    .sort((a, b) => b.sections - a.sections)
-    .slice(0, limit)
 }
 
 export function getDepartmentComparison(courses: Course[]): {
@@ -758,50 +761,7 @@ export function getDepartmentComparison(courses: Course[]): {
   }))
 }
 
-export function getCourseLevelData(courses: Course[]): CourseLevelData[] {
-  const levelMap = new Map<string, { count: number; students: number }>()
 
-  courses.forEach(course => {
-    // Skip courses without a course number
-    const courseNum = course.Course_Number
-    if (!courseNum) return
-    
-    let level = 'Other'
-    
-    // Level is the 3rd digit in the code (e.g., 12322 => 3rd Level, 11411 => 4th Level)
-    const numMatch = courseNum.match(/\d+/)
-    if (numMatch && numMatch[0].length >= 3) {
-      const levelDigit = numMatch[0][2] // Get 3rd digit
-      if (levelDigit === '1') level = '100-Level'
-      else if (levelDigit === '2') level = '200-Level'
-      else if (levelDigit === '3') level = '300-Level'
-      else if (levelDigit === '4') level = '400-Level'
-      else if (levelDigit === '5') level = '500-Level'
-      else if (parseInt(levelDigit) >= 6) level = 'Graduate'
-      else level = 'Prep/Other'
-    } else if (numMatch) {
-      // Fallback to first digit if length < 3
-      const firstDigit = numMatch[0][0]
-      if (firstDigit === '6' || firstDigit === '7' || firstDigit === '8' || firstDigit === '9') level = 'Graduate'
-      else level = 'Prep/Other'
-    }
-    
-    const existing = levelMap.get(level) || { count: 0, students: 0 }
-    existing.count += 1
-    existing.students += course.Registered_Students
-    levelMap.set(level, existing)
-  })
-  
-  const levelOrder = ['Prep/Other', '100-Level', '200-Level', '300-Level', '400-Level', '500-Level', 'Graduate']
-  
-  return levelOrder
-    .filter(level => levelMap.has(level))
-    .map(level => ({
-      level,
-      count: levelMap.get(level)!.count,
-      students: levelMap.get(level)!.students
-    }))
-}
 
 export interface AcademicLevelModeData {
   level: string
@@ -814,30 +774,8 @@ export function getAcademicLevelModeData(courses: Course[]): AcademicLevelModeDa
   const levelMap = new Map<string, { inPerson: number; online: number; blended: number }>()
 
   courses.forEach(course => {
-    // Skip courses without a course number
-    const courseNum = course.Course_Number
-    if (!courseNum) return
-    
-    let level = 'Other'
-    
-    // Check if the course number exists and has a length of at least 4 chars
-    const numMatch = courseNum.match(/\d+/)
-    if (numMatch && numMatch[0].length >= 3) {
-      const levelDigit = numMatch[0][2] // Get 3rd digit
-      if (levelDigit === '1') level = '100-Level'
-      else if (levelDigit === '2') level = '200-Level'
-      else if (levelDigit === '3') level = '300-Level'
-      else if (levelDigit === '4') level = '400-Level'
-      else if (levelDigit === '5') level = '500-Level'
-      else if (parseInt(levelDigit) >= 6) level = 'Graduate'
-      else level = 'Prep/Other'
-    } else if (numMatch) {
-      // Fallback to first digit if length < 3
-      const firstDigit = numMatch[0][0]
-      if (firstDigit === '6' || firstDigit === '7' || firstDigit === '8' || firstDigit === '9') level = 'Graduate'
-      else level = 'Prep/Other'
-    }
-    
+    const level = getAcademicLevelLabel(course.academic_level)
+
     const existing = levelMap.get(level) || { inPerson: 0, online: 0, blended: 0 }
     if (course.Online === 'Online') existing.online += 1
     else if (course.Online === 'Blended') existing.blended += 1
@@ -862,45 +800,13 @@ export function getAcademicLevelModeData(courses: Course[]): AcademicLevelModeDa
     })
 }
 
-export interface AcademicFocusData {
-  level: string
-  fullLevel: string
-  count: number
-}
 
-export function getAcademicFocusData(courses: Course[]): AcademicFocusData[] {
-  const levelMap = new Map<string, number>()
-  
-  // Initialize levels 1-5 to ensure they always appear in the radar chart
-  for (let i = 1; i <= 5; i++) {
-    levelMap.set(`Level ${i}`, 0)
-  }
-
-  courses.forEach(course => {
-    const courseNum = course.Course_Number
-    if (!courseNum) return
-    
-    const numMatch = courseNum.match(/\d+/)
-    if (numMatch && numMatch[0].length >= 3) {
-      const levelDigit = numMatch[0][2] // Get 3rd digit
-      if (['1', '2', '3', '4', '5'].includes(levelDigit)) {
-        const levelKey = `Level ${levelDigit}`
-        levelMap.set(levelKey, (levelMap.get(levelKey) || 0) + 1)
-      }
-    }
-  })
-  
-  return Array.from(levelMap.entries()).map(([level, count]) => ({
-    level,
-    fullLevel: `${level} Courses`,
-    count
-  })).sort((a, b) => a.level.localeCompare(b.level))
-}
 
 
 export function getScheduleHeatmap(courses: Course[]): HeatmapData[] {
   const heatmap: HeatmapData[] = []
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Sat']
+  // Saturday excluded to match DayChart behaviour (PSUT workweek is Sun–Thu)
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu']
   const studentCounts = new Map<string, number>()
   
   courses.forEach(course => {
@@ -1018,16 +924,16 @@ export function getYearOverYearGrowth(
 
         const curH = firstByYear.get(year)
         const prevH = prevYear ? firstByYear.get(prevYear) : undefined
-        if (curH != null && prevH != null) {
-          growth = prevH > 0 ? Math.round(((curH - prevH) / prevH) * 100) : 0
-        } else {
-          growth =
-            prevComparableStudents > 0
-              ? Math.round(
-                  ((curComparableStudents - prevComparableStudents) / prevComparableStudents) * 100,
-                )
-              : 0
-        }
+        // Keep one metric per YoY delta:
+        // - use headcount only when both years have registrar values
+        // - otherwise compare seat-enrollment sums for both years
+        const useHeadcountForGrowth = curH != null && prevH != null
+        const growthCurrentBase = useHeadcountForGrowth ? curH : curComparableStudents
+        const growthPreviousBase = useHeadcountForGrowth ? prevH : prevComparableStudents
+        growth =
+          growthPreviousBase > 0
+            ? Math.round(((growthCurrentBase - growthPreviousBase) / growthPreviousBase) * 100)
+            : 0
       }
 
       let displayYear = year
@@ -1122,14 +1028,18 @@ export interface UnderenrolledSection {
 
 export function getUnderenrolledSections(courses: Course[], threshold = 10): UnderenrolledSection[] {
   return courses
-    .filter(c => c.Registered_Students < threshold && c.Section_Capacity > 0)
+    // Bug 3 fix: exclude online sections — low enrollment in an online section wastes no physical room.
+    .filter(c => !c.isOnline && c.Registered_Students < threshold)
     .map(c => ({
       course: c.Course_Number,
       courseName: c.English_Name,
       section: c.Section,
       students: c.Registered_Students,
       capacity: c.Section_Capacity,
-      utilization: Math.round((c.Registered_Students / c.Section_Capacity) * 100),
+      utilization:
+        c.Section_Capacity > 0
+          ? Math.round((c.Registered_Students / c.Section_Capacity) * 100)
+          : 0,
       lecturer: c.Lecturer_Name,
       department: c.Department
     }))
@@ -1206,6 +1116,7 @@ export function getDepartmentUtilization(courses: Course[]): DepartmentUtilizati
   const deptMap = new Map<string, { students: number; capacity: number; sections: number }>()
   
   courses.forEach(c => {
+    if (c.isOnline || c.Section_Capacity <= 0) return
     const existing = deptMap.get(c.Department) || { students: 0, capacity: 0, sections: 0 }
     existing.students += c.Registered_Students
     existing.capacity += c.Section_Capacity
@@ -1217,8 +1128,9 @@ export function getDepartmentUtilization(courses: Course[]): DepartmentUtilizati
     .filter(([name]) => name)
     .map(([name, data]) => {
       const utilization = data.capacity > 0 ? Math.round((data.students / data.capacity) * 100) : 0
+      // Issue 5: standardized thresholds — <60=low, 60-74=medium, 75-89=high, ≥90=full
       let status: 'low' | 'medium' | 'high' | 'full' = 'medium'
-      if (utilization < 50) status = 'low'
+      if (utilization < 60) status = 'low'
       else if (utilization >= 90) status = 'full'
       else if (utilization >= 75) status = 'high'
       
@@ -1238,36 +1150,53 @@ export function getDepartmentUtilization(courses: Course[]): DepartmentUtilizati
 export function getRoomWasteAnalysis(courses: Course[], limit = 10): RoomWasteData[] {
   const roomMap = new Map<
     string,
-    { capacity: number; students: number; semesters: Set<string> }
+    {
+      termMap: Map<string, { capacity: number; students: number; sectionKeys: Set<string> }>
+    }
   >()
 
   courses.forEach(c => {
-    if (!isExcludedFromRoomUtilization(c.Room)) {
-      const existing = roomMap.get(c.Room) ?? {
-        capacity: 0,
-        students: 0,
-        semesters: new Set<string>(),
-      }
-      existing.capacity += c.Section_Capacity
-      existing.students += c.Registered_Students
-      existing.semesters.add(`${c.Year}|${c.Semester}`)
-      roomMap.set(c.Room, existing)
+    if (isExcludedFromRoomUtilization(c.Room) || c.isOnline || c.Section_Capacity <= 0) return
+    const existing = roomMap.get(c.Room) ?? { termMap: new Map() }
+    const termKey = `${c.Year}|${c.Semester}`
+    const sectionKey = `${c.Course_Number}|${c.Section}`
+    const termData = existing.termMap.get(termKey) ?? {
+      capacity: 0,
+      students: 0,
+      sectionKeys: new Set<string>(),
     }
+    if (!termData.sectionKeys.has(sectionKey)) {
+      termData.capacity += c.Section_Capacity
+      termData.students += c.Registered_Students
+      termData.sectionKeys.add(sectionKey)
+    }
+    existing.termMap.set(termKey, termData)
+    roomMap.set(c.Room, existing)
   })
 
   return Array.from(roomMap.entries())
     .map(([room, data]) => {
-      const semCount = Math.max(1, data.semesters.size)
+      const termTotals = Array.from(data.termMap.values()).reduce(
+        (acc, term) => {
+          acc.capacity += term.capacity
+          acc.students += term.students
+          return acc
+        },
+        { capacity: 0, students: 0 },
+      )
+      const semCount = Math.max(1, data.termMap.size)
       const unusedSeats = Math.max(
         0,
-        Math.round((data.capacity - data.students) / semCount),
+        Math.round((termTotals.capacity - termTotals.students) / semCount),
       )
       const efficiencyScore =
-        data.capacity > 0 ? Math.round((data.students / data.capacity) * 100) : 0
+        termTotals.capacity > 0
+          ? Math.round((termTotals.students / termTotals.capacity) * 100)
+          : 0
       return {
         room,
-        totalCapacity: Math.round(data.capacity / semCount),
-        totalStudents: Math.round(data.students / semCount),
+        totalCapacity: Math.round(termTotals.capacity / semCount),
+        totalStudents: Math.round(termTotals.students / semCount),
         unusedSeats,
         efficiencyScore,
       }
@@ -1353,7 +1282,12 @@ export interface HighDemandSection {
 
 export function getHighDemandSections(courses: Course[], threshold = 95): HighDemandSection[] {
   return courses
-    .filter(c => c.Section_Capacity > 0 && ((c.Registered_Students / c.Section_Capacity) * 100) >= threshold)
+    .filter(
+      c =>
+        !c.isOnline &&
+        c.Section_Capacity > 0 &&
+        ((c.Registered_Students / c.Section_Capacity) * 100) >= threshold,
+    )
     .map(c => ({
       course: c.Course_Number,
       courseName: c.English_Name,
@@ -1394,7 +1328,8 @@ export function getFacultyWorkloadDistribution(courses: Course[]): FacultyWorklo
   lecturerTermMap.forEach(termCounts => {
     const terms = Array.from(termCounts.values())
     if (terms.length === 0) return
-    const avgSections = Math.round(terms.reduce((sum, n) => sum + n, 0) / terms.length)
+    // Issue 4: use rounded average sections per term, not peak, to avoid overstating heavy loads.
+    const avgSections = Math.round(terms.reduce((sum, v) => sum + v, 0) / terms.length)
 
     if (avgSections <= 1) distribution.set('1 Section', distribution.get('1 Section')! + 1)
     else if (avgSections === 2) distribution.set('2 Sections', distribution.get('2 Sections')! + 1)
@@ -1420,26 +1355,26 @@ function isExcludedFromRoomUtilization(room?: string): boolean {
 }
 
 export function getRoomTypeUtilization(courses: Course[]): RoomTypeUtilization[] {
-  let labSections = 0
-  let labUtilSum = 0
-  let classSections = 0
-  let classUtilSum = 0
+  // Issue 3: track raw totals for a capacity-weighted average instead of an unweighted average of per-section %.
+  let labStudents = 0, labCapacity = 0, labSections = 0
+  let classStudents = 0, classCapacity = 0, classSections = 0
   
   courses.forEach(c => {
     if (!isExcludedFromRoomUtilization(c.Room) && c.Section_Capacity > 0) {
-      const util = (c.Registered_Students / c.Section_Capacity) * 100
       if (c.islab === true) {
+        labStudents += c.Registered_Students
+        labCapacity += c.Section_Capacity
         labSections++
-        labUtilSum += util
       } else {
+        classStudents += c.Registered_Students
+        classCapacity += c.Section_Capacity
         classSections++
-        classUtilSum += util
       }
     }
   })
   
   return [
-    { type: 'Standard Classroom', sections: classSections, avgUtilization: classSections > 0 ? Math.round(classUtilSum / classSections) : 0 },
-    { type: 'Laboratory', sections: labSections, avgUtilization: labSections > 0 ? Math.round(labUtilSum / labSections) : 0 }
+    { type: 'Standard Classroom', sections: classSections, avgUtilization: classCapacity > 0 ? Math.round((classStudents / classCapacity) * 100) : 0 },
+    { type: 'Laboratory', sections: labSections, avgUtilization: labCapacity > 0 ? Math.round((labStudents / labCapacity) * 100) : 0 }
   ]
 }

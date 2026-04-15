@@ -119,6 +119,7 @@ let AuthService = AuthService_1 = class AuthService {
             sub: user.user_id,
             email: user.email,
             role: user.role_name,
+            requires_password_change: user.must_change_password,
         };
         const [access_token, refresh_token] = await Promise.all([
             this.jwtService.signAsync(payload, {
@@ -130,7 +131,11 @@ let AuthService = AuthService_1 = class AuthService {
                 expiresIn: this.configService.getOrThrow("JWT_REFRESH_EXPIRES_IN"),
             }),
         ]);
-        return { access_token, refresh_token };
+        return {
+            access_token,
+            refresh_token,
+            requires_password_change: user.must_change_password,
+        };
     }
     async storeRefreshToken(userId, rawToken) {
         const saltRounds = +this.configService.get("BCRYPT_SALT_ROUNDS", "12");

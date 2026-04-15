@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/course-analytics-ui/card'
 import { TopLecturersTable } from '@/components/course-analytics/dashboard/data-table'
@@ -9,13 +9,19 @@ interface StaffTabProps {
   stats: DashboardStats
   lecturerData: LecturerData[]
   facultyWorkload: FacultyWorkloadData[]
+  studentLecturerRatioValue: number | 'N/A'
 }
 
-export function StaffTab({ stats, lecturerData, facultyWorkload }: StaffTabProps) {
+export function StaffTab({
+  stats,
+  lecturerData,
+  facultyWorkload,
+  studentLecturerRatioValue,
+}: StaffTabProps) {
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-2 items-start">
-        <TopLecturersTable data={lecturerData} />
+        <TopLecturersTable data={lecturerData} uniqueSemesters={stats.uniqueSemesters} />
         <FacultyWorkloadChart data={facultyWorkload} />
       </div>
       <Card>
@@ -36,16 +42,14 @@ export function StaffTab({ stats, lecturerData, facultyWorkload }: StaffTabProps
             <div className="text-center">
               <p className="text-3xl font-bold text-accent">
                 {stats.totalSections > 0 && stats.totalLecturers > 0
-                  ? (stats.totalSections / stats.totalLecturers).toFixed(1)
+                  ? (stats.totalSections / stats.uniqueSemesters / stats.totalLecturers).toFixed(1)
                   : '0'}
               </p>
-              <p className="text-sm text-muted-foreground">Avg Sections/Lecturer</p>
+              <p className="text-sm text-muted-foreground">Avg Sections/Lecturer/Term</p>
             </div>
             <div className="text-center">
               <p className="text-3xl font-bold text-chart-5">
-                {stats.totalStudents > 0 && stats.totalLecturers > 0
-                  ? Math.round(stats.totalStudents / stats.totalLecturers)
-                  : '0'}
+                {studentLecturerRatioValue === 'N/A' ? '0' : studentLecturerRatioValue}
               </p>
               <p className="text-sm text-muted-foreground">Avg Students/Lecturer</p>
             </div>

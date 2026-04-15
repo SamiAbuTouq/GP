@@ -64,8 +64,10 @@ function LoginPageContent() {
     }
 
     try {
-      await ApiClient.login(email.trim(), password);
-      const redirectTo = searchParams.get("redirect") || "/dashboard";
+      const loginResponse = await ApiClient.login(email.trim(), password);
+      const redirectTo = loginResponse.requires_password_change
+        ? "/first-login-password"
+        : (searchParams.get("redirect") || "/dashboard");
       router.push(redirectTo);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -190,8 +192,17 @@ function LoginPageContent() {
       </div>
 
       {/* Right Panel - Login Form (White Background) */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 bg-white dark:bg-slate-900 order-last">
-        <div className="w-full max-w-md">
+      <div
+        className="flex-1 flex items-center justify-center p-6 lg:p-12 order-last relative overflow-hidden bg-slate-100 dark:bg-slate-950"
+        style={{
+          backgroundImage: "url('/images/background/D4.jpg')",
+          backgroundSize: "clamp(420px, 40vw, 620px)",
+          backgroundPosition: "top left",
+          backgroundRepeat: "repeat",
+        }}
+      >
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/40 via-white/20 to-black/35 dark:from-slate-950/60 dark:via-slate-950/25 dark:to-slate-950/60" />
+        <div className="relative z-10 w-full max-w-md bg-white/95 dark:bg-slate-900/90 rounded-2xl p-8 shadow-2xl dark:shadow-black/50 border border-slate-200/70 dark:border-slate-700/70">
           {/* Mobile Logo */}
           <div className="lg:hidden flex justify-center mb-8">
             <Image

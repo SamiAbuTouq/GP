@@ -4,6 +4,7 @@ import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { UpdateProfileDto, UpdatePreferencesDto } from "./dto/update-user.dto";
 import type { User } from "@prisma/client";
+import { UpdatePasswordDto } from "./dto/update-password.dto";
 
 @Controller("users")
 @UseGuards(JwtAuthGuard)
@@ -32,5 +33,13 @@ export class UsersController {
       user.user_id,
       updatePreferencesDto,
     );
+  }
+
+  @Patch("me/password")
+  async updatePassword(
+    @CurrentUser() user: User,
+    @Body() dto: UpdatePasswordDto,
+  ) {
+    return this.usersService.updatePasswordForUser(user.user_id, dto.new_password);
   }
 }

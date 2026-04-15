@@ -126,10 +126,8 @@ export class TimetablesService {
       sectionNumber: e.section_number,
       isLab: e.course.is_lab,
       registeredStudents: e.registered_students,
-      sectionCapacity:
-        e.course.delivery_mode === DeliveryMode.ONLINE
-          ? e.registered_students
-          : e.room.capacity,
+      sectionCapacity: e.course.delivery_mode === DeliveryMode.ONLINE ? 0 : e.room.capacity,
+      isOnline: e.course.delivery_mode === DeliveryMode.ONLINE,
     }));
   }
 }

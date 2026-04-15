@@ -32,7 +32,7 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
-    (0, class_validator_1.Max)(24),
+    (0, class_validator_1.Max)(30),
     __metadata("design:type", Number)
 ], CreateLecturerDto.prototype, "maxWorkload", void 0);
 __decorate([
@@ -62,7 +62,7 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
-    (0, class_validator_1.Max)(24),
+    (0, class_validator_1.Max)(30),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Number)
 ], UpdateLecturerDto.prototype, "maxWorkload", void 0);

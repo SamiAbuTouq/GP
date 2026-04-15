@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProfileDto, UpdatePreferencesDto } from './dto/update-user.dto';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -134,5 +135,28 @@ export class UsersService {
       date_format: user.date_format || 'DD/MM/YYYY',
       time_format: user.time_format || '24',
     };
+  }
+
+  async updatePasswordForUser(userId: number, newPassword: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { user_id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with id ${userId} not found`);
+    }
+
+    const saltRounds = Number(this.configService.get('BCRYPT_SALT_ROUNDS', '12'));
+    const password_hash = await bcrypt.hash(newPassword, saltRounds);
+
+    await this.prisma.user.update({
+      where: { user_id: userId },
+      data: {
+        password_hash,
+        must_change_password: false,
+      },
+    });
+
+    return { success: true };
   }
 }

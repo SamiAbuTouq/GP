@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import {
   BookOpen,
@@ -21,7 +21,6 @@ import type {
   DashboardStats,
   DepartmentData,
   SemesterData,
-  OnlineModeData,
   CapacityDistribution,
   RoomWasteData,
   RoomTypeUtilization,
@@ -31,7 +30,6 @@ interface OverviewTabProps {
   stats: DashboardStats
   departmentData: DepartmentData[]
   semesterData: SemesterData[]
-  onlineModeData: OnlineModeData[]
   capacityData: CapacityDistribution[]
   deptComparison: { name: string; students: number; sections: number; courses: number; utilization: number }[]
   roomWasteData: RoomWasteData[]
@@ -42,7 +40,6 @@ export function OverviewTab({
   stats,
   departmentData,
   semesterData,
-  onlineModeData,
   capacityData,
   deptComparison,
   roomWasteData,
@@ -82,13 +79,13 @@ export function OverviewTab({
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Under 50% filled</span>
               <span className="font-semibold">
-                {capacityData.filter(c => c.range === '0-25%' || c.range === '26-50%').reduce((sum, c) => sum + c.count, 0)}
+                {capacityData.filter(c => c.range === '0-25%' || c.range === '25-50%').reduce((sum, c) => sum + c.count, 0)}
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Over 75% filled</span>
               <span className="font-semibold">
-                {capacityData.filter(c => c.range === '76-99%' || c.range === '100%+').reduce((sum, c) => sum + c.count, 0)}
+                {capacityData.filter(c => c.range === '75-99%' || c.range === '100%+').reduce((sum, c) => sum + c.count, 0)}
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
@@ -108,9 +105,9 @@ export function OverviewTab({
           <CardContent className="space-y-3 flex flex-col justify-center">
             <div className="flex flex-col items-center justify-center py-2 text-center">
               <span className="text-4xl font-bold text-destructive mb-2">{stats.wastedFacultyHours}</span>
-              <span className="text-sm font-medium">Estimated Wasted Faculty Hours</span>
+              <span className="text-sm font-medium">Est. Wasted Faculty Hours / Term</span>
               <p className="text-xs text-muted-foreground mt-2 max-w-[250px]">
-                Calculated based on sections running with fewer than 10 students enrolled.
+                Avg per term — physical sections with fewer than 10 enrolled students (online excluded).
               </p>
             </div>
           </CardContent>

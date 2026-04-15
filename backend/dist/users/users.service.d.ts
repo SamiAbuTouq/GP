@@ -34,4 +34,7 @@ export declare class UsersService {
         date_format: string;
         time_format: string;
     }>;
+    updatePasswordForUser(userId: number, newPassword: string): Promise<{
+        success: boolean;
+    }>;
 }

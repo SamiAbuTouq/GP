@@ -119,6 +119,7 @@ export class AuthService {
       sub: user.user_id,
       email: user.email,
       role: user.role_name,
+      requires_password_change: user.must_change_password,
     };
 
     const [access_token, refresh_token] = await Promise.all([
@@ -136,7 +137,11 @@ export class AuthService {
       }),
     ]);
 
-    return { access_token, refresh_token };
+    return {
+      access_token,
+      refresh_token,
+      requires_password_change: user.must_change_password,
+    };
   }
 
   private async storeRefreshToken(

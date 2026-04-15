@@ -9,6 +9,7 @@ interface User {
   id: number;
   email: string;
   role: string;
+  requiresPasswordChange: boolean;
 }
 
 interface AuthContextType {
@@ -76,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id,
         email: payload.email,
         role: payload.role,
+        requiresPasswordChange: Boolean(payload.requires_password_change),
       };
     } catch {
       return null;
@@ -127,6 +129,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     
     setAuthLoading(false);
+    if (response.requires_password_change) {
+      router.push("/first-login-password");
+      return;
+    }
     router.push("/dashboard");
   }, [decodeToken, router]);
 
@@ -189,9 +195,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user && !isPublicRoute) {
         // Not authenticated and trying to access protected route
         router.replace("/login");
+      } else if (
+        user?.requiresPasswordChange &&
+        pathname !== "/first-login-password"
+      ) {
+        router.replace("/first-login-password");
       } else if (user && pathname === "/login") {
         // Authenticated users should not stay on login page.
-        router.replace("/dashboard");
+        if (user.requiresPasswordChange) {
+          router.replace("/first-login-password");
+        } else {
+          router.replace("/dashboard");
+        }
       }
     }
   }, [user, authLoading, pathname, router]);

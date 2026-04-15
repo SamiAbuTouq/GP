@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 interface AccessTokenResponse {
     access_token: string;
+    requires_password_change: boolean;
 }
 export declare class AuthController {
     private readonly authService;
@@ -21,6 +22,7 @@ export declare class AuthController {
             id: number;
             email: string;
             role: string;
+            requires_password_change: boolean;
         };
     }>;
     private setRefreshTokenCookie;

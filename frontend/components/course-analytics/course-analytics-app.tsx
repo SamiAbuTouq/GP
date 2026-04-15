@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState, useMemo, useCallback, useDeferredValue } from 'react'
 import {
@@ -32,7 +32,6 @@ import {
   resolveHeadcountForFilters,
   getDepartmentData,
   getSemesterData,
-  getOnlineModeData,
   getTopLecturers,
   getTimeSlotData,
   getDayData,
@@ -69,7 +68,6 @@ import {
   getFacultyWorkloadDistribution,
   getRoomTypeUtilization,
   getAcademicLevelModeData,
-  getAcademicFocusData,
 } from '@/lib/course-analytics/course-data'
 import { Card, CardContent } from '@/components/course-analytics-ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/course-analytics-ui/tabs'
@@ -132,8 +130,7 @@ export default function CourseAnalyticsApp({
     [filteredCourses, semesterHeadcountTotal],
   )
   const departmentData = useMemo(() => getDepartmentData(filteredCourses), [filteredCourses])
-  const semesterData = useMemo(() => getSemesterData(filteredCourses, semesterTotals), [filteredCourses, semesterTotals])
-  const onlineModeData = useMemo(() => getOnlineModeData(filteredCourses), [filteredCourses])
+  const semesterData = useMemo(() => getSemesterData(filteredCourses), [filteredCourses])
   const lecturerData = useMemo(() => getTopLecturers(filteredCourses), [filteredCourses])
   const timeSlotData = useMemo(() => getTimeSlotData(filteredCourses), [filteredCourses])
   const dayData = useMemo(() => getDayData(filteredCourses), [filteredCourses])
@@ -158,23 +155,19 @@ export default function CourseAnalyticsApp({
   const facultyWorkload = useMemo(() => getFacultyWorkloadDistribution(filteredCourses), [filteredCourses])
   const roomTypeData = useMemo(() => getRoomTypeUtilization(filteredCourses), [filteredCourses])
   const academicLevelModeData = useMemo(() => getAcademicLevelModeData(filteredCourses), [filteredCourses])
-  const academicFocusData = useMemo(() => getAcademicFocusData(filteredCourses), [filteredCourses])
 
   const studentLecturerRatioValue = useMemo(() => {
     if (stats.totalLecturers <= 0) return 'N/A'
-    if (semesterHeadcountTotal != null && semesterHeadcountTotal > 0) {
-      return Math.round((semesterHeadcountTotal / stats.totalLecturers) * 10) / 10
-    }
-    if (selectedSemester !== 'all' || selectedYear !== 'all') return stats.studentLecturerRatio
-    return 'N/A'
-  }, [stats.totalLecturers, stats.studentLecturerRatio, semesterHeadcountTotal, selectedSemester, selectedYear])
+    // Issue 2: always use seat-enrollment sum so the ratio stays consistent across all filter states.
+    return Math.round((stats.seatEnrollmentSum / stats.totalLecturers) * 10) / 10
+  }, [stats.totalLecturers, stats.seatEnrollmentSum])
 
   const studentLecturerRatioDescription = useMemo(() => {
     if (studentLecturerRatioValue === 'N/A') {
-      return 'Select year/semester or use institution view for headcount-based ratio'
+      return 'No lecturers in scope'
     }
-    return semesterHeadcountTotal != null ? 'Based on official semester headcount' : 'Average students per lecturer'
-  }, [studentLecturerRatioValue, semesterHeadcountTotal])
+    return 'Based on seat enrollments'
+  }, [studentLecturerRatioValue])
 
   const lecturersKpiValue = useMemo(() => {
     if (semesterHeadcountTotal != null && semesterHeadcountTotal > 0) return stats.totalLecturers
@@ -285,7 +278,20 @@ export default function CourseAnalyticsApp({
         {/* Primary KPIs */}
         <section className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
           <StatCard
-            title="Total Students"
+            title={
+              (() => {
+                // Both filters 'all' + institution-wide → cumulative all-terms label
+                if (selectedYear === 'all' && selectedSemester === 'all' && selectedDepartment === 'all' && !debouncedSearch.trim()) {
+                  return 'Total Enrollments (All Terms)'
+                }
+                // HC available for this filter combination → normal title
+                if (semesterHeadcountTotal != null) {
+                  return 'Total Students'
+                }
+                // HC suppressed by dept filter / search → make the fallback visible in the title
+                return 'Total Students (Seat Enrollment)'
+              })()
+            }
             value={stats.totalStudents}
             icon={Users}
             description={totalStudentsDescription}
@@ -295,8 +301,13 @@ export default function CourseAnalyticsApp({
             title="Utilization Rate"
             value={`${stats.utilizationRate}%`}
             icon={PieChart}
-            description={`${stats.emptySeats.toLocaleString()} empty seats`}
-            variant={stats.utilizationRate < 60 ? 'warning' : stats.utilizationRate >= 85 ? 'success' : 'default'}
+            description={
+              stats.uniqueSemesters > 1
+                ? `${stats.emptySeats.toLocaleString()} empty seats (${stats.uniqueSemesters} terms combined)`
+                : `${stats.emptySeats.toLocaleString()} empty seats`
+            }
+            // Issue 5: unified threshold — <60=warning, 60-89=default, ≥90=success
+            variant={stats.utilizationRate < 60 ? 'warning' : stats.utilizationRate >= 90 ? 'success' : 'default'}
           />
           <StatCard
             title="Student-Lecturer"
@@ -323,12 +334,30 @@ export default function CourseAnalyticsApp({
                 icon={AlertTriangle}
                 highlight={stats.fullSections > stats.totalSections * 0.2}
               />
-              <MiniStat label="Total Capacity" value={stats.totalCapacity.toLocaleString()} icon={Armchair} />
-              <MiniStat label="Sections/Course" value={stats.avgSectionsPerCourse} icon={BarChart3} />
+              <MiniStat label="Total Capacity" value={stats.totalCapacity.toLocaleString()} icon={Armchair}
+                subValue={stats.uniqueSemesters > 1 ? `${stats.uniqueSemesters} terms combined` : undefined}
+              />
+              <MiniStat
+                label="Sections/Course (avg/term)"
+                value={stats.avgSectionsPerCourse}
+                icon={BarChart3}
+              />
               <MiniStat label="Online" value={stats.onlineSections} icon={Laptop} />
-              <MiniStat label="On-Campus" value={stats.inPersonSections} icon={Building2} />
+              {/* Bug 4 fix: inPersonSections = total - online - blended, so label clearly covers both on-campus and blended */}
+              <MiniStat
+                label="On-Campus / Blended"
+                value={stats.inPersonSections + stats.blendedSections}
+                subValue={stats.blendedSections > 0 ? `incl. ${stats.blendedSections} blended` : undefined}
+                icon={Building2}
+              />
               <MiniStat label="Peak Hour" value={stats.peakHour || 'N/A'} icon={Clock} />
-              <MiniStat label="Busiest Day" value={stats.busiestDay || 'N/A'} icon={Calendar} />
+              {/* Issue 6: clarify that "Busiest Day" counts session-meetings (multi-day sections increment each day) */}
+              <MiniStat
+                label="Busiest Day (by session count)"
+                value={stats.busiestDay || 'N/A'}
+                subValue="Multi-day sections counted once per meeting day"
+                icon={Calendar}
+              />
             </CardContent>
           </Card>
         </section>
@@ -367,7 +396,6 @@ export default function CourseAnalyticsApp({
               stats={stats}
               departmentData={departmentData}
               semesterData={semesterData}
-              onlineModeData={onlineModeData}
               capacityData={capacityData}
               deptComparison={deptComparison}
               roomWasteData={roomWasteData}
@@ -389,11 +417,22 @@ export default function CourseAnalyticsApp({
           </TabsContent>
 
           <TabsContent value="courses">
-            <CoursesTab stats={stats} topCourses={topCourses} academicLevelModeData={academicLevelModeData} />
+            <CoursesTab
+              stats={stats}
+              topCourses={topCourses}
+              academicLevelModeData={academicLevelModeData}
+              // Issue 7: pass filter state so tab can show multi-year disclaimer
+              hasYearOrSemFilter={selectedYear !== 'all' || selectedSemester !== 'all'}
+            />
           </TabsContent>
 
           <TabsContent value="staff">
-            <StaffTab stats={stats} lecturerData={lecturerData} facultyWorkload={facultyWorkload} />
+            <StaffTab
+              stats={stats}
+              lecturerData={lecturerData}
+              facultyWorkload={facultyWorkload}
+              studentLecturerRatioValue={studentLecturerRatioValue}
+            />
           </TabsContent>
 
           <TabsContent value="insights">

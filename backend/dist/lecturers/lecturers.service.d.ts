@@ -1,9 +1,12 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLecturerDto, UpdateLecturerDto } from './dto/lecturer.dto';
+import { MailService } from '../mail/mail.service';
 export declare class LecturersService {
     private prisma;
-    constructor(prisma: PrismaService);
-    private resolveCurrentTimetableId;
+    private readonly mailService;
+    constructor(prisma: PrismaService, mailService: MailService);
+    private generateTemporaryPassword;
+    private resolveLatestTimetableId;
     private teachingLoadByUserIdForTimetable;
     private teachingLoadForUserOnTimetable;
     findAll(): Promise<{

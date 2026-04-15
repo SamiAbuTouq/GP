@@ -44,5 +44,6 @@ export declare class TimetablesService {
         isLab: boolean;
         registeredStudents: number;
         sectionCapacity: number;
+        isOnline: boolean;
     }[]>;
 }
