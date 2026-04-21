@@ -173,41 +173,42 @@ export default function WhatIfPage() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-auto p-4 lg:p-6">
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-balance">What-If Scenarios</h1>
-              <p className="text-muted-foreground">Explore different scheduling configurations and compare outcomes.</p>
-            </div>
-            <Dialog open={isNewDialogOpen} onOpenChange={setIsNewDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Scenario
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create New Scenario</DialogTitle>
-                  <DialogDescription>Define a hypothetical change to explore its impact on the timetable.</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="scenario-name">Scenario Name</Label>
-                    <Input id="scenario-name" value={newScenario.name} onChange={(e) => setNewScenario({ ...newScenario, name: e.target.value })} placeholder="e.g., Add New Lab Room" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="scenario-type">Scenario Type</Label>
-                    <Select value={newScenario.type} onValueChange={(v) => setNewScenario({ ...newScenario, type: v })}>
-                      <SelectTrigger id="scenario-type"><SelectValue placeholder="Select type" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="room-change">Room Change</SelectItem>
-                        <SelectItem value="section-change">Section Change</SelectItem>
-                        <SelectItem value="time-change">Time Slot Change</SelectItem>
-                        <SelectItem value="lecturer-change">Lecturer Change</SelectItem>
-                        <SelectItem value="constraint-change">Constraint Change</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+          <div className="mx-auto w-full max-w-[1680px]">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-balance">What-If Scenarios</h1>
+                <p className="text-muted-foreground">Explore different scheduling configurations and compare outcomes.</p>
+              </div>
+              <Dialog open={isNewDialogOpen} onOpenChange={setIsNewDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Scenario
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create New Scenario</DialogTitle>
+                    <DialogDescription>Define a hypothetical change to explore its impact on the timetable.</DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="scenario-name">Scenario Name</Label>
+                      <Input id="scenario-name" value={newScenario.name} onChange={(e) => setNewScenario({ ...newScenario, name: e.target.value })} placeholder="e.g., Add New Lab Room" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="scenario-type">Scenario Type</Label>
+                      <Select value={newScenario.type} onValueChange={(v) => setNewScenario({ ...newScenario, type: v })}>
+                        <SelectTrigger id="scenario-type"><SelectValue placeholder="Select type" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="room-change">Room Change</SelectItem>
+                          <SelectItem value="section-change">Section Change</SelectItem>
+                          <SelectItem value="time-change">Time Slot Change</SelectItem>
+                          <SelectItem value="lecturer-change">Lecturer Change</SelectItem>
+                          <SelectItem value="constraint-change">Constraint Change</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   <div className="space-y-2">
                     <Label htmlFor="scenario-desc">Description</Label>
                     <Input id="scenario-desc" value={newScenario.description} onChange={(e) => setNewScenario({ ...newScenario, description: e.target.value })} placeholder="Describe the hypothetical change..." />
@@ -492,6 +493,7 @@ export default function WhatIfPage() {
               )}
             </TabsContent>
           </Tabs>
+          </div>
         </main>
       </div>
     </div>

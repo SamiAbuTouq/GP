@@ -33,6 +33,7 @@ import {
   ArrowDown,
   ArrowUpDown,
 } from "lucide-react"
+import { ChevronDownIcon } from "@/components/ui/chevron-down-icon"
 import { ImportIcon } from "@/components/custom-icons"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { slotTypes, type SlotType } from "@/lib/data"
@@ -53,6 +54,7 @@ type TimeSlot = {
 const allDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"]
 type SortField = "days" | "duration"
 type SortDirection = "asc" | "desc"
+type WeeklyOverviewGroupBy = "days" | "type"
 
 export default function TimeSlotsPage() {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
@@ -65,13 +67,15 @@ export default function TimeSlotsPage() {
     days: [],
     start: "",
     end: "",
-    slotType: "Lecture",
+    slotType: "Traditional Lecture",
   })
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [sortField, setSortField] = useState<SortField | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
+  const [weeklyOverviewGroupBy, setWeeklyOverviewGroupBy] = useState<WeeklyOverviewGroupBy>("days")
+  const [collapsedOuterGroups, setCollapsedOuterGroups] = useState<Record<string, boolean>>({})
   const { toast } = useToast()
 
   // Fetch timeslots from API
@@ -145,7 +149,7 @@ export default function TimeSlotsPage() {
       }
 
       setTimeSlots([...timeSlots, data])
-      setNewSlot({ id: 0, days: [], start: "", end: "", slotType: "Lecture" })
+      setNewSlot({ id: 0, days: [], start: "", end: "", slotType: "Traditional Lecture" })
       setIsAddDialogOpen(false)
       toast({
         title: "Success",
@@ -278,9 +282,18 @@ export default function TimeSlotsPage() {
   }
 
   const getSlotTypeColor = (type: SlotType) => {
-    return type === "Lecture"
-      ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-      : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+    const normalizedType = type.toLowerCase().replace(/[_-]/g, " ").trim()
+    const slotTypeColors: Record<string, string> = {
+      lecture: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+      "traditional lecture": "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+      lab: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+      "blended lecture": "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300",
+      tutorial: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+      seminar: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300",
+      workshop: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300",
+      online: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300",
+    }
+    return slotTypeColors[normalizedType] || "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300"
   }
 
   // Calculate duration in hours and minutes
@@ -319,6 +332,13 @@ export default function TimeSlotsPage() {
     setSortDirection("asc")
   }
 
+  const toggleOuterGroup = (groupId: string) => {
+    setCollapsedOuterGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }))
+  }
+
   const sortedTimeSlots = useMemo(() => {
     if (!sortField) return timeSlots
 
@@ -352,16 +372,44 @@ export default function TimeSlotsPage() {
     })
   }, [timeSlots, sortField, sortDirection])
 
-  // Group slots by days for weekly overview
-  const slotsByDayPattern = timeSlots.reduce(
-    (acc, slot) => {
-      const key = [...slot.days].sort().join("-")
-      if (!acc[key]) acc[key] = []
-      acc[key].push(slot)
-      return acc
-    },
-    {} as Record<string, typeof timeSlots>
-  )
+  const weeklyOverviewGroups = useMemo(() => {
+    const sortedByStart = (slots: TimeSlot[]) =>
+      [...slots].sort((a, b) => {
+        const startCompare = a.start.localeCompare(b.start)
+        if (startCompare !== 0) return startCompare
+        const endCompare = a.end.localeCompare(b.end)
+        if (endCompare !== 0) return endCompare
+        return a.id - b.id
+      })
+
+    const outerGroups = timeSlots.reduce(
+      (acc, slot) => {
+        const key = weeklyOverviewGroupBy === "days" ? [...slot.days].sort().join("-") : slot.slotType
+        if (!acc[key]) acc[key] = []
+        acc[key].push(slot)
+        return acc
+      },
+      {} as Record<string, TimeSlot[]>
+    )
+
+    return Object.entries(outerGroups)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([groupKey, slots]) => {
+        if (weeklyOverviewGroupBy === "days") {
+          const innerGroups = slotTypes.map((slotType) => ({
+            key: slotType,
+            slots: sortedByStart(slots.filter((slot) => slot.slotType === slotType)),
+          }))
+          return { groupKey, slots: sortedByStart(slots), innerGroups }
+        }
+
+        const innerGroups = allDays.map((day) => ({
+          key: day,
+          slots: sortedByStart(slots.filter((slot) => slot.days.includes(day))),
+        }))
+        return { groupKey, slots: sortedByStart(slots), innerGroups }
+      })
+  }, [timeSlots, weeklyOverviewGroupBy])
 
   const totalPages = Math.ceil(sortedTimeSlots.length / pageSize)
   const maxPage = totalPages || 1
@@ -688,38 +736,104 @@ export default function TimeSlotsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Weekly Overview</CardTitle>
+            <div className="flex items-center justify-between gap-4">
+              <CardTitle>Weekly Overview</CardTitle>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="weekly-overview-group-by" className="text-sm text-muted-foreground">
+                  Group by
+                </Label>
+                <Select
+                  value={weeklyOverviewGroupBy}
+                  onValueChange={(value) => setWeeklyOverviewGroupBy(value as WeeklyOverviewGroupBy)}
+                >
+                  <SelectTrigger id="weekly-overview-group-by" className="h-8 w-[130px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="days">Days</SelectItem>
+                    <SelectItem value="type">Type</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {Object.keys(slotsByDayPattern).length === 0 ? (
+              {weeklyOverviewGroups.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No time slots configured yet.</p>
               ) : (
-                Object.entries(slotsByDayPattern).map(([pattern, slots]) => (
-                  <div key={pattern} className="space-y-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {pattern.split("-").map((day) => (
-                        <Badge key={day} className={getDayColor(day)}>
-                          {day.slice(0, 3)}
-                        </Badge>
-                      ))}
-                      <span className="text-sm text-muted-foreground">{slots.length} slots</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {slots.map((slot) => (
-                        <div
-                          key={slot.id}
-                          className="rounded-md border bg-muted/50 px-3 py-1 text-sm flex items-center gap-2"
-                        >
-                          <span>
-                            {slot.start} - {slot.end}
-                          </span>
-                          <Badge variant="outline" className="text-xs">
-                            {slot.slotType}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
+                weeklyOverviewGroups.map(({ groupKey, slots, innerGroups }) => (
+                  <div key={groupKey} className="space-y-2">
+                    {(() => {
+                      const groupId = `${weeklyOverviewGroupBy}:${groupKey}`
+                      const isCollapsed = collapsedOuterGroups[groupId] ?? true
+                      return (
+                        <>
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-between gap-2 rounded-md p-1 text-left hover:bg-muted/40"
+                            onClick={() => toggleOuterGroup(groupId)}
+                            aria-expanded={!isCollapsed}
+                          >
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {weeklyOverviewGroupBy === "days" ? (
+                                groupKey.split("-").map((day) => (
+                                  <Badge key={day} className={cn(getDayColor(day), "text-xs font-medium")}>
+                                    {day.slice(0, 3)}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <Badge className={cn(getSlotTypeColor(groupKey as SlotType), "text-xs font-medium")}>{groupKey}</Badge>
+                              )}
+                              <span className="text-sm text-muted-foreground">{slots.length} slots</span>
+                            </div>
+                            {isCollapsed ? (
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDownIcon
+                                size={16}
+                                className="h-4 w-4 text-muted-foreground"
+                              />
+                            )}
+                          </button>
+                          {!isCollapsed && (
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                              {innerGroups.map(({ key, slots: innerSlots }) => (
+                                <div
+                                  key={`${groupKey}-${key}`}
+                                  className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-3 ml-6"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {weeklyOverviewGroupBy === "days" ? (
+                                      <Badge className={getSlotTypeColor(key as SlotType)}>{key}</Badge>
+                                    ) : (
+                                      <Badge className={getDayColor(key)}>{key.slice(0, 3)}</Badge>
+                                    )}
+                                    <span className="text-xs text-muted-foreground">{innerSlots.length} slots</span>
+                                  </div>
+                                  {innerSlots.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground">No slots</p>
+                                  ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                      {innerSlots.map((slot) => (
+                                        <div
+                                          key={slot.id}
+                                          className="rounded-md border bg-muted/50 px-3 py-1 text-sm flex items-center gap-2"
+                                        >
+                                          <span>
+                                            {slot.start} - {slot.end}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
                   </div>
                 ))
               )}
@@ -841,13 +955,13 @@ export default function TimeSlotsPage() {
           if (!daysStr || !start || !end) return null
           const days = daysStr.split(",").map((d) => d.trim()).filter((d) => allDays.includes(d))
           if (days.length === 0) return null
-          const slotType = (findColumn(row, "slotType", "slot_type", "slottype", "type") ?? "Lecture") as SlotType
+          const slotType = (findColumn(row, "slotType", "slot_type", "slottype", "type") ?? "Traditional Lecture") as SlotType
           return {
             id: timeSlots.length + index + 1,
             days,
             start,
             end,
-            slotType: slotTypes.includes(slotType) ? slotType : "Lecture",
+            slotType: slotTypes.includes(slotType) ? slotType : "Traditional Lecture",
           }
         }}
         onImport={async (data) => {

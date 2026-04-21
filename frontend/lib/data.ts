@@ -60,5 +60,5 @@ export function parseDeliveryMode(value: unknown): DeliveryMode {
   return "FACE_TO_FACE"
 }
 
-export const slotTypes = ["Lecture", "Lab"] as const
+export const slotTypes = ["Traditional Lecture", "Blended Lecture", "Lab"] as const
 export type SlotType = (typeof slotTypes)[number]

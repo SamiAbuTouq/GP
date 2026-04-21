@@ -3,11 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Building2,
-  Users,
-  PieChart,
-  AlertTriangle,
-  GraduationCap,
-  Activity,
   FileText,
   FileSpreadsheet,
   Download,
@@ -16,8 +11,14 @@ import {
   Check,
   ChevronRight,
   Search,
-  Sparkles,
 } from "lucide-react"
+import { ChartPieIcon } from "@/components/ui/chart-pie-icon"
+import { UserRoundIcon } from "@/components/ui/user-round-icon"
+import { TriangleAlertIcon } from "@/components/ui/triangle-alert-icon"
+import { GraduationCapIcon } from "@/components/ui/graduation-cap"
+import { ActivityIcon } from "@/components/ui/activity"
+import { SparklesIcon } from "@/components/ui/sparkles-icon"
+import { FileTextIcon } from "@/components/ui/file-text-icon"
 import { format } from "date-fns"
 
 import { Sidebar } from "@/components/sidebar"
@@ -79,13 +80,13 @@ import { generateReportBlob, triggerDownload } from "@/lib/reports/generate-repo
 import { deleteRecentReport, loadRecentReports, saveRecentReport } from "@/lib/reports/recent-storage"
 import * as XLSX from "xlsx"
 
-const REPORT_ICONS: Record<ReportTypeId, typeof Building2> = {
+const REPORT_ICONS: Record<ReportTypeId, any> = {
   "room-utilization": Building2,
-  "lecturer-workload": Users,
-  "course-distribution": PieChart,
-  "conflict-analysis": AlertTriangle,
-  "student-schedule": GraduationCap,
-  "optimization-summary": Activity,
+  "lecturer-workload": UserRoundIcon,
+  "course-distribution": ChartPieIcon,
+  "conflict-analysis": TriangleAlertIcon,
+  "student-schedule": GraduationCapIcon,
+  "optimization-summary": ActivityIcon,
 }
 
 function formatBytes(bytes: number): string {
@@ -112,9 +113,66 @@ function semesterDisplayLabel(s: SemesterListItem) {
   return `${yr} ${s.semester}`
 }
 
+function ReportTypeButton({
+  report,
+  active,
+  onClick,
+}: {
+  report: (typeof REPORT_DEFINITIONS)[number]
+  active: boolean
+  onClick: () => void
+}) {
+  const Icon = REPORT_ICONS[report.id]
+  const iconRef = useRef<any>(null)
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => iconRef.current?.startAnimation()}
+      onMouseLeave={() => iconRef.current?.stopAnimation()}
+      className={cn(
+        "rounded-xl border bg-card text-left transition-all hover:border-primary/40 hover:shadow-md",
+        active ? "border-primary ring-2 ring-primary/20 shadow-sm" : "border-border/80",
+      )}
+    >
+      <div className="flex gap-3 p-4">
+        <div
+          className={cn(
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg",
+            active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
+          )}
+        >
+          <Icon ref={iconRef} size={20} className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium leading-tight">{report.name}</span>
+            {report.comingSoon ? (
+              <Badge variant="outline" className="text-[10px] uppercase">
+                Coming soon
+              </Badge>
+            ) : null}
+          </div>
+          <p className="text-muted-foreground text-sm leading-snug">{report.description}</p>
+          <div className="flex flex-wrap gap-1 pt-1">
+            {report.formats.map((f: any) => (
+              <Badge key={f} variant="secondary" className="text-[10px] font-normal">
+                {formatLabel(f)}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </div>
+    </button>
+  )
+}
+
 export function ReportsApp() {
   const { toast } = useToast()
   const [mainTab, setMainTab] = useState("generate")
+  const sparkleRef = useRef<any>(null)
+  const fileTextRef = useRef<any>(null)
 
   const [selectedReportId, setSelectedReportId] = useState<ReportTypeId | "">("")
   const [exportFormat, setExportFormat] = useState<ExportFormat | "">("")
@@ -473,21 +531,31 @@ export function ReportsApp() {
               </div>
 
               <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-6">
-                <TabsList className="grid h-auto w-full max-w-md grid-cols-2 p-1">
-                  <TabsTrigger value="generate" className="gap-2 py-2.5">
-                    <Sparkles className="h-4 w-4 opacity-70" />
-                    Generate Report
-                  </TabsTrigger>
-                  <TabsTrigger value="recent" className="gap-2 py-2.5">
-                    <FileText className="h-4 w-4 opacity-70" />
-                    Recent Reports
-                    {recentReports.length > 0 ? (
-                      <Badge variant="outline" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
-                        {recentReports.length}
-                      </Badge>
-                    ) : null}
-                  </TabsTrigger>
-                </TabsList>
+                  <TabsList className="grid h-auto w-full max-w-md grid-cols-2 p-1">
+                    <TabsTrigger
+                      value="generate"
+                      className="group gap-2 py-2.5"
+                      onMouseEnter={() => sparkleRef.current?.startAnimation()}
+                      onMouseLeave={() => sparkleRef.current?.stopAnimation()}
+                    >
+                      <SparklesIcon ref={sparkleRef} className="h-4 w-4 opacity-70 transition-transform group-hover:scale-110" />
+                      Generate Report
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="recent"
+                      className="group gap-2 py-2.5"
+                      onMouseEnter={() => fileTextRef.current?.startAnimation()}
+                      onMouseLeave={() => fileTextRef.current?.stopAnimation()}
+                    >
+                      <FileTextIcon ref={fileTextRef} className="h-4 w-4 opacity-70 transition-transform group-hover:scale-110" />
+                      Recent Reports
+                      {recentReports.length > 0 ? (
+                        <Badge variant="outline" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
+                          {recentReports.length}
+                        </Badge>
+                      ) : null}
+                    </TabsTrigger>
+                  </TabsList>
 
                 <TabsContent value="generate" className="mt-0 space-y-6 focus-visible:outline-none">
                   <div className="grid gap-6 lg:grid-cols-3">
@@ -499,54 +567,14 @@ export function ReportsApp() {
                           </h2>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
-                          {REPORT_DEFINITIONS.map((report) => {
-                            const Icon = REPORT_ICONS[report.id]
-                            const active = selectedReportId === report.id
-                            return (
-                              <button
-                                key={report.id}
-                                type="button"
-                                onClick={() => handleSelectReport(report.id)}
-                                className={cn(
-                                  "rounded-xl border bg-card text-left transition-all hover:border-primary/40 hover:shadow-md",
-                                  active
-                                    ? "border-primary ring-2 ring-primary/20 shadow-sm"
-                                    : "border-border/80",
-                                )}
-                              >
-                                <div className="flex gap-3 p-4">
-                                  <div
-                                    className={cn(
-                                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg",
-                                      active ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground",
-                                    )}
-                                  >
-                                    <Icon className="h-5 w-5" />
-                                  </div>
-                                  <div className="min-w-0 flex-1 space-y-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <span className="font-medium leading-tight">{report.name}</span>
-                                      {report.comingSoon ? (
-                                        <Badge variant="outline" className="text-[10px] uppercase">
-                                          Coming soon
-                                        </Badge>
-                                      ) : null}
-                                    </div>
-                                    <p className="text-muted-foreground text-sm leading-snug">
-                                      {report.description}
-                                    </p>
-                                    <div className="flex flex-wrap gap-1 pt-1">
-                                      {report.formats.map((f) => (
-                                        <Badge key={f} variant="secondary" className="text-[10px] font-normal">
-                                          {formatLabel(f)}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              </button>
-                            )
-                          })}
+                          {REPORT_DEFINITIONS.map((report) => (
+                            <ReportTypeButton
+                              key={report.id}
+                              report={report}
+                              active={selectedReportId === report.id}
+                              onClick={() => handleSelectReport(report.id)}
+                            />
+                          ))}
                         </div>
                       </section>
 

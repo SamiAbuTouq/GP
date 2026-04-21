@@ -23,18 +23,15 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // CORS configuration
-  // app.enableCors({
-  //   origin: process.env.CORS_ORIGIN || "http://localhost:3000",
-  //   credentials: true,
-  // });
+  // CORS — configure allowed origins via CORS_ORIGIN env var (comma-separated).
+  // Never hardcode tunnel or third-party domains here.
+  const rawOrigins = process.env.CORS_ORIGIN ?? "http://localhost:3000";
+  const allowedOrigins = rawOrigins.split(",").map((o) => o.trim()).filter(Boolean);
   app.enableCors({
-    origin: [
-      "http://localhost:3000",
-      "https://west-raymond-guru-divide.trycloudflare.com",
-    ],
+    origin: allowedOrigins,
     credentials: true,
   });
+
   
 
   // API prefix

@@ -12,24 +12,36 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.RolesGuard = void 0;
 const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
+const client_1 = require("@prisma/client");
 const roles_decorator_1 = require("../decorators/roles.decorator");
+const public_decorator_1 = require("../decorators/public.decorator");
 let RolesGuard = class RolesGuard {
     constructor(reflector) {
         this.reflector = reflector;
     }
     canActivate(context) {
+        const isPublic = this.reflector.getAllAndOverride(public_decorator_1.IS_PUBLIC_KEY, [
+            context.getHandler(),
+            context.getClass(),
+        ]);
+        if (isPublic)
+            return true;
         const requiredRoles = this.reflector.getAllAndOverride(roles_decorator_1.ROLES_KEY, [
             context.getHandler(),
             context.getClass(),
         ]);
-        if (!requiredRoles) {
-            return true;
-        }
         const { user } = context.switchToHttp().getRequest();
         if (!user) {
-            throw new common_1.ForbiddenException('User not found');
+            throw new common_1.ForbiddenException('Authentication required');
         }
-        if (!requiredRoles.includes(user.role)) {
+        const userRole = user.role_name ?? user.role ?? '';
+        if (!requiredRoles || requiredRoles.length === 0) {
+            if (userRole !== client_1.Role.ADMIN) {
+                throw new common_1.ForbiddenException('Insufficient permissions — this resource requires ADMIN access');
+            }
+            return true;
+        }
+        if (!requiredRoles.includes(userRole)) {
             throw new common_1.ForbiddenException('Insufficient permissions');
         }
         return true;

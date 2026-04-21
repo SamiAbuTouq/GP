@@ -9,8 +9,9 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UpdateTimeslotDto = exports.CreateTimeslotDto = void 0;
+exports.UpdateLecturerPreferencesDto = exports.UpdateLecturerPreferenceItemDto = exports.UpdateTimeslotDto = exports.CreateTimeslotDto = void 0;
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
 class CreateTimeslotDto {
 }
 exports.CreateTimeslotDto = CreateTimeslotDto;
@@ -59,4 +60,24 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], UpdateTimeslotDto.prototype, "slotType", void 0);
+class UpdateLecturerPreferenceItemDto {
+}
+exports.UpdateLecturerPreferenceItemDto = UpdateLecturerPreferenceItemDto;
+__decorate([
+    (0, class_validator_1.IsInt)(),
+    __metadata("design:type", Number)
+], UpdateLecturerPreferenceItemDto.prototype, "slotId", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdateLecturerPreferenceItemDto.prototype, "isPreferred", void 0);
+class UpdateLecturerPreferencesDto {
+}
+exports.UpdateLecturerPreferencesDto = UpdateLecturerPreferencesDto;
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => UpdateLecturerPreferenceItemDto),
+    __metadata("design:type", Array)
+], UpdateLecturerPreferencesDto.prototype, "preferences", void 0);
 //# sourceMappingURL=timeslot.dto.js.map

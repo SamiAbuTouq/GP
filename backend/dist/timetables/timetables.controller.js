@@ -14,7 +14,8 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TimetablesController = void 0;
 const common_1 = require("@nestjs/common");
-const public_decorator_1 = require("../common/decorators/public.decorator");
+const client_1 = require("@prisma/client");
+const roles_decorator_1 = require("../common/decorators/roles.decorator");
 const timetables_service_1 = require("./timetables.service");
 let TimetablesController = class TimetablesController {
     constructor(timetablesService) {
@@ -38,7 +39,6 @@ let TimetablesController = class TimetablesController {
 };
 exports.TimetablesController = TimetablesController;
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Get)(),
     __param(0, (0, common_1.Query)('semesterId')),
     __metadata("design:type", Function),
@@ -46,7 +46,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], TimetablesController.prototype, "list", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Get)(':id/entries'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Query)('courseId')),
@@ -58,6 +57,7 @@ __decorate([
 ], TimetablesController.prototype, "listEntries", null);
 exports.TimetablesController = TimetablesController = __decorate([
     (0, common_1.Controller)('timetables'),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.LECTURER),
     __metadata("design:paramtypes", [timetables_service_1.TimetablesService])
 ], TimetablesController);
 //# sourceMappingURL=timetables.controller.js.map

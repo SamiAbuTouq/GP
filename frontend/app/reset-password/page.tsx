@@ -13,11 +13,13 @@ import {
   X,
   Eye,
   EyeOff,
-  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+const INPUT_BASE_CLASSES =
+  "h-12 rounded-[10px] border px-4 text-white placeholder:text-white/45 backdrop-blur-[4px] transition-all duration-300 ease-out focus:outline-none focus:bg-white/[0.14] focus:border-[#48CAE4] focus:shadow-[0_0_0_3px_rgba(72,202,228,0.18)] bg-white/[0.08] border-white/[0.18]";
 
 function ResetPasswordForm() {
   const [password, setPassword] = useState("");
@@ -98,13 +100,13 @@ function ResetPasswordForm() {
           </div>
         </div>
         <div>
-          <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-3">
+          <h2 className="text-3xl font-bold text-white mb-3">
             Password Updated!
           </h2>
-          <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
+          <p className="text-slate-200 leading-relaxed">
             Your password has been successfully reset. You can now sign in with your new credentials.
           </p>
-          <p className="text-slate-400 dark:text-slate-500 text-sm mt-4">
+          <p className="text-slate-300 text-sm mt-4">
             Redirecting you to sign in shortly...
           </p>
         </div>
@@ -123,10 +125,10 @@ function ResetPasswordForm() {
   return (
     <>
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+        <h2 className="mb-2 text-[2rem] font-bold tracking-[-0.02em] text-white">
           Create new password
         </h2>
-        <p className="text-slate-500 dark:text-slate-400">
+        <p className="text-[0.95rem] text-white/60">
           Choose a strong password to secure your account.
         </p>
       </div>
@@ -141,10 +143,10 @@ function ResetPasswordForm() {
         )}
 
         {/* Password field */}
-        <div className="space-y-2">
+        <div className="form-field space-y-2">
           <Label
             htmlFor="password"
-            className="text-sm font-medium text-slate-700 dark:text-slate-300"
+            className="text-[0.875rem] font-medium tracking-[0.01em] text-white/85"
           >
             New Password
           </Label>
@@ -155,13 +157,20 @@ function ResetPasswordForm() {
               placeholder="Enter your new password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-12 pl-4 pr-12 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-xl focus:border-blue-500 focus:ring-blue-500/20 transition-all"
+              autoComplete="new-password"
+              className={`${INPUT_BASE_CLASSES} pr-12 ${
+                password.length > 0 && !passwordValid
+                  ? "border-[#EF4444] shadow-[0_0_0_3px_rgba(239,68,68,0.2)]"
+                  : passwordValid
+                    ? "border-[#10B981] shadow-[0_0_0_3px_rgba(16,185,129,0.18)]"
+                    : ""
+              }`}
               required
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 transition-colors hover:text-white"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -171,10 +180,10 @@ function ResetPasswordForm() {
         </div>
 
         {/* Confirm password field */}
-        <div className="space-y-2">
+        <div className="form-field space-y-2">
           <Label
             htmlFor="confirmPassword"
-            className="text-sm font-medium text-slate-700 dark:text-slate-300"
+            className="text-[0.875rem] font-medium tracking-[0.01em] text-white/85"
           >
             Confirm Password
           </Label>
@@ -188,24 +197,27 @@ function ResetPasswordForm() {
                 setConfirmPassword(e.target.value);
                 if (confirmError) setConfirmError("");
               }}
-              className={`h-12 pl-4 pr-12 bg-slate-50 dark:bg-slate-800 rounded-xl transition-all ${
+              autoComplete="new-password"
+              className={`${INPUT_BASE_CLASSES} pr-12 ${
                 confirmError
-                  ? "border-red-400 focus:border-red-500 focus:ring-red-500/20"
-                  : "border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-blue-500/20"
+                  ? "border-[#EF4444] shadow-[0_0_0_3px_rgba(239,68,68,0.2)] animate-[shake_0.4s_ease]"
+                  : confirmPassword && password === confirmPassword
+                    ? "border-[#10B981] shadow-[0_0_0_3px_rgba(16,185,129,0.18)]"
+                    : ""
               }`}
               required
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 transition-colors hover:text-white"
               aria-label={showConfirmPassword ? "Hide password" : "Show password"}
             >
               {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
             </button>
           </div>
           {confirmError && (
-            <p className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 mt-1">
+            <p className="mt-1 flex animate-[fadeIn_0.3s_ease] items-center gap-1.5 text-[0.78rem] text-[#FCA5A5]">
               <XCircle className="w-3.5 h-3.5 shrink-0" />
               {confirmError}
             </p>
@@ -213,7 +225,7 @@ function ResetPasswordForm() {
 
           {/* Live password strength checklist */}
           {password.length > 0 && (
-            <ul className="mt-3 grid grid-cols-1 gap-1.5 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700">
+            <ul className="mt-3 grid grid-cols-1 gap-1.5 p-3 bg-white/10 rounded-xl border border-white/20">
               {rules.map((rule) => {
                 const passed = rule.test(password);
                 return (
@@ -221,8 +233,8 @@ function ResetPasswordForm() {
                     key={rule.label}
                     className={`flex items-center gap-2 text-xs font-medium transition-colors ${
                       passed
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-slate-400 dark:text-slate-500"
+                        ? "text-green-300"
+                        : "text-slate-300"
                     }`}
                   >
                     {passed ? (
@@ -241,7 +253,7 @@ function ResetPasswordForm() {
         <Button
           type="submit"
           disabled={isLoading || !token || !passwordValid}
-          className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base rounded-xl shadow-lg shadow-blue-600/25 transition-all hover:shadow-xl hover:shadow-blue-600/30 disabled:opacity-70 disabled:cursor-not-allowed"
+          className="sign-in-btn h-12 w-full rounded-xl bg-[linear-gradient(135deg,#2563EB_0%,#1E54B7_100%)] text-base font-semibold text-white transition-[transform,box-shadow] duration-150 hover:-translate-y-[1px] hover:shadow-[0_6px_20px_rgba(37,99,235,0.4)] active:translate-y-0 active:shadow-none disabled:pointer-events-none disabled:opacity-75"
         >
           {isLoading ? (
             <span className="flex items-center gap-2">
@@ -262,7 +274,7 @@ function ResetPasswordForm() {
         <div className="text-center">
           <Link
             href="/login"
-            className="inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
+            className="inline-flex items-center gap-2 text-sm font-medium text-[#48CAE4] transition-colors hover:text-[#90E0EF]"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Sign In
@@ -275,91 +287,133 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen flex bg-slate-100 dark:bg-slate-950">
-      {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-[45%] bg-[#0a1628] relative overflow-hidden order-first">
-        {/* Grid pattern overlay */}
-        <div
-          className="absolute inset-0 opacity-20"
-          style={{
-            backgroundImage: `linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px)`,
-            backgroundSize: "40px 40px",
-          }}
-        />
-
-        {/* Gradient glow effects */}
-        <div className="absolute top-1/4 -right-20 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 left-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl" />
-
-        <div className="relative z-10 flex flex-col justify-between h-full w-full p-10 xl:p-14">
-          {/* Logo */}
-          <div className="flex justify-center pt-8">
+    <div className="reset-theme min-h-screen lg:grid lg:grid-cols-[42%_58%]">
+      <div className="relative hidden lg:flex overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)]">
+        <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col items-center justify-start px-12 pt-20 pb-16 text-center">
+          <div className="flex justify-center">
             <Image
               src="/images/logo.png"
               alt="PSUT Logo"
-              width={200}
-              height={200}
-              className="object-contain drop-shadow-2xl"
-              priority
-            />
-          </div>
-
-          {/* Main Content */}
-          <div className="flex-1 flex flex-col justify-center items-center text-center">
-            <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-6">
-              <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent">
-                Password
-              </span>
-              <br />
-              <span className="text-white">Reset</span>
-            </h1>
-            <p className="text-slate-400 text-lg max-w-sm leading-relaxed">
-              Create a strong new password to keep your account safe and regain access.
-            </p>
-          </div>
-
-          {/* Security tip at bottom */}
-          <div className="pb-4">
-            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-              <p className="text-slate-400 text-sm leading-relaxed">
-              <span className="text-slate-300 font-medium">Security tip:</span> Use a unique password that you don't use anywhere else.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Right Panel - Form */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 bg-white dark:bg-slate-900 order-last">
-        <div className="w-full max-w-md">
-          {/* Mobile Logo */}
-          <div className="lg:hidden flex justify-center mb-8">
-            <Image
-              src="/images/logo.png"
-              alt="PSUT Logo"
-              width={120}
-              height={120}
+              width={180}
+              height={180}
               className="object-contain"
               priority
             />
           </div>
+          <h1 className="mt-8 text-5xl font-bold leading-tight text-[var(--text-primary)]">
+            <span className="bg-gradient-to-r from-[#1E54B7] via-[#2563EB] to-[#48CAE4] bg-clip-text text-transparent">
+              Password
+            </span>
+            <br />
+            Reset
+          </h1>
+        </div>
+        <div className="absolute inset-x-0 bottom-20 z-10 flex justify-center px-12 text-center">
+          <div className="w-full max-w-xl">
+            <p className="text-base leading-relaxed text-[var(--text-secondary)]">
+              Create a strong new password to keep your account safe and regain access.
+            </p>
+            <div className="mt-6 w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left">
+              <p className="whitespace-nowrap text-sm leading-relaxed text-slate-600 dark:text-white/70">
+                <span className="font-medium text-slate-800 dark:text-white">Security tip:</span> Use a unique password that you do not use anywhere else.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div
+          className="absolute inset-x-0 bottom-0 h-19 bg-bottom bg-repeat-x opacity-90"
+          style={{
+            backgroundImage: "url('/images/background/(1).jpeg')",
+            backgroundSize: "auto 100%",
+            filter: "var(--mosaic-filter)",
+          }}
+        />
+      </div>
 
-          <Suspense fallback={<div className="text-center text-slate-400">Loading...</div>}>
-            <ResetPasswordForm />
-          </Suspense>
+      <div className="relative overflow-hidden p-6 lg:p-12 [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)]">
+        <div className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_70%_80%,rgba(0,180,216,0.12)_0%,transparent_60%),radial-gradient(circle_at_20%_60%,rgba(37,99,235,0.15)_0%,transparent_50%)]" />
+        <div className="relative mx-auto flex min-h-screen w-full max-w-md items-center py-10 lg:min-h-0">
+          <div className="w-full py-4 lg:py-8">
+            <Suspense fallback={<div className="text-center text-slate-300">Loading...</div>}>
+              <ResetPasswordForm />
+            </Suspense>
 
-          <p className="text-center text-sm text-slate-500 dark:text-slate-400 mt-8">
-            Need help?{" "}
-            <Link
-              href="/help"
-              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
-            >
-              Contact IT Support
-            </Link>
-          </p>
+            <p className="mt-8 text-center text-[0.85rem] text-white/50">
+              Need help?{" "}
+              <Link
+                href="/help"
+                className="font-medium text-[#48CAE4] transition-colors hover:text-[#90E0EF]"
+              >
+                Contact IT Support
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
+      <style jsx global>{`
+        :root {
+          --bg-left: #ffffff;
+          --text-primary: #0d1b4b;
+          --text-secondary: #4b5563;
+          --mosaic-filter: none;
+        }
+        @media (prefers-color-scheme: dark) {
+          :root {
+            --bg-left: #0a1128;
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            --mosaic-filter: invert(1) hue-rotate(180deg) saturate(1.5);
+          }
+        }
+        .form-field {
+          animation: slideUpFade 0.5s ease both;
+        }
+        .form-field:nth-of-type(1) {
+          animation-delay: 0.1s;
+        }
+        .form-field:nth-of-type(2) {
+          animation-delay: 0.25s;
+        }
+        .sign-in-btn {
+          animation: slideUpFade 0.5s ease 0.4s both;
+        }
+        @keyframes slideUpFade {
+          from {
+            opacity: 0;
+            transform: translateY(16px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes shake {
+          0%,
+          100% {
+            transform: translateX(0);
+          }
+          20% {
+            transform: translateX(-6px);
+          }
+          40% {
+            transform: translateX(6px);
+          }
+          60% {
+            transform: translateX(-4px);
+          }
+          80% {
+            transform: translateX(4px);
+          }
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 }

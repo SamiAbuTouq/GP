@@ -119,6 +119,7 @@ model Course {
   is_lab              Boolean @default(false)
   credit_hours   Int
   delivery_mode  DeliveryMode
+  /// Count of distinct sections in the most recent semester (seed); 0 if not offered that term.
   sections       Int          @default(1)
 
   department   Department @relation(fields: [dept_id], references: [dept_id])

@@ -1,13 +1,16 @@
 import { Controller, Get, Patch, Body, UseGuards } from "@nestjs/common";
+import { Role } from "@prisma/client";
 import { UsersService } from "./users.service";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { UpdateProfileDto, UpdatePreferencesDto } from "./dto/update-user.dto";
 import type { User } from "@prisma/client";
 import { UpdatePasswordDto } from "./dto/update-password.dto";
+import { Roles } from "../common/decorators/roles.decorator";
 
 @Controller("users")
 @UseGuards(JwtAuthGuard)
+@Roles(Role.ADMIN, Role.LECTURER)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 

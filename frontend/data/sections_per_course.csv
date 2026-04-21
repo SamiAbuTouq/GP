@@ -1,0 +1,342 @@
+course_code,course_name,scheduled_sections
+11100,computer skills (remedial),2
+11102,introduction to computer science,3
+11103,structured programming,15
+11151,structured programming lab,19
+11206,object oriented programming,4
+11212,data structures and introduction to algorithms,7
+11213,data structures and algorithms for cybersecurity,1
+11223,database fundamentals,1
+11253,object oriented programming lab,3
+11313,algorithms design and analysis,4
+11316,theory of computation,1
+11323,database systems,5
+11325,database fundamentals,1
+11335,operating systems,3
+11354,database systems lab,4
+11355,operating systems lab,4
+11435,data communications & computer networks,2
+11436,distributed systems,2
+11447,wireless networks and applications,1
+11449,computer and society,3
+11464,information systems security,2
+12159,computer applications in comouter graphics,1
+12242,webpage design and internet programming lab,3
+12243,webpage design and internet programming,3
+12264,3d-modeling,1
+12266,3d materials and lighting,1
+12267,video editing and production,1
+12273,computer graphics,1
+12275,data structures for games,1
+12343,visual programming,3
+12348,multimedia systems,2
+12351,game design,1
+12354,algorithms and al for games,1
+12362,2d animation,1
+12364,3d animation,1
+12367,3d rigging and skinning,1
+12373,interactive 3d graphics,1
+12379,3d character modeling,1
+12446,digital image processing,2
+12447,user experience,1
+12467,video editing and production,1
+12471,selected topics in computer animation,1
+12473,selected topics in computer graphics,1
+12479,advanced animation,1
+12481,virtual and augmented reality,1
+13211,introduction to software engineering,2
+13212,software construction,2
+13324,system analysis and design,1
+13325,software requirements analysis,1
+13326,software engineering approaches to human computer interaction,1
+13327,sotware design and architecture,1
+13334,mobile application development,1
+13393,special topic in software engineering (1),2
+13428,software quality assurance and testing,1
+13431,advanced topics in programming,1
+13432,software project management,1
+13434,secure software development,1
+13435,database management system,1
+13477,software engineering,1
+13494,special topic in software engineering (2),1
+14140,introduction to data science,3
+14141,introduction to data science lab,4
+14260,data engineering,1
+14261,data engineering lab,2
+14270,statistics and probability for data science,2
+14271,statistics and probability for data science lab,4
+14330,artificial intelligence,2
+14331,artificial intelligence lab,2
+14350,computer architecture for machine learning,2
+14351,natural language processing,1
+14357,special topic in data science and ai (1),2
+14362,high performance computing for big data,4
+14364,data visualization,3
+14452,pattern recognition,2
+14455,information retrieval,1
+14456,robotics programming,1
+14458,computer vision,1
+14465,data mining,1
+14466,business intelligence,2
+14469,special topic in data science and ai (2),1
+15110,cybersecurity fundamentals,2
+15200,programming for security professionals,1
+15201,programming for security professionals lab,1
+15220,networks fundamentals,1
+15261,secure web design and development,2
+15262,secure web design and development lab,2
+15310,cryptography,1
+15312,database security,1
+15313,database security lab,1
+15321,network security and protocols,1
+15322,network security and protocols lab,2
+15350,artificial intelligence and data analytics,1
+15361,secure systems development and design,1
+15370,cryptography principles and practice,1
+15381,infrastructure security using linux,1
+15382,"auditing,policies,legal,ethics,compliance",1
+15410,data integrity and authentication,1
+15411,digital forensics and incident response,1
+15412,digital forensics and incident response lab,2
+15420,mobile and wireless security,1
+15421,network and cloud monitoring & documenting,1
+15422,multimedia security,1
+15423,cloud computing security,1
+15433,malware analysis and reverse engineering,1
+15453,ethical hacking and penetration testing,2
+15460,hacking techniques and intrusion detection,1
+15483,information systems risk management,1
+15493,special topics in cybersecurity (1),1
+15494,special topic cybersecurity (2),1
+20131,mathematics for business,5
+20132,calculus (1),5
+20133,calculus (2),14
+20134,discrete mathematics (1),6
+20135,discrete mathematics (2),1
+20140,basic concepts in chemistry,1
+20141,physics (1),2
+20142,physics (2),9
+20147,physics lab for it,2
+20150,physics lab for engineering,8
+20200,technical writing and communication skills,6
+20231,calculus (3),3
+20232,engineering mathematics(1),2
+20233,statistical methods,4
+20234,linear algebra,7
+20235,statistical methods for business,4
+20331,engineering mathematics(2),1
+20333,numerical analysis,2
+20335,applied probability and statistics,2
+20336,principles of probability,1
+21218,engineering drawing lab,5
+21219,engineering workshop,4
+21221,electric circuits (1),5
+21222,electric circuits (2),5
+21229,electric circuits lab,5
+21231,electronics (1),4
+21331,electronics (2),1
+21332,digital electronics,1
+21338,electronics lab,1
+21339,digital electronics lab,2
+21431,communication electronics,1
+21432,optical electronics,1
+21439,communication electronics lab,1
+21573,image processing,1
+21581,special topics in electronics engineering,1
+22210,programming applications lab,4
+22241,digital logic design,6
+22242,object oriented laboratory for iot,1
+22320,computer architecture (1),1
+22321,computer architecture (2),1
+22342,computer organization and assembly language,4
+22344,microprocessors,1
+22348,digital logic lab,5
+22420,computer design lab,1
+22442,embedded systems,1
+22443,computer networks,1
+22448,embedded systems lab,3
+22449,computer networks lab,3
+22460,operating systems and security,1
+22461,operating systems and security lab,2
+22462,operating systems lab,3
+22541,computer architecture,1
+22560,network programming and applications,2
+22570,artificial intelligence and machine learning,2
+22582,special topics in computer engineering (1),1
+22583,special topics in computer engineering (2)/introduction to quantum computing,1
+23321,electromagnetics (1),1
+23351,signals and systems,2
+23355,communication principles,1
+23356,programming applications in signals & systems lab,1
+23411,engineering economics,2
+23452,communications (2),1
+23454,communication networks,1
+23455,communication networks lab,1
+23457,cellular communications,1
+23459,communications lab,1
+23576,wireless internet of things,1
+24311,thermodynamics,1
+24411,engineering ethics,2
+24467,power electronics,1
+24469,power systems lab,1
+24470,"power systems planning, operation and control",1
+24471,automatic control,2
+24479,automatic control lab,2
+24562,power systems protection,1
+24567,power systems design,1
+24568,power electronics lab,1
+24588,renewable energy systems (2),1
+25330,information security fundamentals,2
+25347,cryptography,2
+25420,networks security,1
+25430,digital forensics & incident response,1
+25441,wireless networks,1
+25445,wireless networks lab,2
+25520,penetration testing,1
+25521,defense security lab,1
+25541,cloud computing & security,1
+25543,intrusion detection & network forensics,1
+25545,network security lab,2
+25549,ethical hacking techniques lab,2
+25560,cybersecurity frameworks and standards,1
+25586,hardware security,1
+25595,special topics in information security (1)/information security management,1
+25596,special topics in information security (2),1
+27251,introduction to iot,1
+27321,electromagnetics (1),1
+27351,internet of things programming and applications,1
+27352,internet of things programming and applications lab,1
+27353,signals and systems,2
+27355,communication principles,2
+27411,engineering economics,1
+27450,antennas and waves propagation,1
+27453,iotsensors and applications,1
+27454,iot sensors and applications lab,1
+27456,communications lab,1
+27541,iot security and privacy,1
+27542,internet of things security lab,1
+27551,wireless iot,1
+27552,cellular communications and wireless iot lab,1
+27585,cloud computing in iot,1
+31021,arabic language communication skills (remedial),2
+31022,english language communication skills (remedial),1
+31112,arabic language communication skills,11
+31122,english language communication skills,8
+31130,foreign languages,9
+31151,national education,8
+31152,arabic islamic civilization,3
+31160,leadership and societal responsibility,4
+31211,arabic literature,1
+31251,military science,4
+31254,entrepreneurship and innovation,7
+31260,human rights,2
+31261,introduction to politics and economic science,2
+31264,introduction to psychology,3
+31272,development and environment,1
+31311,scientific research methods,3
+31351,contemporary issues in the arab world,3
+31352,jerusalem : history and facts,2
+31362,philosophy and critical thinking,4
+31374,life skills,7
+33101,principles of management,6
+33102,leadership and digital transformation,4
+33103,microeconomics,4
+33203,organizational behavior,3
+33204,macroeconomics,4
+33207,islamic business management,1
+33209,management communication skills,3
+33212,operations research for business,2
+33218,logistics management,1
+33309,business ethics and social responsibility,2
+33313,production and operations management,3
+33317,quality management,2
+33322,quality management,2
+33326,innovation management,1
+33331,public relations management,1
+33342,managerial economics,1
+33404,strategic management,1
+33405,human resources management,3
+33408,change management,1
+33409,special topics in management,3
+33432,purchasing and inventory management,1
+33434,conflict & negotiation management,1
+33435,international business management,2
+33439,enterprise management,1
+33445,commercial & electronic legislation,4
+34101,principles of accounting (1),6
+34102,principles of accounting (2),2
+34115,principles of finance,7
+34204,intermediate accounting (1),1
+34205,intermediate accounting (2),2
+34206,corporate accounting,1
+34216,financial management,2
+34226,cost accounting1,2
+34227,auditing (1),1
+34231,accounting for financial institutions (banks & insurance),1
+34233,governmental accounting,1
+34239,computer applications in accounting,1
+34307,advanced accounting,1
+34311,financial statements analysis (1),2
+34313,international accounting standards,1
+34314,banking,3
+34321,managerial accounting,3
+34324,auditing (2),2
+34326,cost accounting,2
+34332,accounting for taxation,2
+34414,accounting theory,1
+34415,international accounting,2
+34432,accounting information systems,1
+34439,computer applications in accounting,2
+35101,principles of marketing,3
+35103,introduction to electronic marketing,2
+35107,social marketing and sustainable development,2
+35202,consumer behavior,3
+35215,marketing management,2
+35217,services marketing,2
+35218,sales management,3
+35219,marketing management,2
+35233,fundamentals of graphic design for business,4
+35235,communication skills and technologies,2
+35308,product and brand management,1
+35314,e marketing channels,2
+35319,marketing research,2
+35323,integrated e- marketing communication,2
+35326,advertising technology,2
+35336,designing of commercial websites,2
+35407,international marketing,2
+35408,customers relations management,2
+35409,international marketing,2
+35416,social media marketing,2
+35419,marketing through mobile,1
+35421,e tourism marketing,1
+35424,global marketing strategies,2
+35435,modern e-marketing topics,2
+35436,interactive web design and analysis,1
+35437,marketing through search engines,2
+36110,business information technology 1,5
+36111,computer applications in business,2
+36112,business applications programming,2
+36113,business applications programming lab,2
+36120,introduction to ai in business applications,6
+36202,web development for business applications,2
+36203,database management for business,2
+36220,business information technology 2,2
+36232,e-business for business students,4
+36251,database management for business lab,2
+36301,business data communications,1
+36302,principles of business analytics (pba),2
+36312,advanced business applications programming,2
+36316,analysis and design of information system,2
+36331,enterprise resource planning erp,2
+36334,decision support systems,2
+36336,enterprise resource planning systems (erp),2
+36339,knowledge management systems,1
+36357,enterprise resource planning systems (erp) lab,2
+36402,information security,2
+36404,business intelligence systems,1
+36405,mobile business applications,2
+36406,advanced database management systems,1
+36415,cloud computing,1
+36428,business process modeling,1
+36435,it project management,2
+36436,advanced applications in e-business & scm,1

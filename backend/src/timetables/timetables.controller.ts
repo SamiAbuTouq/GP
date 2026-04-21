@@ -1,19 +1,19 @@
 import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
-import { Public } from '../common/decorators/public.decorator';
+import { Role } from '@prisma/client';
+import { Roles } from '../common/decorators/roles.decorator';
 import { TimetablesService } from './timetables.service';
 
 @Controller('timetables')
+@Roles(Role.ADMIN, Role.LECTURER)
 export class TimetablesController {
   constructor(private readonly timetablesService: TimetablesService) {}
 
-  @Public()
   @Get()
   list(@Query('semesterId') semesterIdRaw?: string) {
     const semesterId = semesterIdRaw ? Number(semesterIdRaw) : undefined;
     return this.timetablesService.list(Number.isFinite(semesterId) ? semesterId : undefined);
   }
 
-  @Public()
   @Get(':id/entries')
   listEntries(
     @Param('id', ParseIntPipe) id: number,

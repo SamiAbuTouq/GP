@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
+import Link from "next/link"
 import { EntityLayout } from "@/components/entity-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,22 +9,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Plus, Search, Edit, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Loader2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
+import { Plus, Search, Edit, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Eye } from "lucide-react"
 import { ImportIcon } from "@/components/custom-icons"
 import { departments, type Department } from "@/lib/data"
 import { ImportDialog } from "@/components/import-dialog"
@@ -374,21 +368,6 @@ export default function LecturersPage() {
     { key: "courses" as const, label: "Courses" },
   ]
 
-  const getLoadRatio = (load: number, maxWorkload: number): number => {
-    const safeMax = maxWorkload > 0 ? maxWorkload : 15
-    return load / safeMax
-  }
-
-  const getLoadIndicatorStyle = (load: number, maxWorkload: number): React.CSSProperties => {
-    const cappedRatio = Math.min(Math.max(getLoadRatio(load, maxWorkload), 0), 1.2)
-    // Hue moves from green (120) to red (0) continuously for richer shades.
-    const startHue = Math.max(0, 120 - cappedRatio * 120)
-    const endHue = Math.max(0, startHue - 16)
-    return {
-      background: `linear-gradient(90deg, hsl(${startHue} 78% 42%), hsl(${endHue} 88% 52%))`,
-    }
-  }
-
   const getDepartmentColor = (dept: Department) => {
     const colors: Record<string, string> = {
       "Computer Science": "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
@@ -647,56 +626,13 @@ export default function LecturersPage() {
                       )}
                     </button>
                   </TableHead>
-                  <TableHead>
-                    <button
-                      type="button"
-                      className={cn(
-                        "inline-flex items-center gap-1 font-medium hover:text-foreground",
-                        sortColumn === "load" ? "text-foreground" : "text-muted-foreground",
-                      )}
-                      onClick={() => handleSortColumn("load")}
-                    >
-                      Teaching Load
-                      {sortColumn === "load" ? (
-                        sortDirection === "asc" ? (
-                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        ) : (
-                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
-                      )}
-                    </button>
-                  </TableHead>
-                  <TableHead className="text-center">
-                    <button
-                      type="button"
-                      className={cn(
-                        "inline-flex w-full items-center justify-center gap-1 font-medium hover:text-foreground",
-                        sortColumn === "maxWorkload" ? "text-foreground" : "text-muted-foreground",
-                      )}
-                      onClick={() => handleSortColumn("maxWorkload")}
-                    >
-                      Max Workload
-                      {sortColumn === "maxWorkload" ? (
-                        sortDirection === "asc" ? (
-                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        ) : (
-                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
-                      )}
-                    </button>
-                  </TableHead>
-                  <TableHead>Courses</TableHead>
                   <TableHead className="w-[70px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedLecturers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       No lecturers found
                     </TableCell>
                   </TableRow>
@@ -710,53 +646,6 @@ export default function LecturersPage() {
                         <Badge className={getDepartmentColor(lecturer.department)}>{lecturer.department}</Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress
-                            value={Math.min(100, getLoadRatio(lecturer.load, lecturer.maxWorkload) * 100)}
-                            className="h-2 w-20 bg-muted"
-                            indicatorStyle={getLoadIndicatorStyle(lecturer.load, lecturer.maxWorkload)}
-                          />
-                          <span className="text-sm">{lecturer.load}h</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">{lecturer.maxWorkload}h</TableCell>
-                      <TableCell>
-                        {lecturer.courses.length === 0 ? (
-                          <span className="text-sm text-muted-foreground">None</span>
-                        ) : (
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-auto py-1 px-2 font-normal data-[state=open]:bg-muted hover:bg-muted/80">
-                                <span className="text-sm font-medium">{lecturer.courses.length} course{lecturer.courses.length !== 1 ? 's' : ''}</span>
-                                <ChevronDown className="ml-1 h-3 w-3 text-muted-foreground" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80 p-0 overflow-hidden border-border/50 shadow-md" align="end">
-                              <div className="bg-muted/30 p-3 border-b border-border/50">
-                                <p className="font-semibold text-sm text-foreground">Can Teach ({lecturer.courses.length})</p>
-                              </div>
-                              <ScrollArea className="max-h-[280px]">
-                                <div className="p-1.5 space-y-0.5">
-                                  {lecturer.courses.map((courseCode) => {
-                                    const courseInfo = availableCourses.find(c => c.code === courseCode)
-                                    return (
-                                      <div key={courseCode} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/60 transition-colors">
-                                        <Badge variant="secondary" className="text-xs font-medium font-mono shrink-0 bg-primary/10 text-primary hover:bg-primary/20 border-0">
-                                          {courseCode}
-                                        </Badge>
-                                        <span className="text-sm font-medium text-foreground capitalize leading-tight">
-                                          {courseInfo?.name || 'Unknown Course'}
-                                        </span>
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                              </ScrollArea>
-                            </PopoverContent>
-                          </Popover>
-                        )}
-                      </TableCell>
-                      <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -764,6 +653,12 @@ export default function LecturersPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild disabled={!lecturer.databaseId}>
+                              <Link href={`/entity/lecturers/${lecturer.databaseId ?? ""}`}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View details
+                              </Link>
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => {
                               setEditingLecturer({ ...lecturer })
                               setEditCourseQuery("")

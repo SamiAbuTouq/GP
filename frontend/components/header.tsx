@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { MobileSidebar } from "@/components/sidebar"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -18,6 +17,8 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/lib/auth-context"
 import { ApiClient, UserProfile } from "@/lib/api-client"
+import { Bell } from "@/components/animate-ui/icons/bell"
+import { AnimateIcon } from "@/components/animate-ui/icons/icon"
 
 export function Header() {
   const router = useRouter()
@@ -71,7 +72,9 @@ export function Header() {
               size="icon"
               className="relative h-9 w-9 rounded-full text-slate-700 hover:bg-slate-900/10 hover:text-slate-900 dark:text-white/90 dark:hover:bg-white/15 dark:hover:text-white"
             >
-              <Bell className="h-4 w-4" />
+              <AnimateIcon animateOnHover>
+                <Bell className="h-4 w-4" />
+              </AnimateIcon>
               <Badge className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-slate-900 text-[10px] text-white dark:border-card dark:bg-neutral-200 dark:text-black">
                 3
               </Badge>

@@ -14,12 +14,23 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TimeslotsController = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const timeslots_service_1 = require("./timeslots.service");
 const timeslot_dto_1 = require("./dto/timeslot.dto");
-const public_decorator_1 = require("../common/decorators/public.decorator");
+const roles_decorator_1 = require("../common/decorators/roles.decorator");
+const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 let TimeslotsController = class TimeslotsController {
     constructor(timeslotsService) {
         this.timeslotsService = timeslotsService;
+    }
+    getLecturerPreferences(user) {
+        return this.timeslotsService.getLecturerPreferences(user.user_id);
+    }
+    updateLecturerPreferences(user, dto) {
+        return this.timeslotsService.updateLecturerPreferences(user.user_id, dto.preferences ?? []);
+    }
+    getLecturerPreferencesForAdmin(userId) {
+        return this.timeslotsService.getLecturerPreferencesForAdmin(userId);
     }
     findAll() {
         return this.timeslotsService.findAll();
@@ -39,14 +50,36 @@ let TimeslotsController = class TimeslotsController {
 };
 exports.TimeslotsController = TimeslotsController;
 __decorate([
-    (0, public_decorator_1.Public)(),
+    (0, common_1.Get)('lecturer/preferences'),
+    (0, roles_decorator_1.Roles)(client_1.Role.LECTURER),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], TimeslotsController.prototype, "getLecturerPreferences", null);
+__decorate([
+    (0, common_1.Put)('lecturer/preferences'),
+    (0, roles_decorator_1.Roles)(client_1.Role.LECTURER),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, timeslot_dto_1.UpdateLecturerPreferencesDto]),
+    __metadata("design:returntype", void 0)
+], TimeslotsController.prototype, "updateLecturerPreferences", null);
+__decorate([
+    (0, common_1.Get)('lecturer/preferences/:userId'),
+    __param(0, (0, common_1.Param)('userId', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], TimeslotsController.prototype, "getLecturerPreferencesForAdmin", null);
+__decorate([
     (0, common_1.Get)(),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "findAll", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __metadata("design:type", Function),
@@ -54,7 +87,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "findOne", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -62,7 +94,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "create", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Put)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
@@ -71,7 +102,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "update", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __metadata("design:type", Function),
@@ -80,6 +110,7 @@ __decorate([
 ], TimeslotsController.prototype, "remove", null);
 exports.TimeslotsController = TimeslotsController = __decorate([
     (0, common_1.Controller)('timeslots'),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
     __metadata("design:paramtypes", [timeslots_service_1.TimeslotsService])
 ], TimeslotsController);
 //# sourceMappingURL=timeslots.controller.js.map

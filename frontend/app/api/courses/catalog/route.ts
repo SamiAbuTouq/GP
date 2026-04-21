@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { academicLevelFromCourseCode } from '@/lib/academic-level'
+import { requireAdminFromRefreshCookie } from '@/lib/server-auth'
 
 function decodeSemesterType(type: number): string {
   const map: Record<number, string> = {
@@ -35,6 +36,9 @@ function pickNewestSemesterWithData(semesters: SemesterKey[]): SemesterKey | nul
  * we do not rely on nested `timetable` filters (which can behave inconsistently across adapters).
  */
 export async function GET() {
+  const auth = await requireAdminFromRefreshCookie()
+  if (!auth.ok) return auth.response
+
   try {
     const entryRows = await prisma.sectionScheduleEntry.findMany({
       select: {

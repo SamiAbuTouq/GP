@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsArray, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsArray,
+  IsOptional,
+  ValidateNested,
+  IsInt,
+  IsBoolean,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateTimeslotDto {
   @IsArray()
@@ -36,4 +45,19 @@ export class UpdateTimeslotDto {
   @IsString()
   @IsOptional()
   slotType?: string;
+}
+
+export class UpdateLecturerPreferenceItemDto {
+  @IsInt()
+  slotId: number;
+
+  @IsBoolean()
+  isPreferred: boolean;
+}
+
+export class UpdateLecturerPreferencesDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateLecturerPreferenceItemDto)
+  preferences: UpdateLecturerPreferenceItemDto[];
 }

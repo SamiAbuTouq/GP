@@ -11,12 +11,49 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TimeslotsService = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
 const DAY_VALUES = { Sunday: 1, Monday: 2, Tuesday: 4, Wednesday: 8, Thursday: 16 };
 let TimeslotsService = class TimeslotsService {
     constructor(prisma) {
         this.prisma = prisma;
+    }
+    async ensureLecturerProfileExists(tx, userId) {
+        const user = await tx.user.findUnique({
+            where: { user_id: userId },
+            select: { user_id: true, role_name: true },
+        });
+        if (!user) {
+            throw new common_1.NotFoundException(`User with ID ${userId} not found`);
+        }
+        if (user.role_name !== client_1.Role.LECTURER) {
+            throw new common_1.NotFoundException(`Lecturer with ID ${userId} not found`);
+        }
+        const existingLecturer = await tx.lecturer.findUnique({
+            where: { user_id: userId },
+            select: { user_id: true },
+        });
+        if (existingLecturer)
+            return;
+        let fallbackDepartment = await tx.department.findFirst({
+            orderBy: { dept_id: 'asc' },
+            select: { dept_id: true },
+        });
+        if (!fallbackDepartment) {
+            fallbackDepartment = await tx.department.create({
+                data: { dept_name: 'General' },
+                select: { dept_id: true },
+            });
+        }
+        await tx.lecturer.create({
+            data: {
+                user_id: userId,
+                dept_id: fallbackDepartment.dept_id,
+                max_workload: 15,
+                is_available: true,
+            },
+        });
     }
     daysMaskToArray(mask) {
         const days = [];
@@ -124,6 +161,60 @@ let TimeslotsService = class TimeslotsService {
             where: { slot_id: id },
         });
         return { message: 'Timeslot deleted successfully' };
+    }
+    async getLecturerPreferences(userId) {
+        return this.getPreferencesByUserId(userId);
+    }
+    async getLecturerPreferencesForAdmin(userId) {
+        return this.getPreferencesByUserId(userId);
+    }
+    async getPreferencesByUserId(userId) {
+        const slots = await this.prisma.timeslot.findMany({
+            orderBy: [{ start_time: 'asc' }, { end_time: 'asc' }, { slot_id: 'asc' }],
+            include: {
+                lecturer_preferences: {
+                    where: { user_id: userId },
+                    select: { is_preferred: true },
+                    take: 1,
+                },
+            },
+        });
+        return slots.map((slot) => ({
+            slotId: slot.slot_id,
+            days: this.daysMaskToArray(slot.days_mask),
+            start: this.formatTime(slot.start_time),
+            end: this.formatTime(slot.end_time),
+            slotType: slot.slot_type,
+            preference: slot.lecturer_preferences.length > 0
+                ? slot.lecturer_preferences[0].is_preferred
+                    ? 'PREFERRED'
+                    : 'NOT_PREFERRED'
+                : 'NEUTRAL',
+        }));
+    }
+    async updateLecturerPreferences(userId, preferences) {
+        const uniqueBySlot = new Map();
+        for (const item of preferences) {
+            uniqueBySlot.set(item.slotId, item.isPreferred);
+        }
+        const normalized = Array.from(uniqueBySlot.entries()).map(([slotId, isPreferred]) => ({ slotId, isPreferred }));
+        await this.prisma.$transaction(async (tx) => {
+            await this.ensureLecturerProfileExists(tx, userId);
+            await tx.lecturerPreference.deleteMany({
+                where: { user_id: userId },
+            });
+            if (normalized.length > 0) {
+                await tx.lecturerPreference.createMany({
+                    data: normalized.map((item) => ({
+                        user_id: userId,
+                        slot_id: item.slotId,
+                        is_preferred: item.isPreferred,
+                    })),
+                    skipDuplicates: true,
+                });
+            }
+        });
+        return { success: true };
     }
 };
 exports.TimeslotsService = TimeslotsService;

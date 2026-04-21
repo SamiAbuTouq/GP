@@ -1,18 +1,18 @@
 import { Controller, Get, Post } from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { DepartmentsService } from './departments.service';
-import { Public } from '../common/decorators/public.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('departments')
+@Roles(Role.ADMIN)
 export class DepartmentsController {
   constructor(private readonly departmentsService: DepartmentsService) {}
 
-  @Public()
   @Get()
   findAll() {
     return this.departmentsService.findAll();
   }
 
-  @Public()
   @Post('seed')
   seed() {
     return this.departmentsService.seed();

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { requireAdminFromRefreshCookie } from "@/lib/server-auth"
 
 function decodeSemesterType(type: number): string {
   const map: Record<number, string> = {
@@ -63,6 +64,11 @@ function sectionCapacityForEntry(e: {
 }
 
 export async function GET(request: Request) {
+  const auth = await requireAdminFromRefreshCookie()
+  if (!auth.ok) {
+    return auth.response
+  }
+
   try {
     const semesterId = Number(new URL(request.url).searchParams.get("semesterId"))
     if (!Number.isFinite(semesterId) || semesterId <= 0) {

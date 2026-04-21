@@ -84,6 +84,7 @@ export default function RoomsPage() {
   const [pageSize, setPageSize] = useState(10)
   const [sortColumn, setSortColumn] = useState<RoomSortColumn | null>(null)
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+  const [pendingAvailabilityIds, setPendingAvailabilityIds] = useState<Set<string>>(new Set())
   const { toast } = useToast()
 
   // Fetch rooms from API
@@ -272,6 +273,18 @@ export default function RoomsPage() {
   }
 
   const handleToggleAvailability = async (room: Room) => {
+    if (pendingAvailabilityIds.has(room.id)) return
+    const previousAvailability = room.isAvailable
+
+    setPendingAvailabilityIds((prev) => {
+      const next = new Set(prev)
+      next.add(room.id)
+      return next
+    })
+    setRooms((prev) =>
+      prev.map((r) => (r.id === room.id ? { ...r, isAvailable: !r.isAvailable } : r))
+    )
+
     try {
       const response = await fetch(`/api/rooms/${room.databaseId}/toggle`, {
         method: 'PATCH',
@@ -280,6 +293,9 @@ export default function RoomsPage() {
       const data = await response.json()
       
       if (!response.ok) {
+        setRooms((prev) =>
+          prev.map((r) => (r.id === room.id ? { ...r, isAvailable: previousAvailability } : r))
+        )
         toast({
           title: "Error",
           description: data.error || "Failed to update room availability.",
@@ -288,13 +304,22 @@ export default function RoomsPage() {
         return
       }
       
-      setRooms(rooms.map((r) => (r.id === room.id ? data : r)))
+      setRooms((prev) => prev.map((r) => (r.id === room.id ? data : r)))
     } catch (error) {
+      setRooms((prev) =>
+        prev.map((r) => (r.id === room.id ? { ...r, isAvailable: previousAvailability } : r))
+      )
       console.error('Error toggling availability:', error)
       toast({
         title: "Error",
         description: "Failed to update room availability.",
         variant: "destructive",
+      })
+    } finally {
+      setPendingAvailabilityIds((prev) => {
+        const next = new Set(prev)
+        next.delete(room.id)
+        return next
       })
     }
   }
@@ -477,8 +502,9 @@ export default function RoomsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedRooms.map((room) => (
-                    <TableRow key={room.id}>
+                  paginatedRooms.map((room) => {
+                    return (
+                      <TableRow key={room.id}>
                       <TableCell className="font-mono font-medium">{room.id}</TableCell>
                       <TableCell>
                         <Badge className={getTypeColor(room.type)}>{room.type}</Badge>
@@ -509,8 +535,9 @@ export default function RoomsPage() {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
-                    </TableRow>
-                  ))
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>

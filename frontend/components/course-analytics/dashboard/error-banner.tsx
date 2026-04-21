@@ -1,7 +1,8 @@
-﻿'use client'
+'use client'
 
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { Button } from '@/components/course-analytics-ui/button'
+import { InfoIcon } from '@/components/ui/info-icon'
 
 interface ErrorBannerProps {
   message?: string
@@ -17,7 +18,7 @@ export function ErrorBanner({
       <div className="mx-auto max-w-md px-6 text-center">
         <div className="mb-4 flex justify-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-destructive/10">
-            <AlertTriangle className="h-8 w-8 text-destructive" />
+            <InfoIcon size={32} className="text-destructive" />
           </div>
         </div>
         <h2 className="mb-2 text-xl font-bold text-foreground">Failed to Load Data</h2>

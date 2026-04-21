@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { proxyToBackend } from '@/lib/proxy-backend'
+import { requireAdminFromRefreshCookie } from '@/lib/server-auth'
+
 
 function decodeSemesterType(type: number): string {
   const map: Record<number, string> = {
@@ -43,8 +45,12 @@ function formatTime(value: Date | string | null | undefined): string {
  * `lib/course-analytics/course-data.ts` (Year, Semester, Course_Number, …).
  */
 export async function GET(request: Request) {
+  const auth = await requireAdminFromRefreshCookie()
+  if (!auth.ok) return auth.response
+
   try {
     const { searchParams } = new URL(request.url)
+
     const timetableStatus = searchParams.get('timetableStatus')
     const semesterId = searchParams.get('semesterId')
 

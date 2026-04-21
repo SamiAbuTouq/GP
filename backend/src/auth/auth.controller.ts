@@ -12,12 +12,14 @@ import {
 import { Response, Request } from 'express';
 import { ConfigService } from '@nestjs/config';
 import type { User } from '@prisma/client';
+import { Role } from '@prisma/client';
 
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 
 // Response type for login/refresh (only access_token in body)
 interface AccessTokenResponse {
@@ -101,6 +103,7 @@ export class AuthController {
    * Revokes all refresh tokens for the authenticated user and clears cookie.
    */
   @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN, Role.LECTURER)
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(
@@ -119,6 +122,7 @@ export class AuthController {
    * Used by frontend middleware to verify authentication status.
    */
   @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN, Role.LECTURER)
   @Post('check')
   @HttpCode(HttpStatus.OK)
   async check(

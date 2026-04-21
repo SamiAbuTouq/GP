@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
 /**
  * Base URL for the NestJS API (must include /api/v1).
@@ -10,6 +11,38 @@ export function getBackendApiUrl(): string {
     process.env.NEXT_PUBLIC_API_URL ||
     'http://localhost:3001/api/v1'
   return raw.replace(/\/$/, '')
+}
+
+async function getAccessTokenFromRefreshCookie(
+  baseApiUrl: string
+): Promise<string | null> {
+  const refreshToken = (await cookies()).get('refresh_token')?.value
+  if (!refreshToken) return null
+
+  let refreshRes: Response
+  try {
+    refreshRes = await fetch(`${baseApiUrl}/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        Cookie: `refresh_token=${refreshToken}`,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    })
+  } catch {
+    return null
+  }
+
+  if (!refreshRes.ok) {
+    return null
+  }
+
+  try {
+    const payload = (await refreshRes.json()) as { access_token?: string }
+    return typeof payload.access_token === 'string' ? payload.access_token : null
+  } catch {
+    return null
+  }
 }
 
 function mergeBackendError<T extends Record<string, unknown>>(obj: T): T {
@@ -35,6 +68,12 @@ export async function proxyToBackend(
 
   const headers: Record<string, string> = {
     ...(init.headers as Record<string, string>),
+  }
+  if (!headers.Authorization) {
+    const accessToken = await getAccessTokenFromRefreshCookie(base)
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`
+    }
   }
   if (init.body !== undefined && init.body !== null && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json'

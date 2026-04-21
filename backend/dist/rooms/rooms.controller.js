@@ -14,9 +14,10 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RoomsController = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const rooms_service_1 = require("./rooms.service");
 const room_dto_1 = require("./dto/room.dto");
-const public_decorator_1 = require("../common/decorators/public.decorator");
+const roles_decorator_1 = require("../common/decorators/roles.decorator");
 let RoomsController = class RoomsController {
     constructor(roomsService) {
         this.roomsService = roomsService;
@@ -42,14 +43,12 @@ let RoomsController = class RoomsController {
 };
 exports.RoomsController = RoomsController;
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Get)(),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "findAll", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __metadata("design:type", Function),
@@ -57,7 +56,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "findOne", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -65,7 +63,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "create", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Put)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
@@ -74,7 +71,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "update", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Patch)(':id/toggle-availability'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __metadata("design:type", Function),
@@ -82,7 +78,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "toggleAvailability", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __metadata("design:type", Function),
@@ -91,6 +86,7 @@ __decorate([
 ], RoomsController.prototype, "remove", null);
 exports.RoomsController = RoomsController = __decorate([
     (0, common_1.Controller)('rooms'),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
     __metadata("design:paramtypes", [rooms_service_1.RoomsService])
 ], RoomsController);
 //# sourceMappingURL=rooms.controller.js.map

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAdminFromRefreshCookie } from '@/lib/server-auth'
 
 function decodeSemesterType(type: number): string {
   const map: Record<number, string> = {
@@ -11,6 +12,9 @@ function decodeSemesterType(type: number): string {
 }
 
 export async function GET() {
+  const auth = await requireAdminFromRefreshCookie()
+  if (!auth.ok) return auth.response
+
   try {
     const semesters = await prisma.semester.findMany({
       select: {

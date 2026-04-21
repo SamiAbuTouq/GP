@@ -17,11 +17,13 @@ export function EntityLayout({ children, title, description }: EntityLayoutProps
       <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-auto p-4 lg:p-6">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-balance">{title}</h1>
-            <p className="text-muted-foreground">{description}</p>
+          <div className="mx-auto w-full max-w-[1680px]">
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-balance">{title}</h1>
+              <p className="text-muted-foreground">{description}</p>
+            </div>
+            {children}
           </div>
-          {children}
         </main>
       </div>
     </div>

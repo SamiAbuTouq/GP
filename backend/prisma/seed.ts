@@ -251,6 +251,15 @@ function semesterNameFromType(type: number): string {
   return "Summer Semester";
 }
 
+function compareSemesterKeys(a: string, b: string): number {
+  const [yearA, semA] = a.split("|");
+  const [yearB, semB] = b.split("|");
+  const startA = parseInt((yearA ?? "").split("-")[0], 10) || 0;
+  const startB = parseInt((yearB ?? "").split("-")[0], 10) || 0;
+  if (startA !== startB) return startA - startB;
+  return semesterType(semA ?? "") - semesterType(semB ?? "");
+}
+
 /** Third digit of the numeric course code = academic level (same as `academic-level.util.ts` in Nest). */
 function academicLevel(courseCode: string): number {
   const code = courseCode.replace(/\D/g, "");
@@ -281,6 +290,13 @@ function roomType(roomName: string): number {
 function parseIsLab(v: string): boolean {
   const normalized = v.trim().toLowerCase();
   return normalized === "true" || normalized === "1" || normalized === "yes";
+}
+
+function timeslotType(islab: string, online: string): string {
+  if (parseIsLab(islab)) return "Lab";
+  return online.trim().toLowerCase() === "blended"
+    ? "Blended Lecture"
+    : "Traditional Lecture";
 }
 
 function truncate(str: string, max: number): string {
@@ -473,6 +489,14 @@ async function main() {
       if (creditCell != null) cur.creditSamples.push(creditCell);
     }
   }
+  const semesterKeysFromRows = new Set<string>();
+  for (const r of rows) {
+    if (!r.Year || !r.Semester) continue;
+    semesterKeysFromRows.add(`${r.Year}|${r.Semester}`);
+  }
+  const latestSemesterKeyForSections =
+    [...semesterKeysFromRows].sort(compareSemesterKeys).pop() ?? null;
+
   console.log(`Seeding ${courseSet.size} courses...`);
   const courseIdMap = new Map<string, number>(); // course_code → course_id
   for (const [code, info] of courseSet) {
@@ -487,18 +511,19 @@ async function main() {
 
     const level = academicLevel(code);
     const creditHours = mostFrequentInt(info.creditSamples, 3);
-    // Count unique sections across all semesters as a rough number
-    const sectionCount = new Set(
-      rows.filter((r) => r.Course_Number === code).map((r) => `${r.Year}-${r.Semester}-${r.Section}`)
-    ).size;
-
-    // Average sections per semester should be based on the semesters the course
-    // actually appeared in (newer courses won't have all semesters).
-    const semesterAppearedCount = new Set(
-      rows.filter((r) => r.Course_Number === code).map((r) => `${r.Year}-${r.Semester}`)
-    ).size || 1;
-
-    const avgSectionsPerSemester = Math.max(1, Math.round(sectionCount / semesterAppearedCount));
+    // Distinct section numbers for this course in the latest semester present in the CSV (0 if not offered then).
+    const sectionsInLatestSemester =
+      latestSemesterKeyForSections == null
+        ? 1
+        : new Set(
+            rows
+              .filter(
+                (r) =>
+                  r.Course_Number === code &&
+                  `${r.Year}|${r.Semester}` === latestSemesterKeyForSections
+              )
+              .map((r) => r.Section)
+          ).size;
 
     const course = await prisma.course.upsert({
       where: { course_code: code },
@@ -509,7 +534,7 @@ async function main() {
         credit_hours: creditHours,
         delivery_mode: mode,
         is_lab: info.isLab,
-        sections: avgSectionsPerSemester, // avg sections per semester (based on actual appearances)
+        sections: sectionsInLatestSemester,
       },
       create: {
         dept_id: info.deptId,
@@ -519,7 +544,7 @@ async function main() {
         credit_hours: creditHours,
         delivery_mode: mode,
         is_lab: info.isLab,
-        sections: avgSectionsPerSemester,
+        sections: sectionsInLatestSemester,
       },
     });
     courseIdMap.set(code, course.course_id);
@@ -606,26 +631,71 @@ async function main() {
   }
   console.log(`   Semesters done\n`);
 
-  // ── 7. TIMESLOTS ─────────────────────────────────
+  // ── 7. SCHEDULE ROW NORMALIZATION ────────────────
+  // Merge rows that represent the same section meeting pattern but are split
+  // across separate day rows in the CSV export.
+  type NormalizedScheduleRow = {
+    row: CsvRow;
+    daysMask: number;
+  };
+  const scheduleRowsMap = new Map<string, NormalizedScheduleRow>();
+  for (const r of rows) {
+    const mask = daysToBitmask(r.Day);
+    if (!r.Start_Time || !r.End_Time || mask === 0) continue;
+    const key = [
+      r.Year,
+      r.Semester,
+      r.Course_Number,
+      r.Section,
+      r.Start_Time,
+      r.End_Time,
+      r.Room_ID,
+      r.Lecturer_ID,
+    ].join("|");
+    const existing = scheduleRowsMap.get(key);
+    if (!existing) {
+      scheduleRowsMap.set(key, { row: r, daysMask: mask });
+      continue;
+    }
+    existing.daysMask |= mask;
+    const currentRegistered = parseInt(existing.row.Registered_Students, 10) || 0;
+    const incomingRegistered = parseInt(r.Registered_Students, 10) || 0;
+    if (incomingRegistered > currentRegistered) {
+      existing.row.Registered_Students = r.Registered_Students;
+    }
+  }
+  const scheduleRows = [...scheduleRowsMap.values()];
+  console.log(`Normalized schedule rows: ${scheduleRows.length}`);
+
+  // ── 8. TIMESLOTS ─────────────────────────────────
   // Build unique timeslots from (start_time, end_time, days_mask)
-  const slotKey = (st: string, et: string, mask: number) => `${st}|${et}|${mask}`;
+  // to match the DB unique constraint.
+  const slotKey = (st: string, et: string, mask: number) =>
+    `${st}|${et}|${mask}`;
   const slotMap = new Map<string, number>(); // key → slot_id
 
   // Collect unique timeslots first
-  const uniqueSlots = new Map<string, { start: Date; end: Date; mask: number }>();
-  for (const r of rows) {
-    if (!r.Start_Time || !r.End_Time) continue;
+  const uniqueSlots = new Map<
+    string,
+    { start: Date; end: Date; mask: number; type: string }
+  >();
+  for (const item of scheduleRows) {
+    const r = item.row;
     const start = parseTime(r.Start_Time);
     const end = parseTime(r.End_Time);
     if (!start || !end) continue;
-    const mask = daysToBitmask(r.Day);
-    // Skip slots that have no assigned day (e.g., blank/TBA).
-    if (mask === 0) continue;
+    const mask = item.daysMask;
+    const type = timeslotType(r.islab, r.Online);
     const key = slotKey(r.Start_Time, r.End_Time, mask);
     if (!uniqueSlots.has(key)) {
-      uniqueSlots.set(key, { start, end, mask });
+      uniqueSlots.set(key, { start, end, mask, type });
     }
   }
+
+  // Remove historical invalid timeslots with no assigned days.
+  await prisma.timeslot.deleteMany({
+    where: { days_mask: 0 },
+  });
 
   console.log(`Seeding ${uniqueSlots.size} timeslots...`);
   for (const [key, info] of uniqueSlots) {
@@ -644,7 +714,7 @@ async function main() {
           start_time: info.start,
           end_time: info.end,
           days_mask: info.mask,
-          slot_type: "Lecture",
+          slot_type: info.type,
         },
       });
       slotMap.set(key, slot.slot_id);
@@ -652,7 +722,7 @@ async function main() {
   }
   console.log(`   Timeslots done\n`);
 
-  // ── 8. LECTURERS (Users + Lecturer records) ──────
+  // ── 9. LECTURERS (Users + Lecturer records) ──────
   const lecturerSet = new Map<
     number,
     { name: string; deptId: number; courseCodes: Set<string> }
@@ -734,7 +804,7 @@ async function main() {
   }
   console.log(`   Lecturers done\n`);
 
-  // ── 9. TIMETABLES (one per semester) ─────────────
+  // ── 10. TIMETABLES (one per semester) ────────────
   const timetableMap = new Map<string, number>(); // semKey → timetable_id
   for (const [semKey, semId] of semIdMap) {
     const existing = await prisma.timetable.findFirst({
@@ -756,17 +826,64 @@ async function main() {
   }
   console.log(`Created ${timetableMap.size} timetables\n`);
 
-  // ── 10. SECTION SCHEDULE ENTRIES ─────────────────
+  // Ensure Sami teaches 4 sections in the latest semester schedule.
+  const fixedLecturerEmail = "samiabutouq116@gmail.com";
+  const fixedLecturerUser = await prisma.user.findUnique({
+    where: { email: fixedLecturerEmail },
+    select: { user_id: true },
+  });
+  if (fixedLecturerUser) {
+    // SectionScheduleEntry.user_id points to Lecturer.user_id, so ensure
+    // the predefined lecturer account exists in lecturer as well.
+    const fallbackDeptId = deptMap.keys().next().value as number | undefined;
+    if (fallbackDeptId != null) {
+      await prisma.lecturer.upsert({
+        where: { user_id: fixedLecturerUser.user_id },
+        update: {},
+        create: {
+          user_id: fixedLecturerUser.user_id,
+          dept_id: fallbackDeptId,
+          max_workload: 15,
+          is_available: true,
+        },
+      });
+    }
+  }
+  const latestSemesterKey = [...semIdMap.keys()].sort(compareSemesterKeys).pop() ?? null;
+  const forcedLecturerAssignments = new Set<string>();
+  if (fixedLecturerUser && latestSemesterKey) {
+    for (const item of scheduleRows) {
+      const r = item.row;
+      const semKey = `${r.Year}|${r.Semester}`;
+      if (semKey !== latestSemesterKey) continue;
+      const assignmentKey = `${r.Course_Number}|${r.Section}|${r.Start_Time}|${r.End_Time}|${item.daysMask}`;
+      forcedLecturerAssignments.add(assignmentKey);
+      if (forcedLecturerAssignments.size >= 4) break;
+    }
+  }
+
+  // ── 11. SECTION SCHEDULE ENTRIES ─────────────────
+  // Clear seeded timetable entries so reseeding replaces historical row-per-day data.
+  await prisma.sectionScheduleEntry.deleteMany({
+    where: {
+      timetable_id: { in: [...timetableMap.values()] },
+    },
+  });
   console.log(`Seeding section schedule entries...`);
   let entryCount = 0;
   let skippedCount = 0;
 
-  for (const r of rows) {
+  for (const item of scheduleRows) {
+    const r = item.row;
     const semKey = `${r.Year}|${r.Semester}`;
     const timetableId = timetableMap.get(semKey);
     const courseId = courseIdMap.get(r.Course_Number);
     const lecturerId = parseInt(r.Lecturer_ID, 10);
-    const userId = lecturerUserIdMap.get(lecturerId);
+    const assignmentKey = `${r.Course_Number}|${r.Section}|${r.Start_Time}|${r.End_Time}|${item.daysMask}`;
+    const forcedUserId = forcedLecturerAssignments.has(assignmentKey)
+      ? fixedLecturerUser?.user_id
+      : undefined;
+    const userId = forcedUserId ?? lecturerUserIdMap.get(lecturerId);
     const roomId = parseInt(r.Room_ID, 10);
 
     if (!timetableId || !courseId || !userId || isNaN(roomId) || !roomMap.has(roomId)) {
@@ -779,7 +896,7 @@ async function main() {
       skippedCount++;
       continue;
     }
-    const mask = daysToBitmask(r.Day);
+    const mask = item.daysMask;
     if (mask === 0) {
       skippedCount++;
       continue;

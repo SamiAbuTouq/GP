@@ -201,7 +201,8 @@ export async function POST(req: Request) {
         return NextResponse.json({
           success: true,
           message: 'If an account exists, a reset link has been sent.',
-          devResetUrl: resetUrl,
+          // devResetUrl intentionally omitted from response — token must never travel over the wire.
+          // Check the server console output above for the link.
           emailDelivered: false,
         });
       }

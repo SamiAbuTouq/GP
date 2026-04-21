@@ -11,7 +11,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SemestersController = void 0;
 const common_1 = require("@nestjs/common");
-const public_decorator_1 = require("../common/decorators/public.decorator");
+const client_1 = require("@prisma/client");
+const roles_decorator_1 = require("../common/decorators/roles.decorator");
 const semesters_service_1 = require("./semesters.service");
 let SemestersController = class SemestersController {
     constructor(semestersService) {
@@ -23,7 +24,6 @@ let SemestersController = class SemestersController {
 };
 exports.SemestersController = SemestersController;
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Get)(),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
@@ -31,6 +31,7 @@ __decorate([
 ], SemestersController.prototype, "findAll", null);
 exports.SemestersController = SemestersController = __decorate([
     (0, common_1.Controller)('semesters'),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
     __metadata("design:paramtypes", [semesters_service_1.SemestersService])
 ], SemestersController);
 //# sourceMappingURL=semesters.controller.js.map

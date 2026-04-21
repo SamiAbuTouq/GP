@@ -11,6 +11,7 @@ const LOCAL_API_URL = "http://localhost:3001/api/v1";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || LOCAL_API_URL;
 const PROFILE_CACHE_KEY = 'uts_profile_cache_v1';
 const AUTH_HINT_COOKIE = "uts_auth_hint";
+const ROLE_HINT_COOKIE = "uts_role_hint";
 
 // In-memory token storage (not persisted, cleared on page refresh)
 let accessToken: string | null = null;
@@ -52,12 +53,16 @@ function clearCachedProfile(): void {
   }
 }
 
-function setAuthHintCookie(isAuthenticated: boolean): void {
+function setAuthHintCookie(isAuthenticated: boolean, role?: string | null): void {
   if (typeof document === "undefined") return;
   if (isAuthenticated) {
     document.cookie = `${AUTH_HINT_COOKIE}=1; Path=/; SameSite=Lax`;
+    if (role) {
+      document.cookie = `${ROLE_HINT_COOKIE}=${role}; Path=/; SameSite=Lax`;
+    }
   } else {
     document.cookie = `${AUTH_HINT_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+    document.cookie = `${ROLE_HINT_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
   }
 }
 
@@ -127,8 +132,23 @@ export class ApiClient {
 
   private static setAccessToken(token: string | null): void {
     accessToken = token;
-    setAuthHintCookie(Boolean(token));
-    if (!token) {
+    if (token) {
+      // Decode role from JWT payload (for middleware routing hint only)
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+          const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+          const payload = JSON.parse(atob(padded)) as { role?: string };
+          setAuthHintCookie(true, payload.role ?? null);
+        } else {
+          setAuthHintCookie(true);
+        }
+      } catch {
+        setAuthHintCookie(true);
+      }
+    } else {
+      setAuthHintCookie(false);
       clearCachedProfile();
     }
     this.notifyTokenChange(token);

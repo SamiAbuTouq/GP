@@ -1,8 +1,9 @@
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateTimeslotDto, UpdateTimeslotDto } from './dto/timeslot.dto';
+import { CreateTimeslotDto, UpdateTimeslotDto, UpdateLecturerPreferenceItemDto } from './dto/timeslot.dto';
 export declare class TimeslotsService {
     private prisma;
     constructor(prisma: PrismaService);
+    private ensureLecturerProfileExists;
     private daysMaskToArray;
     private daysArrayToMask;
     private formatTime;
@@ -37,5 +38,25 @@ export declare class TimeslotsService {
     }>;
     remove(id: number): Promise<{
         message: string;
+    }>;
+    getLecturerPreferences(userId: number): Promise<{
+        slotId: number;
+        days: string[];
+        start: string;
+        end: string;
+        slotType: string;
+        preference: string;
+    }[]>;
+    getLecturerPreferencesForAdmin(userId: number): Promise<{
+        slotId: number;
+        days: string[];
+        start: string;
+        end: string;
+        slotType: string;
+        preference: string;
+    }[]>;
+    private getPreferencesByUserId;
+    updateLecturerPreferences(userId: number, preferences: UpdateLecturerPreferenceItemDto[]): Promise<{
+        success: boolean;
     }>;
 }

@@ -26,11 +26,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Routes that don't require authentication
 const publicRoutes = ["/", "/login", "/forgot-password", "/reset-password", "/help"];
+const SETTINGS_ROUTE = "/settings";
+const LECTURER_TIME_PREFERENCES_ROUTE = "/lecturer-time-preferences";
+const LECTURER_SCHEDULE_ROUTE = "/lecturer-schedule";
+const LECTURER_ROLE = "LECTURER";
 
 export function isAuthPublicPath(pathname: string | null): boolean {
   if (!pathname) return false;
   return publicRoutes.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+}
+
+function isAllowedLecturerPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (pathname === "/first-login-password") return true;
+  return (
+    pathname === SETTINGS_ROUTE ||
+    pathname.startsWith(`${SETTINGS_ROUTE}/`) ||
+    pathname === LECTURER_TIME_PREFERENCES_ROUTE ||
+    pathname.startsWith(`${LECTURER_TIME_PREFERENCES_ROUTE}/`) ||
+    pathname === LECTURER_SCHEDULE_ROUTE ||
+    pathname.startsWith(`${LECTURER_SCHEDULE_ROUTE}/`)
   );
 }
 
@@ -133,6 +150,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       router.push("/first-login-password");
       return;
     }
+    if (decodedUser?.role === LECTURER_ROLE) {
+      router.push(LECTURER_TIME_PREFERENCES_ROUTE);
+      return;
+    }
+
     router.push("/dashboard");
   }, [decodeToken, router]);
 
@@ -200,10 +222,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         pathname !== "/first-login-password"
       ) {
         router.replace("/first-login-password");
+      } else if (
+        user?.role === LECTURER_ROLE &&
+        !isAllowedLecturerPath(pathname)
+      ) {
+        router.replace(LECTURER_TIME_PREFERENCES_ROUTE);
       } else if (user && pathname === "/login") {
         // Authenticated users should not stay on login page.
         if (user.requiresPasswordChange) {
           router.replace("/first-login-password");
+        } else if (user.role === LECTURER_ROLE) {
+          router.replace(LECTURER_TIME_PREFERENCES_ROUTE);
         } else {
           router.replace("/dashboard");
         }

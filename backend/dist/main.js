@@ -18,11 +18,10 @@ async function bootstrap() {
         forbidNonWhitelisted: true,
         transform: true,
     }));
+    const rawOrigins = process.env.CORS_ORIGIN ?? "http://localhost:3000";
+    const allowedOrigins = rawOrigins.split(",").map((o) => o.trim()).filter(Boolean);
     app.enableCors({
-        origin: [
-            "http://localhost:3000",
-            "https://west-raymond-guru-divide.trycloudflare.com",
-        ],
+        origin: allowedOrigins,
         credentials: true,
     });
     app.setGlobalPrefix("api/v1");

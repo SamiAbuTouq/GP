@@ -12,7 +12,7 @@ export async function POST(request: Request) {
       days: body.days,
       start: body.start ?? body.startTime,
       end: body.end ?? body.endTime,
-      slotType: body.slotType ?? body.type ?? 'Lecture',
+      slotType: body.slotType ?? body.type ?? 'Traditional Lecture',
     }
     return proxyToBackend('/timeslots', {
       method: 'POST',

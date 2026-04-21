@@ -655,6 +655,7 @@ function SettingsContent() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-auto p-4 lg:p-6">
+          <div className="mx-auto w-full max-w-[1680px]">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-balance">Settings</h1>
             <p className="text-muted-foreground">
@@ -1207,6 +1208,7 @@ function SettingsContent() {
               />
             </DialogContent>
           </Dialog>
+          </div>
         </main>
       </div>
     </div>

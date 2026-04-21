@@ -39,14 +39,12 @@ export function proxy(request: NextRequest) {
   // - refresh_token: available when auth cookie is set on this same domain
   // - uts_auth_hint: lightweight client cookie set on login/refresh, cleared on logout
   const refreshToken = request.cookies.get('refresh_token')?.value;
-  const authHint = request.cookies.get('uts_auth_hint')?.value;
   // Only a real refresh token should be treated as authenticated.
   // The hint cookie can be stale and must not cause redirects from / to auth-only flows.
   const hasRefreshToken = Boolean(refreshToken);
-  const isLikelyAuthenticated = Boolean(refreshToken || authHint);
 
   // If trying to access protected route without refresh token, redirect to login
-  if (!isPublicPath && !isLikelyAuthenticated) {
+  if (!isPublicPath && !hasRefreshToken) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);

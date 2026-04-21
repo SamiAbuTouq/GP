@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback, useDeferredValue } from 'react'
+import { motion, AnimatePresence } from 'motion/react'
 import {
   BookOpen,
   Users,
@@ -75,12 +76,27 @@ import { Badge } from '@/components/course-analytics-ui/badge'
 import { ThemeToggle } from '@/components/course-analytics/theme-toggle'
 import { PalettePicker } from '@/components/course-analytics/palette-picker'
 import { useDebounce } from '@/hooks/use-debounce'
+import { segmentedNavTabItemRadiusClass, segmentedNavTabListClassName } from '@/lib/segmented-nav-tabs'
+
+/** Matches Timetable Generation tab bar styling */
+const DASHBOARD_TAB_TRIGGER_CLASS = `relative ${segmentedNavTabItemRadiusClass} px-4 py-2 text-sm font-semibold text-slate-600 shadow-none transition-colors duration-200 data-[state=active]:bg-transparent data-[state=active]:text-primary-foreground data-[state=active]:shadow-none data-[state=active]:hover:bg-transparent dark:text-slate-400 dark:data-[state=active]:bg-transparent dark:data-[state=active]:text-primary-foreground`
+
+function DashboardActiveTabPill() {
+  return (
+    <motion.div
+      layoutId="dashboard-tabs-active"
+      className={`absolute inset-0 z-0 ${segmentedNavTabItemRadiusClass} bg-primary shadow-sm`}
+      transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+    />
+  )
+}
 
 export default function CourseAnalyticsApp({
   onInitialLoadComplete,
 }: {
   onInitialLoadComplete?: () => void
 }) {
+  const [activeTab, setActiveTab] = useState('overview')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [allCourses, setAllCourses] = useState<Course[]>([])
@@ -363,31 +379,42 @@ export default function CourseAnalyticsApp({
         </section>
 
         {/* Tabs */}
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-card p-1.5 sm:w-auto">
-            <TabsTrigger value="overview" className="gap-1.5">
-              <LayoutDashboard className="h-4 w-4" />
-              <span>Overview</span>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className={segmentedNavTabListClassName}>
+            <TabsTrigger value="overview" className={DASHBOARD_TAB_TRIGGER_CLASS}>
+              {activeTab === 'overview' && <DashboardActiveTabPill />}
+              <LayoutDashboard className="relative z-10 h-4 w-4" />
+              <span className="relative z-10">Overview</span>
             </TabsTrigger>
-            <TabsTrigger value="departments" className="gap-1.5">
-              <Building2 className="h-4 w-4" />
-              <span>Departments</span>
+
+            <TabsTrigger value="departments" className={DASHBOARD_TAB_TRIGGER_CLASS}>
+              {activeTab === 'departments' && <DashboardActiveTabPill />}
+              <Building2 className="relative z-10 h-4 w-4" />
+              <span className="relative z-10">Departments</span>
             </TabsTrigger>
-            <TabsTrigger value="schedule" className="gap-1.5">
-              <Calendar className="h-4 w-4" />
-              <span>Schedule</span>
+
+            <TabsTrigger value="schedule" className={DASHBOARD_TAB_TRIGGER_CLASS}>
+              {activeTab === 'schedule' && <DashboardActiveTabPill />}
+              <Calendar className="relative z-10 h-4 w-4" />
+              <span className="relative z-10">Schedule</span>
             </TabsTrigger>
-            <TabsTrigger value="courses" className="gap-1.5">
-              <BookOpen className="h-4 w-4" />
-              <span>Courses</span>
+
+            <TabsTrigger value="courses" className={DASHBOARD_TAB_TRIGGER_CLASS}>
+              {activeTab === 'courses' && <DashboardActiveTabPill />}
+              <BookOpen className="relative z-10 h-4 w-4" />
+              <span className="relative z-10">Courses</span>
             </TabsTrigger>
-            <TabsTrigger value="staff" className="gap-1.5">
-              <Presentation className="h-4 w-4" />
-              <span>Staff</span>
+
+            <TabsTrigger value="staff" className={DASHBOARD_TAB_TRIGGER_CLASS}>
+              {activeTab === 'staff' && <DashboardActiveTabPill />}
+              <Presentation className="relative z-10 h-4 w-4" />
+              <span className="relative z-10">Staff</span>
             </TabsTrigger>
-            <TabsTrigger value="insights" className="gap-1.5">
-              <Lightbulb className="h-4 w-4" />
-              <span>Insights</span>
+
+            <TabsTrigger value="insights" className={DASHBOARD_TAB_TRIGGER_CLASS}>
+              {activeTab === 'insights' && <DashboardActiveTabPill />}
+              <Lightbulb className="relative z-10 h-4 w-4" />
+              <span className="relative z-10">Insights</span>
             </TabsTrigger>
           </TabsList>
 

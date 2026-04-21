@@ -27,9 +27,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { ApiClient } from "@/lib/api-client"
+import { useAuth } from "@/lib/auth-context"
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils"
 import { cn } from "@/lib/utils"
-import { ArrowDown, ArrowUp, ArrowUpDown, Calendar, Check, ChevronDown, ChevronsUpDown, Download, Grid3X3, List, Loader2, Printer, X } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, Calendar, Check, ChevronsUpDown, Grid3X3, List, Loader2, Printer, Upload, X } from "lucide-react"
+import { ChevronDownIcon } from "@/components/ui/chevron-down-icon"
 
 type ViewType = "grid" | "list" | "calendar"
 
@@ -85,6 +87,11 @@ type TimetableEntryDto = {
 }
 
 type ExpandedEntry = TimetableEntryDto & {
+  day: string
+  timeRange: string
+}
+
+type ListEntry = TimetableEntryDto & {
   day: string
   timeRange: string
 }
@@ -203,6 +210,26 @@ function expandEntries(entries: TimetableEntryDto[]): ExpandedEntry[] {
       timeRange: `${e.startTime}-${e.endTime}`,
     })),
   )
+}
+
+function compactEntries(entries: TimetableEntryDto[]): ListEntry[] {
+  const dayAbbrev: Record<string, string> = {
+    Sunday: "Sun",
+    Monday: "Mon",
+    Tuesday: "Tue",
+    Wednesday: "Wed",
+    Thursday: "Thu",
+    Friday: "Fri",
+    Saturday: "Sat",
+  }
+
+  return entries.map((e) => ({
+    ...e,
+    day: (e.days?.length ? e.days : [""])
+      .map((d) => dayAbbrev[d] ?? d)
+      .join(" "),
+    timeRange: `${e.startTime}-${e.endTime}`,
+  }))
 }
 
 function openPrintWindow(html: string) {
@@ -390,14 +417,29 @@ function CompactCollapsibleCard({
         className="flex h-10 w-full items-center justify-between px-4 text-left"
       >
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", isOpen && "rotate-180")} />
+        <ChevronDownIcon
+          size={16}
+          className={cn("h-4 w-4 text-muted-foreground transition-transform", isOpen && "rotate-180")}
+        />
       </button>
       {isOpen ? <CardContent className={cn("space-y-3 px-4 pb-3 pt-0", contentClassName)}>{children}</CardContent> : null}
     </Card>
   )
 }
 
-export default function ScheduleViewerPage() {
+export function ScheduleViewerPage({
+  enableMySchedule = false,
+  hideScheduleSelection = false,
+  autoSelectLatestTimetable = false,
+  hideVersionInTitle = false,
+}: {
+  enableMySchedule?: boolean
+  hideScheduleSelection?: boolean
+  autoSelectLatestTimetable?: boolean
+  hideVersionInTitle?: boolean
+} = {}) {
+  const { user } = useAuth()
+  const myLecturerId = user?.role === "LECTURER" ? String(user.id) : null
   const [viewType, setViewType] = useState<ViewType>("grid")
   const [listSortField, setListSortField] = useState<ListSortField>("courseCode")
   const [listSortDirection, setListSortDirection] = useState<SortDirection>("asc")
@@ -412,6 +454,7 @@ export default function ScheduleViewerPage() {
   const [courseFilter, setCourseFilter] = useState("all")
   const [lecturerFilter, setLecturerFilter] = useState("all")
   const [roomFilter, setRoomFilter] = useState("all")
+  const [myScheduleOnly, setMyScheduleOnly] = useState(false)
   const [searchText, setSearchText] = useState("")
 
   const [loadingSemesters, setLoadingSemesters] = useState(true)
@@ -421,6 +464,10 @@ export default function ScheduleViewerPage() {
 
   // Load semesters
   useEffect(() => {
+    if (autoSelectLatestTimetable) {
+      setLoadingSemesters(false)
+      return
+    }
     let mounted = true
     setLoadingSemesters(true)
     setError(null)
@@ -441,10 +488,11 @@ export default function ScheduleViewerPage() {
     return () => {
       mounted = false
     }
-  }, [])
+  }, [autoSelectLatestTimetable])
 
   // Load timetables when semester changes
   useEffect(() => {
+    if (autoSelectLatestTimetable) return
     let mounted = true
     if (!semesterId) {
       setTimetables([])
@@ -477,12 +525,49 @@ export default function ScheduleViewerPage() {
     return () => {
       mounted = false
     }
-  }, [semesterId])
+  }, [semesterId, autoSelectLatestTimetable])
+
+  // Auto-select latest timetable (newest first from backend ordering).
+  useEffect(() => {
+    let mounted = true
+    if (!autoSelectLatestTimetable) {
+      return () => {
+        mounted = false
+      }
+    }
+
+    setError(null)
+    setLoadingTimetables(true)
+    setTimetables([])
+    setTimetableId(null)
+
+    ApiClient.request<TimetableDto[]>("/timetables")
+      .then((data) => {
+        if (!mounted) return
+        setTimetables(data)
+        const latest = data[0] ?? null
+        setSemesterId(latest?.semesterId ?? null)
+        setTimetableId(latest?.timetableId ?? null)
+      })
+      .catch((e) => {
+        if (!mounted) return
+        setError(e instanceof Error ? e.message : "Failed to load latest timetable.")
+      })
+      .finally(() => {
+        if (!mounted) return
+        setLoadingTimetables(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [autoSelectLatestTimetable])
 
   useEffect(() => {
     setCourseFilter("all")
     setLecturerFilter("all")
     setRoomFilter("all")
+    setMyScheduleOnly(false)
     setSearchText("")
   }, [timetableId])
 
@@ -532,7 +617,8 @@ export default function ScheduleViewerPage() {
       if (Number.isFinite(courseId)) query.set("courseId", String(courseId))
       if (typeRaw === "lab" || typeRaw === "lecture") query.set("isLab", String(typeRaw === "lab"))
     }
-    if (lecturerFilter !== "all") query.set("lecturerUserId", lecturerFilter)
+    const effectiveLecturerFilter = myScheduleOnly && myLecturerId ? myLecturerId : lecturerFilter
+    if (effectiveLecturerFilter !== "all") query.set("lecturerUserId", effectiveLecturerFilter)
     if (roomFilter !== "all") query.set("roomId", roomFilter)
 
     const queryString = query.toString()
@@ -555,7 +641,7 @@ export default function ScheduleViewerPage() {
     return () => {
       mounted = false
     }
-  }, [timetableId, courseFilter, lecturerFilter, roomFilter])
+  }, [timetableId, courseFilter, lecturerFilter, roomFilter, myScheduleOnly, myLecturerId])
   const strictlyFilteredEntries = useMemo(() => {
     return entries.filter((entry) => {
       if (courseFilter !== "all") {
@@ -565,22 +651,26 @@ export default function ScheduleViewerPage() {
         if (typeRaw === "lab" && !entry.isLab) return false
         if (typeRaw === "lecture" && entry.isLab) return false
       }
+      if (myScheduleOnly && myLecturerId && String(entry.lecturerUserId) !== myLecturerId) return false
       if (lecturerFilter !== "all" && String(entry.lecturerUserId) !== lecturerFilter) return false
       if (roomFilter !== "all" && String(entry.roomId) !== roomFilter) return false
       return true
     })
-  }, [entries, courseFilter, lecturerFilter, roomFilter])
-  const displayedEntries = useMemo(
+  }, [entries, courseFilter, lecturerFilter, roomFilter, myScheduleOnly, myLecturerId])
+  const visibleBaseEntries = useMemo(
     () =>
-      expandEntries(strictlyFilteredEntries).filter(
+      strictlyFilteredEntries.filter(
         (entry) => !(entry.registeredStudents === 0 && entry.sectionCapacity === 0),
       ),
     [strictlyFilteredEntries],
   )
-  const searchFiltered = useMemo(() => {
+  const expandedDisplayedEntries = useMemo(() => expandEntries(visibleBaseEntries), [visibleBaseEntries])
+  const listDisplayedEntries = useMemo(() => compactEntries(visibleBaseEntries), [visibleBaseEntries])
+
+  const searchFilteredExpanded = useMemo(() => {
     const q = searchText.trim().toLowerCase()
-    if (!q) return displayedEntries
-    return displayedEntries.filter((e) => {
+    if (!q) return expandedDisplayedEntries
+    return expandedDisplayedEntries.filter((e) => {
       const searchable = [
         e.courseCode,
         e.courseName,
@@ -594,15 +684,35 @@ export default function ScheduleViewerPage() {
       ]
       return searchable.some((field) => field.toLowerCase().includes(q))
     })
-  }, [displayedEntries, searchText])
+  }, [expandedDisplayedEntries, searchText])
+
+  const searchFilteredList = useMemo(() => {
+    const q = searchText.trim().toLowerCase()
+    if (!q) return listDisplayedEntries
+    return listDisplayedEntries.filter((e) => {
+      const searchable = [
+        e.courseCode,
+        e.courseName,
+        e.sectionNumber,
+        e.lecturerName,
+        e.roomNumber,
+        e.day,
+        e.startTime,
+        e.endTime,
+        e.isLab ? "lab" : "lecture",
+      ]
+      return searchable.some((field) => field.toLowerCase().includes(q))
+    })
+  }, [listDisplayedEntries, searchText])
 
   const sortedListEntries = useMemo(() => {
+    const firstDay = (dayLabel: string) => dayLabel.split(/\s+/)[0] ?? dayLabel
     const dayIndex = (day: string) => {
-      const idx = DAY_ORDER.indexOf(day as (typeof DAY_ORDER)[number])
+      const idx = DAY_ORDER.indexOf(firstDay(day) as (typeof DAY_ORDER)[number])
       return idx === -1 ? Number.MAX_SAFE_INTEGER : idx
     }
 
-    const compare = (a: ExpandedEntry, b: ExpandedEntry) => {
+    const compare = (a: ListEntry, b: ListEntry) => {
       switch (listSortField) {
         case "day":
           return dayIndex(a.day) - dayIndex(b.day)
@@ -629,35 +739,35 @@ export default function ScheduleViewerPage() {
       }
     }
 
-    return searchFiltered
+    return searchFilteredList
       .slice()
       .sort((a, b) => {
         const primary = compare(a, b)
         const directional = listSortDirection === "asc" ? primary : -primary
         return directional || a.day.localeCompare(b.day) || a.startTime.localeCompare(b.startTime) || a.courseCode.localeCompare(b.courseCode)
       })
-  }, [searchFiltered, listSortField, listSortDirection])
+  }, [searchFilteredList, listSortField, listSortDirection])
 
   const days = useMemo(() => {
     return DAY_ORDER.slice(0, 5) as unknown as string[]
   }, [])
 
   const timeSlots = useMemo(() => {
-    const set = new Set(searchFiltered.map((e) => e.timeRange))
+    const set = new Set(searchFilteredExpanded.map((e) => e.timeRange))
     const arr = Array.from(set)
     arr.sort((a, b) => a.localeCompare(b))
     return arr
-  }, [searchFiltered])
+  }, [searchFilteredExpanded])
   const entriesByDayTime = useMemo(() => {
     const grouped = new Map<string, ExpandedEntry[]>()
-    for (const entry of searchFiltered) {
+    for (const entry of searchFilteredExpanded) {
       const key = `${entry.day}__${entry.timeRange}`
       const existing = grouped.get(key)
       if (existing) existing.push(entry)
       else grouped.set(key, [entry])
     }
     return grouped
-  }, [searchFiltered])
+  }, [searchFilteredExpanded])
 
   const timetable = useMemo(
     () => timetables.find((t) => t.timetableId === timetableId) ?? null,
@@ -666,14 +776,16 @@ export default function ScheduleViewerPage() {
 
   const scheduleTitle = useMemo(() => {
     if (!timetable) return "Schedule Viewer"
+    if (hideVersionInTitle) return `${timetable.academicYear} • ${timetable.semester}`
     return `${timetable.academicYear} • ${timetable.semester} • v${timetable.versionNumber}`
-  }, [timetable])
+  }, [timetable, hideVersionInTitle])
 
   const useSectionColors = courseFilter !== "all" || lecturerFilter !== "all" || roomFilter !== "all"
   const getEntryColorKey = (entry: ExpandedEntry) => (useSectionColors ? `section-${entry.entryId}` : entry.courseCode)
 
   const exportRows = useMemo(() => {
-    return searchFiltered.map((e) => ({
+    const source = viewType === "list" ? searchFilteredList : searchFilteredExpanded
+    return source.map((e) => ({
       course: e.courseCode,
       section: e.sectionNumber,
       name: getDisplayCourseName(e.courseName, e.isLab),
@@ -686,11 +798,11 @@ export default function ScheduleViewerPage() {
       students: e.registeredStudents,
       capacity: e.sectionCapacity,
     }))
-  }, [searchFiltered])
+  }, [searchFilteredExpanded, searchFilteredList, viewType])
   const uniqueSectionCount = useMemo(() => {
-    const sectionIds = new Set(searchFiltered.map((e) => e.entryId))
+    const sectionIds = new Set(searchFilteredList.map((e) => e.entryId))
     return sectionIds.size
-  }, [searchFiltered])
+  }, [searchFilteredList])
 
   const courseOptions = useMemo(() => {
     const dedup = new Map<string, { value: string; label: string }>()
@@ -728,7 +840,8 @@ export default function ScheduleViewerPage() {
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [allEntries])
 
-  const hasActiveFilters = courseFilter !== "all" || lecturerFilter !== "all" || roomFilter !== "all" || !!searchText.trim()
+  const hasActiveFilters =
+    courseFilter !== "all" || lecturerFilter !== "all" || roomFilter !== "all" || myScheduleOnly || !!searchText.trim()
   const activeCourseLabel = courseOptions.find((o) => o.value === courseFilter)?.label ?? courseFilter
   const activeLecturerLabel = lecturerOptions.find((o) => o.value === lecturerFilter)?.label ?? lecturerFilter
   const activeRoomLabel = roomOptions.find((o) => o.value === roomFilter)?.label ?? roomFilter
@@ -969,7 +1082,9 @@ export default function ScheduleViewerPage() {
     setListSortDirection("asc")
   }
 
-  const isReady = !loadingSemesters && !!semesterId && !loadingTimetables && !!timetableId
+  const isReady = autoSelectLatestTimetable
+    ? !loadingTimetables && !!timetableId
+    : !loadingSemesters && !!semesterId && !loadingTimetables && !!timetableId
   const isViewerLoading = loadingSemesters || loadingTimetables || loadingEntries
 
   return (
@@ -978,6 +1093,7 @@ export default function ScheduleViewerPage() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-auto p-4 lg:p-6">
+          <div className="mx-auto w-full max-w-[1680px]">
           <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-1">
               <h1 className="text-xl font-bold text-balance text-foreground">Schedule Viewer</h1>
@@ -987,6 +1103,15 @@ export default function ScheduleViewerPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {enableMySchedule && myLecturerId ? (
+                <Button
+                  variant={myScheduleOnly ? "default" : "outline"}
+                  onClick={() => setMyScheduleOnly((prev) => !prev)}
+                  disabled={!isReady || loadingEntries}
+                >
+                  My Schedule
+                </Button>
+              ) : null}
               <Button variant="outline" onClick={handlePrint} disabled={!isReady || loadingEntries}>
                 <Printer className="mr-2 h-4 w-4" />
                 Print / PDF
@@ -994,7 +1119,7 @@ export default function ScheduleViewerPage() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" disabled={!isReady || loadingEntries}>
-                    <Download className="mr-2 h-4 w-4" />
+                    <Upload className="mr-2 h-4 w-4" />
                     Export
                   </Button>
                 </DropdownMenuTrigger>
@@ -1013,6 +1138,7 @@ export default function ScheduleViewerPage() {
           )}
 
           <div className="space-y-4">
+            {!hideScheduleSelection ? (
             <CompactCollapsibleCard title="Schedule Selection">
                   <CardDescription className="text-xs">
                     Pick semester and timetable to load a specific generated schedule version.
@@ -1058,6 +1184,7 @@ export default function ScheduleViewerPage() {
                     </div>
                   </div>
             </CompactCollapsibleCard>
+            ) : null}
 
             <CompactCollapsibleCard title="Filters" contentClassName="pb-0">
                   <CardDescription className="text-xs">
@@ -1144,6 +1271,14 @@ export default function ScheduleViewerPage() {
                           </button>
                         </Badge>
                       )}
+                      {myScheduleOnly && (
+                        <Badge variant="secondary" className="gap-1 py-0">
+                          Scope: My schedule
+                          <button type="button" onClick={() => setMyScheduleOnly(false)} aria-label="Remove my schedule filter">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      )}
                       {trimmedSearch && (
                         <Badge variant="outline" className="gap-1 py-0">
                           Search: {trimmedSearch}
@@ -1161,6 +1296,7 @@ export default function ScheduleViewerPage() {
                             setCourseFilter("all")
                             setLecturerFilter("all")
                             setRoomFilter("all")
+                            setMyScheduleOnly(false)
                             setSearchText("")
                           }}
                           className="h-6 px-2"
@@ -1232,10 +1368,14 @@ export default function ScheduleViewerPage() {
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading schedule…
                     </div>
-                  ) : !semesterId ? (
+                  ) : !autoSelectLatestTimetable && !semesterId ? (
                     <div className="p-6 text-sm text-muted-foreground">No semester selected. Please select a semester to continue.</div>
                   ) : !timetableId ? (
-                    <div className="p-6 text-sm text-muted-foreground">No schedule selected. Please select a schedule to view.</div>
+                    <div className="p-6 text-sm text-muted-foreground">
+                      {autoSelectLatestTimetable
+                        ? "No schedule found in the database yet."
+                        : "No schedule selected. Please select a schedule to view."}
+                    </div>
                   ) : exportRows.length === 0 ? (
                     <div className="p-6 text-sm text-muted-foreground">No sessions found for this timetable.</div>
                   ) : viewType === "grid" ? (
@@ -1288,7 +1428,7 @@ export default function ScheduleViewerPage() {
                   ) : viewType === "calendar" ? (
                     <div className="grid gap-4 p-4 md:grid-cols-5">
                       {days.slice(0, 5).map((day) => {
-                        const dayEntries = searchFiltered
+                        const dayEntries = searchFilteredExpanded
                           .filter((e) => e.day === day)
                           .sort((a, b) => a.startTime.localeCompare(b.startTime))
                         return (
@@ -1392,8 +1532,13 @@ export default function ScheduleViewerPage() {
               </Card>
             </div>
           </div>
+          </div>
         </main>
       </div>
     </div>
   )
+}
+
+export default function AdminScheduleViewerPage() {
+  return <ScheduleViewerPage />
 }

@@ -14,9 +14,10 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CoursesController = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const courses_service_1 = require("./courses.service");
 const course_dto_1 = require("./dto/course.dto");
-const public_decorator_1 = require("../common/decorators/public.decorator");
+const roles_decorator_1 = require("../common/decorators/roles.decorator");
 let CoursesController = class CoursesController {
     constructor(coursesService) {
         this.coursesService = coursesService;
@@ -39,14 +40,12 @@ let CoursesController = class CoursesController {
 };
 exports.CoursesController = CoursesController;
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Get)(),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], CoursesController.prototype, "findAll", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __metadata("design:type", Function),
@@ -54,7 +53,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], CoursesController.prototype, "findOne", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -62,7 +60,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], CoursesController.prototype, "create", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Put)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
@@ -71,7 +68,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], CoursesController.prototype, "update", null);
 __decorate([
-    (0, public_decorator_1.Public)(),
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
     __metadata("design:type", Function),
@@ -80,6 +76,7 @@ __decorate([
 ], CoursesController.prototype, "remove", null);
 exports.CoursesController = CoursesController = __decorate([
     (0, common_1.Controller)('courses'),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
     __metadata("design:paramtypes", [courses_service_1.CoursesService])
 ], CoursesController);
 //# sourceMappingURL=courses.controller.js.map
