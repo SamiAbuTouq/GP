@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { GwoRunProvider } from "@/components/gwo-run-context";
+import { TimetableGridDraftProvider } from "@/components/timetable-grid-draft-context";
 import { ProtectedRoute } from "@/components/protected-route";
 
 const LECTURER_ONLY_PATHS = ["/lecturer-time-preferences", "/lecturer-schedule"];
@@ -36,7 +37,9 @@ export default function AppLayout({
 
   return (
     <ProtectedRoute allowedRoles={allowedRoles}>
-      <GwoRunProvider>{children}</GwoRunProvider>
+      <GwoRunProvider>
+        <TimetableGridDraftProvider>{children}</TimetableGridDraftProvider>
+      </GwoRunProvider>
     </ProtectedRoute>
   );
 }

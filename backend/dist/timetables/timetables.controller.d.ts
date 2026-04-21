@@ -2,7 +2,7 @@ import { TimetablesService } from './timetables.service';
 export declare class TimetablesController {
     private readonly timetablesService;
     constructor(timetablesService: TimetablesService);
-    list(semesterIdRaw?: string): Promise<{
+    list(semesterIdRaw?: string, draftsOnlyRaw?: string): Promise<{
         timetableId: number;
         semesterId: number;
         academicYear: string;

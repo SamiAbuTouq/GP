@@ -9,9 +9,29 @@ export class TimetablesController {
   constructor(private readonly timetablesService: TimetablesService) {}
 
   @Get()
-  list(@Query('semesterId') semesterIdRaw?: string) {
-    const semesterId = semesterIdRaw ? Number(semesterIdRaw) : undefined;
-    return this.timetablesService.list(Number.isFinite(semesterId) ? semesterId : undefined);
+  list(
+    @Query('semesterId') semesterIdRaw?: string,
+    @Query('draftsOnly') draftsOnlyRaw?: string,
+  ) {
+    const draftsOnly =
+      draftsOnlyRaw === 'true' ||
+      draftsOnlyRaw === '1' ||
+      draftsOnlyRaw?.toLowerCase() === 'yes';
+    const rawTrimmed =
+      typeof semesterIdRaw === 'string' ? semesterIdRaw.trim() : '';
+    const parsedSemester =
+      rawTrimmed !== '' &&
+      rawTrimmed.toLowerCase() !== 'null' &&
+      rawTrimmed.toLowerCase() !== 'undefined'
+        ? Number(rawTrimmed)
+        : undefined;
+    const semesterId =
+      typeof parsedSemester === 'number' &&
+      Number.isFinite(parsedSemester) &&
+      parsedSemester > 0
+        ? parsedSemester
+        : undefined;
+    return this.timetablesService.list(semesterId, draftsOnly);
   }
 
   @Get(':id/entries')

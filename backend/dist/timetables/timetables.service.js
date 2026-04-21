@@ -48,22 +48,31 @@ let TimetablesService = class TimetablesService {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async list(semesterId) {
+    async list(semesterId, draftsOnly) {
+        const hasSemesterFilter = semesterId != null &&
+            typeof semesterId === 'number' &&
+            Number.isFinite(semesterId) &&
+            semesterId > 0;
         const timetables = await this.prisma.timetable.findMany({
-            where: semesterId ? { semester_id: semesterId } : undefined,
+            where: draftsOnly || !hasSemesterFilter
+                ? undefined
+                : { semester_id: semesterId },
             include: {
                 semester: true,
                 timetable_metrics: true,
             },
             orderBy: [{ generated_at: 'desc' }, { timetable_id: 'desc' }],
         });
-        return timetables.map((t) => ({
+        const rows = draftsOnly && !hasSemesterFilter
+            ? timetables.filter((t) => t.semester_id == null)
+            : timetables;
+        return rows.map((t) => ({
             timetableId: t.timetable_id,
             semesterId: t.semester_id,
-            academicYear: t.semester.academic_year,
-            semesterType: t.semester.semester_type,
-            semester: decodeSemesterType(t.semester.semester_type),
-            totalStudents: t.semester.total_students,
+            academicYear: t.semester?.academic_year ?? 'Unassigned',
+            semesterType: t.semester?.semester_type ?? 0,
+            semester: t.semester ? decodeSemesterType(t.semester.semester_type) : 'Unassigned draft',
+            totalStudents: t.semester?.total_students ?? null,
             generatedAt: t.generated_at,
             status: t.status,
             generationType: t.generation_type,

@@ -4,6 +4,7 @@ import { MailService } from '../mail/mail.service';
 export declare class LecturersService {
     private prisma;
     private readonly mailService;
+    private readonly logger;
     constructor(prisma: PrismaService, mailService: MailService);
     private generateTemporaryPassword;
     private resolveLatestTimetableId;

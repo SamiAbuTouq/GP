@@ -506,8 +506,8 @@ export default function CoursesPage() {
                   <DialogDescription>Enter the course information below.</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="course-code">Course Code</Label>
                       <Input
                         id="course-code"
@@ -523,7 +523,7 @@ export default function CoursesPage() {
                         placeholder="e.g. 13432"
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="course-credits">Credit Hours</Label>
                       <Input
                         id="course-credits"
@@ -536,39 +536,7 @@ export default function CoursesPage() {
                         }
                       />
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="course-name">Course Name</Label>
-                    <Input
-                      id="course-name"
-                      value={newCourse.name}
-                      onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })}
-                      placeholder="Course Name"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="course-level">Academic Level</Label>
-                      <p className="text-xs text-muted-foreground mb-1">
-                        From the 3rd digit of the code (updates when you change the code).
-                      </p>
-                      <Select
-                        value={newCourse.academicLevel.toString()}
-                        disabled
-                      >
-                        <SelectTrigger id="course-level" className="disabled:opacity-100">
-                          <SelectValue placeholder="Enter a code with 3+ digits" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((level) => (
-                            <SelectItem key={level} value={level.toString()}>
-                              Level {level}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="course-sections">Number of Sections</Label>
                       <Input
                         id="course-sections"
@@ -582,6 +550,24 @@ export default function CoursesPage() {
                         placeholder="1"
                       />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="course-name">Course Name</Label>
+                    <Input
+                      id="course-name"
+                      value={newCourse.name}
+                      onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })}
+                      placeholder="Course Name"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium leading-none">Academic Level</p>
+                    <p className="text-xs text-muted-foreground">
+                      From the 3rd digit of the code (updates when you change the code).{" "}
+                      <span className="font-medium text-foreground" aria-live="polite">
+                        Level {newCourse.academicLevel}
+                      </span>
+                    </p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2 min-w-0">
@@ -956,20 +942,34 @@ export default function CoursesPage() {
           </DialogHeader>
           {editingCourse && (
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Course Code</Label>
-                  <Input value={editingCourse.code} disabled />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="space-y-2 min-w-0">
+                  <Label htmlFor="edit-course-code">Course Code</Label>
+                  <Input id="edit-course-code" value={editingCourse.code} disabled />
                 </div>
-                <div className="space-y-2">
-                  <Label>Credit Hours</Label>
+                <div className="space-y-2 min-w-0">
+                  <Label htmlFor="edit-course-credits">Credit Hours</Label>
                   <Input
+                    id="edit-course-credits"
                     type="number"
                     min="1"
                     max="6"
                     value={editingCourse.creditHours}
                     onChange={(e) =>
                       setEditingCourse({ ...editingCourse, creditHours: Number.parseInt(e.target.value) || 3 })
+                    }
+                  />
+                </div>
+                <div className="space-y-2 min-w-0">
+                  <Label htmlFor="edit-course-sections">Number of Sections</Label>
+                  <Input
+                    id="edit-course-sections"
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={editingCourse.sections}
+                    onChange={(e) =>
+                      setEditingCourse({ ...editingCourse, sections: Math.max(1, Number.parseInt(e.target.value) || 1) })
                     }
                   />
                 </div>
@@ -981,35 +981,14 @@ export default function CoursesPage() {
                   onChange={(e) => setEditingCourse({ ...editingCourse, name: e.target.value })}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Academic Level</Label>
-                  <p className="text-xs text-muted-foreground mb-1">From the 3rd digit of the course code.</p>
-                  <Select value={editingCourse.academicLevel.toString()} disabled>
-                    <SelectTrigger className="disabled:opacity-100">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((level) => (
-                        <SelectItem key={level} value={level.toString()}>
-                          Level {level}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Number of Sections</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={editingCourse.sections}
-                    onChange={(e) =>
-                      setEditingCourse({ ...editingCourse, sections: Math.max(1, Number.parseInt(e.target.value) || 1) })
-                    }
-                  />
-                </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium leading-none">Academic Level</p>
+                <p className="text-xs text-muted-foreground">
+                  From the 3rd digit of the code (updates when you change the code).{" "}
+                  <span className="font-medium text-foreground" aria-live="polite">
+                    Level {editingCourse.academicLevel}
+                  </span>
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2 min-w-0">

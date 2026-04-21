@@ -41,18 +41,21 @@ var __importStar = (this && this.__importStar) || (function () {
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var LecturersService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LecturersService = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const bcrypt = __importStar(require("bcrypt"));
 const crypto_1 = require("crypto");
 const mail_service_1 = require("../mail/mail.service");
 const STANDARD_MAX_WORKLOAD_HOURS = 15;
-let LecturersService = class LecturersService {
+let LecturersService = LecturersService_1 = class LecturersService {
     constructor(prisma, mailService) {
         this.prisma = prisma;
         this.mailService = mailService;
+        this.logger = new common_1.Logger(LecturersService_1.name);
     }
     generateTemporaryPassword(length = 16) {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*';
@@ -175,6 +178,21 @@ let LecturersService = class LecturersService {
         };
     }
     async create(dto) {
+        const email = dto.email.trim().toLowerCase();
+        const existingUser = await this.prisma.user.findUnique({
+            where: { email },
+            select: { user_id: true, role_name: true },
+        });
+        if (existingUser) {
+            const existingLecturer = await this.prisma.lecturer.findUnique({
+                where: { user_id: existingUser.user_id },
+                select: { user_id: true },
+            });
+            if (existingLecturer) {
+                throw new common_1.ConflictException('A lecturer with this email already exists.');
+            }
+            throw new common_1.ConflictException('This email is already registered to another account. Use a different email or update the existing user.');
+        }
         let department = await this.prisma.department.findFirst({
             where: { dept_name: dto.department },
         });
@@ -188,16 +206,31 @@ let LecturersService = class LecturersService {
         const nameParts = dto.name.split(' ');
         const firstName = nameParts[0] || '';
         const lastName = nameParts.slice(1).join(' ') || '';
-        const user = await this.prisma.user.create({
-            data: {
-                email: dto.email,
-                password_hash: hashedPassword,
-                must_change_password: true,
-                first_name: firstName,
-                last_name: lastName,
-                role_name: 'LECTURER',
-            },
-        });
+        let user;
+        try {
+            user = await this.prisma.user.create({
+                data: {
+                    email,
+                    password_hash: hashedPassword,
+                    must_change_password: true,
+                    first_name: firstName,
+                    last_name: lastName,
+                    role_name: 'LECTURER',
+                },
+                select: { user_id: true },
+            });
+        }
+        catch (e) {
+            if (e instanceof client_1.Prisma.PrismaClientKnownRequestError &&
+                e.code === 'P2002') {
+                const targets = e.meta?.target ?? [];
+                if (targets.includes('email')) {
+                    throw new common_1.ConflictException('A user with this email already exists.');
+                }
+                throw new common_1.ConflictException('This record conflicts with existing data.');
+            }
+            throw e;
+        }
         const lecturer = await this.prisma.lecturer.create({
             data: {
                 user_id: user.user_id,
@@ -217,16 +250,22 @@ let LecturersService = class LecturersService {
                 })),
             });
         }
-        await this.mailService.sendLecturerWelcomeEmail({
-            to: dto.email,
-            fullName: dto.name,
-            temporaryPassword,
-        });
+        try {
+            await this.mailService.sendLecturerWelcomeEmail({
+                to: email,
+                fullName: dto.name,
+                temporaryPassword,
+            });
+        }
+        catch (error) {
+            this.logger.warn(`Lecturer ${user.user_id} was created but welcome email failed for ${email}.`);
+            this.logger.debug(error instanceof Error ? error.stack : JSON.stringify(error));
+        }
         return {
             id: `LEC${String(lecturer.user_id).padStart(3, '0')}`,
             databaseId: lecturer.user_id,
             name: dto.name,
-            email: dto.email,
+            email,
             department: dto.department,
             departmentId: department.dept_id,
             load: 0,
@@ -307,7 +346,7 @@ let LecturersService = class LecturersService {
     }
 };
 exports.LecturersService = LecturersService;
-exports.LecturersService = LecturersService = __decorate([
+exports.LecturersService = LecturersService = LecturersService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         mail_service_1.MailService])

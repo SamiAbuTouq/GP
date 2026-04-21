@@ -66,6 +66,11 @@ type ProgramStructure = {
   }
 }
 
+const COURSE_PLACEHOLDERS: Record<number, { name: string; creditHours: number }> = {
+  0: { name: "Elective University Requirements", creditHours: 3 },
+  1: { name: "Elective Program Requirements", creditHours: 3 },
+}
+
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export default function ProgramsPage() {
@@ -174,6 +179,35 @@ export default function ProgramsPage() {
     [resolveCatalogCourse],
   )
 
+  const resolveSemesterCourseDisplay = useCallback(
+    (ref: number) => {
+      const placeholder = COURSE_PLACEHOLDERS[ref]
+      if (placeholder) {
+        return {
+          code: "",
+          name: placeholder.name,
+          creditHours: placeholder.creditHours,
+        }
+      }
+
+      const course = resolveCatalogCourse(ref)
+      if (course) {
+        return {
+          code: course.code,
+          name: toTitleCase(course.name),
+          creditHours: typeof course.creditHours === "number" ? course.creditHours : null,
+        }
+      }
+
+      return {
+        code: "",
+        name: "Unknown course",
+        creditHours: null,
+      }
+    },
+    [resolveCatalogCourse],
+  )
+
   const filteredPrograms = useMemo(() => {
     if (!localPrograms) return []
     return Object.keys(localPrograms).filter(p => 
@@ -239,10 +273,10 @@ export default function ProgramsPage() {
   const currentSemesterCreditHours = useMemo(
     () =>
       currentSemesterCourses.reduce((total, ref) => {
-        const course = resolveCatalogCourse(ref)
-        return total + (course?.creditHours ?? 0)
+        const display = resolveSemesterCourseDisplay(ref)
+        return total + (display.creditHours ?? 0)
       }, 0),
-    [currentSemesterCourses, resolveCatalogCourse],
+    [currentSemesterCourses, resolveSemesterCourseDisplay],
   )
 
   const coursesAvailableToAdd = useMemo(
@@ -562,11 +596,11 @@ export default function ProgramsPage() {
                       </div>
 
                       <div className="rounded-md border">
-                        <Table>
+                        <Table className="table-fixed">
                           <TableHeader>
                             <TableRow>
                               <TableHead className="w-12">#</TableHead>
-                              <TableHead>Code</TableHead>
+                              <TableHead className="w-[8rem]">Code</TableHead>
                               <TableHead>Name</TableHead>
                               <TableHead className="w-[5rem] text-right tabular-nums">Credits</TableHead>
                               <TableHead className="w-[70px] text-right">Actions</TableHead>
@@ -584,18 +618,18 @@ export default function ProgramsPage() {
                               </TableRow>
                             ) : (
                               currentSemesterCourses.map((id, index) => {
-                                const course = resolveCatalogCourse(id)
-                                const displayCode = course?.code ?? String(id)
-                                const displayName = course?.name ? toTitleCase(course.name) : "Unknown course"
+                                const display = resolveSemesterCourseDisplay(id)
                                 return (
                                   <TableRow key={`${selectedProgram}-${selectedYear}-${selectedSemester}-${id}`}>
                                     <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                                    <TableCell className="font-mono text-sm font-medium">{displayCode}</TableCell>
-                                    <TableCell className="max-w-[min(100vw-8rem,28rem)] truncate sm:max-w-[36rem]">
-                                      {displayName}
+                                    <TableCell className="w-[8rem] overflow-hidden text-ellipsis font-mono text-sm font-medium">
+                                      {display.code || <span className="inline-block w-[5ch] text-center text-muted-foreground">—</span>}
+                                    </TableCell>
+                                    <TableCell className="overflow-hidden text-ellipsis">
+                                      {display.name}
                                     </TableCell>
                                     <TableCell className="text-right tabular-nums text-muted-foreground">
-                                      {course != null && typeof course.creditHours === "number" ? course.creditHours : "—"}
+                                      {display.creditHours ?? <span className="text-muted-foreground">—</span>}
                                     </TableCell>
                                     <TableCell className="text-right">
                                       <DropdownMenu>

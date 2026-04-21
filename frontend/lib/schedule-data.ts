@@ -23,7 +23,8 @@ export type LectureConfig = {
   course: string
   /** Full title for UI / exports (GWO reads `course` as the canonical code). */
   course_name?: string
-  allowed_lecturers: number[]
+  /** Lecturer indices into `config.lecturers`, and/or lecturer names (as in exported schedules). */
+  allowed_lecturers: Array<number | string>
   size: number
   delivery_mode?: string
   session_type?: string

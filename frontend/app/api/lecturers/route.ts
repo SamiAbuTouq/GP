@@ -8,11 +8,12 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>
+    const parsedMaxWorkload = Number(body.maxWorkload)
     const payload: Record<string, unknown> = {
       name: String(body.name ?? '').trim(),
       email: String(body.email ?? '').trim().toLowerCase(),
       department: String(body.department ?? '').trim(),
-      maxWorkload: Number(body.maxWorkload),
+      maxWorkload: Number.isFinite(parsedMaxWorkload) ? parsedMaxWorkload : 15,
     }
     if (Array.isArray(body.courses)) {
       payload.courses = body.courses

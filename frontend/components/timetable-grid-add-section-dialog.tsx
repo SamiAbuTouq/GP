@@ -5,6 +5,7 @@ import type { ScheduleConfig, ScheduleEntry } from "@/lib/schedule-data";
 import {
   allowedLecturerNamesForLecture,
   allowedRoomNamesForLecture,
+  explainNoAddSectionCandidates,
   isTimeslotAllowedForLecture,
   lecturerTimeslotAllowed,
   listLectureConfigsNotOnSchedule,
@@ -96,6 +97,11 @@ export function TimetableGridAddSectionDialog({
     });
   }, [candidates, query]);
 
+  const emptyListHint = useMemo(() => {
+    if (!targetCell) return "";
+    return explainNoAddSectionCandidates(config, scheduleEntries, targetCell, catalogue);
+  }, [config, scheduleEntries, targetCell, catalogue]);
+
   const selectedLecture = useMemo(
     () => candidates.find((c) => String(c.id) === selectedLectureId),
     [candidates, selectedLectureId],
@@ -169,8 +175,9 @@ export function TimetableGridAddSectionDialog({
             />
             <ul className="max-h-48 overflow-auto rounded-md border border-slate-200 text-sm">
               {filteredCandidates.length === 0 ? (
-                <li className="px-3 py-2 text-muted-foreground">
-                  No addable section fits this cell. Try another empty block.
+                <li className="space-y-2 px-3 py-2">
+                  <p className="text-muted-foreground">No addable section fits this cell.</p>
+                  <p className="text-xs leading-snug text-muted-foreground">{emptyListHint}</p>
                 </li>
               ) : (
                 filteredCandidates.map((lec) => (

@@ -72,25 +72,26 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = (await req.json()) as {
-      semesterId?: number;
+      semesterId?: number | null;
       schedule?: ScheduleEntry[];
       timeslots_catalogue?: TimeslotCatalogueEntry[];
     };
 
-    const semesterId = Number(body.semesterId);
-    if (!Number.isFinite(semesterId) || semesterId <= 0) {
-      return NextResponse.json({ error: "semesterId is required." }, { status: 400 });
-    }
+    const parsedSemesterId = Number(body.semesterId);
+    const semesterId =
+      Number.isFinite(parsedSemesterId) && parsedSemesterId > 0 ? parsedSemesterId : null;
     if (!Array.isArray(body.schedule) || body.schedule.length === 0) {
       return NextResponse.json({ error: "schedule must be a non-empty array." }, { status: 400 });
     }
 
-    const semester = await prisma.semester.findUnique({
-      where: { semester_id: semesterId },
-      select: { semester_id: true },
-    });
-    if (!semester) {
-      return NextResponse.json({ error: `Semester ${semesterId} not found.` }, { status: 404 });
+    if (semesterId != null) {
+      const semester = await prisma.semester.findUnique({
+        where: { semester_id: semesterId },
+        select: { semester_id: true },
+      });
+      if (!semester) {
+        return NextResponse.json({ error: `Semester ${semesterId} not found.` }, { status: 404 });
+      }
     }
 
     const config = await loadMergedConfig();
@@ -212,10 +213,35 @@ export async function POST(req: NextRequest) {
       return t;
     });
 
+    const semesterTypeLabel = (type: number): string => {
+      const map: Record<number, string> = {
+        1: "First Semester",
+        2: "Second Semester",
+        3: "Summer Semester",
+      };
+      return map[type] ?? `Semester ${type}`;
+    };
+
+    let timetableName = `Timetable #${timetable.timetable_id}`;
+    if (timetable.semester_id != null) {
+      const sem = await prisma.semester.findUnique({
+        where: { semester_id: timetable.semester_id },
+        select: { academic_year: true, semester_type: true },
+      });
+      if (sem) {
+        timetableName = `${sem.academic_year} · ${semesterTypeLabel(sem.semester_type)}`;
+      }
+    } else {
+      timetableName = "Unassigned draft";
+    }
+
     return NextResponse.json({
       ok: true,
       timetableId: timetable.timetable_id,
       versionNumber: nextVersion,
+      timetableName,
+      status: timetable.status,
+      generationType: timetable.generation_type,
       entryCount: rowsToCreate.length,
     });
   } catch (err) {

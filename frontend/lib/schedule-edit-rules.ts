@@ -138,10 +138,37 @@ export function allowedRoomNamesForLecture(
 
 export function allowedLecturerNamesForLecture(config: ScheduleConfig, lec: LectureConfig): string[] {
   const lecturers = config.lecturers ?? [];
-  const idxs = lec.allowed_lecturers ?? [];
-  const names = idxs
-    .map((i) => lecturers[Number(i)])
-    .filter((n): n is string => typeof n === "string" && n.trim().length > 0);
+  const idxs = (lec.allowed_lecturers ?? []) as unknown[];
+  const names: string[] = [];
+  const lecturerSet = new Set(lecturers.map((n) => n.trim().toLowerCase()));
+
+  for (const raw of idxs) {
+    if (typeof raw === "string") {
+      const t = raw.trim();
+      if (!t) continue;
+      if (lecturerSet.has(t.toLowerCase())) {
+        const exact = lecturers.find((n) => n.trim().toLowerCase() === t.toLowerCase())!;
+        names.push(exact);
+        continue;
+      }
+      const asNum = Number(t);
+      if (Number.isFinite(asNum)) {
+        const i = Math.trunc(asNum);
+        const byIdx = lecturers[i];
+        if (typeof byIdx === "string" && byIdx.trim()) {
+          names.push(byIdx);
+        }
+      }
+      continue;
+    }
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      const i = Math.trunc(raw);
+      const byIdx = lecturers[i];
+      if (typeof byIdx === "string" && byIdx.trim()) {
+        names.push(byIdx);
+      }
+    }
+  }
   return [...new Set(names)].sort();
 }
 
@@ -151,7 +178,12 @@ export function lecturerTimeslotAllowed(
   timeslotId: string,
 ): boolean {
   const map = config.lecturer_availability ?? {};
-  const list = map[lecturerName];
+  const name = lecturerName.trim();
+  let list = map[name];
+  if (!list || list.length === 0) {
+    const key = Object.keys(map).find((k) => k.trim().toLowerCase() === name.toLowerCase());
+    if (key) list = map[key];
+  }
   if (!list || list.length === 0) return true;
   return list.includes(timeslotId);
 }
@@ -196,6 +228,47 @@ export function listLectureConfigsNotOnSchedule(
 ): LectureConfig[] {
   const used = new Set(scheduleEntries.map((e) => String(e.lecture_id)));
   return (config.lectures ?? []).filter((l) => !used.has(String(l.id)));
+}
+
+/** Human-readable hint when the add-section dialog finds zero matching courses. */
+export function explainNoAddSectionCandidates(
+  config: ScheduleConfig,
+  scheduleEntries: ScheduleEntry[],
+  targetCell: { rowKey: string; timeslotId: string },
+  catalogue: TimeslotCatalogueEntry[],
+): string {
+  const notOn = listLectureConfigsNotOnSchedule(config, scheduleEntries);
+  if (notOn.length === 0) {
+    return "Every section from the planning configuration is already on the timetable. Remove a section first if you want to add a different placement.";
+  }
+  const catMap = catalogueById(catalogue);
+  const tsRow = catMap.get(targetCell.timeslotId);
+  if (!tsRow) {
+    return "This timeslot id is missing from the merged catalogue (check config vs schedule timeslots).";
+  }
+  const isOnlineRow = targetCell.rowKey === "__online__";
+  const eng = engineSlotTypeForCatalogueRow(tsRow);
+  const roomKey = targetCell.rowKey;
+  const roomRv = roomKey === "__online__" ? null : config.rooms?.[roomKey];
+  const rt =
+    isOnlineRow
+      ? "any"
+      : roomRv == null
+        ? "missing"
+        : typeof roomRv === "number"
+          ? "any"
+          : (roomCfgType(roomRv) || "any");
+
+  if (!isOnlineRow && eng === "lab" && (rt === "lecture_hall" || rt === "missing")) {
+    return "This timeslot is a lab period. Lab sections need a lab-capable room; this row is not a lab room. Use a lab room row, the Online row for online-only sections, or choose a non-lab timeslot column.";
+  }
+  if (!isOnlineRow && eng === "lab") {
+    return "This timeslot only accepts lab sessions. Only lab courses can be placed here, and only in rooms marked as lab (or “any”) with enough capacity.";
+  }
+  if (isOnlineRow && eng === "lab") {
+    return "This column is a lab timeslot; online-only sections normally use other slot patterns. Try a different empty cell.";
+  }
+  return "No remaining section fits this exact room and timeslot: slot pattern (lecture vs lab vs blended), room type/capacity, delivery mode (room vs online), and lecturer rules must all line up.";
 }
 
 /**

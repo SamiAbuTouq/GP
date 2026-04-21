@@ -56,6 +56,26 @@ type SortField = "days" | "duration"
 type SortDirection = "asc" | "desc"
 type WeeklyOverviewGroupBy = "days" | "type"
 
+const getDayIndex = (day: string) => allDays.indexOf(day)
+
+const sortDaysByWeekOrder = (days: string[]) =>
+  [...days].sort((a, b) => {
+    const aIndex = getDayIndex(a)
+    const bIndex = getDayIndex(b)
+    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b)
+    if (aIndex === -1) return 1
+    if (bIndex === -1) return -1
+    return aIndex - bIndex
+  })
+
+const normalizeSlotTypeLabel = (value: string) => value.trim().toLowerCase().replace(/[_-]/g, " ").replace(/\s+/g, " ")
+
+const getCanonicalSlotType = (value: string) => {
+  const normalized = normalizeSlotTypeLabel(value)
+  const canonicalMatch = slotTypes.find((slotType) => normalizeSlotTypeLabel(slotType) === normalized)
+  return canonicalMatch ?? value.trim()
+}
+
 export default function TimeSlotsPage() {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
   const [loading, setLoading] = useState(true)
@@ -319,7 +339,7 @@ export default function TimeSlotsPage() {
   const getDaySortValue = (days: string[]) => {
     const dayIndexes = days.map((d) => allDays.indexOf(d)).filter((i) => i >= 0)
     const firstIndex = dayIndexes.length > 0 ? Math.min(...dayIndexes) : Number.MAX_SAFE_INTEGER
-    return { firstIndex, count: days.length, label: [...days].sort().join(",") }
+    return { firstIndex, count: days.length, label: sortDaysByWeekOrder(days).join(",") }
   }
 
   const handleSort = (field: SortField) => {
@@ -335,7 +355,7 @@ export default function TimeSlotsPage() {
   const toggleOuterGroup = (groupId: string) => {
     setCollapsedOuterGroups((prev) => ({
       ...prev,
-      [groupId]: !prev[groupId],
+      [groupId]: !(prev[groupId] ?? true),
     }))
   }
 
@@ -384,7 +404,7 @@ export default function TimeSlotsPage() {
 
     const outerGroups = timeSlots.reduce(
       (acc, slot) => {
-        const key = weeklyOverviewGroupBy === "days" ? [...slot.days].sort().join("-") : slot.slotType
+        const key = weeklyOverviewGroupBy === "days" ? sortDaysByWeekOrder(slot.days).join("-") : getCanonicalSlotType(slot.slotType)
         if (!acc[key]) acc[key] = []
         acc[key].push(slot)
         return acc
@@ -393,20 +413,56 @@ export default function TimeSlotsPage() {
     )
 
     return Object.entries(outerGroups)
-      .sort(([a], [b]) => a.localeCompare(b))
+      .sort(([a], [b]) => {
+        if (weeklyOverviewGroupBy === "days") {
+          const firstDayA = a.split("-")[0] ?? ""
+          const firstDayB = b.split("-")[0] ?? ""
+          const dayCompare = getDayIndex(firstDayA) - getDayIndex(firstDayB)
+          if (dayCompare !== 0) return dayCompare
+          return a.localeCompare(b)
+        }
+
+        const slotTypeAIndex = slotTypes.findIndex((slotType) => slotType === a)
+        const slotTypeBIndex = slotTypes.findIndex((slotType) => slotType === b)
+        if (slotTypeAIndex !== -1 || slotTypeBIndex !== -1) {
+          if (slotTypeAIndex === -1) return 1
+          if (slotTypeBIndex === -1) return -1
+          if (slotTypeAIndex !== slotTypeBIndex) return slotTypeAIndex - slotTypeBIndex
+        }
+        return a.localeCompare(b)
+      })
       .map(([groupKey, slots]) => {
         if (weeklyOverviewGroupBy === "days") {
           const innerGroups = slotTypes.map((slotType) => ({
             key: slotType,
-            slots: sortedByStart(slots.filter((slot) => slot.slotType === slotType)),
+            slots: sortedByStart(slots.filter((slot) => getCanonicalSlotType(slot.slotType) === slotType)),
           }))
           return { groupKey, slots: sortedByStart(slots), innerGroups }
         }
 
-        const innerGroups = allDays.map((day) => ({
-          key: day,
-          slots: sortedByStart(slots.filter((slot) => slot.days.includes(day))),
-        }))
+        const groupedByDayPattern = slots.reduce(
+          (acc, slot) => {
+            const dayPattern = sortDaysByWeekOrder(slot.days).join("-")
+            if (!acc[dayPattern]) acc[dayPattern] = []
+            acc[dayPattern].push(slot)
+            return acc
+          },
+          {} as Record<string, TimeSlot[]>
+        )
+
+        const innerGroups = Object.entries(groupedByDayPattern)
+          .sort(([a], [b]) => {
+            const patternADays = a.split("-")
+            const patternBDays = b.split("-")
+            const firstDayCompare = getDayIndex(patternADays[0] ?? "") - getDayIndex(patternBDays[0] ?? "")
+            if (firstDayCompare !== 0) return firstDayCompare
+            if (patternADays.length !== patternBDays.length) return patternADays.length - patternBDays.length
+            return a.localeCompare(b)
+          })
+          .map(([dayPattern, groupedSlots]) => ({
+            key: dayPattern,
+            slots: sortedByStart(groupedSlots),
+          }))
         return { groupKey, slots: sortedByStart(slots), innerGroups }
       })
   }, [timeSlots, weeklyOverviewGroupBy])
@@ -807,7 +863,13 @@ export default function TimeSlotsPage() {
                                     {weeklyOverviewGroupBy === "days" ? (
                                       <Badge className={getSlotTypeColor(key as SlotType)}>{key}</Badge>
                                     ) : (
-                                      <Badge className={getDayColor(key)}>{key.slice(0, 3)}</Badge>
+                                      <div className="flex flex-wrap gap-1">
+                                        {key.split("-").map((day) => (
+                                          <Badge key={`${groupKey}-${key}-${day}`} className={getDayColor(day)}>
+                                            {day.slice(0, 3)}
+                                          </Badge>
+                                        ))}
+                                      </div>
                                     )}
                                     <span className="text-xs text-muted-foreground">{innerSlots.length} slots</span>
                                   </div>

@@ -10,7 +10,16 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,9 +54,18 @@ type SemesterDto = {
   endDate: string
 }
 
+/** Which timetables to list before picking a version (includes GWO drafts with no semester). */
+type TimetableSource = "all" | "drafts" | "published"
+
+const PUBLISHED_SEMESTER_TYPES: { value: number; label: string }[] = [
+  { value: 1, label: "First Semester" },
+  { value: 2, label: "Second Semester" },
+  { value: 3, label: "Summer Semester" },
+]
+
 type TimetableDto = {
   timetableId: number
-  semesterId: number
+  semesterId: number | null
   academicYear: string
   semesterType: number
   semester: string
@@ -63,6 +81,38 @@ type TimetableDto = {
     fitnessScore: number
     isValid: boolean
   }
+}
+
+function formatTimetableGeneratedAt(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso.length > 16 ? iso.slice(0, 16) : iso
+  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+}
+
+/**
+ * Groups unassigned drafts into "lines": v1→v2→v3 is one line; after v2 a new v1 starts a new line.
+ * Uses chronological order (no explicit parent id in the DB).
+ */
+function assignDraftRunNumbers(drafts: TimetableDto[]): Map<number, number> {
+  const map = new Map<number, number>()
+  if (drafts.length === 0) return map
+  const chronological = [...drafts].sort((a, b) => {
+    const ta = new Date(a.generatedAt).getTime()
+    const tb = new Date(b.generatedAt).getTime()
+    if (ta !== tb) return ta - tb
+    return a.timetableId - b.timetableId
+  })
+  let runIndex = 0
+  for (let i = 0; i < chronological.length; i += 1) {
+    const cur = chronological[i]!
+    const prev = chronological[i - 1]
+    if (i > 0 && prev) {
+      const startNewLine = cur.versionNumber === 1 && prev.versionNumber !== cur.versionNumber - 1
+      if (startNewLine) runIndex += 1
+    }
+    map.set(cur.timetableId, runIndex + 1)
+  }
+  return map
 }
 
 type TimetableEntryDto = {
@@ -444,7 +494,9 @@ export function ScheduleViewerPage({
   const [listSortField, setListSortField] = useState<ListSortField>("courseCode")
   const [listSortDirection, setListSortDirection] = useState<SortDirection>("asc")
   const [semesters, setSemesters] = useState<SemesterDto[]>([])
-  const [semesterId, setSemesterId] = useState<number | null>(null)
+  const [timetableSource, setTimetableSource] = useState<TimetableSource>("all")
+  const [publishedYear, setPublishedYear] = useState<string>("")
+  const [publishedSemesterType, setPublishedSemesterType] = useState<number>(1)
 
   const [timetables, setTimetables] = useState<TimetableDto[]>([])
   const [timetableId, setTimetableId] = useState<number | null>(null)
@@ -475,7 +527,14 @@ export function ScheduleViewerPage({
       .then((data) => {
         if (!mounted) return
         setSemesters(data)
-        setSemesterId(null)
+        if (data.length > 0) {
+          setPublishedYear((prev) => prev || data[0].academicYear)
+          setPublishedSemesterType((prev) => {
+            const firstType = data[0].semesterType
+            const hasPrev = data.some((s) => s.semesterType === prev)
+            return hasPrev ? prev : firstType
+          })
+        }
       })
       .catch((e) => {
         if (!mounted) return
@@ -490,28 +549,102 @@ export function ScheduleViewerPage({
     }
   }, [autoSelectLatestTimetable])
 
-  // Load timetables when semester changes
+  const academicYears = useMemo(() => {
+    const ys = new Set(semesters.map((s) => s.academicYear))
+    return Array.from(ys).sort()
+  }, [semesters])
+
+  const semesterTypesForYear = useMemo(() => {
+    if (!publishedYear.trim()) return PUBLISHED_SEMESTER_TYPES
+    const types = new Set(
+      semesters.filter((s) => s.academicYear === publishedYear).map((s) => s.semesterType),
+    )
+    const opts = PUBLISHED_SEMESTER_TYPES.filter((o) => types.has(o.value))
+    return opts.length > 0 ? opts : PUBLISHED_SEMESTER_TYPES
+  }, [semesters, publishedYear])
+
+  useEffect(() => {
+    if (timetableSource !== "published") return
+    if (semesterTypesForYear.length === 0) return
+    if (!semesterTypesForYear.some((o) => o.value === publishedSemesterType)) {
+      setPublishedSemesterType(semesterTypesForYear[0].value)
+    }
+  }, [timetableSource, semesterTypesForYear, publishedSemesterType])
+
+  const resolvedPublishedSemesterId = useMemo(() => {
+    if (timetableSource !== "published") return null
+    if (!publishedYear.trim()) return null
+    const row = semesters.find(
+      (s) => s.academicYear === publishedYear && s.semesterType === publishedSemesterType,
+    )
+    return row?.semesterId ?? null
+  }, [timetableSource, publishedYear, publishedSemesterType, semesters])
+
+  const timetableVersionSelectModel = useMemo(() => {
+    const drafts = timetables.filter((t) => t.semesterId == null)
+    const published = timetables.filter((t) => t.semesterId != null)
+    const draftRunById = assignDraftRunNumbers(drafts)
+    const runs = new Map<number, TimetableDto[]>()
+    for (const d of drafts) {
+      const r = draftRunById.get(d.timetableId) ?? 1
+      const arr = runs.get(r) ?? []
+      arr.push(d)
+      runs.set(r, arr)
+    }
+    for (const arr of runs.values()) {
+      arr.sort((a, b) => {
+        const tb = new Date(b.generatedAt).getTime()
+        const ta = new Date(a.generatedAt).getTime()
+        if (tb !== ta) return tb - ta
+        return b.timetableId - a.timetableId
+      })
+    }
+    const runOrder = [...runs.keys()].sort((a, b) => {
+      const timesA = (runs.get(a) ?? []).map((t) => new Date(t.generatedAt).getTime())
+      const timesB = (runs.get(b) ?? []).map((t) => new Date(t.generatedAt).getTime())
+      const newestA = timesA.length ? Math.max(...timesA) : 0
+      const newestB = timesB.length ? Math.max(...timesB) : 0
+      return newestB - newestA
+    })
+    const publishedSorted = [...published].sort((a, b) => {
+      const tb = new Date(b.generatedAt).getTime()
+      const ta = new Date(a.generatedAt).getTime()
+      if (tb !== ta) return tb - ta
+      return b.timetableId - a.timetableId
+    })
+    return { draftRunById, runs, runOrder, published: publishedSorted }
+  }, [timetables])
+
+  // Load timetables when scope changes (all, drafts only, or one semester).
   useEffect(() => {
     if (autoSelectLatestTimetable) return
     let mounted = true
-    if (!semesterId) {
-      setTimetables([])
-      setTimetableId(null)
-      return () => {
-        mounted = false
-      }
-    }
 
     setLoadingTimetables(true)
     setError(null)
     setTimetables([])
     setTimetableId(null)
 
-    ApiClient.request<TimetableDto[]>(`/timetables?semesterId=${semesterId}`)
+    if (timetableSource === "published" && resolvedPublishedSemesterId == null) {
+      setLoadingTimetables(false)
+      return () => {
+        mounted = false
+      }
+    }
+
+    let endpoint = "/timetables"
+    if (timetableSource === "drafts") {
+      endpoint = "/timetables?draftsOnly=true"
+    } else if (timetableSource === "published" && resolvedPublishedSemesterId != null) {
+      endpoint = `/timetables?semesterId=${resolvedPublishedSemesterId}`
+    }
+
+    ApiClient.request<TimetableDto[]>(endpoint)
       .then((data) => {
         if (!mounted) return
         setTimetables(data)
-        setTimetableId(null)
+        const first = data[0] ?? null
+        setTimetableId(first?.timetableId ?? null)
       })
       .catch((e) => {
         if (!mounted) return
@@ -525,7 +658,7 @@ export function ScheduleViewerPage({
     return () => {
       mounted = false
     }
-  }, [semesterId, autoSelectLatestTimetable])
+  }, [timetableSource, resolvedPublishedSemesterId, autoSelectLatestTimetable])
 
   // Auto-select latest timetable (newest first from backend ordering).
   useEffect(() => {
@@ -546,7 +679,13 @@ export function ScheduleViewerPage({
         if (!mounted) return
         setTimetables(data)
         const latest = data[0] ?? null
-        setSemesterId(latest?.semesterId ?? null)
+        if (latest?.semesterId != null) {
+          setTimetableSource("published")
+          setPublishedYear(latest.academicYear)
+          setPublishedSemesterType(latest.semesterType)
+        } else {
+          setTimetableSource("drafts")
+        }
         setTimetableId(latest?.timetableId ?? null)
       })
       .catch((e) => {
@@ -777,8 +916,13 @@ export function ScheduleViewerPage({
   const scheduleTitle = useMemo(() => {
     if (!timetable) return "Schedule Viewer"
     if (hideVersionInTitle) return `${timetable.academicYear} • ${timetable.semester}`
+    if (timetable.semesterId == null) {
+      const line = timetableVersionSelectModel.draftRunById.get(timetable.timetableId)
+      const linePart = line != null ? `Draft line ${line} · ` : ""
+      return `${linePart}v${timetable.versionNumber} · ${formatTimetableGeneratedAt(timetable.generatedAt)}`
+    }
     return `${timetable.academicYear} • ${timetable.semester} • v${timetable.versionNumber}`
-  }, [timetable, hideVersionInTitle])
+  }, [timetable, hideVersionInTitle, timetableVersionSelectModel.draftRunById])
 
   const useSectionColors = courseFilter !== "all" || lecturerFilter !== "all" || roomFilter !== "all"
   const getEntryColorKey = (entry: ExpandedEntry) => (useSectionColors ? `section-${entry.entryId}` : entry.courseCode)
@@ -874,7 +1018,7 @@ export function ScheduleViewerPage({
     if (viewType === "calendar") {
       const byDay: Record<string, ExpandedEntry[]> = {}
       for (const d of days) byDay[d] = []
-      for (const e of displayedEntries) {
+      for (const e of searchFilteredExpanded) {
         if (!byDay[e.day]) byDay[e.day] = []
         byDay[e.day].push(e)
       }
@@ -950,7 +1094,7 @@ export function ScheduleViewerPage({
       grid[day] = {}
       for (const t of timeSlots) grid[day][t] = []
     }
-    for (const e of displayedEntries) {
+    for (const e of searchFilteredExpanded) {
       if (!grid[e.day]) grid[e.day] = {}
       if (!grid[e.day][e.timeRange]) grid[e.day][e.timeRange] = []
       grid[e.day][e.timeRange].push(e)
@@ -1082,9 +1226,7 @@ export function ScheduleViewerPage({
     setListSortDirection("asc")
   }
 
-  const isReady = autoSelectLatestTimetable
-    ? !loadingTimetables && !!timetableId
-    : !loadingSemesters && !!semesterId && !loadingTimetables && !!timetableId
+  const isReady = !loadingTimetables && !!timetableId
   const isViewerLoading = loadingSemesters || loadingTimetables || loadingEntries
 
   return (
@@ -1098,7 +1240,8 @@ export function ScheduleViewerPage({
             <div className="space-y-1">
               <h1 className="text-xl font-bold text-balance text-foreground">Schedule Viewer</h1>
               <p className="hidden text-sm text-muted-foreground lg:block">
-                Explore the latest generated schedule in multiple views and export exactly what you see.
+                Browse GWO-generated drafts and published timetables from the database, then switch grid, list, or
+                calendar and export what you see.
               </p>
             </div>
 
@@ -1141,47 +1284,128 @@ export function ScheduleViewerPage({
             {!hideScheduleSelection ? (
             <CompactCollapsibleCard title="Schedule Selection">
                   <CardDescription className="text-xs">
-                    Pick semester and timetable to load a specific generated schedule version.
+                    List GWO drafts (no semester), everything, or published timetables for a specific academic year and
+                    term. Then pick a version to view.
                   </CardDescription>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div className="space-y-1">
-                      <div className="text-xs font-medium text-muted-foreground">Semester</div>
-                      <Select
-                        value={semesterId ? String(semesterId) : ""}
-                        onValueChange={(v) => setSemesterId(v ? Number(v) : null)}
-                        disabled={loadingSemesters || semesters.length === 0}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder={loadingSemesters ? "Loading semesters..." : "Select semester"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {semesters.map((semester) => (
-                            <SelectItem key={semester.semesterId} value={String(semester.semesterId)}>
-                              {semester.academicYear} - {semester.semester}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <div className="grid gap-3">
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <div className="text-xs font-medium text-muted-foreground">Timetable source</div>
+                        <Select
+                          value={timetableSource}
+                          onValueChange={(v) => setTimetableSource(v as TimetableSource)}
+                          disabled={loadingSemesters}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Choose source…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All timetables (drafts + published)</SelectItem>
+                            <SelectItem value="drafts">Drafts only</SelectItem>
+                            <SelectItem value="published">Published only</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs font-medium text-muted-foreground">Timetable version</div>
+                        <Select
+                          value={timetableId ? String(timetableId) : ""}
+                          onValueChange={(v) => setTimetableId(v ? Number(v) : null)}
+                          disabled={
+                            loadingTimetables ||
+                            timetables.length === 0 ||
+                            (timetableSource === "published" && resolvedPublishedSemesterId == null)
+                          }
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder={loadingTimetables ? "Loading timetables..." : "Select timetable"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {timetableVersionSelectModel.runOrder.map((runNum) => {
+                              const items = timetableVersionSelectModel.runs.get(runNum) ?? []
+                              const oldest = items[items.length - 1]
+                              const lineStarted = oldest ? formatTimetableGeneratedAt(oldest.generatedAt) : ""
+                              return (
+                                <SelectGroup key={`draft-line-${runNum}`}>
+                                  <SelectLabel>
+                                    Draft line {runNum}
+                                    {lineStarted ? ` · from ${lineStarted}` : ""}
+                                  </SelectLabel>
+                                  {items.map((tt) => (
+                                    <SelectItem key={tt.timetableId} value={String(tt.timetableId)}>
+                                      v{tt.versionNumber} · {formatTimetableGeneratedAt(tt.generatedAt)}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              )
+                            })}
+                            {timetableVersionSelectModel.published.length > 0 ? (
+                              <>
+                                {timetableVersionSelectModel.runOrder.length > 0 ? <SelectSeparator /> : null}
+                                <SelectGroup>
+                                  <SelectLabel>Published timetables</SelectLabel>
+                                  {timetableVersionSelectModel.published.map((tt) => (
+                                    <SelectItem key={tt.timetableId} value={String(tt.timetableId)}>
+                                      v{tt.versionNumber} · {tt.academicYear} {tt.semester} ·{" "}
+                                      {formatTimetableGeneratedAt(tt.generatedAt)}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </>
+                            ) : null}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <div className="text-xs font-medium text-muted-foreground">Timetable Version</div>
-                      <Select
-                        value={timetableId ? String(timetableId) : ""}
-                        onValueChange={(v) => setTimetableId(v ? Number(v) : null)}
-                        disabled={loadingTimetables || timetables.length === 0}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder={loadingTimetables ? "Loading timetables..." : "Select timetable"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {timetables.map((tt) => (
-                            <SelectItem key={tt.timetableId} value={String(tt.timetableId)}>
-                              v{tt.versionNumber} - {tt.generationType} ({tt.status})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+
+                    {timetableSource === "published" ? (
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <div className="space-y-1">
+                          <div className="text-xs font-medium text-muted-foreground">Academic year</div>
+                          <Select
+                            value={publishedYear || (academicYears[0] ?? "")}
+                            onValueChange={(v) => setPublishedYear(v)}
+                            disabled={loadingSemesters || academicYears.length === 0}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue placeholder="Select year" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {academicYears.map((y) => (
+                                <SelectItem key={y} value={y}>
+                                  {y}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs font-medium text-muted-foreground">Semester</div>
+                          <Select
+                            value={String(publishedSemesterType)}
+                            onValueChange={(v) => setPublishedSemesterType(Number(v))}
+                            disabled={loadingSemesters || semesterTypesForYear.length === 0}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue placeholder="Select semester" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {semesterTypesForYear.map((opt) => (
+                                <SelectItem key={opt.value} value={String(opt.value)}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {resolvedPublishedSemesterId == null && publishedYear ? (
+                          <p className="text-xs text-amber-800 dark:text-amber-200 md:col-span-2">
+                            No semester row matches this year and term in the database. Check entity data or pick
+                            another combination.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
             </CompactCollapsibleCard>
             ) : null}
@@ -1319,7 +1543,7 @@ export function ScheduleViewerPage({
                       <CardDescription>
                         {timetableId ? (
                           <span>
-                            {timetable ? `${timetable.generationType} • ` : ""}
+                            {timetable ? `${formatTimetableGeneratedAt(timetable.generatedAt)} • ` : ""}
                             {uniqueSectionCount} sections
                           </span>
                         ) : (
@@ -1368,8 +1592,11 @@ export function ScheduleViewerPage({
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading schedule…
                     </div>
-                  ) : !autoSelectLatestTimetable && !semesterId ? (
-                    <div className="p-6 text-sm text-muted-foreground">No semester selected. Please select a semester to continue.</div>
+                  ) : !autoSelectLatestTimetable && !loadingTimetables && timetables.length === 0 ? (
+                    <div className="p-6 text-sm text-muted-foreground">
+                      No timetables match this source. Try &quot;All timetables&quot; or store a schedule from GWO
+                      first.
+                    </div>
                   ) : !timetableId ? (
                     <div className="p-6 text-sm text-muted-foreground">
                       {autoSelectLatestTimetable

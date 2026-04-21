@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { useEffect, useId, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { TimetableGridSectionDialog } from "@/components/timetable-grid-section-dialog";
@@ -9,8 +9,18 @@ import { TimetableGridAddSectionDialog } from "@/components/timetable-grid-add-s
 import { validateScheduleHardConstraints } from "@/lib/schedule-hard-constraints";
 import { mergeEntryWithPlacement } from "@/lib/schedule-edit-rules";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, Check, ChevronsUpDown, CircleCheck, GripVertical, Pencil, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronsUpDown, GripVertical, Pencil, RotateCcw, X } from "lucide-react";
 import type {
   SchedulePayload,
   ScheduleEntry,
@@ -1144,12 +1154,46 @@ export function TeachingLoadPanel() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const lecturerSummary = data?.lecturer_summary ?? [];
-  const maxLoad = data?.metadata?.max_classes_per_lecturer ?? 5;
+  const workloadInfo = data?.workload_info ?? [];
 
-  if (isLoading || lecturerSummary.length === 0) return null;
+  if (isLoading || (lecturerSummary.length === 0 && workloadInfo.length === 0)) return null;
+
+  const workloadMap = new Map(
+    workloadInfo.map((item) => [item.lecturer, item]),
+  );
+  const mergedLecturers = lecturerSummary.map((lec) => {
+    const workload = workloadMap.get(lec.name);
+    const teachingLoad = workload?.credit_hour_load ?? workload?.classes ?? lec.teaching_load;
+    const maxLoad = workload?.max_workload ?? lec.max_load;
+    const overloaded = workload?.within_limit != null ? !workload.within_limit : teachingLoad > maxLoad;
+    return {
+      ...lec,
+      teaching_load: teachingLoad,
+      max_load: maxLoad,
+      overloaded,
+    };
+  });
+  for (const workload of workloadInfo) {
+    if (mergedLecturers.some((lec) => lec.name === workload.lecturer)) continue;
+    const teachingLoad = workload.credit_hour_load ?? workload.classes ?? 0;
+    const maxLoad = workload.max_workload ?? 0;
+    const overloaded = workload.within_limit != null ? !workload.within_limit : teachingLoad > maxLoad;
+    mergedLecturers.push({
+      name: workload.lecturer,
+      teaching_load: teachingLoad,
+      max_load: maxLoad,
+      overloaded,
+      courses: [],
+      preferred_slots: [],
+      unpreferred_slots: [],
+      warning_count: 0,
+      warnings: [],
+      gap_count: 0,
+    });
+  }
 
   // Sort: overloaded first, then by load desc
-  const sorted = [...lecturerSummary].sort((a, b) => {
+  const sorted = [...mergedLecturers].sort((a, b) => {
     if (a.overloaded !== b.overloaded) return a.overloaded ? -1 : 1;
     return b.teaching_load - a.teaching_load;
   });
@@ -1171,7 +1215,7 @@ export function TeachingLoadPanel() {
         <div className="flex items-center gap-2">
           <span className="font-semibold text-slate-900">Teaching load</span>
           <span className="text-xs text-slate-500 ml-1">
-            — max {maxLoad} classes per lecturer
+            — assigned workload vs lecturer max workload
           </span>
         </div>
         <span className="text-slate-500 text-sm tabular-nums" aria-hidden>
@@ -1192,7 +1236,8 @@ export function TeachingLoadPanel() {
           <div className="divide-y divide-slate-100">
           {filtered.map((lec) => {
             const color = getLecturerColor(lec.name);
-            const pct = Math.min(100, (lec.teaching_load / maxLoad) * 100);
+            const safeMaxLoad = lec.max_load > 0 ? lec.max_load : 1;
+            const pct = Math.min(100, (lec.teaching_load / safeMaxLoad) * 100);
             const barColor = lec.overloaded
               ? "bg-red-500"
               : lec.warning_count > 0
@@ -1222,7 +1267,7 @@ export function TeachingLoadPanel() {
                   <span
                     className={`text-sm font-bold ${lec.overloaded ? "text-red-600" : "text-slate-700"}`}
                   >
-                    {lec.teaching_load} / {maxLoad}
+                    {lec.teaching_load} / {lec.max_load}
                   </span>
                 </div>
 
@@ -1273,27 +1318,40 @@ export function RoomUtilizationPanel() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const roomSummary = data?.room_summary ?? [];
+  const entries = data?.schedule ?? [];
 
-  if (isLoading || roomSummary.length === 0) return null;
+  const seatedByRoom = useMemo(() => {
+    const byRoom = new Map<string, number>();
+    for (const entry of entries) {
+      if (!entryRequiresRoom(entry)) continue;
+      const room = entry.room?.trim();
+      if (!room || room === "ONLINE") continue;
+      const classSize = Number(entry.class_size ?? 0);
+      if (!Number.isFinite(classSize) || classSize <= 0) continue;
+      byRoom.set(room, (byRoom.get(room) ?? 0) + classSize);
+    }
+    return byRoom;
+  }, [entries]);
 
-  // Total wasted seats across all rooms and timeslots
-  const grandTotalWasted = roomSummary.reduce(
-    (sum, r) => sum + (r.total_wasted_seats ?? 0),
-    0,
-  );
   const grandTotalCapacity = roomSummary.reduce(
     (sum, r) => sum + r.capacity * r.total_slots,
     0,
   );
-  const overallWastePct =
+  const grandTotalSeated = roomSummary.reduce((sum, room) => {
+    const roomCapacity = room.capacity * room.total_slots;
+    const seatedSeats = Math.max(0, Math.min(roomCapacity, seatedByRoom.get(room.name) ?? 0));
+    return sum + seatedSeats;
+  }, 0);
+  const overallSeatUtilPct =
     grandTotalCapacity > 0
-      ? (grandTotalWasted / grandTotalCapacity) * 100
+      ? (grandTotalSeated / grandTotalCapacity) * 100
       : 0;
-  const overallSeatUtilPct = Math.max(0, 100 - overallWastePct);
   const q = query.trim().toLowerCase();
   const filteredRooms = q
     ? roomSummary.filter((room) => room.name.toLowerCase().includes(q))
     : roomSummary;
+
+  if (isLoading || roomSummary.length === 0) return null;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-sm">
@@ -1338,14 +1396,21 @@ export function RoomUtilizationPanel() {
               room.total_slots > 0
                 ? Math.round((room.used_slots / room.total_slots) * 100)
                 : 0;
-            // Wasted seat capacity
+            // Seat utilization against full room x slot catalog capacity.
             const totalCapacityForRoom = room.capacity * room.total_slots;
-            const wastedSeats = room.total_wasted_seats ?? totalCapacityForRoom;
+            const seatedSeats = Math.max(
+              0,
+              Math.min(totalCapacityForRoom, seatedByRoom.get(room.name) ?? 0),
+            );
+            const seatUtilPct =
+              totalCapacityForRoom > 0
+                ? Math.round((seatedSeats / totalCapacityForRoom) * 100)
+                : 0;
+            const wastedSeats = Math.max(0, totalCapacityForRoom - seatedSeats);
             const wastePct =
               totalCapacityForRoom > 0
                 ? Math.round((wastedSeats / totalCapacityForRoom) * 100)
-                : 100;
-            const seatUtilPct = Math.max(0, 100 - wastePct);
+                : 0;
             const slotBarColor =
               slotPct >= 80
                 ? "bg-blue-500"
@@ -1810,37 +1875,39 @@ export function TimeslotCodeLegend() {
 
 // ─── Publish generated timetable to DB (Viewer Schedule) ─────────────────────
 
-type DbPersistFeedback =
-  | { kind: "idle" }
-  | { kind: "error"; title: string; lines: string[] }
-  | { kind: "success"; message: string };
-
 /**
  * Saves the current optimizer/UI schedule to Prisma as a new timetable version.
  * Renders nothing until `/api/schedule` has rows and config is loaded.
  *
  * @param scheduleOverride When editing the grid, pass the draft so "Store" matches unsaved edits.
+ * @param onPersistError Show validation/API errors in the parent grid using the same full-width Alert as edit errors.
+ * @param clearPersistError Clear that banner (call on success, dismiss, and before a new attempt).
  */
 export function TimetableDatabasePersistBar({
   className,
   scheduleOverride,
+  onPersistError,
+  clearPersistError,
 }: {
   className?: string;
   scheduleOverride?: ScheduleEntry[] | null;
+  onPersistError: (payload: { title: string; lines: string[] }) => void;
+  clearPersistError: () => void;
 }) {
   const { data } = useSchedule();
   const { config } = useConfig();
   const { toast } = useToast();
-  const formId = useId();
-  const [semesters, setSemesters] = useState<
-    { semesterId: number; academicYear: string; semester: string }[]
-  >([]);
-  const [persistSemesterId, setPersistSemesterId] = useState<number | "">("");
   const [savingDb, setSavingDb] = useState(false);
-  const [feedback, setFeedback] = useState<DbPersistFeedback>({ kind: "idle" });
-  const semesterSelectId = `${formId}-semester`;
+  /** After a successful DB store, until the schedule rows change (new edit / new run). */
+  const [persistSuccess, setPersistSuccess] = useState<{
+    scheduleSnapshot: string;
+    timetableId: number;
+    versionNumber: number;
+    timetableName: string;
+  } | null>(null);
 
   const entries = scheduleOverride ?? data?.schedule ?? [];
+  const scheduleSnapshot = useMemo(() => JSON.stringify(entries), [entries]);
   const rawCatalogue = data?.timeslots_catalogue ?? [];
   const configSlotRows = useMemo(
     () => normalizeTimeslotsInput(config?.timeslots ?? []) as TimeslotCatalogueEntry[],
@@ -1852,53 +1919,33 @@ export function TimetableDatabasePersistBar({
   );
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const r = await fetch("/api/semesters", { credentials: "include" });
-        if (!r.ok) return;
-        const j = (await r.json()) as { semesterId: number; academicYear: string; semester: string }[];
-        if (!cancelled && Array.isArray(j)) setSemesters(j);
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (feedback.kind !== "success") return;
-    const t = window.setTimeout(() => setFeedback({ kind: "idle" }), 4500);
-    return () => window.clearTimeout(t);
-  }, [feedback]);
+    if (!persistSuccess) return;
+    if (persistSuccess.scheduleSnapshot !== scheduleSnapshot) {
+      setPersistSuccess(null);
+    }
+  }, [persistSuccess, scheduleSnapshot]);
 
   const persistTimetableToDatabase = async () => {
     if (!config) return;
-    const sid = typeof persistSemesterId === "number" ? persistSemesterId : Number(persistSemesterId);
-    if (!Number.isFinite(sid) || sid <= 0) {
-      const line = "Choose a semester in the dropdown before storing in the database.";
-      setFeedback({ kind: "error", title: "Semester required", lines: [line] });
-      toast({ title: "Pick a semester", description: line, variant: "destructive" });
-      return;
-    }
+    clearPersistError();
     if (entries.length === 0) {
       const line = "No schedule rows to store. Run the optimizer or load a schedule first.";
-      setFeedback({ kind: "error", title: "Nothing to store", lines: [line] });
+      onPersistError({ title: "Nothing to store", lines: [line] });
       toast({ title: "Nothing to store", description: line, variant: "destructive" });
       return;
     }
     const v = validateScheduleHardConstraints(entries, config, catalogue);
     if (!v.ok) {
-      setFeedback({
-        kind: "error",
+      onPersistError({
         title: "Fix issues before storing in the database",
         lines: v.errors.slice(0, 14),
       });
       toast({
         title: "Not stored",
-        description: `Fix ${v.errors.length} scheduling issue(s) first — details below.`,
+        description:
+          v.errors.length === 1
+            ? v.errors[0]!
+            : `${v.errors[0]!} (+${v.errors.length - 1} more — see message above the grid).`,
         variant: "destructive",
       });
       return;
@@ -1910,7 +1957,7 @@ export function TimetableDatabasePersistBar({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          semesterId: sid,
+          semesterId: null,
           schedule: entries,
           timeslots_catalogue: data?.timeslots_catalogue ?? [],
         }),
@@ -1919,21 +1966,31 @@ export function TimetableDatabasePersistBar({
         error?: string;
         timetableId?: number;
         versionNumber?: number;
+        timetableName?: string;
       };
       if (!r.ok) {
         throw new Error(body.error || r.statusText);
       }
-      setFeedback({
-        kind: "success",
-        message: `New timetable version #${body.versionNumber ?? "?"} (id ${body.timetableId ?? "?"}) was written to the database. Open Viewer Schedule to review or export it.`,
+      const tid = body.timetableId ?? 0;
+      const ver = body.versionNumber ?? 0;
+      const tname =
+        typeof body.timetableName === "string" && body.timetableName.trim()
+          ? body.timetableName.trim()
+          : `Timetable #${tid}`;
+      setPersistSuccess({
+        scheduleSnapshot,
+        timetableId: tid,
+        versionNumber: ver,
+        timetableName: tname,
       });
+      clearPersistError();
       toast({
         title: "Stored in database",
-        description: `Timetable id ${body.timetableId ?? "?"}, version ${body.versionNumber ?? "?"}.`,
+        description: `${tname} · v${ver} (id ${tid}).`,
       });
     } catch (e) {
       const msg = String(e);
-      setFeedback({ kind: "error", title: "Database save failed", lines: [msg] });
+      onPersistError({ title: "Database save failed", lines: [msg] });
       toast({
         title: "Database save failed",
         description: msg,
@@ -1946,88 +2003,32 @@ export function TimetableDatabasePersistBar({
 
   if (!config || entries.length === 0) return null;
 
-  return (
-    <div className={cn("space-y-2", className)}>
-      <div className="flex flex-col gap-3 rounded-lg border border-emerald-200/90 bg-gradient-to-b from-emerald-50/90 to-white px-3 py-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="min-w-0 space-y-1">
-          <p className="text-sm font-semibold text-slate-800">Store timetable in the database</p>
-          <p className="text-xs leading-relaxed text-slate-600">
-            Saves this generated timetable as a new version for the semester you pick. It then appears alongside other
-            stored timetables on the Viewer Schedule page (admin sign-in required).
-          </p>
-        </div>
-        <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
-          <label className="text-xs font-medium text-slate-600" htmlFor={semesterSelectId}>
-            Semester
-          </label>
-          <select
-            id={semesterSelectId}
-            className="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm"
-            value={persistSemesterId === "" ? "" : String(persistSemesterId)}
-            onChange={(e) => {
-              const v = e.target.value;
-              setPersistSemesterId(v === "" ? "" : Number(v));
-            }}
-          >
-            <option value="">Select…</option>
-            {semesters.map((s) => (
-              <option key={s.semesterId} value={s.semesterId}>
-                {s.academicYear} · {s.semester}
-              </option>
-            ))}
-          </select>
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            className="font-semibold"
-            onClick={() => void persistTimetableToDatabase()}
-            disabled={savingDb || semesters.length === 0}
-          >
-            {savingDb ? "Storing…" : "Store in database"}
-          </Button>
-        </div>
-      </div>
+  const isSavedForCurrentSchedule =
+    persistSuccess != null && persistSuccess.scheduleSnapshot === scheduleSnapshot;
 
-      {feedback.kind !== "idle" && (
-        <Alert
-          variant={feedback.kind === "error" ? "destructive" : "default"}
-          className={cn(
-            "border shadow-sm",
-            feedback.kind === "success" && "border-emerald-200 bg-emerald-50/90 text-emerald-950",
-          )}
+  return (
+    <div className={cn("flex flex-col items-stretch gap-1.5 sm:items-end", className)}>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant={isSavedForCurrentSchedule ? "secondary" : "default"}
+          size="sm"
+          className="font-semibold"
+          onClick={() => void persistTimetableToDatabase()}
+          disabled={savingDb || isSavedForCurrentSchedule}
         >
-          {feedback.kind === "error" ? (
-            <AlertTriangle className="h-4 w-4" aria-hidden />
-          ) : (
-            <CircleCheck className="h-4 w-4 text-emerald-700" aria-hidden />
-          )}
-          <AlertTitle className="flex items-center justify-between gap-2">
-            <span>{feedback.kind === "error" ? feedback.title : "Done"}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0"
-              aria-label="Dismiss message"
-              onClick={() => setFeedback({ kind: "idle" })}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </AlertTitle>
-          <AlertDescription>
-            {feedback.kind === "error" ? (
-              <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
-                {feedback.lines.map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-1 text-sm leading-relaxed">{feedback.message}</p>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
+          {savingDb ? "Storing…" : isSavedForCurrentSchedule ? "Saved" : "Store in database"}
+        </Button>
+        {isSavedForCurrentSchedule && persistSuccess ? (
+          <span
+            className="max-w-[min(100%,20rem)] truncate text-xs text-slate-600 sm:max-w-xs"
+            title={`Timetable id ${persistSuccess.timetableId}`}
+          >
+            <span className="font-medium text-slate-800">{persistSuccess.timetableName}</span>
+            <span className="text-slate-500"> · v{persistSuccess.versionNumber}</span>
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -2053,10 +2054,10 @@ export function TimetableGrid() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addTargetCell, setAddTargetCell] = useState<{ rowKey: string; timeslotId: string } | null>(null);
   const [savingFile, setSavingFile] = useState(false);
-  type GridFeedback =
-    | { kind: "idle" }
-    | { kind: "error"; title: string; lines: string[] }
-    | { kind: "success"; message: string };
+  const [resetDraftConfirmOpen, setResetDraftConfirmOpen] = useState(false);
+  /** Shown in the same full-width destructive Alert row as grid edit errors (e.g. Store validation). */
+  const [persistError, setPersistError] = useState<{ title: string; lines: string[] } | null>(null);
+  type GridFeedback = { kind: "idle" } | { kind: "error"; title: string; lines: string[] };
   const [feedback, setFeedback] = useState<GridFeedback>({ kind: "idle" });
 
   const entries = data?.schedule ?? [];
@@ -2070,6 +2071,10 @@ export function TimetableGrid() {
     [rawCatalogue, configSlotRows],
   );
   const displayEntries = draft ?? entries;
+  const draftDiffersFromWorkspaceFile = useMemo(() => {
+    if (draft == null) return false;
+    return JSON.stringify(draft) !== JSON.stringify(entries);
+  }, [draft, entries]);
   const { conflictIds } = buildUiConflicts(displayEntries, catalogue);
   const catMap = useMemo(() => catalogueById(catalogue), [catalogue]);
 
@@ -2100,12 +2105,6 @@ export function TimetableGrid() {
     }
     return r;
   }, [physicalRooms, hasOnline]);
-
-  useEffect(() => {
-    if (feedback.kind !== "success") return;
-    const t = window.setTimeout(() => setFeedback({ kind: "idle" }), 4500);
-    return () => window.clearTimeout(t);
-  }, [feedback]);
 
   const commitDraftIfValid = (nextDraft: ScheduleEntry[]) => {
     if (!config) {
@@ -2157,11 +2156,7 @@ export function TimetableGrid() {
     } else {
       setDraft(entries.map((e) => ({ ...e })));
       setEditMode(true);
-      setFeedback({
-        kind: "success",
-        message:
-          "Edit mode is on. Use the ⋮⋮ grip to drag a section to another room/timeslot, or click the course block to change room, slot, or lecturer. Changes apply only when they pass all hard checks.",
-      });
+      setFeedback({ kind: "idle" });
     }
   };
 
@@ -2196,10 +2191,7 @@ export function TimetableGrid() {
       await refresh();
       setDraft(null);
       setEditMode(false);
-      setFeedback({
-        kind: "success",
-        message: "Saved to the workspace schedule file. Edit mode was turned off.",
-      });
+      setFeedback({ kind: "idle" });
       toast({
         title: "Saved",
         description: "The server schedule file was updated. You can turn Edit back on to keep adjusting.",
@@ -2245,10 +2237,6 @@ export function TimetableGrid() {
     const nextDraft = draft.map((e, i) => (i === idx ? next : e));
     if (commitDraftIfValid(nextDraft)) {
       const where = onlineRow ? "Online row" : `Room ${rowKey}`;
-      setFeedback({
-        kind: "success",
-        message: `Moved ${entry.course_code} to ${where} at ${tsId}.`,
-      });
       toast({
         title: "Section moved",
         description: `${entry.course_code} → ${where}`,
@@ -2275,17 +2263,20 @@ export function TimetableGrid() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100/90 p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Rooms &amp; Timeslots Grid
+          </p>
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               type="button"
               variant={editMode ? "default" : "outline"}
               size="sm"
               aria-pressed={editMode}
               className={cn(
-                "gap-2 font-semibold shadow-sm transition-all",
-                editMode && "ring-2 ring-primary/35 ring-offset-2 ring-offset-slate-50",
+                "gap-2 font-semibold transition-all",
+                editMode && "ring-2 ring-primary/35 ring-offset-2 ring-offset-background",
               )}
               onClick={toggleEditMode}
               disabled={!entries.length || !config}
@@ -2293,56 +2284,93 @@ export function TimetableGrid() {
               <Pencil className="h-4 w-4 shrink-0" aria-hidden />
               {editMode ? "Editing…" : "Edit timetable"}
             </Button>
+            {editMode ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!draftDiffersFromWorkspaceFile}
+                  className={cn(
+                    "gap-1.5 font-semibold transition-colors",
+                    draftDiffersFromWorkspaceFile
+                      ? "border-amber-600/80 text-amber-950 shadow-sm hover:bg-amber-50 dark:border-amber-500/70 dark:text-amber-50 dark:hover:bg-amber-950/35"
+                      : "border-dashed border-muted-foreground/30 text-muted-foreground shadow-none hover:bg-transparent",
+                  )}
+                  title={
+                    draftDiffersFromWorkspaceFile
+                      ? "Discard unsaved grid changes and reload from the workspace schedule file on the server"
+                      : "Grid already matches the saved workspace schedule — nothing to reset"
+                  }
+                  onClick={() => {
+                    if (draftDiffersFromWorkspaceFile) setResetDraftConfirmOpen(true);
+                  }}
+                >
+                  <RotateCcw className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+                  Reset draft
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  title="Writes your edited timetable to the workspace schedule on the server (POST /api/schedule). That file is what this page loads and what the optimizer uses as the starting timetable for the next run."
+                  onClick={() => void saveScheduleToWorkspace()}
+                  disabled={savingFile}
+                >
+                  {savingFile ? "Saving…" : "Save to workspace file"}
+                </Button>
+              </>
+            ) : null}
+            <TimetableDatabasePersistBar
+              scheduleOverride={editMode && draft ? draft : undefined}
+              onPersistError={setPersistError}
+              clearPersistError={() => setPersistError(null)}
+            />
           </div>
-          <p className="max-w-xl text-xs leading-relaxed text-slate-600">
-            {editMode
-              ? "Drag the ⋮⋮ handle to move a section. Click a course block to edit/remove it. To add, click an empty grid cell and enter section details for that room/timeslot."
-              : "Turn on Edit timetable to change placements, add missing sections, or remove a section. View-only: click a section to see its details. You can store the current timetable in the database using the panel below (no need to turn on edit)."}
-          </p>
         </div>
-        {editMode && (
-          <div className="flex flex-col gap-2 border-t border-slate-200/80 pt-3 sm:border-t-0 sm:pt-0 sm:pl-4 md:border-l md:border-slate-200/80">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Persist</span>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setDraft(entries.map((e) => ({ ...e })));
-                  setFeedback({
-                    kind: "success",
-                    message: "Draft reset to match the last optimizer result (unsaved file).",
-                  });
-                }}
-              >
-                Reset draft
-              </Button>
-              <Button type="button" size="sm" onClick={() => void saveScheduleToWorkspace()} disabled={savingFile}>
-                {savingFile ? "Saving…" : "Save to workspace file"}
-              </Button>
-            </div>
+        {editMode ? (
+          <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+            <p
+              className="whitespace-nowrap px-1 text-xs leading-relaxed text-slate-600"
+              title="Drag the ⋮⋮ handle to move a section. Click a course block to edit/remove it. To add, click an empty grid cell and enter section details for that room/timeslot."
+            >
+              Drag the ⋮⋮ handle to move a section. Click a course block to edit/remove it. To add, click an empty grid
+              cell and enter section details for that room/timeslot.
+            </p>
           </div>
-        )}
+        ) : null}
       </div>
 
-      <TimetableDatabasePersistBar scheduleOverride={editMode && draft ? draft : undefined} />
-
-      {feedback.kind !== "idle" && (
-        <Alert
-          variant={feedback.kind === "error" ? "destructive" : "default"}
-          className={cn(
-            "border shadow-sm",
-            feedback.kind === "success" && "border-emerald-200 bg-emerald-50/90 text-emerald-950",
-          )}
-        >
-          {feedback.kind === "error" ? (
-            <AlertTriangle className="h-4 w-4" aria-hidden />
-          ) : (
-            <CircleCheck className="h-4 w-4 text-emerald-700" aria-hidden />
-          )}
+      {persistError ? (
+        <Alert variant="destructive" className="border shadow-sm">
+          <AlertTriangle className="h-4 w-4" aria-hidden />
           <AlertTitle className="flex items-center justify-between gap-2">
-            <span>{feedback.kind === "error" ? feedback.title : "All set"}</span>
+            <span>{persistError.title}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0"
+              aria-label="Dismiss message"
+              onClick={() => setPersistError(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </AlertTitle>
+          <AlertDescription>
+            <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
+              {persistError.lines.map((line, i) => (
+                <li key={i}>{line}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {feedback.kind === "error" && (
+        <Alert variant="destructive" className="border shadow-sm">
+          <AlertTriangle className="h-4 w-4" aria-hidden />
+          <AlertTitle className="flex items-center justify-between gap-2">
+            <span>{feedback.title}</span>
             <Button
               type="button"
               variant="ghost"
@@ -2355,15 +2383,11 @@ export function TimetableGrid() {
             </Button>
           </AlertTitle>
           <AlertDescription>
-            {feedback.kind === "error" ? (
-              <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
-                {feedback.lines.map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-1 text-sm leading-relaxed">{feedback.message}</p>
-            )}
+            <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
+              {feedback.lines.map((line, i) => (
+                <li key={i}>{line}</li>
+              ))}
+            </ul>
           </AlertDescription>
         </Alert>
       )}
@@ -2381,10 +2405,6 @@ export function TimetableGrid() {
             String(e.lecture_id) === String(next.lecture_id) ? next : e,
           );
           if (commitDraftIfValid(nextDraft)) {
-            setFeedback({
-              kind: "success",
-              message: `Updated ${next.course_code}: ${next.lecturer} · timeslot ${next.timeslot}${next.room ? ` · room ${next.room}` : ""}.`,
-            });
             toast({
               title: "Section updated",
               description: `${next.course_code} — ${next.lecturer}`,
@@ -2418,10 +2438,6 @@ export function TimetableGrid() {
           if (!draft) return;
           const nextDraft = [...draft, next];
           if (commitDraftIfValid(nextDraft)) {
-            setFeedback({
-              kind: "success",
-              message: `Added ${next.course_code} in ${next.room ?? "Online"} at ${next.timeslot}.`,
-            });
             toast({
               title: "Section added",
               description: `${next.course_code} — ${next.lecturer}`,
@@ -2429,6 +2445,32 @@ export function TimetableGrid() {
           }
         }}
       />
+
+      <AlertDialog open={resetDraftConfirmOpen} onOpenChange={setResetDraftConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset draft timetable?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Unsaved grid changes will be discarded and the table will match the last saved workspace schedule from the
+              server. This does not run the optimizer again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                setDraft(entries.map((e) => ({ ...e })));
+                setFeedback({ kind: "idle" });
+                toast({ title: "Draft reset", description: "Grid matches the saved workspace schedule." });
+                setResetDraftConfirmOpen(false);
+              }}
+            >
+              Reset draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm min-w-[720px]">
@@ -3204,8 +3246,8 @@ export function HardConstraintsReadOnlyPanel() {
   ];
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm">
-      <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-4 py-3">
+    <div className="space-y-3">
+      <div>
         <h3 className="text-sm font-semibold tracking-tight text-slate-900">
           Hard constraints
         </h3>
@@ -3213,11 +3255,11 @@ export function HardConstraintsReadOnlyPanel() {
           Feasible timetables from GWO must satisfy all of these rules. This list is read-only (view only).
         </p>
       </div>
-      <ul className="grid grid-cols-1 gap-3 p-2 sm:grid-cols-2 sm:p-3">
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {hardRules.map((rule) => (
           <li
             key={rule.title}
-            className="flex gap-3 rounded-lg border border-slate-100 bg-white px-2 py-2.5 sm:gap-4 sm:px-3"
+            className="flex gap-3 py-1.5 sm:gap-4"
           >
             <span
               className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200/90 text-slate-600"
@@ -3286,8 +3328,8 @@ export function SoftConstraintWeightsPanel() {
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-sm font-semibold tracking-tight text-slate-900">
             Soft constraint weights
@@ -3305,7 +3347,7 @@ export function SoftConstraintWeightsPanel() {
           {saving ? "Saving…" : "Save changes"}
         </button>
       </div>
-      <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-3 sm:p-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {SOFT_CONSTRAINT_DEFINITIONS.map((item) => {
           const value = Math.max(
             0,
@@ -3367,7 +3409,7 @@ export function SoftConstraintWeightsPanel() {
           );
         })}
       </div>
-      {saveError ? <p className="border-t border-slate-100 px-4 py-2 text-xs text-red-600">{saveError}</p> : null}
+      {saveError ? <p className="text-xs text-red-600">{saveError}</p> : null}
     </div>
   );
 }

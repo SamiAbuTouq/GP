@@ -104,7 +104,6 @@ export function TimetableGenerationTabs() {
       </TabsContent>
 
       <TabsContent value="grid" className="mt-0 space-y-3 outline-none">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Rooms &amp; Timeslots Grid</p>
         <TimetableGrid />
         <p className="text-right text-xs text-muted-foreground">Format: course - lecturer - class size / room capacity</p>
         <TimeslotCodeLegend />

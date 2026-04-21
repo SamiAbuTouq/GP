@@ -90,6 +90,13 @@ export function mergeCatalogueWithConfigTimeslots(
         ? { short_code: cfg.short_code }
         : {}),
       ...(cfg.label != null && cfg.label !== "" ? { label: cfg.label } : {}),
+      // When the schedule catalogue row is missing engine slot_type, inherit from config so
+      // add/move validation (lab vs lecture) matches the solver inputs.
+      ...(cfg.slot_type != null &&
+      cfg.slot_type !== "" &&
+      (row.slot_type == null || String(row.slot_type).trim() === "")
+        ? { slot_type: cfg.slot_type }
+        : {}),
     }
   })
 }

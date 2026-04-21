@@ -21,9 +21,22 @@ let TimetablesController = class TimetablesController {
     constructor(timetablesService) {
         this.timetablesService = timetablesService;
     }
-    list(semesterIdRaw) {
-        const semesterId = semesterIdRaw ? Number(semesterIdRaw) : undefined;
-        return this.timetablesService.list(Number.isFinite(semesterId) ? semesterId : undefined);
+    list(semesterIdRaw, draftsOnlyRaw) {
+        const draftsOnly = draftsOnlyRaw === 'true' ||
+            draftsOnlyRaw === '1' ||
+            draftsOnlyRaw?.toLowerCase() === 'yes';
+        const rawTrimmed = typeof semesterIdRaw === 'string' ? semesterIdRaw.trim() : '';
+        const parsedSemester = rawTrimmed !== '' &&
+            rawTrimmed.toLowerCase() !== 'null' &&
+            rawTrimmed.toLowerCase() !== 'undefined'
+            ? Number(rawTrimmed)
+            : undefined;
+        const semesterId = typeof parsedSemester === 'number' &&
+            Number.isFinite(parsedSemester) &&
+            parsedSemester > 0
+            ? parsedSemester
+            : undefined;
+        return this.timetablesService.list(semesterId, draftsOnly);
     }
     listEntries(id, courseIdRaw, lecturerUserIdRaw, roomIdRaw) {
         const courseId = courseIdRaw ? Number(courseIdRaw) : undefined;
@@ -41,8 +54,9 @@ exports.TimetablesController = TimetablesController;
 __decorate([
     (0, common_1.Get)(),
     __param(0, (0, common_1.Query)('semesterId')),
+    __param(1, (0, common_1.Query)('draftsOnly')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", void 0)
 ], TimetablesController.prototype, "list", null);
 __decorate([

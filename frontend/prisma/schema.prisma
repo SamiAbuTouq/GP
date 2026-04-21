@@ -169,13 +169,13 @@ model Scenario {
 
 model Timetable {
   timetable_id    Int      @id @default(autoincrement())
-  semester_id     Int
+  semester_id     Int?
   generated_at    DateTime @default(now())
   status          String   @db.VarChar(30)
   generation_type String   @db.VarChar(30)
   version_number  Int
 
-  semester Semester @relation(fields: [semester_id], references: [semester_id])
+  semester Semester? @relation(fields: [semester_id], references: [semester_id])
 
   timetable_metrics            TimetableMetrics?
   scenario_produces_timetables ScenarioProducesTimetable[]

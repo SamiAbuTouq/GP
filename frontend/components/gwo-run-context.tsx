@@ -155,12 +155,18 @@ type GwoRunContextValue = {
   runOptimizer: () => Promise<string | null>;
   /** Wall time since the run began minus optimizer pauses (UI “Elapsed” clock). */
   getRunElapsedActiveSec: () => number;
+  /**
+   * Increments only after a successful optimizer run once the new `/api/schedule` payload
+   * is written to the SWR cache. Grid UI uses this to refresh “generated” baselines.
+   */
+  optimizerScheduleEpoch: number;
 };
 
 const GwoRunContext = createContext<GwoRunContextValue | null>(null);
 
 export function GwoRunProvider({ children }: { children: ReactNode }) {
   const { mutate } = useSWRConfig();
+  const [optimizerScheduleEpoch, setOptimizerScheduleEpoch] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
@@ -462,6 +468,7 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
               "/api/schedule",
             )) as SchedulePayload;
             await mutate("/api/schedule", schedule, { revalidate: false });
+            setOptimizerScheduleEpoch((n) => n + 1);
             return null;
           }
         }
@@ -546,6 +553,7 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
       resumeRun,
       runOptimizer,
       getRunElapsedActiveSec,
+      optimizerScheduleEpoch,
     }),
     [
       isRunning,
@@ -564,6 +572,7 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
       resumeRun,
       runOptimizer,
       getRunElapsedActiveSec,
+      optimizerScheduleEpoch,
     ],
   );
 

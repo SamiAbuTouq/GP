@@ -2,7 +2,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export declare class TimetablesService {
     private prisma;
     constructor(prisma: PrismaService);
-    list(semesterId?: number): Promise<{
+    list(semesterId?: number, draftsOnly?: boolean): Promise<{
         timetableId: number;
         semesterId: number;
         academicYear: string;

@@ -2167,29 +2167,13 @@
     "Dr. Abdallah Abu Madi",
     "Dr. George Sammour",
     "Rana Maali",
-    "Eng. Mohamed Ibrahim"
+    "Eng. Mohamed Ibrahim",
+    "Prof. Abeer Abu Hmaid"
   ],
   "lecturer_preferences": {
     "Sami Abu Touq": {
-      "preferred": [
-        "slot_73",
-        "slot_88",
-        "slot_39",
-        "slot_105",
-        "slot_13",
-        "slot_33",
-        "slot_67",
-        "slot_69",
-        "slot_72",
-        "slot_47"
-      ],
-      "unpreferred": [
-        "slot_6",
-        "slot_42",
-        "slot_149",
-        "slot_140",
-        "slot_134"
-      ]
+      "preferred": [],
+      "unpreferred": []
     },
     "Rasha Khalil": {
       "preferred": [],
@@ -3788,6 +3772,10 @@
       "unpreferred": []
     },
     "Eng. Mohamed Ibrahim": {
+      "preferred": [],
+      "unpreferred": []
+    },
+    "Prof. Abeer Abu Hmaid": {
       "preferred": [],
       "unpreferred": []
     }
@@ -17568,7 +17556,7 @@
     "preferred_timeslot": 0,
     "unpreferred_timeslot": 0,
     "minimize_gaps": 0,
-    "room_utilization": 100,
+    "room_utilization": 0,
     "balanced_workload": 0,
     "distribute_classes": 0,
     "student_gaps": 0,
@@ -18006,7 +17994,8 @@
     "Dr. Abdallah Abu Madi": [],
     "Dr. George Sammour": [],
     "Rana Maali": [],
-    "Eng. Mohamed Ibrahim": []
+    "Eng. Mohamed Ibrahim": [],
+    "Prof. Abeer Abu Hmaid": []
   },
   "lecturer_max_workload": {
     "Sami Abu Touq": 15,
@@ -18409,6 +18398,7 @@
     "Dr. Abdallah Abu Madi": 15,
     "Dr. George Sammour": 15,
     "Rana Maali": 15,
-    "Eng. Mohamed Ibrahim": 15
+    "Eng. Mohamed Ibrahim": 15,
+    "Prof. Abeer Abu Hmaid": 15
   }
 }
