@@ -14,12 +14,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Menu,
   DoorOpen,
@@ -419,8 +414,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 
   return (
-    <TooltipProvider delayDuration={100}>
-      <div className="flex h-full flex-col bg-[linear-gradient(to_bottom,transparent_56px,hsl(var(--sidebar))_56px)]">
+    <div className="flex h-full flex-col bg-[linear-gradient(to_bottom,transparent_56px,hsl(var(--sidebar))_56px)]">
         {/* Logo Section */}
         <div
           className={cn(
@@ -506,31 +500,36 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             collapsed ? "flex justify-center" : "flex justify-end px-3",
           )}
         >
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            onClick={toggle}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <span className="relative inline-block h-4 w-4">
-              <PanelLeftOpen
-                className={cn(
-                  "absolute inset-0 h-4 w-4 transition-opacity duration-200",
-                  collapsed ? "opacity-100" : "opacity-0",
-                )}
-              />
-              <PanelLeftClose
-                className={cn(
-                  "absolute inset-0 h-4 w-4 transition-opacity duration-200",
-                  collapsed ? "opacity-0" : "opacity-100",
-                )}
-              />
-            </span>
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                onClick={toggle}
+              >
+                <span className="relative inline-block h-4 w-4">
+                  <PanelLeftOpen
+                    className={cn(
+                      "absolute inset-0 h-4 w-4 transition-opacity duration-200",
+                      collapsed ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  <PanelLeftClose
+                    className={cn(
+                      "absolute inset-0 h-4 w-4 transition-opacity duration-200",
+                      collapsed ? "opacity-0" : "opacity-100",
+                    )}
+                  />
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="font-medium">
+              {collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
-    </TooltipProvider>
   );
 }
 

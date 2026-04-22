@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
 import {
   TimetableGrid,
@@ -21,6 +22,12 @@ import { segmentedNavTabItemRadiusClass, segmentedNavTabListClassName } from "@/
 
 type TabValue = "schedule" | "study-plan" | "constraints" | "soft-metrics" | "gwo" | "grid";
 
+const TAB_VALUES: TabValue[] = ["schedule", "study-plan", "constraints", "soft-metrics", "gwo", "grid"];
+
+function isTabValue(value: string | null): value is TabValue {
+  return value !== null && (TAB_VALUES as string[]).includes(value);
+}
+
 const TAB_TRIGGER_CLASS = `relative ${segmentedNavTabItemRadiusClass} px-4 py-2 text-sm font-semibold text-slate-600 shadow-none transition-colors duration-200 data-[state=active]:bg-transparent data-[state=active]:text-primary-foreground data-[state=active]:shadow-none dark:text-slate-400 dark:data-[state=active]:bg-transparent dark:data-[state=active]:text-primary-foreground`;
 
 function ActiveTabPill() {
@@ -33,8 +40,36 @@ function ActiveTabPill() {
   );
 }
 
-export function TimetableGenerationTabs() {
-  const [activeTab, setActiveTab] = useState<TabValue>("schedule");
+function TimetableGenerationTabsInner() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const tabFromUrl = useMemo((): TabValue => {
+    const raw = searchParams.get("tab");
+    return isTabValue(raw) ? raw : "schedule";
+  }, [searchParams]);
+
+  const [activeTab, setActiveTabState] = useState<TabValue>(tabFromUrl);
+
+  useEffect(() => {
+    setActiveTabState((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
+  }, [tabFromUrl]);
+
+  const setActiveTab = useCallback(
+    (tab: TabValue) => {
+      setActiveTabState(tab);
+      const params = new URLSearchParams(searchParams.toString());
+      if (tab === "schedule") {
+        params.delete("tab");
+      } else {
+        params.set("tab", tab);
+      }
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
 
   return (
     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)} className="space-y-5">
@@ -109,5 +144,15 @@ export function TimetableGenerationTabs() {
         <TimeslotCodeLegend />
       </TabsContent>
     </Tabs>
+  );
+}
+
+export function TimetableGenerationTabs() {
+  return (
+    <Suspense
+      fallback={<div className="h-12 w-full max-w-3xl animate-pulse rounded-lg bg-muted" aria-hidden />}
+    >
+      <TimetableGenerationTabsInner />
+    </Suspense>
   );
 }

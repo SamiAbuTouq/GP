@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/course-analytics-ui/badge'
 import { ScrollArea } from '@/components/course-analytics-ui/scroll-area'
 import { DepartmentChart, SectionScatterChart } from '@/components/course-analytics/dashboard/charts'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { DepartmentData } from '@/lib/course-analytics/course-data'
 
 interface DepartmentsTabProps {
@@ -42,7 +43,12 @@ export function DepartmentsTab({ departmentData, scatterData }: DepartmentsTabPr
                           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
                             {index + 1}
                           </span>
-                          <span className="truncate font-medium" title={dept.fullName}>{dept.name}</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-default truncate font-medium">{dept.name}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">{dept.fullName}</TooltipContent>
+                          </Tooltip>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-semibold">{dept.students.toLocaleString()}</td>

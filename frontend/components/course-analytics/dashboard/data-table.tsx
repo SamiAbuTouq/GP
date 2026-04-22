@@ -1,6 +1,7 @@
 'use client'
  
 import { formatName } from '@/lib/utils'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Table,
   TableBody,
@@ -46,9 +47,14 @@ export function TopCoursesTable({ data, className }: TopCoursesTableProps) {
                         {index + 1}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold leading-tight text-foreground transition-colors group-hover:text-primary" title={course.fullName}>
-                          {formatName(course.name)}
-                        </p>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <p className="cursor-default text-sm font-semibold leading-tight text-foreground transition-colors group-hover:text-primary">
+                              {formatName(course.name)}
+                            </p>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">{course.fullName}</TooltipContent>
+                        </Tooltip>
                         <p className="mt-0.5 text-[11px] font-mono tracking-wider text-muted-foreground/80 uppercase">
                           {course.code}
                         </p>
@@ -116,9 +122,14 @@ export function TopLecturersTable({ data, className, uniqueSemesters = 1 }: TopL
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-xs font-bold text-accent transition-all duration-300 group-hover:scale-110 group-hover:bg-accent/25">
                         {index + 1}
                       </span>
-                      <span className="text-sm font-semibold text-foreground transition-colors group-hover:text-accent" title={lecturer.fullName}>
-                        {formatName(lecturer.name)}
-                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-default text-sm font-semibold text-foreground transition-colors group-hover:text-accent">
+                            {formatName(lecturer.name)}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">{lecturer.fullName}</TooltipContent>
+                      </Tooltip>
                     </div>
                   </TableCell>
                   <TableCell className="text-right py-4">

@@ -90,8 +90,8 @@ function formatTimetableGeneratedAt(iso: string): string {
 }
 
 /**
- * Groups unassigned drafts into "lines": v1→v2→v3 is one line; after v2 a new v1 starts a new line.
- * Uses chronological order (no explicit parent id in the DB).
+ * Groups unassigned drafts into "lines": v1→v2→v3 is one line; a new v1 after a higher version starts a new line.
+ * DB rows use per-line versions when saving from GWO (`continueFromTimetableId`); older rows may still be one global v1…vN chain.
  */
 function assignDraftRunNumbers(drafts: TimetableDto[]): Map<number, number> {
   const map = new Map<number, number>()

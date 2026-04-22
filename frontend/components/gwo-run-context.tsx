@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2, Pause } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSWRConfig } from "swr";
 import {
   createContext,
@@ -653,9 +654,14 @@ export function GwoTopProgressBar() {
           <div className="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
             {runStartedAt != null && (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums text-slate-500 dark:text-slate-400 sm:justify-end">
-                <span title="Active elapsed time — pauses while the optimizer is stopped are not counted">
-                  Elapsed {formatElapsed(elapsedSec)}
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-default">Elapsed {formatElapsed(elapsedSec)}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    Active elapsed time — pauses while the optimizer is stopped are not counted
+                  </TooltipContent>
+                </Tooltip>
               </div>
             )}
             {isRunning ? (

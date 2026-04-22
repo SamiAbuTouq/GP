@@ -65,12 +65,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { REPORT_DEFINITIONS } from "@/lib/reports/definitions"
@@ -512,8 +507,7 @@ export function ReportsApp() {
   ]
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background">
         <Sidebar />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <Header />
@@ -1055,6 +1049,5 @@ export function ReportsApp() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </TooltipProvider>
   )
 }

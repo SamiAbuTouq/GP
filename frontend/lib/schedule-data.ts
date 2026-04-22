@@ -89,6 +89,13 @@ export type ScheduleConfig = {
 
 export type ScheduleEntry = {
   lecture_id: string | number
+  /**
+   * When `lecture_id` is a synthetic id (extra section beyond configured rows), points at the
+   * `LectureConfig.id` used for room/timeslot/lecturer rules and workload.
+   */
+  template_lecture_id?: string | number
+  /** Section label (e.g. S1); may differ from configured rows when adding extras. */
+  section_number?: string
   course_code: string
   course_name: string
   room: string | null

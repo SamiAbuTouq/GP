@@ -144,9 +144,13 @@ export function TimetableGridSectionDialog({
 
   if (!entry) return null;
 
-  const title = `${entry.course_code}${
-    lec?.section_number ? ` · ${lec.section_number}` : ""
-  }`;
+  const courseCode = String(entry.course_code ?? "").trim();
+  const courseName =
+    (entry.course_name || "").trim() ||
+    (lec?.course_name && lec.course_name.trim()) ||
+    "";
+  const courseHeading = courseName || courseCode;
+  const showCodeInHeading = Boolean(courseName && courseCode);
 
   const tsRow = catMap.get(ts);
   const canApply =
@@ -170,24 +174,43 @@ export function TimetableGridSectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle className="text-left text-base sm:text-lg">
-            {readOnly ? "Section details" : "Edit placement"}:{" "}
-            <span className="font-mono font-semibold tracking-tight">{entry.course_code}</span>
+            <span className="font-semibold tracking-tight text-foreground">{courseHeading}</span>
+            {showCodeInHeading ? (
+              <span className="font-mono font-semibold tracking-tight text-muted-foreground">
+                {" "}
+                ({courseCode})
+              </span>
+            ) : null}
             {lec?.section_number ? (
               <span className="text-muted-foreground font-normal"> · {lec.section_number}</span>
             ) : null}
           </DialogTitle>
-          <DialogDescription className="text-balance">
-            {readOnly
-              ? "View-only summary. Turn on Edit timetable to make changes."
-              : "Choose a timeslot, room (if required), and lecturer. Only combinations that satisfy scheduling rules are listed."}
+          <DialogDescription className={readOnly ? "text-balance" : undefined}>
+            {readOnly ? (
+              "View-only summary. Turn on Edit timetable to make changes."
+            ) : (
+              <>
+                Choose a timeslot, room (if required), and lecturer.{" "}
+                <span className="whitespace-nowrap">
+                  Only combinations that satisfy scheduling rules are listed.
+                </span>
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
         {readOnly ? (
           <div className="grid gap-3 text-sm">
+            <div>
+              <div className="text-xs font-medium text-muted-foreground">Course</div>
+              <div className="font-medium text-foreground">{courseHeading}</div>
+              {showCodeInHeading ? (
+                <div className="mt-0.5 font-mono text-xs text-muted-foreground">Code {courseCode}</div>
+              ) : null}
+            </div>
             <div>
               <div className="text-xs font-medium text-muted-foreground">Lecturer</div>
               <div className="font-medium text-foreground">{entry.lecturer}</div>
@@ -234,70 +257,74 @@ export function TimetableGridSectionDialog({
               </Alert>
             )}
 
-            <div className="space-y-2">
-              <Label className="text-foreground">Timeslot</Label>
-              <p className="text-xs text-muted-foreground">
-                Slot pattern for this course: <span className="font-mono font-medium">{slotEngine}</span>
-              </p>
-              <Input placeholder="Filter timeslots…" value={qTs} onChange={(e) => setQTs(e.target.value)} className="h-9" />
-              {filteredTs.length === 0 ? (
-                <p className="rounded-md border border-dashed border-amber-200 bg-amber-50 px-2 py-2 text-xs text-amber-950">
-                  No compatible timeslots. If you use database slots, ensure the timetable catalogue includes them.
-                </p>
-              ) : (
-                <ul className="max-h-36 overflow-auto rounded-md border border-border text-sm">
-                  {filteredTs.map((id) => {
-                    const row = catMap.get(id);
-                    return (
-                      <li key={id}>
-                        <button
-                          type="button"
-                          onClick={() => setTs(id)}
-                          className={`flex w-full flex-col items-start px-2 py-1.5 text-left hover:bg-muted/80 ${
-                            ts === id ? "bg-primary/15 font-medium" : ""
-                          }`}
-                        >
-                          <span>{row ? timeslotLongLabel(row) : id}</span>
-                          <span className="font-mono text-[10px] text-muted-foreground">{id}</span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-
-            {entryNeedsRoom(entry) && (
-              <div className="space-y-2">
-                <Label className="text-foreground">Room</Label>
+            <div
+              className={`grid gap-4 ${entryNeedsRoom(entry) ? "sm:grid-cols-2" : ""}`}
+            >
+              <div className="min-w-0 space-y-2">
+                <Label className="text-foreground">Timeslot</Label>
                 <p className="text-xs text-muted-foreground">
-                  Only rooms with the right type and enough seats for this section are shown.
+                  Slot pattern for this course: <span className="font-mono font-medium">{slotEngine}</span>
                 </p>
-                <Input placeholder="Filter rooms…" value={qRoom} onChange={(e) => setQRoom(e.target.value)} className="h-9" />
-                {filteredRooms.length === 0 ? (
+                <Input placeholder="Filter timeslots…" value={qTs} onChange={(e) => setQTs(e.target.value)} className="h-9" />
+                {filteredTs.length === 0 ? (
                   <p className="rounded-md border border-dashed border-amber-200 bg-amber-50 px-2 py-2 text-xs text-amber-950">
-                    No room fits this timeslot pattern and class size. Try another timeslot.
+                    No compatible timeslots. If you use database slots, ensure the timetable catalogue includes them.
                   </p>
                 ) : (
-                  <ul className="max-h-32 overflow-auto rounded-md border border-border text-sm">
-                    {filteredRooms.map((r) => (
-                      <li key={r}>
-                        <button
-                          type="button"
-                          onClick={() => setRoom(r)}
-                          className={`block w-full px-2 py-1.5 text-left hover:bg-muted/80 ${
-                            room === r ? "bg-primary/15 font-medium" : ""
-                          }`}
-                        >
-                          {r}{" "}
-                          <span className="text-muted-foreground">(capacity {roomCap(config, r)})</span>
-                        </button>
-                      </li>
-                    ))}
+                  <ul className="max-h-[min(14rem,40vh)] overflow-auto rounded-md border border-border text-sm sm:max-h-[min(18rem,45vh)]">
+                    {filteredTs.map((id) => {
+                      const row = catMap.get(id);
+                      return (
+                        <li key={id}>
+                          <button
+                            type="button"
+                            onClick={() => setTs(id)}
+                            className={`flex w-full flex-col items-start px-2 py-1.5 text-left hover:bg-muted/80 ${
+                              ts === id ? "bg-primary/15 font-medium" : ""
+                            }`}
+                          >
+                            <span>{row ? timeslotLongLabel(row) : id}</span>
+                            <span className="font-mono text-[10px] text-muted-foreground">{id}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>
-            )}
+
+              {entryNeedsRoom(entry) ? (
+                <div className="min-w-0 space-y-2">
+                  <Label className="text-foreground">Room</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Only suitable rooms with enough seats are shown.
+                  </p>
+                  <Input placeholder="Filter rooms…" value={qRoom} onChange={(e) => setQRoom(e.target.value)} className="h-9" />
+                  {filteredRooms.length === 0 ? (
+                    <p className="rounded-md border border-dashed border-amber-200 bg-amber-50 px-2 py-2 text-xs text-amber-950">
+                      No room fits this timeslot pattern and class size. Try another timeslot.
+                    </p>
+                  ) : (
+                    <ul className="max-h-[min(14rem,40vh)] overflow-auto rounded-md border border-border text-sm sm:max-h-[min(18rem,45vh)]">
+                      {filteredRooms.map((r) => (
+                        <li key={r}>
+                          <button
+                            type="button"
+                            onClick={() => setRoom(r)}
+                            className={`block w-full px-2 py-1.5 text-left hover:bg-muted/80 ${
+                              room === r ? "bg-primary/15 font-medium" : ""
+                            }`}
+                          >
+                            {r}{" "}
+                            <span className="text-muted-foreground">(capacity {roomCap(config, r)})</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : null}
+            </div>
 
             <div className="space-y-2">
               <Label className="text-foreground">Lecturer</Label>

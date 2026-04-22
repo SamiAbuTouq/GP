@@ -57,6 +57,7 @@ export async function GET(request: Request) {
     const entries = await prisma.sectionScheduleEntry.findMany({
       where: {
         timetable: {
+          semester_id: { not: null },
           ...(timetableStatus ? { status: timetableStatus } : {}),
           ...(semesterId ? { semester_id: Number(semesterId) } : {}),
         },
@@ -94,35 +95,41 @@ export async function GET(request: Request) {
       orderBy: { entry_id: 'asc' },
     })
 
-    const courses = entries.map((entry) => ({
-      Year: entry.timetable.semester.academic_year,
-      Semester: decodeSemesterType(entry.timetable.semester.semester_type),
-      Course_Number: entry.course.course_code,
-      English_Name: entry.course.course_name,
-      academic_level: entry.course.academic_level,
-      credit_hours: entry.course.credit_hours,
-      Section: entry.section_number,
-      Lecturer_Name: `${entry.lecturer.user.first_name} ${entry.lecturer.user.last_name}`,
-      Lecturer_ID: String(entry.user_id),
-      Department: entry.course.department.dept_name,
-      Day: decodeDaysMask(entry.timeslot.days_mask),
-      Time: `${formatTime(entry.timeslot.start_time)} - ${formatTime(entry.timeslot.end_time)}`,
-      Room: entry.room.room_number,
-      Room_ID: String(entry.room_id),
-      Registered_Students: entry.registered_students,
-      Section_Capacity: entry.course.delivery_mode === 'ONLINE' ? 0 : entry.room.capacity,
-      isOnline: entry.course.delivery_mode === 'ONLINE',
-      Online:
-        entry.course.delivery_mode === 'ONLINE'
-          ? 'Online'
-          : entry.course.delivery_mode === 'BLENDED'
-            ? 'Blended'
-            : 'On-Campus',
-      Start_Time: formatTime(entry.timeslot.start_time),
-      End_Time: formatTime(entry.timeslot.end_time),
-      islab: entry.course.is_lab,
-      Department_ID: String(entry.course.dept_id),
-    }))
+    const courses = entries.flatMap((entry) => {
+      const semester = entry.timetable.semester
+      if (!semester) return []
+      return [
+        {
+          Year: semester.academic_year,
+          Semester: decodeSemesterType(semester.semester_type),
+          Course_Number: entry.course.course_code,
+          English_Name: entry.course.course_name,
+          academic_level: entry.course.academic_level,
+          credit_hours: entry.course.credit_hours,
+          Section: entry.section_number,
+          Lecturer_Name: `${entry.lecturer.user.first_name} ${entry.lecturer.user.last_name}`,
+          Lecturer_ID: String(entry.user_id),
+          Department: entry.course.department.dept_name,
+          Day: decodeDaysMask(entry.timeslot.days_mask),
+          Time: `${formatTime(entry.timeslot.start_time)} - ${formatTime(entry.timeslot.end_time)}`,
+          Room: entry.room.room_number,
+          Room_ID: String(entry.room_id),
+          Registered_Students: entry.registered_students,
+          Section_Capacity: entry.course.delivery_mode === 'ONLINE' ? 0 : entry.room.capacity,
+          isOnline: entry.course.delivery_mode === 'ONLINE',
+          Online:
+            entry.course.delivery_mode === 'ONLINE'
+              ? 'Online'
+              : entry.course.delivery_mode === 'BLENDED'
+                ? 'Blended'
+                : 'On-Campus',
+          Start_Time: formatTime(entry.timeslot.start_time),
+          End_Time: formatTime(entry.timeslot.end_time),
+          islab: entry.course.is_lab,
+          Department_ID: String(entry.course.dept_id),
+        },
+      ]
+    })
 
     return NextResponse.json(courses, {
       headers: {

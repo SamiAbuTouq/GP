@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Plus, Trash2, Loader2, MoreHorizontal, GraduationCap, ArrowRightLeft } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Command,
   CommandEmpty,
@@ -432,40 +433,45 @@ export default function ProgramsPage() {
                       <p className="px-2 py-8 text-center text-sm text-muted-foreground">No programs match your search.</p>
                     ) : (
                       filteredPrograms.map((program) => (
-                        <button
-                          key={program}
-                          type="button"
-                          title={`${Object.keys(localPrograms[program]).length} academic years in this plan`}
-                          onClick={() => {
-                            setSelectedProgram(program)
-                            const years = Object.keys(localPrograms[program]).sort()
-                            const nextYear =
-                              selectedYear && years.includes(selectedYear) ? selectedYear : (years[0] ?? null)
-                            setSelectedYear(nextYear)
-                            if (nextYear) {
-                              const semesters = Object.keys(localPrograms[program][nextYear]).sort()
-                              const nextSemester =
-                                selectedSemester && semesters.includes(selectedSemester)
-                                  ? selectedSemester
-                                  : (semesters[0] ?? null)
-                              setSelectedSemester(nextSemester)
-                            } else {
-                              setSelectedSemester(null)
-                            }
-                          }}
-                          className={cn(
-                            "grid w-full grid-cols-[minmax(0,1fr)_2.75rem] items-center gap-2 rounded-sm px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted",
-                            selectedProgram === program && "bg-muted font-medium text-foreground",
-                          )}
-                        >
-                          <div className="flex min-w-0 items-center gap-2">
-                            <GraduationCap className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                            <span className="min-w-0 truncate">{program}</span>
-                          </div>
-                          <span className="text-right tabular-nums text-xs text-muted-foreground">
-                            {Object.keys(localPrograms[program]).length}
-                          </span>
-                        </button>
+                        <Tooltip key={program}>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedProgram(program)
+                                const years = Object.keys(localPrograms[program]).sort()
+                                const nextYear =
+                                  selectedYear && years.includes(selectedYear) ? selectedYear : (years[0] ?? null)
+                                setSelectedYear(nextYear)
+                                if (nextYear) {
+                                  const semesters = Object.keys(localPrograms[program][nextYear]).sort()
+                                  const nextSemester =
+                                    selectedSemester && semesters.includes(selectedSemester)
+                                      ? selectedSemester
+                                      : (semesters[0] ?? null)
+                                  setSelectedSemester(nextSemester)
+                                } else {
+                                  setSelectedSemester(null)
+                                }
+                              }}
+                              className={cn(
+                                "grid w-full grid-cols-[minmax(0,1fr)_2.75rem] items-center gap-2 rounded-sm px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted",
+                                selectedProgram === program && "bg-muted font-medium text-foreground",
+                              )}
+                            >
+                              <div className="flex min-w-0 items-center gap-2">
+                                <GraduationCap className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                                <span className="min-w-0 truncate">{program}</span>
+                              </div>
+                              <span className="text-right tabular-nums text-xs text-muted-foreground">
+                                {Object.keys(localPrograms[program]).length}
+                              </span>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" align="start">
+                            {`${Object.keys(localPrograms[program]).length} academic years in this plan`}
+                          </TooltipContent>
+                        </Tooltip>
                       ))
                     )}
                   </div>

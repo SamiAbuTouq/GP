@@ -47,8 +47,13 @@ export function findLectureConfig(
   config: ScheduleConfig,
   entry: ScheduleEntry,
 ): LectureConfig | undefined {
-  const lid = Number(entry.lecture_id);
   const lectures = config.lectures ?? [];
+  const tpl = entry.template_lecture_id;
+  if (tpl != null && String(tpl).trim() !== "") {
+    const byTpl = lectures.find((l) => String(l.id) === String(tpl));
+    if (byTpl) return byTpl;
+  }
+  const lid = Number(entry.lecture_id);
   if (Number.isFinite(lid)) {
     const byId = lectures.find((l) => Number(l.id) === lid);
     if (byId) return byId;
@@ -221,13 +226,89 @@ export function allowedTimeslotIdsForEntry(
   });
 }
 
-/** Lecture configs that are not yet placed on the current schedule (by `lecture_id`). */
+/** `course_code|section` when both are present — catches “already placed” when `lecture_id` differs between engine and UI config. */
+export function scheduleEntryCourseSectionKey(e: ScheduleEntry): string | null {
+  const sec = (e as ScheduleEntry & { section_number?: string }).section_number;
+  const code = String(e.course_code || "").trim().toLowerCase();
+  if (!code) return null;
+  if (sec == null || String(sec).trim() === "") return null;
+  return `${code}|${String(sec).trim().toLowerCase()}`;
+}
+
+export function lectureConfigCourseSectionKey(lec: LectureConfig): string | null {
+  const code = String(lec.course || "").trim().toLowerCase();
+  const sec = (lec.section_number ?? "").trim().toLowerCase();
+  if (!sec) return null;
+  return `${code}|${sec}`;
+}
+
+/** Lecture configs that are not yet placed on the current schedule (by `lecture_id` and by course+section when known). */
 export function listLectureConfigsNotOnSchedule(
   config: ScheduleConfig,
   scheduleEntries: ScheduleEntry[],
 ): LectureConfig[] {
-  const used = new Set(scheduleEntries.map((e) => String(e.lecture_id)));
-  return (config.lectures ?? []).filter((l) => !used.has(String(l.id)));
+  const usedIds = new Set(scheduleEntries.map((e) => String(e.lecture_id)));
+  const usedCourseSections = new Set(
+    scheduleEntries
+      .map(scheduleEntryCourseSectionKey)
+      .filter((k): k is string => k != null),
+  );
+  return (config.lectures ?? []).filter((l) => {
+    if (usedIds.has(String(l.id))) return false;
+    const ck = lectureConfigCourseSectionKey(l);
+    if (ck != null && usedCourseSections.has(ck)) return false;
+    return true;
+  });
+}
+
+/** Pool of lectures to offer in the add-section dialog: either only unplaced rows or the full config list. */
+export function listLectureConfigsForAddDialog(
+  config: ScheduleConfig,
+  scheduleEntries: ScheduleEntry[],
+  extraSectionsOverride: boolean,
+): LectureConfig[] {
+  if (extraSectionsOverride) return config.lectures ?? [];
+  return listLectureConfigsNotOnSchedule(config, scheduleEntries);
+}
+
+/** Next numeric id not colliding with schedule or config lecture ids (for extra sections). */
+export function allocateExtraLectureId(
+  scheduleEntries: ScheduleEntry[],
+  config: ScheduleConfig,
+): number {
+  let max = 0;
+  for (const e of scheduleEntries) {
+    const n = Number(e.lecture_id);
+    if (Number.isFinite(n)) max = Math.max(max, Math.trunc(n));
+  }
+  for (const l of config.lectures ?? []) {
+    const n = Number(l.id);
+    if (Number.isFinite(n)) max = Math.max(max, Math.trunc(n));
+  }
+  return max > 0 ? max + 1 : Date.now();
+}
+
+/** Next section label `S{n}` for a course, above all configured and scheduled section numbers. */
+export function nextFreeSectionLabelForCourse(
+  courseCode: string,
+  scheduleEntries: ScheduleEntry[],
+  config: ScheduleConfig,
+): string {
+  const code = courseCode.trim().toLowerCase();
+  let maxN = 0;
+  const bump = (sec: string | undefined) => {
+    const m = /^s(\d+)$/i.exec(String(sec ?? "").trim());
+    if (m) maxN = Math.max(maxN, Number(m[1]));
+  };
+  for (const e of scheduleEntries) {
+    if (String(e.course_code || "").trim().toLowerCase() !== code) continue;
+    bump((e as ScheduleEntry).section_number);
+  }
+  for (const l of config.lectures ?? []) {
+    if (String(l.course || "").trim().toLowerCase() !== code) continue;
+    bump(l.section_number);
+  }
+  return `S${maxN + 1}`;
 }
 
 /** Human-readable hint when the add-section dialog finds zero matching courses. */
@@ -236,10 +317,13 @@ export function explainNoAddSectionCandidates(
   scheduleEntries: ScheduleEntry[],
   targetCell: { rowKey: string; timeslotId: string },
   catalogue: TimeslotCatalogueEntry[],
+  options?: { extraSectionsOverride?: boolean },
 ): string {
-  const notOn = listLectureConfigsNotOnSchedule(config, scheduleEntries);
-  if (notOn.length === 0) {
-    return "Every section from the planning configuration is already on the timetable. Remove a section first if you want to add a different placement.";
+  const pool = listLectureConfigsForAddDialog(config, scheduleEntries, !!options?.extraSectionsOverride);
+  if (pool.length === 0) {
+    return (config.lectures ?? []).length === 0
+      ? "The planning configuration has no course sections to add."
+      : "Every section from the planning configuration is already on the timetable. Remove a section first if you want to add a different placement, or turn on “Extra sections” to add beyond the configured count.";
   }
   const catMap = catalogueById(catalogue);
   const tsRow = catMap.get(targetCell.timeslotId);

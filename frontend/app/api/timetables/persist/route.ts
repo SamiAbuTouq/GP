@@ -73,6 +73,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as {
       semesterId?: number | null;
+      /** When saving an unassigned GWO draft, set to the last stored timetable id to bump version; omit after a new optimizer run so the next store is v1 again. */
+      continueFromTimetableId?: number | null;
       schedule?: ScheduleEntry[];
       timeslots_catalogue?: TimeslotCatalogueEntry[];
     };
@@ -122,11 +124,35 @@ export async function POST(req: NextRequest) {
       roomByNumber.set(r.room_number.trim().toLowerCase(), r.room_id);
     }
 
-    const maxVersion = await prisma.timetable.aggregate({
-      where: { semester_id: semesterId },
-      _max: { version_number: true },
-    });
-    const nextVersion = (maxVersion._max.version_number ?? 0) + 1;
+    let nextVersion: number;
+    if (semesterId == null) {
+      const raw = body.continueFromTimetableId;
+      const continueId =
+        typeof raw === "number" && Number.isFinite(raw) && raw > 0
+          ? Math.trunc(raw)
+          : typeof raw === "string" && raw.trim() !== ""
+            ? Number(raw.trim())
+            : NaN;
+      if (Number.isFinite(continueId) && continueId > 0) {
+        const parent = await prisma.timetable.findUnique({
+          where: { timetable_id: continueId },
+          select: { version_number: true, semester_id: true },
+        });
+        if (parent != null && parent.semester_id == null) {
+          nextVersion = parent.version_number + 1;
+        } else {
+          nextVersion = 1;
+        }
+      } else {
+        nextVersion = 1;
+      }
+    } else {
+      const maxVersion = await prisma.timetable.aggregate({
+        where: { semester_id: semesterId },
+        _max: { version_number: true },
+      });
+      nextVersion = (maxVersion._max.version_number ?? 0) + 1;
+    }
 
     const rowsToCreate: {
       user_id: number;

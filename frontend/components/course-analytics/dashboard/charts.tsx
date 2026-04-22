@@ -9,7 +9,7 @@ import {
   Bar,
   XAxis,
   YAxis,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   LineChart,
   Line,
@@ -24,6 +24,7 @@ import {
   ScatterChart,
   ZAxis,
 } from 'recharts'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/course-analytics-ui/card'
 import type { 
   DepartmentData, 
@@ -150,7 +151,7 @@ export function DepartmentChart({ data }: DepartmentChartProps) {
               tick={AXIS_TICK_LIGHT}
               label={{ value: 'Department', angle: -90, position: 'insideLeft', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
-            <Tooltip 
+            <RechartsTooltip 
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null
                 const item = payload[0].payload as DepartmentData
@@ -239,7 +240,7 @@ export function SemesterChart({ data }: SemesterChartProps) {
               tick={AXIS_TICK}
               label={{ value: 'Sections', angle: 90, position: 'insideRight', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <RechartsTooltip content={<CustomTooltip />} />
             <Legend 
               wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }}
               iconType="circle"
@@ -317,7 +318,7 @@ export function OnlineModeChart({ data }: OnlineModeChartProps) {
                 <Cell key={`cell-${index}`} fill={colors[index % colors.length]} className="hover:opacity-80 transition-opacity drop-shadow-md" />
               ))}
             </Pie>
-            <Tooltip 
+            <RechartsTooltip 
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null
                 const item = payload[0].payload as OnlineModeData
@@ -400,7 +401,7 @@ export function TimeSlotChart({ data }: TimeSlotChartProps) {
               tick={AXIS_TICK}
               label={{ value: 'Sections', angle: -90, position: 'insideLeft', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <RechartsTooltip content={<CustomTooltip />} />
             <Area
               type="monotone"
               dataKey="sections"
@@ -467,7 +468,7 @@ export function DayChart({ data }: DayChartProps) {
               tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v.toString()}
               label={{ value: 'Student-seat-days', angle: 90, position: 'insideRight', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
-            <Tooltip
+            <RechartsTooltip
               content={({ active, payload, label }) => {
                 if (!active || !payload?.length) return null
                 const row = payload[0]?.payload as DayData
@@ -561,7 +562,7 @@ export function CapacityChart({ data }: CapacityChartProps) {
               tick={AXIS_TICK}
               label={{ value: 'Number of Sections', angle: -90, position: 'insideLeft', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+            <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
             <Bar 
               dataKey="count" 
               radius={[6, 6, 0, 0]}
@@ -624,7 +625,7 @@ export function TopCoursesChart({ data }: TopCoursesChartProps) {
               tick={AXIS_TICK_LIGHT}
               label={{ value: 'Course', angle: -90, position: 'insideLeft', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
-            <Tooltip 
+            <RechartsTooltip 
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null
                 const item = payload[0].payload as CourseData
@@ -700,7 +701,7 @@ export function DepartmentComparisonChart({ data }: DepartmentComparisonChartPro
               tick={AXIS_TICK_LIGHT}
               label={{ value: 'Department', angle: -90, position: 'insideLeft', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
-            <Tooltip
+            <RechartsTooltip
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null
                 const item = payload[0].payload as { name: string; students: number; sections: number; courses: number; utilization: number }
@@ -785,7 +786,7 @@ export function SectionScatterChart({ data }: SectionScatterChartProps) {
               domain={[0, 100]}
             />
             <ZAxis type="number" dataKey="sections" range={[50, 400]} />
-            <Tooltip 
+            <RechartsTooltip 
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null
                 const item = payload[0].payload as ScatterDataPoint
@@ -870,12 +871,16 @@ export function UtilizationHeatmap({ data }: UtilizationHeatmapProps) {
                 <div className="w-12 text-xs text-muted-foreground">{day}</div>
                 {hours.map(hour => {
                   const cell = data.find(d => d.day === day && d.hour === hour)
+                  const tip = cell
+                    ? `${day} ${hour}: ${cell.value} Student-Seat-Days`
+                    : `${day} ${hour}: 0 Student-Seat-Days`
                   return (
-                    <div
-                      key={`${day}-${hour}`}
-                      className={`flex-1 h-8 rounded ${cell ? getColor(cell.value) : 'bg-muted/30'}`}
-                      title={cell ? `${day} ${hour}: ${cell.value} Student-Seat-Days` : `${day} ${hour}: 0 Student-Seat-Days`}
-                    />
+                    <Tooltip key={`${day}-${hour}`}>
+                      <TooltipTrigger asChild>
+                        <div className={`flex-1 h-8 cursor-default rounded ${cell ? getColor(cell.value) : 'bg-muted/30'}`} />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{tip}</TooltipContent>
+                    </Tooltip>
                   )
                 })}
               </div>
@@ -974,9 +979,14 @@ export function UnderenrolledAlert({ data, threshold = 10 }: UnderenrolledAlertP
                   <td className="px-6 py-2.5">
                     <div className="flex flex-col">
                       <span className="font-medium text-foreground">{section.course}</span>
-                      <span className="truncate text-xs text-muted-foreground max-w-[200px]" title={section.courseName}>
-                        {section.courseName}
-                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="max-w-[200px] cursor-default truncate text-xs text-muted-foreground">
+                            {section.courseName}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">{section.courseName}</TooltipContent>
+                      </Tooltip>
                     </div>
                   </td>
                   <td className="px-3 py-2.5 text-center text-muted-foreground">{section.section}</td>
@@ -1027,7 +1037,7 @@ export function SemesterYoYChart({ data }: SemesterYoYChartProps) {
               axisLine={false}
               tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v.toString()}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+            <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
             <Legend 
               wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }}
               iconType="circle"
@@ -1086,9 +1096,12 @@ export function DepartmentUtilizationGauges({ data }: { data: DepartmentUtilizat
           {data.map((dept) => (
             <div key={dept.fullName} className="space-y-1.5">
               <div className="flex items-center justify-between text-sm">
-                <span className="truncate text-muted-foreground" title={dept.fullName}>
-                  {dept.name}
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-default truncate text-muted-foreground">{dept.name}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">{dept.fullName}</TooltipContent>
+                </Tooltip>
                 <span className="font-semibold tabular-nums">{dept.utilization}%</span>
               </div>
               <div className={`h-2.5 w-full rounded-full ${getStatusBg(dept.status)}`}>
@@ -1175,7 +1188,7 @@ export function CourseGrowthChart({ data }: { data: CourseGrowthData[] }) {
               axisLine={false}
               width={80}
             />
-            <Tooltip
+            <RechartsTooltip
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null
                 const item = payload[0].payload as CourseGrowthData
@@ -1278,9 +1291,14 @@ export function HighDemandAlert({ data, threshold = 95 }: HighDemandAlertProps) 
                   <td className="px-6 py-2.5">
                     <div className="flex flex-col">
                       <span className="font-medium text-foreground">{section.course}</span>
-                      <span className="truncate text-xs text-muted-foreground max-w-[200px]" title={section.courseName}>
-                        {section.courseName}
-                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="max-w-[200px] cursor-default truncate text-xs text-muted-foreground">
+                            {section.courseName}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">{section.courseName}</TooltipContent>
+                      </Tooltip>
                     </div>
                   </td>
                   <td className="px-3 py-2.5 text-center text-muted-foreground">{section.section}</td>
@@ -1335,7 +1353,7 @@ export function FacultyWorkloadChart({ data }: FacultyWorkloadChartProps) {
               tick={AXIS_TICK}
               label={{ value: 'Number of Lecturers', angle: -90, position: 'insideLeft', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+            <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
             <Bar 
               dataKey="count" 
               fill={colors[2]}
@@ -1384,7 +1402,7 @@ export function RoomTypeChart({ data }: RoomTypeChartProps) {
               domain={[0, 100]}
               label={{ value: 'Utilization %', angle: -90, position: 'insideLeft', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+            <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
             <Bar 
               dataKey="avgUtilization" 
               fill={colors[1]}
@@ -1433,7 +1451,7 @@ export function AcademicLevelStackedChart({ data }: AcademicLevelStackedChartPro
               tick={AXIS_TICK}
               label={{ value: 'Sections', angle: -90, position: 'insideLeft', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+            <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
             <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }} />
             <Bar dataKey="inPerson" stackId="a" fill={colors[0]} name="On-Campus" radius={[0, 0, 0, 0]} isAnimationActive={true} />
             <Bar dataKey="online" stackId="a" fill={colors[1]} name="Online" radius={[0, 0, 0, 0]} isAnimationActive={true} />

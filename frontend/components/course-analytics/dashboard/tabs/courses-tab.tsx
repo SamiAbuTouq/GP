@@ -1,6 +1,7 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/course-analytics-ui/card'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { TopCoursesChart, AcademicLevelStackedChart } from '@/components/course-analytics/dashboard/charts'
 import { TopCoursesTable } from '@/components/course-analytics/dashboard/data-table'
 import type { DashboardStats, CourseData, AcademicLevelModeData } from '@/lib/course-analytics/course-data'
@@ -42,9 +43,18 @@ export function CoursesTab({ stats, topCourses, academicLevelModeData, hasYearOr
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Most popular course</span>
-                <span className="truncate max-w-[180px] font-semibold" title={stats.mostPopularCourse}>
-                  {stats.mostPopularCourse || 'N/A'}
-                </span>
+                {stats.mostPopularCourse ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="max-w-[180px] cursor-default truncate font-semibold">
+                        {stats.mostPopularCourse}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{stats.mostPopularCourse}</TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <span className="max-w-[180px] truncate font-semibold">N/A</span>
+                )}
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Average class size</span>

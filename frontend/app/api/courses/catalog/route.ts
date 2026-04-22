@@ -41,6 +41,9 @@ export async function GET() {
 
   try {
     const entryRows = await prisma.sectionScheduleEntry.findMany({
+      where: {
+        timetable: { semester_id: { not: null } },
+      },
       select: {
         course_id: true,
         section_number: true,
@@ -62,6 +65,7 @@ export async function GET() {
     const semesterById = new Map<number, SemesterKey>()
     for (const row of entryRows) {
       const s = row.timetable.semester
+      if (!s) continue
       semesterById.set(s.semester_id, {
         semester_id: s.semester_id,
         academic_year: s.academic_year,
@@ -75,7 +79,8 @@ export async function GET() {
     if (latestSemester) {
       const targetId = latestSemester.semester_id
       for (const row of entryRows) {
-        if (row.timetable.semester_id !== targetId) continue
+        const sid = row.timetable.semester_id
+        if (sid == null || sid !== targetId) continue
         let set = sectionSetsByCourseId.get(row.course_id)
         if (!set) {
           set = new Set()

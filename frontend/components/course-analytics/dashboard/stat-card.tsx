@@ -3,6 +3,7 @@
 import { Card, CardContent } from '@/components/course-analytics-ui/card'
 import { Badge } from '@/components/course-analytics-ui/badge'
 import { cn } from '@/lib/utils'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { LucideIcon } from 'lucide-react'
 
 interface StatCardProps {
@@ -61,12 +62,14 @@ export function StatCard({
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-muted-foreground">{title}</span>
               {methodBadge && (
-                <Badge
-                  title={methodBadge.title}
-                  className="h-5 rounded-sm border-0 bg-primary/15 px-1.5 text-[10px] font-semibold tracking-wide text-primary"
-                >
-                  {methodBadge.label}
-                </Badge>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge className="h-5 rounded-sm border-0 bg-primary/15 px-1.5 text-[10px] font-semibold tracking-wide text-primary">
+                      {methodBadge.label}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">{methodBadge.title}</TooltipContent>
+                </Tooltip>
               )}
             </div>
             <span className={cn(

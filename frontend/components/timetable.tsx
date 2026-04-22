@@ -1,9 +1,10 @@
 "use client";
 
 import useSWR from "swr";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TimetableGridSectionDialog } from "@/components/timetable-grid-section-dialog";
 import { TimetableGridAddSectionDialog } from "@/components/timetable-grid-add-section-dialog";
 import { validateScheduleHardConstraints } from "@/lib/schedule-hard-constraints";
@@ -20,7 +21,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, Check, ChevronsUpDown, GripVertical, Pencil, RotateCcw, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  ChevronsUpDown,
+  GripVertical,
+  Layers2,
+  Pencil,
+  RotateCcw,
+  X,
+} from "lucide-react";
 import type {
   SchedulePayload,
   ScheduleEntry,
@@ -1071,12 +1081,16 @@ export function SoftConstraintMetricsPanel({
                       key={d.timeslot}
                       className="flex w-9 shrink-0 flex-col items-center gap-1 sm:w-10"
                     >
-                      <div
-                        className="text-center text-[10px] font-medium text-slate-600"
-                        title={`${fullSlotLabel} (${d.timeslot}) — ${d.classes} class(es)`}
-                      >
-                        T{idx + 1}
-                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="cursor-default text-center text-[10px] font-medium text-slate-600">
+                            T{idx + 1}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          {`${fullSlotLabel} (${d.timeslot}) — ${d.classes} class(es)`}
+                        </TooltipContent>
+                      </Tooltip>
                       <div className="relative isolate mx-auto h-[4.5rem] w-full max-w-[1.375rem] overflow-hidden rounded-[5px] bg-[#F1F4F9]">
                         {loadTier >= 1 && (
                           <div
@@ -1361,18 +1375,25 @@ export function RoomUtilizationPanel() {
       >
         <div className="flex items-center gap-3">
           <span className="font-semibold text-slate-900">Room utilization</span>
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-              overallSeatUtilPct >= 60
-                ? "bg-green-100 text-green-700"
-                : overallSeatUtilPct >= 35
-                  ? "bg-amber-100 text-amber-700"
-                  : "bg-red-100 text-red-700"
-            }`}
-            title="Share of all room×timeslot seat capacity that has students seated (empty slots count as 0%). Higher is better."
-          >
-            {overallSeatUtilPct.toFixed(1)}% seats utilized
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className={`cursor-default text-xs px-2 py-0.5 rounded-full font-medium ${
+                  overallSeatUtilPct >= 60
+                    ? "bg-green-100 text-green-700"
+                    : overallSeatUtilPct >= 35
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-red-100 text-red-700"
+                }`}
+              >
+                {overallSeatUtilPct.toFixed(1)}% seats utilized
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              Share of all room×timeslot seat capacity that has students seated (empty slots count as 0%). Higher is
+              better.
+            </TooltipContent>
+          </Tooltip>
         </div>
         <span className="text-slate-500 text-sm tabular-nums" aria-hidden>
           {open ? "▾" : "▸"}
@@ -1712,7 +1733,6 @@ export function StudyPlanTabPanel() {
                                 return (
                                   <div
                                     key={code}
-                                    title={name ? `${code} — ${name}` : code}
                                     className="rounded-md border border-slate-200 bg-white px-2.5 py-2 shadow-sm"
                                   >
                                     <p className="font-mono text-xs font-semibold text-slate-800">{code}</p>
@@ -1897,6 +1917,10 @@ export function TimetableDatabasePersistBar({
   const { data } = useSchedule();
   const { config } = useConfig();
   const { toast } = useToast();
+  const { optimizerScheduleEpoch } = useGwoRun();
+  /** Last timetable row stored in this browser session; cleared when a new GWO run finishes so the next store is v1. */
+  const continueFromTimetableIdRef = useRef<number | null>(null);
+  const prevOptimizerEpochRef = useRef(optimizerScheduleEpoch);
   const [savingDb, setSavingDb] = useState(false);
   /** After a successful DB store, until the schedule rows change (new edit / new run). */
   const [persistSuccess, setPersistSuccess] = useState<{
@@ -1924,6 +1948,13 @@ export function TimetableDatabasePersistBar({
       setPersistSuccess(null);
     }
   }, [persistSuccess, scheduleSnapshot]);
+
+  useEffect(() => {
+    if (optimizerScheduleEpoch !== prevOptimizerEpochRef.current) {
+      prevOptimizerEpochRef.current = optimizerScheduleEpoch;
+      continueFromTimetableIdRef.current = null;
+    }
+  }, [optimizerScheduleEpoch]);
 
   const persistTimetableToDatabase = async () => {
     if (!config) return;
@@ -1958,6 +1989,9 @@ export function TimetableDatabasePersistBar({
         credentials: "include",
         body: JSON.stringify({
           semesterId: null,
+          ...(continueFromTimetableIdRef.current != null
+            ? { continueFromTimetableId: continueFromTimetableIdRef.current }
+            : {}),
           schedule: entries,
           timeslots_catalogue: data?.timeslots_catalogue ?? [],
         }),
@@ -1977,6 +2011,7 @@ export function TimetableDatabasePersistBar({
         typeof body.timetableName === "string" && body.timetableName.trim()
           ? body.timetableName.trim()
           : `Timetable #${tid}`;
+      continueFromTimetableIdRef.current = tid;
       setPersistSuccess({
         scheduleSnapshot,
         timetableId: tid,
@@ -2020,13 +2055,17 @@ export function TimetableDatabasePersistBar({
           {savingDb ? "Storing…" : isSavedForCurrentSchedule ? "Saved" : "Store in database"}
         </Button>
         {isSavedForCurrentSchedule && persistSuccess ? (
-          <span
-            className="max-w-[min(100%,20rem)] truncate text-xs text-slate-600 sm:max-w-xs"
-            title={`Timetable id ${persistSuccess.timetableId}`}
-          >
-            <span className="font-medium text-slate-800">{persistSuccess.timetableName}</span>
-            <span className="text-slate-500"> · v{persistSuccess.versionNumber}</span>
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="max-w-[min(100%,20rem)] cursor-default truncate text-xs text-slate-600 sm:max-w-xs">
+                <span className="font-medium text-slate-800">{persistSuccess.timetableName}</span>
+                <span className="text-slate-500"> · v{persistSuccess.versionNumber}</span>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="end">
+              Timetable id {persistSuccess.timetableId}
+            </TooltipContent>
+          </Tooltip>
         ) : null}
       </div>
     </div>
@@ -2047,6 +2086,8 @@ export function TimetableGrid() {
   const { config } = useConfig();
   const { toast } = useToast();
   const [editMode, setEditMode] = useState(false);
+  /** Add-section dialog may exceed configured section count; cleared when leaving edit mode. */
+  const [extraSectionsOverride, setExtraSectionsOverride] = useState(false);
   const [draft, setDraft] = useState<ScheduleEntry[] | null>(null);
   const [pickedEntry, setPickedEntry] = useState<ScheduleEntry | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -2148,6 +2189,7 @@ export function TimetableGrid() {
 
   const toggleEditMode = () => {
     if (editMode) {
+      setExtraSectionsOverride(false);
       setDraft(null);
       setEditMode(false);
       setAddDialogOpen(false);
@@ -2269,6 +2311,68 @@ export function TimetableGrid() {
             Rooms &amp; Timeslots Grid
           </p>
           <div className="flex flex-wrap items-center justify-end gap-2">
+            {editMode ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!draftDiffersFromWorkspaceFile}
+                      className={cn(
+                        "gap-1.5 font-semibold transition-colors",
+                        draftDiffersFromWorkspaceFile
+                          ? "border-amber-600/80 text-amber-950 shadow-sm hover:bg-amber-50 dark:border-amber-500/70 dark:text-amber-50 dark:hover:bg-amber-950/35"
+                          : "border-dashed border-muted-foreground/30 text-muted-foreground shadow-none hover:bg-transparent",
+                      )}
+                      onClick={() => {
+                        if (draftDiffersFromWorkspaceFile) setResetDraftConfirmOpen(true);
+                      }}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+                      Reset draft
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  align="start"
+                  sideOffset={8}
+                  className="max-w-[min(22rem,calc(100vw-2rem))] px-3.5 py-2.5 text-left text-xs leading-relaxed shadow-lg"
+                >
+                  {draftDiffersFromWorkspaceFile
+                    ? "Discard unsaved grid changes and reload from the workspace schedule file on the server"
+                    : "Grid already matches the saved workspace schedule — nothing to reset"}
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
+            {editMode ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-pressed={extraSectionsOverride}
+                    className={cn(
+                      "gap-1.5 font-semibold transition-all",
+                      extraSectionsOverride &&
+                        "border-primary/45 bg-primary/10 text-foreground shadow-sm ring-2 ring-primary/25 ring-offset-2 ring-offset-background hover:bg-primary/15 dark:border-primary/50 dark:bg-primary/15 dark:hover:bg-primary/20",
+                    )}
+                    onClick={() => setExtraSectionsOverride((v) => !v)}
+                  >
+                    <Layers2 className="h-3.5 w-3.5 shrink-0 opacity-95" aria-hidden />
+                    Extra sections
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="start" sideOffset={8}>
+                  {extraSectionsOverride
+                    ? "Override is on: you can add more section rows than the planning configuration defines. Each extra gets a new id; rules follow the template section you pick."
+                    : "Turn on to add sections beyond the number defined in the planning configuration (same course can appear more often than configured)."}
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
             <Button
               type="button"
               variant={editMode ? "default" : "outline"}
@@ -2285,40 +2389,29 @@ export function TimetableGrid() {
               {editMode ? "Editing…" : "Edit timetable"}
             </Button>
             {editMode ? (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!draftDiffersFromWorkspaceFile}
-                  className={cn(
-                    "gap-1.5 font-semibold transition-colors",
-                    draftDiffersFromWorkspaceFile
-                      ? "border-amber-600/80 text-amber-950 shadow-sm hover:bg-amber-50 dark:border-amber-500/70 dark:text-amber-50 dark:hover:bg-amber-950/35"
-                      : "border-dashed border-muted-foreground/30 text-muted-foreground shadow-none hover:bg-transparent",
-                  )}
-                  title={
-                    draftDiffersFromWorkspaceFile
-                      ? "Discard unsaved grid changes and reload from the workspace schedule file on the server"
-                      : "Grid already matches the saved workspace schedule — nothing to reset"
-                  }
-                  onClick={() => {
-                    if (draftDiffersFromWorkspaceFile) setResetDraftConfirmOpen(true);
-                  }}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => void saveScheduleToWorkspace()}
+                      disabled={savingFile}
+                    >
+                      {savingFile ? "Saving…" : "Save to workspace file"}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  align="end"
+                  sideOffset={8}
+                  className="max-w-[min(22rem,calc(100vw-2rem))] px-3.5 py-2.5 text-left text-xs leading-relaxed shadow-lg"
                 >
-                  <RotateCcw className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
-                  Reset draft
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  title="Writes your edited timetable to the workspace schedule on the server (POST /api/schedule). That file is what this page loads and what the optimizer uses as the starting timetable for the next run."
-                  onClick={() => void saveScheduleToWorkspace()}
-                  disabled={savingFile}
-                >
-                  {savingFile ? "Saving…" : "Save to workspace file"}
-                </Button>
-              </>
+                  Writes your edited timetable to the workspace schedule on the server (POST /api/schedule). That file is
+                  what this page loads and what the optimizer uses as the starting timetable for the next run.
+                </TooltipContent>
+              </Tooltip>
             ) : null}
             <TimetableDatabasePersistBar
               scheduleOverride={editMode && draft ? draft : undefined}
@@ -2329,10 +2422,7 @@ export function TimetableGrid() {
         </div>
         {editMode ? (
           <div className="-mx-1 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
-            <p
-              className="whitespace-nowrap px-1 text-xs leading-relaxed text-slate-600"
-              title="Drag the ⋮⋮ handle to move a section. Click a course block to edit/remove it. To add, click an empty grid cell and enter section details for that room/timeslot."
-            >
+            <p className="whitespace-nowrap px-1 text-xs leading-relaxed text-slate-600">
               Drag the ⋮⋮ handle to move a section. Click a course block to edit/remove it. To add, click an empty grid
               cell and enter section details for that room/timeslot.
             </p>
@@ -2434,6 +2524,7 @@ export function TimetableGrid() {
         config={config ?? ({} as ScheduleConfig)}
         catalogue={catalogue}
         scheduleEntries={displayEntries}
+        extraSectionsOverride={extraSectionsOverride}
         onAdd={(next) => {
           if (!draft) return;
           const nextDraft = [...draft, next];
@@ -2472,11 +2563,14 @@ export function TimetableGrid() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-sm min-w-[720px]">
+      <div className="relative max-h-[min(calc(100dvh-10rem),80rem)] min-h-0 overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm [scrollbar-width:thin]">
+        <table className="w-full border-separate border-spacing-0 text-sm min-w-[720px]">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-100">
-              <th className="px-3 py-2.5 text-left font-semibold text-slate-700 w-36">
+              <th
+                scope="col"
+                className="sticky left-0 top-0 z-30 w-36 border-b border-r border-slate-200 bg-slate-100 px-3 py-2.5 text-left font-semibold text-slate-700 shadow-[4px_0_6px_-4px_rgba(15,23,42,0.12)]"
+              >
                 Room
               </th>
               {timeslotIds.map((ts, colIdx) => {
@@ -2488,18 +2582,22 @@ export function TimetableGrid() {
                     : family === "blended"
                       ? "bg-violet-50"
                       : "bg-slate-50";
+                const slotHdrTip = `${timeslotHeaderLabel(ts, catalogue, displayEntries, "long")} · ${ts}`;
                 return (
                   <th
                     key={ts}
-                    className={`border-l border-slate-200 px-2 py-2.5 text-center text-xs font-semibold text-slate-800 ${famClass}`}
-                    title={`${timeslotHeaderLabel(ts, catalogue, displayEntries, "long")} · ${ts}`}
+                    scope="col"
+                    className={`sticky top-0 z-20 border-b border-l border-slate-200 px-2 py-2.5 text-center text-xs font-semibold text-slate-800 shadow-[0_4px_6px_-4px_rgba(15,23,42,0.12)] ${famClass}`}
                   >
-                    <div className="leading-snug mx-auto tabular-nums">
-                      T{colIdx + 1}
-                    </div>
-                    <div className="text-[10px] font-normal text-slate-500 mt-0.5 font-mono">
-                      {ts}
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="block cursor-default">
+                          <div className="mx-auto leading-snug tabular-nums">T{colIdx + 1}</div>
+                          <div className="mt-0.5 font-mono text-[10px] font-normal text-slate-500">{ts}</div>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{slotHdrTip}</TooltipContent>
+                    </Tooltip>
                   </th>
                 );
               })}
@@ -2512,8 +2610,11 @@ export function TimetableGrid() {
                   ? data?.room_summary?.find((r) => r.name === row.key)
                   : undefined;
               return (
-                <tr key={row.key} className="border-t border-slate-100">
-                  <td className="border-r border-slate-200 bg-slate-50 px-3 py-2 align-top">
+                <tr key={row.key}>
+                  <th
+                    scope="row"
+                    className="sticky left-0 z-10 border-t border-slate-100 border-r border-slate-200 bg-slate-50 px-3 py-2 text-left align-top font-normal shadow-[4px_0_6px_-4px_rgba(15,23,42,0.12)]"
+                  >
                     <div className="font-semibold text-slate-800">{row.label}</div>
                     {roomData && (
                       <div className="text-xs font-normal text-slate-500">
@@ -2525,7 +2626,7 @@ export function TimetableGrid() {
                         Synchronous online sections
                       </div>
                     )}
-                  </td>
+                  </th>
                   {timeslotIds.map((ts) => {
                     const cellEntries = cellEntriesFor(row.key, ts);
                     const isConflict = cellEntries.some((e) =>
@@ -2534,7 +2635,7 @@ export function TimetableGrid() {
                     return (
                       <td
                         key={`${row.key}-${ts}`}
-                        className={`border-l border-slate-200 p-1 align-top ${
+                        className={`border-t border-slate-100 border-l border-slate-200 p-1 align-top ${
                           isConflict ? "bg-red-50" : ""
                         } ${editMode ? "ring-1 ring-transparent hover:ring-slate-200" : ""} ${
                           editMode && cellEntries.length === 0 ? "cursor-pointer hover:bg-slate-50/70" : ""
@@ -2587,21 +2688,25 @@ export function TimetableGrid() {
                                 )}
                               >
                                 {editMode && (
-                                  <span
-                                    draggable
-                                    title="Drag to another room / timeslot"
-                                    onDragStart={(ev) => {
-                                      ev.dataTransfer.setData(
-                                        "application/json",
-                                        JSON.stringify({ lecture_id: entry.lecture_id }),
-                                      );
-                                      ev.dataTransfer.effectAllowed = "move";
-                                    }}
-                                    className="flex shrink-0 cursor-grab touch-none select-none items-center border-r border-black/10 px-0.5 active:cursor-grabbing"
-                                    aria-hidden
-                                  >
-                                    <GripVertical className="h-3.5 w-3.5 opacity-70" />
-                                  </span>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span
+                                        draggable
+                                        onDragStart={(ev) => {
+                                          ev.dataTransfer.setData(
+                                            "application/json",
+                                            JSON.stringify({ lecture_id: entry.lecture_id }),
+                                          );
+                                          ev.dataTransfer.effectAllowed = "move";
+                                        }}
+                                        className="flex shrink-0 cursor-grab touch-none select-none items-center border-r border-black/10 px-0.5 active:cursor-grabbing"
+                                        aria-hidden
+                                      >
+                                        <GripVertical className="h-3.5 w-3.5 opacity-70" />
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">Drag to another room / timeslot</TooltipContent>
+                                  </Tooltip>
                                 )}
                                 <button
                                   type="button"
@@ -2612,8 +2717,29 @@ export function TimetableGrid() {
                                     setDialogOpen(true);
                                   }}
                                 >
-                                  <div className="font-semibold">{entry.course_code}</div>
-                                  <div className="font-normal opacity-80">{entry.lecturer}</div>
+                                  {(() => {
+                                    const code = String(entry.course_code ?? "").trim();
+                                    const name = (entry.course_name ?? "").trim();
+                                    const primary = name || code;
+                                    const showCodeSub = Boolean(name && code);
+                                    const courseTitleTip = showCodeSub ? `${code} — ${name}` : primary;
+                                    return (
+                                      <>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <div className="line-clamp-2 cursor-default font-semibold leading-snug">
+                                              {primary}
+                                            </div>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="top">{courseTitleTip}</TooltipContent>
+                                        </Tooltip>
+                                        {showCodeSub ? (
+                                          <div className="font-mono text-[10px] font-medium opacity-75">{code}</div>
+                                        ) : null}
+                                        <div className="font-normal opacity-80">{entry.lecturer}</div>
+                                      </>
+                                    );
+                                  })()}
                                   {tag && (
                                     <div className="mt-0.5 flex flex-wrap gap-0.5">
                                       <span className="rounded bg-white/60 px-1 text-[10px] font-medium text-slate-700">
@@ -2708,10 +2834,10 @@ export function CourseList() {
                 <div className={`h-4 w-1 rounded shrink-0 mt-1 ${accentBar}`} />
 
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-slate-900">
-                    {entry.course_code}
+                  <div className="font-semibold text-slate-900 leading-snug">
+                    {(entry.course_name || "").trim() || entry.course_code}
                   </div>
-                  <div className="text-xs text-slate-500">{entry.course_name}</div>
+                  <div className="font-mono text-xs text-slate-500">{entry.course_code}</div>
                   <div className="flex flex-wrap gap-1 mt-1">
                     <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                       {formatDeliveryMode(entry.delivery_mode)}
@@ -2870,6 +2996,16 @@ export function OptimizationInfo() {
     labelTitle?: string;
     /** Shown in the browser tooltip on hover (e.g. room metric cards). */
     description?: string;
+  };
+
+  const mergeDetailStatTooltip = (row: DetailCell): string | undefined => {
+    if (row.description) {
+      const s = [row.labelTitle, row.description].filter(Boolean).join(" — ");
+      return s.trim() || undefined;
+    }
+    const parts = [row.labelTitle, row.title].filter(Boolean) as string[];
+    if (parts.length === 0) return undefined;
+    return parts.join(" — ");
   };
 
   const unitConflictCount =
@@ -3042,63 +3178,65 @@ export function OptimizationInfo() {
             Schedule overview
           </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-            {scheduleOverviewInputRows.map(
-              ({
-                label,
-                value,
-                highlight,
-                title,
-                mono,
-                labelTitle,
-                description,
-              }) => (
+            {scheduleOverviewInputRows.map((row) => {
+              const { label, value, highlight, mono } = row;
+              const tip = mergeDetailStatTooltip(row);
+              const tile = (
                 <div
-                  key={`input-${label}`}
-                  className={`min-w-0 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2 ${
-                    description ? "cursor-help" : ""
-                  }`}
-                  title={
-                    description
-                      ? [labelTitle, description].filter(Boolean).join(" — ")
-                      : labelTitle
-                  }
+                  className={`min-w-0 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2 ${tip ? "cursor-help" : ""}`}
                 >
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    {label}
-                  </div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</div>
                   <div
                     className={`mt-0.5 break-words text-sm font-semibold ${mono ? "tabular-nums" : ""} ${highlight ?? "text-slate-900"}`}
-                    title={description ? undefined : title}
                   >
                     {value}
                   </div>
                 </div>
-              ),
-            )}
+              );
+              return (
+                <Fragment key={`input-${label}`}>
+                  {tip ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>{tile}</TooltipTrigger>
+                      <TooltipContent side="top">{tip}</TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    tile
+                  )}
+                </Fragment>
+              );
+            })}
           </div>
           <p className="mb-2 mt-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
             Session types (last generated timetable)
           </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {scheduleOverviewSessionMix.map(
-              ({ label, value, highlight, title, mono, labelTitle }) => (
-                <div
-                  key={`mix-${label}`}
-                  className="min-w-0 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2"
-                  title={labelTitle}
-                >
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    {label}
-                  </div>
+            {scheduleOverviewSessionMix.map((row) => {
+              const { label, value, highlight, mono } = row;
+              const tip = mergeDetailStatTooltip(row);
+              const tile = (
+                <div className="min-w-0 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</div>
                   <div
                     className={`mt-0.5 break-words text-sm font-semibold ${mono ? "tabular-nums" : ""} ${highlight ?? "text-slate-800"}`}
-                    title={title}
                   >
                     {value}
                   </div>
                 </div>
-              ),
-            )}
+              );
+              return (
+                <Fragment key={`mix-${label}`}>
+                  {tip ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>{tile}</TooltipTrigger>
+                      <TooltipContent side="top">{tip}</TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    tile
+                  )}
+                </Fragment>
+              );
+            })}
           </div>
         </div>
 
@@ -3107,39 +3245,34 @@ export function OptimizationInfo() {
             Optimization run
           </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-            {detailRows.flat().map(
-              ({
-                label,
-                value,
-                highlight,
-                title,
-                mono,
-                labelTitle,
-                description,
-              }) => (
+            {detailRows.flat().map((row) => {
+              const { label, value, highlight, mono } = row;
+              const tip = mergeDetailStatTooltip(row);
+              const tile = (
                 <div
-                  key={label}
-                  className={`min-w-0 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2 ${
-                    description ? "cursor-help" : ""
-                  }`}
-                  title={
-                    description
-                      ? [labelTitle, description].filter(Boolean).join(" — ")
-                      : labelTitle
-                  }
+                  className={`min-w-0 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2 ${tip ? "cursor-help" : ""}`}
                 >
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    {label}
-                  </div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</div>
                   <div
                     className={`mt-0.5 break-words text-sm font-semibold ${mono ? "tabular-nums" : ""} ${highlight ?? "text-slate-800"}`}
-                    title={description ? undefined : title}
                   >
                     {value}
                   </div>
                 </div>
-              ),
-            )}
+              );
+              return (
+                <Fragment key={label}>
+                  {tip ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>{tile}</TooltipTrigger>
+                      <TooltipContent side="top">{tip}</TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    tile
+                  )}
+                </Fragment>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -3567,14 +3700,18 @@ function RoomConfigEditorRow({
           </option>
         ))}
       </select>
-      <button
-        onClick={() => removeRoom(roomKey)}
-        className="ml-auto text-red-500 hover:text-red-700 text-xs"
-        type="button"
-        title="Remove room"
-      >
-        Remove
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => removeRoom(roomKey)}
+            className="ml-auto text-xs text-red-500 hover:text-red-700"
+            type="button"
+          >
+            Remove
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">Remove room</TooltipContent>
+      </Tooltip>
     </div>
   );
 }
@@ -4291,29 +4428,27 @@ export function ConfigurationPanel() {
                                 </span>
                               ) : (
                                 prefs.preferred.map((id) => (
-                                  <button
-                                    key={id}
-                                    type="button"
-                                    title="Remove from preferred"
-                                    onClick={() =>
-                                      updateLecturerPref(
-                                        name,
-                                        "preferred",
-                                        prefs.preferred.filter((t) => t !== id),
-                                      )
-                                    }
-                                    className="inline-flex max-w-full items-center gap-1 rounded border border-green-700 bg-green-600 px-2 py-0.5 text-left text-xs font-medium text-white shadow-sm hover:bg-green-700"
-                                  >
-                                    <span className="min-w-0 truncate">
-                                      {prefLabel(id)}
-                                    </span>
-                                    <span
-                                      className="shrink-0 opacity-90"
-                                      aria-hidden
-                                    >
-                                      ×
-                                    </span>
-                                  </button>
+                                  <Tooltip key={id}>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          updateLecturerPref(
+                                            name,
+                                            "preferred",
+                                            prefs.preferred.filter((t) => t !== id),
+                                          )
+                                        }
+                                        className="inline-flex max-w-full items-center gap-1 rounded border border-green-700 bg-green-600 px-2 py-0.5 text-left text-xs font-medium text-white shadow-sm hover:bg-green-700"
+                                      >
+                                        <span className="min-w-0 truncate">{prefLabel(id)}</span>
+                                        <span className="shrink-0 opacity-90" aria-hidden>
+                                          ×
+                                        </span>
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">Remove from preferred</TooltipContent>
+                                  </Tooltip>
                                 ))
                               )}
                             </div>
@@ -4367,29 +4502,27 @@ export function ConfigurationPanel() {
                                 </span>
                               ) : (
                                 prefs.unpreferred.map((id) => (
-                                  <button
-                                    key={id}
-                                    type="button"
-                                    title="Remove from unpreferred"
-                                    onClick={() =>
-                                      updateLecturerPref(
-                                        name,
-                                        "unpreferred",
-                                        prefs.unpreferred.filter((t) => t !== id),
-                                      )
-                                    }
-                                    className="inline-flex max-w-full items-center gap-1 rounded border border-red-700 bg-red-600 px-2 py-0.5 text-left text-xs font-medium text-white shadow-sm hover:bg-red-700"
-                                  >
-                                    <span className="min-w-0 truncate">
-                                      {prefLabel(id)}
-                                    </span>
-                                    <span
-                                      className="shrink-0 opacity-90"
-                                      aria-hidden
-                                    >
-                                      ×
-                                    </span>
-                                  </button>
+                                  <Tooltip key={id}>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          updateLecturerPref(
+                                            name,
+                                            "unpreferred",
+                                            prefs.unpreferred.filter((t) => t !== id),
+                                          )
+                                        }
+                                        className="inline-flex max-w-full items-center gap-1 rounded border border-red-700 bg-red-600 px-2 py-0.5 text-left text-xs font-medium text-white shadow-sm hover:bg-red-700"
+                                      >
+                                        <span className="min-w-0 truncate">{prefLabel(id)}</span>
+                                        <span className="shrink-0 opacity-90" aria-hidden>
+                                          ×
+                                        </span>
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">Remove from unpreferred</TooltipContent>
+                                  </Tooltip>
                                 ))
                               )}
                             </div>
@@ -4903,14 +5036,18 @@ export function ConfigurationPanel() {
                           </div>
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => removeCourse(lec.id)}
-                            className="text-red-500 hover:text-red-700 text-xs font-medium"
-                            title="Remove course"
-                          >
-                            Remove
-                          </button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => removeCourse(lec.id)}
+                                className="text-xs font-medium text-red-500 hover:text-red-700"
+                              >
+                                Remove
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Remove course</TooltipContent>
+                          </Tooltip>
                         </td>
                       </tr>
                     ))}
