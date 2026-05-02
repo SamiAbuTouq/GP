@@ -26,6 +26,9 @@ export class CreateTimeslotDto {
   @IsString()
   @IsNotEmpty()
   slotType: string;
+
+  @IsBoolean()
+  isSummer: boolean;
 }
 
 export class UpdateTimeslotDto {
@@ -45,6 +48,10 @@ export class UpdateTimeslotDto {
   @IsString()
   @IsOptional()
   slotType?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isSummer?: boolean;
 }
 
 export class UpdateLecturerPreferenceItemDto {

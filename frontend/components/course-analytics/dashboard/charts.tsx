@@ -26,6 +26,7 @@ import {
 } from 'recharts'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/course-analytics-ui/card'
+import { ScrollArea } from '@/components/course-analytics-ui/scroll-area'
 import type { 
   DepartmentData, 
   SemesterData, 
@@ -946,6 +947,8 @@ export function UnderenrolledAlert({ data, threshold = 10 }: UnderenrolledAlertP
     )
   }
 
+  const listHeight = 8 * 40 // ~8 rows visible; rest scrolls
+
   return (
     <Card className="border-destructive/30">
       <CardHeader className="pb-4">
@@ -962,7 +965,7 @@ export function UnderenrolledAlert({ data, threshold = 10 }: UnderenrolledAlertP
         </CardDescription>
       </CardHeader>
       <CardContent className="px-0 pb-0">
-        <div className="max-h-[320px] overflow-auto">
+        <ScrollArea className="w-full" style={{ height: listHeight }}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-card">
               <tr className="border-b text-left">
@@ -1001,7 +1004,7 @@ export function UnderenrolledAlert({ data, threshold = 10 }: UnderenrolledAlertP
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollArea>
       </CardContent>
     </Card>
   )
@@ -1085,6 +1088,8 @@ export function DepartmentUtilizationGauges({ data }: { data: DepartmentUtilizat
     }
   }
 
+  const listHeight = 8 * 44 // shows ~8 items; rest scrolls
+
   return (
     <Card>
       <CardHeader className="pb-4">
@@ -1092,27 +1097,29 @@ export function DepartmentUtilizationGauges({ data }: { data: DepartmentUtilizat
         <CardDescription>Utilization rate by department</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4 max-h-[320px] overflow-y-auto pr-2">
-          {data.map((dept) => (
-            <div key={dept.fullName} className="space-y-1.5">
-              <div className="flex items-center justify-between text-sm">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="cursor-default truncate text-muted-foreground">{dept.name}</span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">{dept.fullName}</TooltipContent>
-                </Tooltip>
-                <span className="font-semibold tabular-nums">{dept.utilization}%</span>
+        <ScrollArea className="w-full" style={{ height: listHeight }}>
+          <div className="space-y-4 pr-4">
+            {data.map((dept) => (
+              <div key={dept.fullName} className="space-y-1.5">
+                <div className="flex items-center justify-between text-sm">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-default truncate text-muted-foreground">{dept.name}</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{dept.fullName}</TooltipContent>
+                  </Tooltip>
+                  <span className="font-semibold tabular-nums">{dept.utilization}%</span>
+                </div>
+                <div className={`h-2.5 w-full rounded-full ${getStatusBg(dept.status)}`}>
+                  <div
+                    className={`h-full rounded-full transition-all ${getStatusColor(dept.status)}`}
+                    style={{ width: `${Math.min(dept.utilization, 100)}%` }}
+                  />
+                </div>
               </div>
-              <div className={`h-2.5 w-full rounded-full ${getStatusBg(dept.status)}`}>
-                <div 
-                  className={`h-full rounded-full transition-all ${getStatusColor(dept.status)}`}
-                  style={{ width: `${Math.min(dept.utilization, 100)}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </ScrollArea>
       </CardContent>
     </Card>
   )
@@ -1258,6 +1265,8 @@ export function HighDemandAlert({ data, threshold = 95 }: HighDemandAlertProps) 
     )
   }
 
+  const listHeight = 8 * 40 // ~8 rows visible; rest scrolls
+
   return (
     <Card className="border-warning/30 border-amber-500/30">
       <CardHeader className="pb-4">
@@ -1274,7 +1283,7 @@ export function HighDemandAlert({ data, threshold = 95 }: HighDemandAlertProps) 
         </CardDescription>
       </CardHeader>
       <CardContent className="px-0 pb-0">
-        <div className="max-h-[320px] overflow-auto">
+        <ScrollArea className="w-full" style={{ height: listHeight }}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-card">
               <tr className="border-b text-left">
@@ -1313,7 +1322,7 @@ export function HighDemandAlert({ data, threshold = 95 }: HighDemandAlertProps) 
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollArea>
       </CardContent>
     </Card>
   )

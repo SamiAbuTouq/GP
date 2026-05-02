@@ -2,6 +2,144 @@ import type { DeliveryMode } from "@prisma/client";
 import type { LectureConfig, RoomConfigValue, ScheduleConfig, TimeslotConfigEntry } from "./schedule-data";
 import { prisma } from "./prisma";
 
+export type SemesterMode = "normal" | "summer";
+
+type SemesterRow = {
+  semester_id: number;
+  academic_year: string;
+  semester_type: number;
+};
+
+/** Newest term first (same ordering as course catalog): academic year start, then semester_type. */
+function pickNewestSemester(semesters: SemesterRow[]): SemesterRow | null {
+  if (semesters.length === 0) return null;
+  const startYear = (y: string) => {
+    const m = String(y).trim().match(/^(\d{4})/);
+    return m ? parseInt(m[1], 10) : 0;
+  };
+  return [...semesters].sort((a, b) => {
+    const yd = startYear(b.academic_year) - startYear(a.academic_year);
+    if (yd !== 0) return yd;
+    return b.semester_type - a.semester_type;
+  })[0] ?? null;
+}
+
+/**
+ * For GWO lecture counts: distinct parallel sections per course from `section_schedule_entry`
+ * in the latest semester of the given kind (first/second vs summer). When no schedule history
+ * exists for that kind, returns null so callers fall back to `course.sections_normal` /
+ * `course.sections_summer`.
+ */
+async function loadSectionCountsFromLatestScheduleSemester(
+  semesterMode: SemesterMode,
+): Promise<{
+  targetSemesterId: number;
+  sectionCountByCourseId: Map<number, number>;
+  maxRegisteredByCourseId: Map<number, number>;
+} | null> {
+  const entries = await prisma.sectionScheduleEntry.findMany({
+    where: { timetable: { semester_id: { not: null } } },
+    select: {
+      course_id: true,
+      section_number: true,
+      registered_students: true,
+      timetable: {
+        select: {
+          semester_id: true,
+          semester: {
+            select: {
+              semester_id: true,
+              academic_year: true,
+              semester_type: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const semesterById = new Map<number, SemesterRow>();
+  for (const row of entries) {
+    const s = row.timetable.semester;
+    if (!s) continue;
+    semesterById.set(s.semester_id, {
+      semester_id: s.semester_id,
+      academic_year: s.academic_year,
+      semester_type: s.semester_type,
+    });
+  }
+
+  const allSems = [...semesterById.values()];
+  const normalCandidates = allSems.filter((s) => s.semester_type === 1 || s.semester_type === 2);
+  const summerCandidates = allSems.filter((s) => s.semester_type === 3);
+
+  const target =
+    semesterMode === "summer"
+      ? pickNewestSemester(summerCandidates)
+      : pickNewestSemester(normalCandidates);
+
+  if (!target) return null;
+
+  const sectionSets = new Map<number, Set<string>>();
+  const maxReg = new Map<number, number>();
+
+  for (const row of entries) {
+    if (row.timetable.semester_id !== target.semester_id) continue;
+    const cid = row.course_id;
+    let set = sectionSets.get(cid);
+    if (!set) {
+      set = new Set();
+      sectionSets.set(cid, set);
+    }
+    set.add(String(row.section_number).trim());
+    const reg = row.registered_students ?? 0;
+    const prev = maxReg.get(cid) ?? 0;
+    if (reg > prev) maxReg.set(cid, reg);
+  }
+
+  const sectionCountByCourseId = new Map<number, number>();
+  for (const [cid, set] of sectionSets) {
+    sectionCountByCourseId.set(cid, set.size);
+  }
+
+  return {
+    targetSemesterId: target.semester_id,
+    sectionCountByCourseId,
+    maxRegisteredByCourseId: maxReg,
+  };
+}
+
+/** Keep preference / availability slot ids that exist in the merged timeslot list. */
+function filterLecturerSlotRefsToTimeslots(config: ScheduleConfig): ScheduleConfig {
+  const raw = config.timeslots;
+  if (!Array.isArray(raw)) return config;
+  const ids = new Set(raw.map((t) => t.id));
+  if (ids.size === 0) return config;
+
+  const lecturer_preferences: ScheduleConfig["lecturer_preferences"] = {
+    ...config.lecturer_preferences,
+  };
+  for (const name of Object.keys(lecturer_preferences)) {
+    const p = lecturer_preferences[name];
+    lecturer_preferences[name] = {
+      preferred: (p.preferred ?? []).filter((id) => ids.has(id)),
+      unpreferred: (p.unpreferred ?? []).filter((id) => ids.has(id)),
+    };
+  }
+
+  const next: ScheduleConfig = { ...config, lecturer_preferences };
+  if (config.lecturer_availability !== undefined) {
+    const lecturer_availability = { ...config.lecturer_availability };
+    for (const name of Object.keys(lecturer_availability)) {
+      lecturer_availability[name] = (lecturer_availability[name] ?? []).filter((id) =>
+        ids.has(id),
+      );
+    }
+    return { ...next, lecturer_availability };
+  }
+  return next;
+}
+
 /** Matches `daysToBitmask` in `prisma/seed.ts` (bit 0=Sun … bit 5=Sat; no Friday bit). */
 function daysMaskToWeekdayNames(mask: number): string[] {
   const parts: { bit: number; name: string }[] = [
@@ -38,9 +176,18 @@ function inferGwoSlotType(days: string[], durationHours: number, dbSlotType: str
     return "lab";
   }
 
+  const isBlended = /blended/i.test(t);
   const set = new Set(days);
   const has = (name: string) => set.has(name);
   const n = days.length;
+
+  if (isBlended) {
+    if (n === 1 && has("Monday")) return "blended_mon";
+    if (n === 1 && has("Wednesday")) return "blended_wed";
+    if (has("Sunday") && has("Tuesday") && !has("Thursday")) return "blended_st";
+    // Summer (or custom) blended patterns that don't match the standard templates.
+    return "blended_generic";
+  }
 
   if (n === 2 && has("Monday") && has("Wednesday") && approxEq(durationHours, 1.5)) {
     return "lecture_mw";
@@ -48,28 +195,9 @@ function inferGwoSlotType(days: string[], durationHours: number, dbSlotType: str
   if (n === 3 && has("Sunday") && has("Tuesday") && has("Thursday") && approxEq(durationHours, 1)) {
     return "lecture_stt";
   }
-  if (n === 1 && has("Monday") && approxEq(durationHours, 1.5)) {
-    return "blended_mon";
-  }
-  if (n === 1 && has("Wednesday") && approxEq(durationHours, 1.5)) {
-    return "blended_wed";
-  }
-  if (n === 2 && has("Sunday") && has("Tuesday") && approxEq(durationHours, 1)) {
-    return "blended_st";
-  }
 
-  if (/blended/i.test(t)) {
-    if (n === 1 && has("Monday")) return "blended_mon";
-    if (n === 1 && has("Wednesday")) return "blended_wed";
-    if (has("Sunday") && has("Tuesday") && !has("Thursday")) return "blended_st";
-    return "blended_st";
-  }
-
-  if (has("Monday") && has("Wednesday")) return "lecture_mw";
-  if (has("Sunday") && has("Tuesday") && has("Thursday")) return "lecture_stt";
-  if (n === 1 && has("Monday")) return "blended_mon";
-  if (n === 1 && has("Wednesday")) return "blended_wed";
-  return "lecture_stt";
+  // Summer (or custom) lecture patterns that don't match the standard templates.
+  return "lecture_generic";
 }
 
 /** Exposed for timetable persistence: maps a DB row to the canonical `slot_<id>` used in GWO / `schedule.json`. */
@@ -105,13 +233,16 @@ export function prismaTimeslotRowToConfig(row: {
  * Loads structured timeslots from PostgreSQL for GWO / UI.
  * Returns null if no DB URL, on error, or when there are no usable rows.
  */
-export async function loadTimeslotsFromDatabase(): Promise<TimeslotConfigEntry[] | null> {
+export async function loadTimeslotsFromDatabase(
+  semesterMode: SemesterMode,
+): Promise<TimeslotConfigEntry[] | null> {
   if (!process.env.DATABASE_URL?.trim()) {
     return null;
   }
 
+  const isSummer = semesterMode === "summer";
   const rows = await prisma.timeslot.findMany({
-    where: { days_mask: { not: 0 } },
+    where: { days_mask: { not: 0 }, is_summer: isSummer },
     orderBy: { slot_id: "asc" },
   });
 
@@ -155,11 +286,16 @@ function maxRoomCapacity(rooms: Record<string, RoomConfigValue>): number {
  * Scheduling rules from the DB:
  * - Lecturers: only rows with `is_available === true`; each slot may only use lecturers listed in
  *   `lecturer_can_teach_course` (mapped to indices in the `lecturers` array).
- * - Courses: `Course.sections` is the number of parallel sections to schedule; `0` means the
- *   course is omitted. Each section becomes one `LectureConfig` row (same course code, unique `id`).
+ * - Courses: parallel section count comes from `section_schedule_entry` in the newest
+ *   first-or-second-semester (`semester_type` 1 or 2) when `semesterMode === "normal"`, or the
+ *   newest summer term (`semester_type` 3) when `semesterMode === "summer"`, counting distinct
+ *   `section_number` per course. Max registered students for class size use the same term.
+ *   If no such timetable rows exist, falls back to `course.sections_normal` / `course.sections_summer`.
  */
 // BUG 2 + 4 FIX: extended return type includes availability and per-lecturer max workload.
-export async function loadScheduleConfigEntitiesFromDatabase(): Promise<
+export async function loadScheduleConfigEntitiesFromDatabase(
+  semesterMode: SemesterMode,
+): Promise<
   Pick<ScheduleConfig, "rooms" | "lecturers" | "lecturer_preferences" | "lectures"
     | "lecturer_availability" | "lecturer_max_workload"> | null
 > {
@@ -277,13 +413,15 @@ export async function loadScheduleConfigEntitiesFromDatabase(): Promise<
     // Availability will remain empty (= no restriction) for all lecturers.
   }
 
+  const scheduleSectionAgg = await loadSectionCountsFromLatestScheduleSemester(semesterMode);
+
   const maxByCourse = await prisma.sectionScheduleEntry.groupBy({
     by: ["course_id"],
     _max: { registered_students: true },
   });
-  const regByCourse = new Map<number, number>();
+  const regByCourseGlobal = new Map<number, number>();
   for (const row of maxByCourse) {
-    regByCourse.set(row.course_id, row._max.registered_students ?? 0);
+    regByCourseGlobal.set(row.course_id, row._max.registered_students ?? 0);
   }
 
   const courses = await prisma.course.findMany({
@@ -303,7 +441,15 @@ export async function loadScheduleConfigEntitiesFromDatabase(): Promise<
   let nextLectureId = 1;
 
   for (const c of courses) {
-    if (c.sections <= 0) continue;
+    const dbFallback =
+      semesterMode === "summer" ? c.sections_summer : c.sections_normal;
+    const sectionCountFromHistory =
+      scheduleSectionAgg?.sectionCountByCourseId.get(c.course_id) ?? null;
+    const sectionCount =
+      scheduleSectionAgg != null
+        ? (sectionCountFromHistory ?? 0)
+        : dbFallback;
+    if (sectionCount <= 0) continue;
 
     const allowed: number[] = [
       ...new Set(
@@ -315,12 +461,14 @@ export async function loadScheduleConfigEntitiesFromDatabase(): Promise<
 
     if (allowed.length === 0) continue;
 
-    const registered = regByCourse.get(c.course_id) ?? 0;
+    const registered = scheduleSectionAgg
+      ? (scheduleSectionAgg.maxRegisteredByCourseId.get(c.course_id) ?? 0)
+      : (regByCourseGlobal.get(c.course_id) ?? 0);
     const fallbackSize = Math.min(maxCap, Math.max(12, c.credit_hours * 10));
     const rawSize = registered > 0 ? registered : fallbackSize;
     const size = Math.min(Math.max(rawSize, 1), maxCap);
 
-    for (let s = 0; s < c.sections; s++) {
+    for (let s = 0; s < sectionCount; s++) {
       if (maxCourses > 0 && lectures.length >= maxCourses) break;
 
       lectures.push({
@@ -351,11 +499,12 @@ export async function loadScheduleConfigEntitiesFromDatabase(): Promise<
 
 export async function mergeFileConfigWithDatabase(
   fileBased: ScheduleConfig,
+  semesterMode: SemesterMode = "normal",
 ): Promise<ScheduleConfig> {
   let merged: ScheduleConfig = fileBased;
 
   try {
-    const fromDb = await loadScheduleConfigEntitiesFromDatabase();
+    const fromDb = await loadScheduleConfigEntitiesFromDatabase(semesterMode);
     if (fromDb) {
       merged = {
         ...merged,
@@ -374,7 +523,7 @@ export async function mergeFileConfigWithDatabase(
   }
 
   try {
-    const dbSlots = await loadTimeslotsFromDatabase();
+    const dbSlots = await loadTimeslotsFromDatabase(semesterMode);
     if (dbSlots && dbSlots.length > 0) {
       merged = { ...merged, timeslots: dbSlots };
     }
@@ -382,5 +531,5 @@ export async function mergeFileConfigWithDatabase(
     console.error("[db-schedule-config] Timeslots load failed; using file timeslots.", err);
   }
 
-  return merged;
+  return filterLecturerSlotRefsToTimeslots(merged);
 }

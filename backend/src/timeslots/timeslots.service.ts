@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -92,8 +92,12 @@ export class TimeslotsService {
     return date;
   }
 
-  async findAll() {
+  async findAll(isSummer?: boolean) {
     const timeslots = await this.prisma.timeslot.findMany({
+      where: {
+        is_active: true,
+        ...(isSummer !== undefined ? { is_summer: isSummer } : {}),
+      },
       orderBy: [{ start_time: 'asc' }],
     });
 
@@ -103,6 +107,7 @@ export class TimeslotsService {
       start: this.formatTime(slot.start_time),
       end: this.formatTime(slot.end_time),
       slotType: slot.slot_type,
+      isSummer: slot.is_summer,
     }));
   }
 
@@ -121,6 +126,7 @@ export class TimeslotsService {
       start: this.formatTime(slot.start_time),
       end: this.formatTime(slot.end_time),
       slotType: slot.slot_type,
+      isSummer: slot.is_summer,
     };
   }
 
@@ -131,6 +137,7 @@ export class TimeslotsService {
         start_time: this.parseTime(dto.start),
         end_time: this.parseTime(dto.end),
         slot_type: dto.slotType,
+        is_summer: dto.isSummer,
       },
     });
 
@@ -140,6 +147,7 @@ export class TimeslotsService {
       start: this.formatTime(slot.start_time),
       end: this.formatTime(slot.end_time),
       slotType: slot.slot_type,
+      isSummer: slot.is_summer,
     };
   }
 
@@ -159,6 +167,7 @@ export class TimeslotsService {
         ...(dto.start && { start_time: this.parseTime(dto.start) }),
         ...(dto.end && { end_time: this.parseTime(dto.end) }),
         ...(dto.slotType && { slot_type: dto.slotType }),
+        ...(dto.isSummer !== undefined ? { is_summer: dto.isSummer } : {}),
       },
     });
 
@@ -168,6 +177,7 @@ export class TimeslotsService {
       start: this.formatTime(slot.start_time),
       end: this.formatTime(slot.end_time),
       slotType: slot.slot_type,
+      isSummer: slot.is_summer,
     };
   }
 
@@ -180,11 +190,12 @@ export class TimeslotsService {
       throw new NotFoundException(`Timeslot with ID ${id} not found`);
     }
 
-    await this.prisma.timeslot.delete({
+    await this.prisma.timeslot.update({
       where: { slot_id: id },
+      data: { is_active: false },
     });
 
-    return { message: 'Timeslot deleted successfully' };
+    return { message: 'Timeslot archived successfully', archived: true };
   }
 
   async getLecturerPreferences(userId: number) {
@@ -197,6 +208,7 @@ export class TimeslotsService {
 
   private async getPreferencesByUserId(userId: number) {
     const slots = await this.prisma.timeslot.findMany({
+      where: { is_active: true },
       orderBy: [{ start_time: 'asc' }, { end_time: 'asc' }, { slot_id: 'asc' }],
       include: {
         lecturer_preferences: {
@@ -213,6 +225,7 @@ export class TimeslotsService {
       start: this.formatTime(slot.start_time),
       end: this.formatTime(slot.end_time),
       slotType: slot.slot_type,
+      isSummer: slot.is_summer,
       preference:
         slot.lecturer_preferences.length > 0
           ? slot.lecturer_preferences[0].is_preferred
@@ -255,5 +268,95 @@ export class TimeslotsService {
     });
 
     return { success: true };
+  }
+
+  async findArchived(isSummer?: boolean) {
+    const timeslots = await this.prisma.timeslot.findMany({
+      where: {
+        is_active: false,
+        ...(isSummer !== undefined ? { is_summer: isSummer } : {}),
+      },
+      orderBy: [{ start_time: 'asc' }],
+    });
+
+    return timeslots.map((slot) => ({
+      id: slot.slot_id,
+      days: this.daysMaskToArray(slot.days_mask),
+      start: this.formatTime(slot.start_time),
+      end: this.formatTime(slot.end_time),
+      slotType: slot.slot_type,
+      isSummer: slot.is_summer,
+    }));
+  }
+
+  async restoreArchived(id: number) {
+    const slot = await this.prisma.timeslot.findUnique({
+      where: { slot_id: id },
+      select: { slot_id: true },
+    });
+    if (!slot) {
+      throw new NotFoundException(`Timeslot with ID ${id} not found`);
+    }
+
+    await this.prisma.timeslot.update({
+      where: { slot_id: id },
+      data: { is_active: true },
+    });
+    return { message: 'Timeslot restored successfully' };
+  }
+
+  async getDeletionImpact(id: number) {
+    const slot = await this.prisma.timeslot.findUnique({
+      where: { slot_id: id },
+      select: { slot_id: true },
+    });
+    if (!slot) {
+      throw new NotFoundException(`Timeslot with ID ${id} not found`);
+    }
+
+    const entries = await this.prisma.sectionScheduleEntry.findMany({
+      where: { slot_id: id },
+      select: {
+        timetable_id: true,
+        timetable: {
+          select: { generation_type: true, status: true, version_number: true },
+        },
+      },
+      distinct: ['timetable_id'],
+      orderBy: { timetable_id: 'asc' },
+    });
+
+    return {
+      slotId: id,
+      entryCount: await this.prisma.sectionScheduleEntry.count({ where: { slot_id: id } }),
+      timetables: entries.map((entry) => ({
+        timetableId: entry.timetable_id,
+        generationType: entry.timetable.generation_type,
+        status: entry.timetable.status,
+        versionNumber: entry.timetable.version_number,
+      })),
+    };
+  }
+
+  async permanentlyDeleteArchived(id: number) {
+    const slot = await this.prisma.timeslot.findUnique({
+      where: { slot_id: id },
+      select: { slot_id: true, is_active: true },
+    });
+    if (!slot) {
+      throw new NotFoundException(`Timeslot with ID ${id} not found`);
+    }
+    if (slot.is_active) {
+      throw new ConflictException('Only archived timeslots can be permanently deleted.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.sectionScheduleEntry.deleteMany({ where: { slot_id: id } });
+      await tx.lecturerPreference.deleteMany({ where: { slot_id: id } });
+      await tx.lecturerOfficeHours.deleteMany({ where: { slot_id: id } });
+      await tx.timeslot.delete({ where: { slot_id: id } });
+    });
+
+    return { message: 'Timeslot permanently deleted successfully' };
   }
 }

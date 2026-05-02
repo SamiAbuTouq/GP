@@ -18,12 +18,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   Plus,
   Search,
   Edit,
   Trash2,
+  Archive,
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
@@ -50,6 +61,7 @@ import { ExportDropdownWithDialog } from "@/components/export-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type Course = {
   id?: number
@@ -59,7 +71,10 @@ type Course = {
   academicLevel: number
   deliveryMode: DeliveryMode
   department: Department
-  sections: number
+  sectionsNormal: number
+  sectionsSummer: number
+  /** Distinct section labels in the newest term that has schedule rows (informational). */
+  sectionsInLatestSchedule?: number
   isLab: boolean
 }
 
@@ -87,7 +102,9 @@ function mapCatalogRow(raw: unknown): Course | null {
     academicLevel: academicLevelFromCourseCode(code),
     deliveryMode: parseDeliveryMode(item.deliveryMode),
     department: String(item.department ?? "Computer Science") as Department,
-    sections: parseNumber(item.sections, 0),
+    sectionsNormal: parseNumber(item.sectionsNormal, 1),
+    sectionsSummer: parseNumber(item.sectionsSummer, 0),
+    sectionsInLatestSchedule: parseNumber(item.sectionsInLatestSchedule, 0),
     isLab: typeof item.isLab === "boolean" ? item.isLab : false,
   }
 }
@@ -99,7 +116,8 @@ type SortableColumn =
   | "academicLevel"
   | "deliveryMode"
   | "isLab"
-  | "sections"
+  | "sectionsNormal"
+  | "sectionsSummer"
 
 function sortCoursesCopy(
   list: Course[],
@@ -130,8 +148,11 @@ function sortCoursesCopy(
       case "isLab":
         cmp = Number(a.isLab) - Number(b.isLab)
         break
-      case "sections":
-        cmp = a.sections - b.sections
+      case "sectionsNormal":
+        cmp = a.sectionsNormal - b.sectionsNormal
+        break
+      case "sectionsSummer":
+        cmp = a.sectionsSummer - b.sectionsSummer
         break
       default:
         break
@@ -146,9 +167,10 @@ function sortCoursesCopy(
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([])
-  /** Human-readable source for the Sections column (latest DB semester). */
-  const [sectionCountSource, setSectionCountSource] = useState<string | null>(null)
+  const [archivedCourses, setArchivedCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingArchived, setLoadingArchived] = useState(false)
+  const [tab, setTab] = useState<"active" | "archived">("active")
   const [searchQuery, setSearchQuery] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingCourse, setEditingCourse] = useState<Course | null>(null)
@@ -160,7 +182,9 @@ export default function CoursesPage() {
     academicLevel: 1,
     deliveryMode: "FACE_TO_FACE",
     department: "Computer Science",
-    sections: 1,
+    sectionsNormal: 1,
+    sectionsSummer: 0,
+    sectionsInLatestSchedule: 0,
     isLab: false,
   })
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
@@ -168,12 +192,42 @@ export default function CoursesPage() {
   const [pageSize, setPageSize] = useState(10)
   const [sortColumn, setSortColumn] = useState<SortableColumn | null>(null)
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null)
+  const [archivedCourseToPermanentlyDelete, setArchivedCourseToPermanentlyDelete] =
+    useState<Course | null>(null)
+  const [archivedCourseDeletionImpact, setArchivedCourseDeletionImpact] = useState<{
+    entryCount: number
+    timetables: { timetableId: number; generationType: string; status: string; versionNumber: number }[]
+  } | null>(null)
+  const [loadingDeletionImpact, setLoadingDeletionImpact] = useState(false)
+  const [permanentlyDeleting, setPermanentlyDeleting] = useState(false)
   const { toast } = useToast()
+  const formatTimetableLabel = (t: {
+    timetableId: number
+    generationType: string
+    status: string
+    versionNumber: number
+  }) => `Timetable ${t.timetableId} (${t.status}, ${t.generationType} v${t.versionNumber})`
 
   // Fetch courses from API
   useEffect(() => {
     fetchCourses()
   }, [])
+
+  useEffect(() => {
+    if (tab !== "archived") return
+    fetchArchivedCourses()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
+
+  useEffect(() => {
+    if (tab !== "archived") return
+    const interval = setInterval(() => {
+      fetchArchivedCourses()
+    }, 15000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
 
   const fetchCourses = async (options?: { showFullLoading?: boolean }) => {
     const showFullLoading = options?.showFullLoading !== false
@@ -183,19 +237,12 @@ export default function CoursesPage() {
       if (!response.ok) throw new Error('Failed to fetch courses')
       const body = (await response.json()) as {
         courses?: unknown[]
-        lastSemester?: { academicYear?: string; semester?: string } | null
       }
       const rows = Array.isArray(body.courses) ? body.courses : []
       const normalizedCourses = rows
         .map(mapCatalogRow)
         .filter((c): c is Course => c != null)
       setCourses(normalizedCourses)
-      const ls = body.lastSemester
-      if (ls?.academicYear && ls?.semester) {
-        setSectionCountSource(`${ls.academicYear} · ${ls.semester}`)
-      } else {
-        setSectionCountSource(null)
-      }
     } catch (error) {
       console.error('Error fetching courses:', error)
       toast({
@@ -205,6 +252,29 @@ export default function CoursesPage() {
       })
     } finally {
       if (showFullLoading) setLoading(false)
+    }
+  }
+
+  const fetchArchivedCourses = async () => {
+    try {
+      setLoadingArchived(true)
+      const response = await fetch("/api/courses/archived/list", { cache: "no-store" })
+      if (!response.ok) throw new Error("Failed to fetch archived courses")
+      const body = (await response.json()) as unknown[]
+      const rows = Array.isArray(body) ? body : []
+      const normalized = rows
+        .map(mapCatalogRow)
+        .filter((c): c is Course => c != null)
+      setArchivedCourses(normalized)
+    } catch (error) {
+      console.error("Error fetching archived courses:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load archived courses. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingArchived(false)
     }
   }
 
@@ -278,7 +348,17 @@ export default function CoursesPage() {
       const response = await fetch('/api/courses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCourse),
+        body: JSON.stringify({
+          code: newCourse.code,
+          name: newCourse.name,
+          creditHours: newCourse.creditHours,
+          academicLevel: newCourse.academicLevel,
+          deliveryMode: newCourse.deliveryMode,
+          department: newCourse.department,
+          sectionsNormal: newCourse.sectionsNormal,
+          sectionsSummer: newCourse.sectionsSummer,
+          isLab: newCourse.isLab,
+        }),
       })
 
       const data = await response.json()
@@ -300,7 +380,9 @@ export default function CoursesPage() {
         academicLevel: 1,
         deliveryMode: "FACE_TO_FACE",
         department: "Computer Science",
-        sections: 1,
+        sectionsNormal: 1,
+        sectionsSummer: 0,
+        sectionsInLatestSchedule: 0,
         isLab: false,
       })
       setIsAddDialogOpen(false)
@@ -335,7 +417,8 @@ export default function CoursesPage() {
           academicLevel: editingCourse.academicLevel,
           deliveryMode: editingCourse.deliveryMode,
           department: editingCourse.department,
-          sections: editingCourse.sections,
+          sectionsNormal: editingCourse.sectionsNormal,
+          sectionsSummer: editingCourse.sectionsSummer,
           isLab: editingCourse.isLab,
         }),
       })
@@ -376,29 +459,152 @@ export default function CoursesPage() {
       })
 
       const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
 
       if (!response.ok) {
         toast({
           title: "Error",
-          description: data.error || "Failed to delete course. Please try again.",
+          description: errorMessage || "Failed to archive course. Please try again.",
           variant: "destructive",
         })
         return
       }
 
       await fetchCourses({ showFullLoading: false })
+      await fetchArchivedCourses()
       toast({
         title: "Success",
-        description: "Course deleted successfully.",
+        description: `${course.code} archived — it won't be used in future scheduling`,
       })
     } catch (error) {
       console.error('Error deleting course:', error)
       toast({
         title: "Error",
-        description: "Failed to delete course. Please try again.",
+        description: "Failed to archive course. Please try again.",
         variant: "destructive",
       })
     }
+  }
+
+  const handleRestoreArchivedCourse = async (course: Course) => {
+    try {
+      const response = await fetch(`/api/courses/${course.id}/restore`, { method: "PATCH" })
+      const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: errorMessage || "Failed to restore course. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setArchivedCourses((prev) => prev.filter((c) => c.id !== course.id))
+      await fetchCourses({ showFullLoading: false })
+      toast({ title: "Success", description: "Course restored successfully." })
+    } catch (error) {
+      console.error("Error restoring course:", error)
+      toast({
+        title: "Error",
+        description: "Failed to restore course. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const openPermanentDeleteCourseModal = async (course: Course) => {
+    try {
+      setLoadingDeletionImpact(true)
+      const response = await fetch(`/api/courses/${course.id}/deletion-impact`, { cache: "no-store" })
+      const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: errorMessage || "Failed to check deletion impact. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setArchivedCourseToPermanentlyDelete(course)
+      setArchivedCourseDeletionImpact({
+        entryCount: Number((data as { entryCount?: unknown }).entryCount ?? 0) || 0,
+        timetables: Array.isArray((data as { timetables?: unknown }).timetables)
+          ? ((data as { timetables: unknown[] }).timetables as {
+              timetableId: number
+              generationType: string
+              status: string
+              versionNumber: number
+            }[])
+          : [],
+      })
+    } catch (error) {
+      console.error("Error checking deletion impact:", error)
+      toast({
+        title: "Error",
+        description: "Failed to check deletion impact. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingDeletionImpact(false)
+    }
+  }
+
+  const confirmPermanentDeleteArchivedCourse = async () => {
+    if (!archivedCourseToPermanentlyDelete) return
+    try {
+      setPermanentlyDeleting(true)
+      const response = await fetch(`/api/courses/${archivedCourseToPermanentlyDelete.id}/permanent`, {
+        method: "DELETE",
+      })
+      const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: errorMessage || "Failed to permanently delete course. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setArchivedCourses((prev) => prev.filter((c) => c.id !== archivedCourseToPermanentlyDelete.id))
+      setArchivedCourseToPermanentlyDelete(null)
+      setArchivedCourseDeletionImpact(null)
+      toast({ title: "Success", description: "Course permanently deleted successfully." })
+    } catch (error) {
+      console.error("Error permanently deleting course:", error)
+      toast({
+        title: "Error",
+        description: "Failed to permanently delete course. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setPermanentlyDeleting(false)
+    }
+  }
+
+  const confirmDeleteCourse = async () => {
+    if (!courseToDelete) return
+    await handleDeleteCourse(courseToDelete)
+    setCourseToDelete(null)
   }
 
   const courseColumns = [
@@ -409,7 +615,8 @@ export default function CoursesPage() {
     { key: "deliveryMode" as const, label: "Delivery Mode" },
     { key: "isLab" as const, label: "Lab" },
     { key: "department" as const, label: "Department" },
-    { key: "sections" as const, label: "Sections (latest term)" },
+    { key: "sectionsNormal" as const, label: "Sections (normal)" },
+    { key: "sectionsSummer" as const, label: "Sections (summer)" },
   ]
 
   const getDeliveryModeColor = (mode: DeliveryMode) => {
@@ -458,55 +665,68 @@ export default function CoursesPage() {
   }
 
   return (
-    <EntityLayout title="Course Management" description="Add, edit, and manage course catalog.">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <div className="space-y-1">
-            <CardTitle>Courses ({sortedFilteredCourses.length})</CardTitle>
-            {sectionCountSource ? (
-              <p className="text-sm font-normal text-muted-foreground">
-                Sections column counts distinct sections per course in {sectionCountSource}.
-              </p>
-            ) : (
-              <p className="text-sm font-normal text-muted-foreground">
-                No semester data — section counts are 0.
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="bg-transparent" onClick={() => setIsImportDialogOpen(true)}>
-              <ImportIcon className="mr-2 h-4 w-4" />
-              Import
-            </Button>
-            <ExportDropdownWithDialog
-              allData={sortedAllCourses}
-              filteredData={paginatedCourses}
-              columns={courseColumns}
-              filenamePrefix="courses"
-              pdfTitle="Courses"
-              totalLabel={`${courses.length}`}
-              filteredLabel={`${paginatedCourses.length}`}
-              isFiltered={searchQuery !== "" || sortColumn != null}
-              filterDescription={
-                [searchQuery ? `search: "${searchQuery}"` : null, sortColumn ? `sort: ${sortColumn} ${sortDirection}` : null]
-                  .filter(Boolean)
-                  .join(" · ") || undefined
-              }
-            />
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Course
+    <Tabs value={tab} onValueChange={(v) => setTab(v as "active" | "archived")}>
+      <EntityLayout
+        title="Course Management"
+        description="Add, edit, and manage course catalog."
+        headerActions={
+          <TabsList>
+            <TabsTrigger value="active">Courses</TabsTrigger>
+            <TabsTrigger value="archived">Archived</TabsTrigger>
+          </TabsList>
+        }
+      >
+        <TabsContent value="active">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0">
+              <div className="space-y-1">
+                <CardTitle>Courses ({sortedFilteredCourses.length})</CardTitle>
+                <p className="text-sm font-normal text-muted-foreground">
+                  Normal and summer columns are the scheduler targets stored on each course.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-transparent"
+                  onClick={() => setIsImportDialogOpen(true)}
+                >
+                  <ImportIcon className="mr-2 h-4 w-4" />
+                  Import
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+                <ExportDropdownWithDialog
+                  allData={sortedAllCourses}
+                  filteredData={paginatedCourses}
+                  columns={courseColumns}
+                  filenamePrefix="courses"
+                  pdfTitle="Courses"
+                  totalLabel={`${courses.length}`}
+                  filteredLabel={`${paginatedCourses.length}`}
+                  isFiltered={searchQuery !== "" || sortColumn != null}
+                  filterDescription={
+                    [
+                      searchQuery ? `search: "${searchQuery}"` : null,
+                      sortColumn ? `sort: ${sortColumn} ${sortDirection}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || undefined
+                  }
+                />
+                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Course
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Add New Course</DialogTitle>
                   <DialogDescription>Enter the course information below.</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2 min-w-0">
                       <Label htmlFor="course-code">Course Code</Label>
                       <Input
@@ -536,19 +756,44 @@ export default function CoursesPage() {
                         }
                       />
                     </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2 min-w-0">
-                      <Label htmlFor="course-sections">Number of Sections</Label>
+                      <Label htmlFor="course-sections-normal">Normal semester sections</Label>
                       <Input
-                        id="course-sections"
+                        id="course-sections-normal"
                         type="number"
-                        min="1"
+                        min="0"
                         max="20"
-                        value={newCourse.sections}
+                        value={newCourse.sectionsNormal}
                         onChange={(e) =>
-                          setNewCourse({ ...newCourse, sections: Math.max(1, Number.parseInt(e.target.value) || 1) })
+                          setNewCourse({
+                            ...newCourse,
+                            sectionsNormal: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
+                          })
                         }
                         placeholder="1"
                       />
+                    </div>
+                    <div className="space-y-2 min-w-0">
+                      <Label htmlFor="course-sections-summer">Summer semester sections</Label>
+                      <Input
+                        id="course-sections-summer"
+                        type="number"
+                        min="0"
+                        max="20"
+                        value={newCourse.sectionsSummer}
+                        onChange={(e) =>
+                          setNewCourse({
+                            ...newCourse,
+                            sectionsSummer: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
+                          })
+                        }
+                        placeholder="0"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Set to 0 if this course is not offered in summer.
+                      </p>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -629,9 +874,9 @@ export default function CoursesPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </div>
-        </CardHeader>
-        <CardContent>
+              </div>
+            </CardHeader>
+            <CardContent>
           <div className="mb-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -783,12 +1028,33 @@ export default function CoursesPage() {
                       type="button"
                       className={cn(
                         "inline-flex w-full items-center justify-center gap-1 font-medium hover:text-foreground",
-                        sortColumn === "sections" ? "text-foreground" : "text-muted-foreground",
+                        sortColumn === "sectionsNormal" ? "text-foreground" : "text-muted-foreground",
                       )}
-                      onClick={() => handleSortColumn("sections")}
+                      onClick={() => handleSortColumn("sectionsNormal")}
                     >
-                      Sections (latest)
-                      {sortColumn === "sections" ? (
+                      Normal
+                      {sortColumn === "sectionsNormal" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                      )}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-center">
+                    <button
+                      type="button"
+                      className={cn(
+                        "inline-flex w-full items-center justify-center gap-1 font-medium hover:text-foreground",
+                        sortColumn === "sectionsSummer" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => handleSortColumn("sectionsSummer")}
+                    >
+                      Summer
+                      {sortColumn === "sectionsSummer" ? (
                         sortDirection === "asc" ? (
                           <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
                         ) : (
@@ -805,7 +1071,7 @@ export default function CoursesPage() {
               <TableBody>
                 {paginatedCourses.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No courses found
                     </TableCell>
                   </TableRow>
@@ -827,7 +1093,8 @@ export default function CoursesPage() {
                       <TableCell>
                         <Badge className={getDepartmentColor(course.department)}>{course.department}</Badge>
                       </TableCell>
-                      <TableCell className="text-center">{course.sections}</TableCell>
+                      <TableCell className="text-center">{course.sectionsNormal}</TableCell>
+                      <TableCell className="text-center">{course.sectionsSummer}</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -847,9 +1114,12 @@ export default function CoursesPage() {
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteCourse(course)}>
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
+                            <DropdownMenuItem
+                              className="text-destructive hover:text-destructive focus:text-destructive data-[highlighted]:text-destructive"
+                              onClick={() => setCourseToDelete(course)}
+                            >
+                              <Archive className="mr-2 h-4 w-4 text-destructive" />
+                              Archive
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -930,8 +1200,83 @@ export default function CoursesPage() {
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="archived">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div className="space-y-1">
+                <CardTitle>Archived courses ({archivedCourses.length})</CardTitle>
+                <p className="text-sm font-normal text-muted-foreground">
+                  Archived courses are excluded from future scheduling.
+                </p>
+              </div>
+              {loadingArchived ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+            </CardHeader>
+            <CardContent>
+              {loadingArchived ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Department</TableHead>
+                        <TableHead className="w-[70px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {archivedCourses.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                            No archived courses
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        archivedCourses.map((course, index) => (
+                          <TableRow key={getCourseRowKey(course, index)}>
+                            <TableCell className="font-mono font-medium">{course.code}</TableCell>
+                            <TableCell>{course.name}</TableCell>
+                            <TableCell>
+                              <Badge className={getDepartmentColor(course.department)}>{course.department}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleRestoreArchivedCourse(course)}>
+                                    Restore
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => openPermanentDeleteCourseModal(course)}
+                                    disabled={loadingDeletionImpact}
+                                  >
+                                    Permanently Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
       {/* Edit Dialog */}
       <Dialog open={!!editingCourse} onOpenChange={(open) => !open && setEditingCourse(null)}>
@@ -942,7 +1287,7 @@ export default function CoursesPage() {
           </DialogHeader>
           {editingCourse && (
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2 min-w-0">
                   <Label htmlFor="edit-course-code">Course Code</Label>
                   <Input id="edit-course-code" value={editingCourse.code} disabled />
@@ -960,18 +1305,42 @@ export default function CoursesPage() {
                     }
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2 min-w-0">
-                  <Label htmlFor="edit-course-sections">Number of Sections</Label>
+                  <Label htmlFor="edit-course-sections-normal">Normal semester sections</Label>
                   <Input
-                    id="edit-course-sections"
+                    id="edit-course-sections-normal"
                     type="number"
-                    min="1"
+                    min="0"
                     max="20"
-                    value={editingCourse.sections}
+                    value={editingCourse.sectionsNormal}
                     onChange={(e) =>
-                      setEditingCourse({ ...editingCourse, sections: Math.max(1, Number.parseInt(e.target.value) || 1) })
+                      setEditingCourse({
+                        ...editingCourse,
+                        sectionsNormal: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
+                      })
                     }
                   />
+                </div>
+                <div className="space-y-2 min-w-0">
+                  <Label htmlFor="edit-course-sections-summer">Summer semester sections</Label>
+                  <Input
+                    id="edit-course-sections-summer"
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={editingCourse.sectionsSummer}
+                    onChange={(e) =>
+                      setEditingCourse({
+                        ...editingCourse,
+                        sectionsSummer: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Set to 0 if this course is not offered in summer.
+                  </p>
                 </div>
               </div>
               <div className="space-y-2">
@@ -1064,7 +1433,8 @@ export default function CoursesPage() {
           "academicLevel",
           "deliveryMode",
           "department",
-          "numberOfSections",
+          "sectionsNormal",
+          "sectionsSummer",
           "isLab",
         ]}
         columns={courseColumns}
@@ -1092,7 +1462,25 @@ export default function CoursesPage() {
               findColumn(row, "deliveryMode", "delivery_mode", "deliverymode", "delivery") ?? "FACE_TO_FACE",
             ),
             department: dept as Department,
-            sections: parseInt(findColumn(row, "numberOfSections", "sections", "section_count", "sectioncount") ?? "1", 10) || 1,
+            sectionsNormal: (() => {
+              const raw = findColumn(
+                row,
+                "sectionsNormal",
+                "sections_normal",
+                "numberOfSections",
+                "sections",
+                "section_count",
+                "sectioncount",
+              )
+              const n = parseInt(raw ?? "1", 10)
+              return Number.isFinite(n) ? Math.max(0, n) : 1
+            })(),
+            sectionsSummer: (() => {
+              const raw = findColumn(row, "sectionsSummer", "sections_summer")
+              const n = parseInt(raw ?? "0", 10)
+              return Number.isFinite(n) ? Math.max(0, n) : 0
+            })(),
+            sectionsInLatestSchedule: 0,
             isLab,
           }
         }}
@@ -1123,6 +1511,80 @@ export default function CoursesPage() {
           return { added, duplicates, errors }
         }}
       />
-    </EntityLayout>
+
+      <AlertDialog open={courseToDelete !== null} onOpenChange={(open) => !open && setCourseToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive course?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {courseToDelete
+                ? `"${courseToDelete.code} - ${courseToDelete.name}" will be archived. Archived courses are excluded from future scheduling.`
+                : "Archived courses are excluded from future scheduling."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDeleteCourse}
+            >
+              Archive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={archivedCourseToPermanentlyDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setArchivedCourseToPermanentlyDelete(null)
+            setArchivedCourseDeletionImpact(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete course?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  This will permanently remove this course and delete{" "}
+                  <span className="font-semibold text-foreground">{archivedCourseDeletionImpact?.entryCount ?? 0}</span>{" "}
+                  schedule entries.
+                </p>
+                <div className="rounded-md border bg-muted/40 p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Affected Timetables
+                  </p>
+                  {(archivedCourseDeletionImpact?.timetables?.length ?? 0) === 0 ? (
+                    <p>No timetables</p>
+                  ) : (
+                    <ul className="max-h-36 list-disc space-y-1 overflow-y-auto pl-5">
+                      {(archivedCourseDeletionImpact?.timetables ?? []).map((t) => (
+                        <li key={`${t.timetableId}-${t.versionNumber}`}>{formatTimetableLabel(t)}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <p className="font-medium text-destructive">This cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={permanentlyDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmPermanentDeleteArchivedCourse}
+              disabled={permanentlyDeleting || archivedCourseDeletionImpact == null}
+            >
+              {permanentlyDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Permanently Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      </EntityLayout>
+    </Tabs>
   )
 }

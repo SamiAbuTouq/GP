@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -20,10 +21,21 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Plus,
   Trash2,
   MoreHorizontal,
   Edit,
+  Archive,
   Loader2,
   ChevronLeft,
   ChevronRight,
@@ -42,6 +54,7 @@ import { findColumn, type ParsedRow } from "@/lib/import-utils"
 import { ExportDropdownWithDialog } from "@/components/export-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type TimeSlot = {
   id: number
@@ -49,6 +62,15 @@ type TimeSlot = {
   start: string
   end: string
   slotType: SlotType
+  isSummer: boolean
+}
+
+type TimeslotListFilter = "all" | "normal" | "summer"
+
+function filterSlotsBySemester(slots: TimeSlot[], filter: TimeslotListFilter): TimeSlot[] {
+  if (filter === "all") return slots
+  if (filter === "summer") return slots.filter((s) => s.isSummer)
+  return slots.filter((s) => !s.isSummer)
 }
 
 const allDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"]
@@ -77,8 +99,12 @@ const getCanonicalSlotType = (value: string) => {
 }
 
 export default function TimeSlotsPage() {
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
+  /** Full list from API (all semester kinds); list vs weekly filters apply client-side. */
+  const [allTimeSlots, setAllTimeSlots] = useState<TimeSlot[]>([])
+  const [archivedTimeSlots, setArchivedTimeSlots] = useState<TimeSlot[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingArchived, setLoadingArchived] = useState(false)
+  const [tab, setTab] = useState<"active" | "archived">("active")
   const [saving, setSaving] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null)
@@ -88,7 +114,11 @@ export default function TimeSlotsPage() {
     start: "",
     end: "",
     slotType: "Traditional Lecture",
+    isSummer: false,
   })
+  const [listFilter, setListFilter] = useState<TimeslotListFilter>("all")
+  const [weeklyOverviewFilter, setWeeklyOverviewFilter] =
+    useState<TimeslotListFilter>("all")
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -96,20 +126,60 @@ export default function TimeSlotsPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
   const [weeklyOverviewGroupBy, setWeeklyOverviewGroupBy] = useState<WeeklyOverviewGroupBy>("days")
   const [collapsedOuterGroups, setCollapsedOuterGroups] = useState<Record<string, boolean>>({})
+  const [slotToDelete, setSlotToDelete] = useState<TimeSlot | null>(null)
+  const [archivedSlotToPermanentlyDelete, setArchivedSlotToPermanentlyDelete] =
+    useState<TimeSlot | null>(null)
+  const [archivedSlotDeletionImpact, setArchivedSlotDeletionImpact] = useState<{
+    entryCount: number
+    timetables: { timetableId: number; generationType: string; status: string; versionNumber: number }[]
+  } | null>(null)
+  const [loadingDeletionImpact, setLoadingDeletionImpact] = useState(false)
+  const [permanentlyDeleting, setPermanentlyDeleting] = useState(false)
   const { toast } = useToast()
+  const formatTimetableLabel = (t: {
+    timetableId: number
+    generationType: string
+    status: string
+    versionNumber: number
+  }) => `Timetable ${t.timetableId} (${t.status}, ${t.generationType} v${t.versionNumber})`
 
-  // Fetch timeslots from API
   useEffect(() => {
     fetchTimeSlots()
   }, [])
 
+  useEffect(() => {
+    if (tab !== "archived") return
+    fetchArchivedTimeSlots()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, listFilter])
+
+  useEffect(() => {
+    if (tab !== "archived") return
+    const interval = setInterval(() => {
+      fetchArchivedTimeSlots()
+    }, 15000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, listFilter])
+
   const fetchTimeSlots = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/timeslots')
+      const response = await fetch("/api/timeslots")
       if (!response.ok) throw new Error('Failed to fetch timeslots')
-      const data = await response.json()
-      setTimeSlots(data)
+      const data = (await response.json()) as unknown[]
+      const normalized: TimeSlot[] = (Array.isArray(data) ? data : []).map((raw) => {
+        const row = raw as Record<string, unknown>
+        return {
+          id: Number(row.id),
+          days: Array.isArray(row.days) ? (row.days as string[]) : [],
+          start: String(row.start ?? ""),
+          end: String(row.end ?? ""),
+          slotType: getCanonicalSlotType(String(row.slotType ?? "Traditional Lecture")) as SlotType,
+          isSummer: Boolean(row.isSummer),
+        }
+      })
+      setAllTimeSlots(normalized)
     } catch (error) {
       console.error('Error fetching timeslots:', error)
       toast({
@@ -119,6 +189,37 @@ export default function TimeSlotsPage() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchArchivedTimeSlots = async () => {
+    try {
+      setLoadingArchived(true)
+      const qs = listFilter !== "all" ? `?filter=${encodeURIComponent(listFilter)}` : ""
+      const response = await fetch(`/api/timeslots/archived/list${qs}`, { cache: "no-store" })
+      if (!response.ok) throw new Error("Failed to fetch archived timeslots")
+      const data = (await response.json()) as unknown[]
+      const normalized: TimeSlot[] = (Array.isArray(data) ? data : []).map((raw) => {
+        const row = raw as Record<string, unknown>
+        return {
+          id: Number(row.id),
+          days: Array.isArray(row.days) ? (row.days as string[]) : [],
+          start: String(row.start ?? ""),
+          end: String(row.end ?? ""),
+          slotType: getCanonicalSlotType(String(row.slotType ?? "Traditional Lecture")) as SlotType,
+          isSummer: Boolean(row.isSummer),
+        }
+      })
+      setArchivedTimeSlots(normalized)
+    } catch (error) {
+      console.error("Error fetching archived timeslots:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load archived time slots. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingArchived(false)
     }
   }
 
@@ -154,6 +255,7 @@ export default function TimeSlotsPage() {
           start: newSlot.start,
           end: newSlot.end,
           slotType: newSlot.slotType,
+          isSummer: newSlot.isSummer,
         }),
       })
 
@@ -168,8 +270,14 @@ export default function TimeSlotsPage() {
         return
       }
 
-      setTimeSlots([...timeSlots, data])
-      setNewSlot({ id: 0, days: [], start: "", end: "", slotType: "Traditional Lecture" })
+      setAllTimeSlots([
+        ...allTimeSlots,
+        {
+          ...data,
+          isSummer: Boolean((data as { isSummer?: boolean }).isSummer),
+        } as TimeSlot,
+      ])
+      setNewSlot({ id: 0, days: [], start: "", end: "", slotType: "Traditional Lecture", isSummer: false })
       setIsAddDialogOpen(false)
       toast({
         title: "Success",
@@ -221,6 +329,7 @@ export default function TimeSlotsPage() {
           start: editingSlot.start,
           end: editingSlot.end,
           slotType: editingSlot.slotType,
+          isSummer: editingSlot.isSummer,
         }),
       })
 
@@ -235,7 +344,13 @@ export default function TimeSlotsPage() {
         return
       }
 
-      setTimeSlots(timeSlots.map((s) => (s.id === editingSlot.id ? data : s)))
+      setAllTimeSlots(
+        allTimeSlots.map((s) =>
+          s.id === editingSlot.id
+            ? ({ ...data, isSummer: Boolean((data as { isSummer?: boolean }).isSummer) } as TimeSlot)
+            : s,
+        ),
+      )
       setEditingSlot(null)
       toast({
         title: "Success",
@@ -253,6 +368,16 @@ export default function TimeSlotsPage() {
     }
   }
 
+  const tableSlots = useMemo(
+    () => filterSlotsBySemester(allTimeSlots, listFilter),
+    [allTimeSlots, listFilter],
+  )
+
+  const overviewSlots = useMemo(
+    () => filterSlotsBySemester(allTimeSlots, weeklyOverviewFilter),
+    [allTimeSlots, weeklyOverviewFilter],
+  )
+
   const handleDeleteSlot = async (slot: TimeSlot) => {
     try {
       const response = await fetch(`/api/timeslots/${slot.id}`, {
@@ -260,29 +385,152 @@ export default function TimeSlotsPage() {
       })
 
       const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
 
       if (!response.ok) {
         toast({
           title: "Error",
-          description: data.error || "Failed to delete time slot. Please try again.",
+          description: errorMessage || "Failed to archive time slot. Please try again.",
           variant: "destructive",
         })
         return
       }
 
-      setTimeSlots(timeSlots.filter((s) => s.id !== slot.id))
+      setAllTimeSlots(allTimeSlots.filter((s) => s.id !== slot.id))
+      await fetchArchivedTimeSlots()
       toast({
         title: "Success",
-        description: "Time slot deleted successfully.",
+        description: `${slot.days.join(", ")} ${slot.start}-${slot.end} archived — it won't be used in future scheduling`,
       })
     } catch (error) {
       console.error('Error deleting timeslot:', error)
       toast({
         title: "Error",
-        description: "Failed to delete time slot. Please try again.",
+        description: "Failed to archive time slot. Please try again.",
         variant: "destructive",
       })
     }
+  }
+
+  const handleRestoreArchivedSlot = async (slot: TimeSlot) => {
+    try {
+      const response = await fetch(`/api/timeslots/${slot.id}/restore`, { method: "PATCH" })
+      const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: errorMessage || "Failed to restore time slot. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setArchivedTimeSlots((prev) => prev.filter((s) => s.id !== slot.id))
+      await fetchTimeSlots()
+      toast({ title: "Success", description: "Time slot restored successfully." })
+    } catch (error) {
+      console.error("Error restoring timeslot:", error)
+      toast({
+        title: "Error",
+        description: "Failed to restore time slot. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const openPermanentDeleteSlotModal = async (slot: TimeSlot) => {
+    try {
+      setLoadingDeletionImpact(true)
+      const response = await fetch(`/api/timeslots/${slot.id}/deletion-impact`, { cache: "no-store" })
+      const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: errorMessage || "Failed to check deletion impact. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setArchivedSlotToPermanentlyDelete(slot)
+      setArchivedSlotDeletionImpact({
+        entryCount: Number((data as { entryCount?: unknown }).entryCount ?? 0) || 0,
+        timetables: Array.isArray((data as { timetables?: unknown }).timetables)
+          ? ((data as { timetables: unknown[] }).timetables as {
+              timetableId: number
+              generationType: string
+              status: string
+              versionNumber: number
+            }[])
+          : [],
+      })
+    } catch (error) {
+      console.error("Error checking timeslot deletion impact:", error)
+      toast({
+        title: "Error",
+        description: "Failed to check deletion impact. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingDeletionImpact(false)
+    }
+  }
+
+  const confirmPermanentDeleteArchivedSlot = async () => {
+    if (!archivedSlotToPermanentlyDelete) return
+    try {
+      setPermanentlyDeleting(true)
+      const response = await fetch(`/api/timeslots/${archivedSlotToPermanentlyDelete.id}/permanent`, {
+        method: "DELETE",
+      })
+      const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: errorMessage || "Failed to permanently delete time slot. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setArchivedTimeSlots((prev) => prev.filter((s) => s.id !== archivedSlotToPermanentlyDelete.id))
+      setArchivedSlotToPermanentlyDelete(null)
+      setArchivedSlotDeletionImpact(null)
+      toast({ title: "Success", description: "Time slot permanently deleted successfully." })
+    } catch (error) {
+      console.error("Error permanently deleting timeslot:", error)
+      toast({
+        title: "Error",
+        description: "Failed to permanently delete time slot. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setPermanentlyDeleting(false)
+    }
+  }
+
+  const confirmDeleteSlot = async () => {
+    if (!slotToDelete) return
+    await handleDeleteSlot(slotToDelete)
+    setSlotToDelete(null)
   }
 
   const toggleDay = (day: string, slot: TimeSlot, setSlot: (s: TimeSlot) => void) => {
@@ -360,9 +608,9 @@ export default function TimeSlotsPage() {
   }
 
   const sortedTimeSlots = useMemo(() => {
-    if (!sortField) return timeSlots
+    if (!sortField) return tableSlots
 
-    return [...timeSlots].sort((a, b) => {
+    return [...tableSlots].sort((a, b) => {
       let comparison = 0
 
       if (sortField === "duration") {
@@ -390,7 +638,7 @@ export default function TimeSlotsPage() {
 
       return sortDirection === "asc" ? comparison : -comparison
     })
-  }, [timeSlots, sortField, sortDirection])
+  }, [tableSlots, sortField, sortDirection])
 
   const weeklyOverviewGroups = useMemo(() => {
     const sortedByStart = (slots: TimeSlot[]) =>
@@ -402,7 +650,7 @@ export default function TimeSlotsPage() {
         return a.id - b.id
       })
 
-    const outerGroups = timeSlots.reduce(
+    const outerGroups = overviewSlots.reduce(
       (acc, slot) => {
         const key = weeklyOverviewGroupBy === "days" ? sortDaysByWeekOrder(slot.days).join("-") : getCanonicalSlotType(slot.slotType)
         if (!acc[key]) acc[key] = []
@@ -465,7 +713,7 @@ export default function TimeSlotsPage() {
           }))
         return { groupKey, slots: sortedByStart(slots), innerGroups }
       })
-  }, [timeSlots, weeklyOverviewGroupBy])
+  }, [overviewSlots, weeklyOverviewGroupBy])
 
   const totalPages = Math.ceil(sortedTimeSlots.length / pageSize)
   const maxPage = totalPages || 1
@@ -480,7 +728,10 @@ export default function TimeSlotsPage() {
 
   if (loading) {
     return (
-      <EntityLayout title="Time Slot Management" description="Configure available time slots for scheduling.">
+      <EntityLayout
+      title="Time Slot Management"
+      description="Add, edit, and manage Time slots."
+    >
         <Card>
           <CardContent className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -491,32 +742,79 @@ export default function TimeSlotsPage() {
   }
 
   return (
-    <EntityLayout title="Time Slot Management" description="Configure available time slots for scheduling.">
-      <div className="flex flex-col gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle>Time Slots ({sortedTimeSlots.length})</CardTitle>
-            <div className="flex items-center gap-2">
+    <Tabs value={tab} onValueChange={(v) => setTab(v as "active" | "archived")}>
+      <EntityLayout
+        title="Time Slot Management"
+        description="Add, edit, and manage Time slots."
+        headerActions={
+          <TabsList>
+            <TabsTrigger value="active">Time Slots</TabsTrigger>
+            <TabsTrigger value="archived">Archived</TabsTrigger>
+          </TabsList>
+        }
+      >
+        <TabsContent value="active">
+          <div className="flex flex-col gap-6">
+            <Card className="gap-2 py-4">
+          <CardHeader className="flex flex-col gap-2 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between sm:pb-2">
+            <CardTitle>
+              Time Slots ({tableSlots.length}
+              {listFilter !== "all" ? (
+                <span className="text-sm font-normal text-muted-foreground"> of {allTimeSlots.length}</span>
+              ) : null}
+              )
+            </CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-muted-foreground">List filter</span>
+                <Select
+                  value={listFilter}
+                  onValueChange={(v) => setListFilter(v as TimeslotListFilter)}
+                >
+                  <SelectTrigger className="h-9 w-[200px]" aria-label="Timeslot list semester filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="normal">Normal (1st / 2nd semester)</SelectItem>
+                    <SelectItem value="summer">Summer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <Button variant="outline" size="sm" className="bg-transparent" onClick={() => setIsImportDialogOpen(true)}>
                 <ImportIcon className="mr-2 h-4 w-4" />
                 Import
               </Button>
               <ExportDropdownWithDialog
-                allData={sortedTimeSlots.map((s) => ({ ...s, days: s.days.join(", ") }))}
-                filteredData={paginatedTimeSlots.map((s) => ({ ...s, days: s.days.join(", ") }))}
+                allData={sortedTimeSlots.map((s) => ({
+                  ...s,
+                  days: s.days.join(", "),
+                  isSummer: s.isSummer ? "Summer" : "1st/2nd",
+                }))}
+                filteredData={paginatedTimeSlots.map((s) => ({
+                  ...s,
+                  days: s.days.join(", "),
+                  isSummer: s.isSummer ? "Summer" : "1st/2nd",
+                }))}
                 columns={[
                   { key: "days" as const, label: "Days" },
                   { key: "start" as const, label: "Start" },
                   { key: "end" as const, label: "End" },
                   { key: "slotType" as const, label: "Type" },
+                  { key: "isSummer" as const, label: "Semester" },
                 ]}
                 filenamePrefix="timeslots"
                 pdfTitle="Time Slots"
-                totalLabel={`${timeSlots.length}`}
+                totalLabel={`${allTimeSlots.length}`}
                 filteredLabel={`${paginatedTimeSlots.length}`}
-                isFiltered={sortField != null}
+                isFiltered={sortField != null || listFilter !== "all"}
                 filterDescription={
-                  sortField ? `sort: ${sortField} ${sortDirection}` : undefined
+                  [
+                    listFilter !== "all" ? `list: ${listFilter}` : null,
+                    sortField ? `sort: ${sortField} ${sortDirection}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || undefined
                 }
               />
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -529,7 +827,10 @@ export default function TimeSlotsPage() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add New Time Slot</DialogTitle>
-                    <DialogDescription>Define a new time slot for scheduling.</DialogDescription>
+                    <DialogDescription>
+                      Choose whether this pattern applies to the summer semester or to first/second semester
+                      (normal) scheduling.
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="space-y-2">
@@ -600,6 +901,29 @@ export default function TimeSlotsPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div className="space-y-2">
+                      <Label>Semester</Label>
+                      <RadioGroup
+                        value={newSlot.isSummer ? "summer" : "normal"}
+                        onValueChange={(v) =>
+                          setNewSlot({ ...newSlot, isSummer: v === "summer" })
+                        }
+                        className="flex flex-col gap-2 sm:flex-row sm:gap-6"
+                      >
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="normal" id="new-slot-sem-normal" />
+                          <Label htmlFor="new-slot-sem-normal" className="cursor-pointer text-sm font-normal">
+                            First or second semester
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="summer" id="new-slot-sem-summer" />
+                          <Label htmlFor="new-slot-sem-summer" className="cursor-pointer text-sm font-normal">
+                            Summer semester
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
@@ -614,7 +938,7 @@ export default function TimeSlotsPage() {
               </Dialog>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -664,13 +988,14 @@ export default function TimeSlotsPage() {
                       </button>
                     </TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Semester</TableHead>
                     <TableHead className="w-[70px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedTimeSlots.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No time slots found
                       </TableCell>
                     </TableRow>
@@ -693,6 +1018,17 @@ export default function TimeSlotsPage() {
                           <Badge className={getSlotTypeColor(slot.slotType)}>{slot.slotType}</Badge>
                         </TableCell>
                         <TableCell>
+                          <Badge
+                            className={
+                              slot.isSummer
+                                ? "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-100"
+                                : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                            }
+                          >
+                            {slot.isSummer ? "Summer" : "1st/2nd"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -704,9 +1040,12 @@ export default function TimeSlotsPage() {
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteSlot(slot)}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
+                              <DropdownMenuItem
+                                className="text-destructive hover:text-destructive focus:text-destructive data-[highlighted]:text-destructive"
+                                onClick={() => setSlotToDelete(slot)}
+                              >
+                                <Archive className="mr-2 h-4 w-4 text-destructive" />
+                                Archive
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -792,31 +1131,63 @@ export default function TimeSlotsPage() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between gap-4">
-              <CardTitle>Weekly Overview</CardTitle>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="weekly-overview-group-by" className="text-sm text-muted-foreground">
-                  Group by
-                </Label>
-                <Select
-                  value={weeklyOverviewGroupBy}
-                  onValueChange={(value) => setWeeklyOverviewGroupBy(value as WeeklyOverviewGroupBy)}
-                >
-                  <SelectTrigger id="weekly-overview-group-by" className="h-8 w-[130px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="days">Days</SelectItem>
-                    <SelectItem value="type">Type</SelectItem>
-                  </SelectContent>
-                </Select>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div className="space-y-1">
+                <CardTitle>
+                  Weekly Overview ({overviewSlots.length}
+                  {weeklyOverviewFilter !== "all" ? (
+                    <span className="text-sm font-normal text-muted-foreground"> of {allTimeSlots.length}</span>
+                  ) : null}
+                  )
+                </CardTitle>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Label htmlFor="weekly-overview-sem-filter" className="text-sm text-muted-foreground whitespace-nowrap">
+                    Show
+                  </Label>
+                  <Select
+                    value={weeklyOverviewFilter}
+                    onValueChange={(v) => setWeeklyOverviewFilter(v as TimeslotListFilter)}
+                  >
+                    <SelectTrigger id="weekly-overview-sem-filter" className="h-8 w-[200px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="normal">Normal (1st / 2nd semester)</SelectItem>
+                      <SelectItem value="summer">Summer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Label htmlFor="weekly-overview-group-by" className="text-sm text-muted-foreground whitespace-nowrap">
+                    Group by
+                  </Label>
+                  <Select
+                    value={weeklyOverviewGroupBy}
+                    onValueChange={(value) => setWeeklyOverviewGroupBy(value as WeeklyOverviewGroupBy)}
+                  >
+                    <SelectTrigger id="weekly-overview-group-by" className="h-8 w-[130px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="days">Days</SelectItem>
+                      <SelectItem value="type">Type</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {weeklyOverviewGroups.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No time slots configured yet.</p>
+                <p className="text-sm text-muted-foreground">
+                  {allTimeSlots.length === 0
+                    ? "No time slots configured yet."
+                    : "No slots match this weekly overview filter — try “All” or another semester."}
+                </p>
               ) : (
                 weeklyOverviewGroups.map(({ groupKey, slots, innerGroups }) => (
                   <div key={groupKey} className="space-y-2">
@@ -902,7 +1273,118 @@ export default function TimeSlotsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="archived">
+          <Card>
+            <CardHeader className="flex flex-col gap-2 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between sm:pb-2">
+              <CardTitle>Archived Time Slots ({archivedTimeSlots.length})</CardTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm text-muted-foreground">List filter</span>
+                  <Select
+                    value={listFilter}
+                    onValueChange={(v) => setListFilter(v as TimeslotListFilter)}
+                  >
+                    <SelectTrigger className="h-9 w-[200px]" aria-label="Archived timeslot list semester filter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="normal">Normal (1st / 2nd semester)</SelectItem>
+                      <SelectItem value="summer">Summer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {loadingArchived ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingArchived ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Days</TableHead>
+                        <TableHead>Start</TableHead>
+                        <TableHead>End</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Semester</TableHead>
+                        <TableHead className="w-[70px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {archivedTimeSlots.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                            No archived time slots
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        archivedTimeSlots.map((slot) => (
+                          <TableRow key={slot.id}>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {slot.days.map((day) => (
+                                  <Badge key={day} className={getDayColor(day)}>
+                                    {day.slice(0, 3)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                            <TableCell>{slot.start}</TableCell>
+                            <TableCell>{slot.end}</TableCell>
+                            <TableCell>
+                              <Badge className={getSlotTypeColor(slot.slotType)}>{slot.slotType}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                className={
+                                  slot.isSummer
+                                    ? "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-100"
+                                    : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                                }
+                              >
+                                {slot.isSummer ? "Summer" : "1st/2nd"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleRestoreArchivedSlot(slot)}>
+                                    Restore
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => openPermanentDeleteSlotModal(slot)}
+                                    disabled={loadingDeletionImpact}
+                                  >
+                                    Permanently Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      
 
       {/* Edit Dialog */}
       <Dialog open={!!editingSlot} onOpenChange={(open) => !open && setEditingSlot(null)}>
@@ -979,6 +1461,29 @@ export default function TimeSlotsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>Semester</Label>
+                <RadioGroup
+                  value={editingSlot.isSummer ? "summer" : "normal"}
+                  onValueChange={(v) =>
+                    setEditingSlot({ ...editingSlot, isSummer: v === "summer" })
+                  }
+                  className="flex flex-col gap-2 sm:flex-row sm:gap-6"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="normal" id="edit-slot-sem-normal" />
+                    <Label htmlFor="edit-slot-sem-normal" className="cursor-pointer text-sm font-normal">
+                      First or second semester
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="summer" id="edit-slot-sem-summer" />
+                    <Label htmlFor="edit-slot-sem-summer" className="cursor-pointer text-sm font-normal">
+                      Summer semester
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -998,13 +1503,14 @@ export default function TimeSlotsPage() {
         onOpenChange={setIsImportDialogOpen}
         title="Import Time Slots"
         description="Upload a CSV, Excel, or JSON file with time slot data."
-        exampleHeaders={["days", "start", "end", "slotType"]}
+        exampleHeaders={["days", "start", "end", "slotType", "isSummer"]}
         columns={[
           { key: "id", label: "ID" },
           { key: "days", label: "Days" },
           { key: "start", label: "Start" },
           { key: "end", label: "End" },
           { key: "slotType", label: "Type" },
+          { key: "isSummer", label: "Semester" },
         ]}
         getRowKey={(row) => {
           const days = [...row.days].sort().join(",")
@@ -1018,12 +1524,19 @@ export default function TimeSlotsPage() {
           const days = daysStr.split(",").map((d) => d.trim()).filter((d) => allDays.includes(d))
           if (days.length === 0) return null
           const slotType = (findColumn(row, "slotType", "slot_type", "slottype", "type") ?? "Traditional Lecture") as SlotType
+          const summerRaw = findColumn(row, "isSummer", "is_summer", "summer", "semester_type")
+          const isSummer =
+            summerRaw?.toLowerCase() === "true" ||
+            summerRaw === "1" ||
+            summerRaw?.toLowerCase() === "summer" ||
+            summerRaw?.toLowerCase() === "yes"
           return {
-            id: timeSlots.length + index + 1,
+            id: allTimeSlots.length + index + 1,
             days,
             start,
             end,
             slotType: slotTypes.includes(slotType) ? slotType : "Traditional Lecture",
+            isSummer,
           }
         }}
         onImport={async (data) => {
@@ -1039,7 +1552,7 @@ export default function TimeSlotsPage() {
               })
               if (response.ok) {
                 const created = await response.json()
-                setTimeSlots((prev) => [...prev, created])
+                setAllTimeSlots((prev) => [...prev, created])
                 added++
               } else if (response.status === 409) {
                 duplicates++
@@ -1054,6 +1567,80 @@ export default function TimeSlotsPage() {
           return { added, duplicates, errors }
         }}
       />
-    </EntityLayout>
+
+      <AlertDialog open={slotToDelete !== null} onOpenChange={(open) => !open && setSlotToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive time slot?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {slotToDelete
+                ? `"${slotToDelete.days.join(", ")} ${slotToDelete.start}-${slotToDelete.end}" will be archived. Archived time slots are excluded from future scheduling.`
+                : "Archived time slots are excluded from future scheduling."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDeleteSlot}
+            >
+              Archive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={archivedSlotToPermanentlyDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setArchivedSlotToPermanentlyDelete(null)
+            setArchivedSlotDeletionImpact(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete time slot?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  This will permanently remove this timeslot and delete{" "}
+                  <span className="font-semibold text-foreground">{archivedSlotDeletionImpact?.entryCount ?? 0}</span>{" "}
+                  schedule entries.
+                </p>
+                <div className="rounded-md border bg-muted/40 p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Affected Timetables
+                  </p>
+                  {(archivedSlotDeletionImpact?.timetables?.length ?? 0) === 0 ? (
+                    <p>No timetables</p>
+                  ) : (
+                    <ul className="max-h-36 list-disc space-y-1 overflow-y-auto pl-5">
+                      {(archivedSlotDeletionImpact?.timetables ?? []).map((t) => (
+                        <li key={`${t.timetableId}-${t.versionNumber}`}>{formatTimetableLabel(t)}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <p className="font-medium text-destructive">This cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={permanentlyDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmPermanentDeleteArchivedSlot}
+              disabled={permanentlyDeleting || archivedSlotDeletionImpact == null}
+            >
+              {permanentlyDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Permanently Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      </EntityLayout>
+    </Tabs>
   )
 }

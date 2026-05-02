@@ -208,7 +208,7 @@ export function TimetableGridAddSectionDialog({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <ul className="max-h-56 overflow-auto rounded-md border border-slate-200 text-sm">
+            <ul className="max-h-56 overflow-auto rounded-md border border-border text-sm">
               {filteredCandidateRows.length === 0 ? (
                 <li className="space-y-2 px-3 py-2">
                   <p className="text-muted-foreground">No addable section matches this timeslot and delivery mode.</p>
@@ -220,7 +220,7 @@ export function TimetableGridAddSectionDialog({
                     <button
                       type="button"
                       onClick={() => setSelectedLectureId(String(lec.id))}
-                      className={`block w-full px-3 py-2 text-left hover:bg-slate-50 ${
+                      className={`block w-full px-3 py-2 text-left hover:bg-muted/60 ${
                         selectedLectureId === String(lec.id) ? "bg-primary/10" : ""
                       }`}
                     >
@@ -257,7 +257,7 @@ export function TimetableGridAddSectionDialog({
           <div className="space-y-2">
             <Label>Lecturer</Label>
             <select
-              className="h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm"
+              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
               value={selectedLecturer}
               onChange={(e) => setSelectedLecturer(e.target.value)}
               disabled={!selectedLecture || allLecturerNames.length === 0}

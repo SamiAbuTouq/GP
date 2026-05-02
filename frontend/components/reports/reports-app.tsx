@@ -80,9 +80,19 @@ const REPORT_ICONS: Record<ReportTypeId, any> = {
   "lecturer-workload": UserRoundIcon,
   "course-distribution": ChartPieIcon,
   "conflict-analysis": TriangleAlertIcon,
-  "student-schedule": GraduationCapIcon,
   "optimization-summary": ActivityIcon,
+  "lecturer-preference-compliance": GraduationCapIcon,
+  "room-type-matching": TriangleAlertIcon,
 }
+
+const ZIP_CSV_REPORT_TYPES = new Set<ReportTypeId>([
+  "room-utilization",
+  "lecturer-workload",
+  "course-distribution",
+  "conflict-analysis",
+  "lecturer-preference-compliance",
+  "room-type-matching",
+])
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -94,6 +104,13 @@ function formatLabel(f: ExportFormat): "PDF" | "Excel" | "CSV" {
   if (f === "excel") return "Excel"
   if (f === "csv") return "CSV"
   return "PDF"
+}
+
+function formatChoiceLabel(f: ExportFormat, reportTypeId: ReportTypeId | ""): string {
+  if (f === "csv" && reportTypeId && ZIP_CSV_REPORT_TYPES.has(reportTypeId)) {
+    return "CSV (zip)"
+  }
+  return formatLabel(f)
 }
 
 type SemesterListItem = {
@@ -119,13 +136,21 @@ function ReportTypeButton({
 }) {
   const Icon = REPORT_ICONS[report.id]
   const iconRef = useRef<any>(null)
+  const startIconAnimation = () => {
+    const fn = iconRef.current?.startAnimation
+    if (typeof fn === "function") fn.call(iconRef.current)
+  }
+  const stopIconAnimation = () => {
+    const fn = iconRef.current?.stopAnimation
+    if (typeof fn === "function") fn.call(iconRef.current)
+  }
 
   return (
     <button
       type="button"
       onClick={onClick}
-      onMouseEnter={() => iconRef.current?.startAnimation()}
-      onMouseLeave={() => iconRef.current?.stopAnimation()}
+      onMouseEnter={startIconAnimation}
+      onMouseLeave={stopIconAnimation}
       className={cn(
         "rounded-xl border bg-card text-left transition-all hover:border-primary/40 hover:shadow-md",
         active ? "border-primary ring-2 ring-primary/20 shadow-sm" : "border-border/80",
@@ -445,6 +470,13 @@ export function ReportsApp() {
       })
       return
     }
+    if (r.extension === "zip") {
+      setPreviewTable([
+        ["Preview unavailable for ZIP exports"],
+        ["Download the file to inspect the packaged CSV files."],
+      ])
+      return
+    }
     if (r.extension === "xlsx") {
       r.blob.arrayBuffer().then((buf) => {
         const wb = XLSX.read(buf, { type: "array" })
@@ -607,7 +639,9 @@ export function ReportsApp() {
                                     <FileSpreadsheet className="h-5 w-5 text-sky-600/90" />
                                   )}
                                   <div>
-                                    <div className="text-sm font-medium">{formatLabel(f)}</div>
+                                    <div className="text-sm font-medium">
+                                      {formatChoiceLabel(f, selectedReportId)}
+                                    </div>
                                     <div className="text-muted-foreground text-xs">
                                       {f === "pdf"
                                         ? "Print-ready layout"
@@ -834,7 +868,7 @@ export function ReportsApp() {
                             </div>
                             <div className="font-medium">
                               {selectedReportId && exportFormat !== "" && hasChosenFormat
-                                ? formatLabel(exportFormat as ExportFormat)
+                                ? formatChoiceLabel(exportFormat as ExportFormat, selectedReportId)
                                 : "—"}
                             </div>
                           </div>
@@ -855,125 +889,118 @@ export function ReportsApp() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="recent" className="mt-0 focus-visible:outline-none">
-                  <Card className="border-border/80 shadow-sm">
-                    <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between space-y-0">
-                      <div>
-                        <CardTitle className="text-lg">Recent Reports</CardTitle>
-                        <CardDescription>
-                          Session-only history. Reloading the page clears this list.
-                        </CardDescription>
-                      </div>
-                      <div className="relative w-full sm:max-w-xs">
-                        <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          placeholder="Search name, type, semester…"
-                          className="h-10 pl-9"
-                          value={recentFilter}
-                          onChange={(e) => setRecentFilter(e.target.value)}
-                        />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {filteredRecent.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-                          <FileText className="h-10 w-10 text-muted-foreground/40" />
-                          <p className="font-medium text-muted-foreground">
-                            {recentReports.length === 0
-                              ? "No reports yet"
-                              : "No matches for your search"}
-                          </p>
-                          <p className="text-muted-foreground text-sm max-w-sm">
-                            {recentReports.length === 0
-                              ? "Generate a report from the other tab — it will show up here instantly."
-                              : "Try a different search term."}
-                          </p>
-                        </div>
-                      ) : (
-                        <ScrollArea className="h-[min(560px,calc(100vh-280px))] pr-4">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="hover:bg-transparent">
-                                <TableHead className="min-w-[200px]">Report</TableHead>
-                                <TableHead>Format</TableHead>
-                                <TableHead className="min-w-[160px]">Timetable</TableHead>
-                                <TableHead className="text-right">Size</TableHead>
-                                <TableHead className="min-w-[140px]">Generated</TableHead>
-                                <TableHead className="text-right w-[140px]">Actions</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filteredRecent.map((r) => (
-                                <TableRow key={r.id}>
-                                  <TableCell>
-                                    <div className="font-medium leading-snug">{r.displayName}</div>
-                                    <div className="text-muted-foreground text-xs">{r.reportTypeName}</div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="secondary" className="font-normal">
-                                      {r.format}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-muted-foreground text-sm">
-                                    {r.timetableLabel}
-                                  </TableCell>
-                                  <TableCell className="text-right tabular-nums text-sm">
-                                    {formatBytes(r.sizeBytes)}
-                                  </TableCell>
-                                  <TableCell className="text-muted-foreground text-sm tabular-nums">
-                                    {format(r.generatedAt, "MMM d, yyyy · HH:mm")}
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <div className="flex justify-end gap-0.5">
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8"
-                                            onClick={() => openPreview(r)}
-                                          >
-                                            <Eye className="h-4 w-4" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>View</TooltipContent>
-                                      </Tooltip>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8"
-                                            onClick={() => handleDownloadRecent(r)}
-                                          >
-                                            <Download className="h-4 w-4" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>Download</TooltipContent>
-                                      </Tooltip>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 text-destructive hover:text-destructive"
-                                            onClick={() => setDeleteTarget(r)}
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>Delete</TooltipContent>
-                                      </Tooltip>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </ScrollArea>
-                      )}
-                    </CardContent>
-                  </Card>
+                <TabsContent value="recent" className="mt-0 space-y-6 focus-visible:outline-none">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold">Recent Reports</h2>
+                      <p className="text-muted-foreground text-sm">
+                        Session-only history. Reloading the page clears this list.
+                      </p>
+                    </div>
+                    <div className="relative w-full sm:max-w-xs">
+                      <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search name, type, semester…"
+                        className="h-10 pl-9"
+                        value={recentFilter}
+                        onChange={(e) => setRecentFilter(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {filteredRecent.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+                      <FileText className="h-10 w-10 text-muted-foreground/40" />
+                      <p className="font-medium text-muted-foreground">
+                        {recentReports.length === 0 ? "No reports yet" : "No matches for your search"}
+                      </p>
+                      <p className="text-muted-foreground text-sm max-w-sm">
+                        {recentReports.length === 0
+                          ? "Generate a report from the other tab — it will show up here instantly."
+                          : "Try a different search term."}
+                      </p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[min(560px,calc(100vh-280px))] pr-4">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="hover:bg-transparent">
+                            <TableHead className="min-w-[200px]">Report</TableHead>
+                            <TableHead>Format</TableHead>
+                            <TableHead className="min-w-[160px]">Timetable</TableHead>
+                            <TableHead className="text-right">Size</TableHead>
+                            <TableHead className="min-w-[140px]">Generated</TableHead>
+                            <TableHead className="text-right w-[140px]">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredRecent.map((r) => (
+                            <TableRow key={r.id}>
+                              <TableCell>
+                                <div className="font-medium leading-snug">{r.displayName}</div>
+                                <div className="text-muted-foreground text-xs">{r.reportTypeName}</div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="font-normal">
+                                  {r.format}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground text-sm">{r.timetableLabel}</TableCell>
+                              <TableCell className="text-right tabular-nums text-sm">
+                                {formatBytes(r.sizeBytes)}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground text-sm tabular-nums">
+                                {format(r.generatedAt, "MMM d, yyyy · HH:mm")}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-0.5">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => openPreview(r)}
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>View</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => handleDownloadRecent(r)}
+                                      >
+                                        <Download className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Download</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-destructive hover:text-destructive"
+                                        onClick={() => setDeleteTarget(r)}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Delete</TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  )}
                 </TabsContent>
               </Tabs>
             </div>

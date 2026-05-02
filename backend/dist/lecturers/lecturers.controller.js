@@ -25,8 +25,8 @@ let LecturersController = class LecturersController {
     findAll() {
         return this.lecturersService.findAll();
     }
-    findOne(id) {
-        return this.lecturersService.findOne(id);
+    findDeactivated() {
+        return this.lecturersService.findDeactivated();
     }
     create(dto) {
         return this.lecturersService.create(dto);
@@ -37,6 +37,18 @@ let LecturersController = class LecturersController {
     remove(id) {
         return this.lecturersService.remove(id);
     }
+    reactivate(id) {
+        return this.lecturersService.reactivate(id);
+    }
+    getPurgeImpact(id) {
+        return this.lecturersService.getPurgeImpact(id);
+    }
+    purge(id) {
+        return this.lecturersService.purgeDeactivated(id);
+    }
+    findOne(id) {
+        return this.lecturersService.findOne(id);
+    }
 };
 exports.LecturersController = LecturersController;
 __decorate([
@@ -46,12 +58,11 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], LecturersController.prototype, "findAll", null);
 __decorate([
-    (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)('deactivated/list'),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
-], LecturersController.prototype, "findOne", null);
+], LecturersController.prototype, "findDeactivated", null);
 __decorate([
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),
@@ -74,6 +85,34 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], LecturersController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Patch)(':id/reactivate'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], LecturersController.prototype, "reactivate", null);
+__decorate([
+    (0, common_1.Get)(':id/purge-impact'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], LecturersController.prototype, "getPurgeImpact", null);
+__decorate([
+    (0, common_1.Delete)(':id/purge'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], LecturersController.prototype, "purge", null);
+__decorate([
+    (0, common_1.Get)(':id'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], LecturersController.prototype, "findOne", null);
 exports.LecturersController = LecturersController = __decorate([
     (0, common_1.Controller)('lecturers'),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),

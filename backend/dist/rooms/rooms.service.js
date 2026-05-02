@@ -19,6 +19,7 @@ let RoomsService = class RoomsService {
     }
     async findAll() {
         const rooms = await this.prisma.room.findMany({
+            where: { is_available: true },
             orderBy: { room_number: 'asc' },
         });
         return rooms.map((room) => ({
@@ -112,10 +113,86 @@ let RoomsService = class RoomsService {
         if (!existing) {
             throw new common_1.NotFoundException(`Room with ID ${id} not found`);
         }
-        await this.prisma.room.delete({
+        await this.prisma.room.update({
             where: { room_id: id },
+            data: { is_available: false },
         });
-        return { message: 'Room deleted successfully' };
+        return { message: 'Room archived successfully', archived: true };
+    }
+    async findArchived() {
+        const rooms = await this.prisma.room.findMany({
+            where: { is_available: false },
+            orderBy: { room_number: 'asc' },
+        });
+        return rooms.map((room) => ({
+            id: room.room_number,
+            databaseId: room.room_id,
+            type: ROOM_TYPES[room.room_type] || 'Classroom',
+            capacity: room.capacity,
+            isAvailable: room.is_available,
+        }));
+    }
+    async restoreArchived(id) {
+        const room = await this.prisma.room.findUnique({
+            where: { room_id: id },
+            select: { room_id: true },
+        });
+        if (!room) {
+            throw new common_1.NotFoundException(`Room with ID ${id} not found`);
+        }
+        await this.prisma.room.update({
+            where: { room_id: id },
+            data: { is_available: true },
+        });
+        return { message: 'Room restored successfully' };
+    }
+    async getDeletionImpact(id) {
+        const room = await this.prisma.room.findUnique({
+            where: { room_id: id },
+            select: { room_id: true, room_number: true },
+        });
+        if (!room) {
+            throw new common_1.NotFoundException(`Room with ID ${id} not found`);
+        }
+        const entries = await this.prisma.sectionScheduleEntry.findMany({
+            where: { room_id: id },
+            select: {
+                timetable_id: true,
+                timetable: {
+                    select: { generation_type: true, status: true, version_number: true },
+                },
+            },
+            distinct: ['timetable_id'],
+            orderBy: { timetable_id: 'asc' },
+        });
+        return {
+            roomId: room.room_id,
+            roomNumber: room.room_number,
+            entryCount: await this.prisma.sectionScheduleEntry.count({ where: { room_id: id } }),
+            timetables: entries.map((entry) => ({
+                timetableId: entry.timetable_id,
+                generationType: entry.timetable.generation_type,
+                status: entry.timetable.status,
+                versionNumber: entry.timetable.version_number,
+            })),
+        };
+    }
+    async permanentlyDeleteArchived(id) {
+        const room = await this.prisma.room.findUnique({
+            where: { room_id: id },
+            select: { room_id: true, is_available: true },
+        });
+        if (!room) {
+            throw new common_1.NotFoundException(`Room with ID ${id} not found`);
+        }
+        if (room.is_available) {
+            throw new common_1.ConflictException('Only archived rooms can be permanently deleted.');
+        }
+        await this.prisma.$transaction(async (tx) => {
+            await tx.sectionScheduleEntry.deleteMany({ where: { room_id: id } });
+            await tx.room.delete({ where: { room_id: id } });
+        });
+        return { message: 'Room permanently deleted successfully' };
     }
 };
 exports.RoomsService = RoomsService;

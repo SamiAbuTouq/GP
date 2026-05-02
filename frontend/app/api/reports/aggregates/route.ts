@@ -51,6 +51,24 @@ function decodeRoomType(code: number): string {
   return map[code] ?? `Type ${code}`
 }
 
+function roomTypeIsLab(typeLabel: string): boolean {
+  const t = typeLabel.toLowerCase()
+  return t.includes("laboratory") || t.includes("computer lab")
+}
+
+function deliveryLabel(mode: string): string {
+  if (mode === "FACE_TO_FACE") return "Face-to-face"
+  if (mode === "ONLINE") return "Online"
+  if (mode === "BLENDED") return "Blended"
+  return mode
+}
+
+function generationTypeLabel(value: string): string {
+  if (value === "gwo_ui") return "GWO (UI)"
+  if (value === "manual") return "Manual"
+  return value
+}
+
 function isUndergraduateLevel(level: number): boolean {
   return level < 500
 }
@@ -90,14 +108,26 @@ export async function GET(request: Request) {
 
     const timetables = await prisma.timetable.findMany({
       where: { semester_id: semesterId },
-      orderBy: [{ version_number: "desc" }, { generated_at: "desc" }],
+      orderBy: [{ generated_at: "asc" }, { timetable_id: "asc" }],
       include: { timetable_metrics: true },
     })
 
     const selectedTimetable =
       timetables.find((t) => t.status.toLowerCase() === "active") ?? timetables[0] ?? null
+    const timetableIds = timetables.map((t) => t.timetable_id)
+    const sectionCounts =
+      timetableIds.length > 0
+        ? await prisma.sectionScheduleEntry.groupBy({
+            by: ["timetable_id"],
+            where: { timetable_id: { in: timetableIds } },
+            _count: { _all: true },
+          })
+        : []
+    const sectionsByTimetableId = new Map<number, number>(
+      sectionCounts.map((r) => [r.timetable_id, r._count._all]),
+    )
 
-    const [allRooms, catalogCourses] = await Promise.all([
+    const [allRooms, catalogCourses, activeLecturers] = await Promise.all([
       prisma.room.findMany({ orderBy: { room_number: "asc" } }),
       prisma.course.findMany({
         select: {
@@ -107,6 +137,14 @@ export async function GET(request: Request) {
           delivery_mode: true,
           department: { select: { dept_name: true } },
         },
+      }),
+      prisma.lecturer.findMany({
+        where: { user: { is_active: true } },
+        include: {
+          user: { select: { first_name: true, last_name: true } },
+          department: { select: { dept_name: true } },
+        },
+        orderBy: [{ user: { first_name: "asc" } }, { user: { last_name: "asc" } }],
       }),
     ])
 
@@ -138,6 +176,7 @@ export async function GET(request: Request) {
           avgWeeklyHoursPerUsedRoom: 0,
           totalSeatFillWeightedPct: null,
           lecturerCountScheduled: 0,
+          lecturersWithNoAssignments: activeLecturers.length,
           distinctCoursesScheduled: 0,
           departmentsScheduled: 0,
         },
@@ -154,7 +193,18 @@ export async function GET(request: Request) {
           peakDay: "—",
           onlineOrBlendedSessions: 0,
         })),
-        lecturerRows: [],
+        lecturerRows: activeLecturers.map((l) => ({
+          userId: l.user_id,
+          lecturerName: `${l.user.first_name} ${l.user.last_name}`.trim(),
+          department: l.department.dept_name,
+          maxWorkloadHours: l.max_workload,
+          sectionsScheduled: 0,
+          distinctCourses: 0,
+          labSections: 0,
+          weeklyContactHours: 0,
+          loadIndex: 0,
+          loadPctOfMax: 0,
+        })),
         courseDistributionRows: Array.from(catalogByDept.entries())
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([department, counts]) => ({
@@ -170,18 +220,42 @@ export async function GET(request: Request) {
             faceToFaceSections: 0,
             avgSectionEnrollment: 0,
           })),
+        optimizationRuns: [],
+        conflicts: [],
+        lecturerPreferenceRows: [],
+        lecturerPreferenceSummary: {
+          scheduledLecturers: 0,
+          lecturersWithPreferences: 0,
+          lecturersWithoutPreferences: 0,
+          totalPreferredHits: 0,
+          totalAvoidedViolations: 0,
+          lecturersRequiringAttention: 0,
+        },
+        roomTypeRows: [],
+        roomTypeSummary: {
+          totalSections: 0,
+          okCount: 0,
+          hardMismatchCount: 0,
+          softMismatchCount: 0,
+        },
       })
     }
 
-    const entries = await prisma.sectionScheduleEntry.findMany({
-      where: { timetable_id: selectedTimetable.timetable_id },
-      include: {
-        timeslot: true,
-        course: { include: { department: true } },
-        lecturer: { include: { user: true, department: true } },
-        room: true,
-      },
-    })
+    const [entries, conflicts] = await Promise.all([
+      prisma.sectionScheduleEntry.findMany({
+        where: { timetable_id: selectedTimetable.timetable_id },
+        include: {
+          timeslot: true,
+          course: { include: { department: true } },
+          lecturer: { include: { user: true, department: true } },
+          room: true,
+        },
+      }),
+      prisma.timetableConflict.findMany({
+        where: { timetable_id: selectedTimetable.timetable_id },
+        orderBy: [{ severity: "asc" }, { conflict_type: "asc" }, { conflict_id: "asc" }],
+      }),
+    ])
 
     type RoomAgg = {
       sessions: number
@@ -356,7 +430,7 @@ export async function GET(request: Request) {
       }
     })
 
-    const lecturerRows = [...byLecturer.entries()]
+    const scheduledLecturerRows = [...byLecturer.entries()]
       .map(([userId, v]) => {
         const mw = Math.max(1, v.maxWorkload)
         const loadIndex = Math.round((v.weeklyHours / mw) * 1000) / 1000
@@ -375,6 +449,25 @@ export async function GET(request: Request) {
         }
       })
       .sort((a, b) => b.weeklyContactHours - a.weeklyContactHours)
+
+    const scheduledLecturerIds = new Set(scheduledLecturerRows.map((r) => r.userId))
+    const zeroLoadLecturerRows = activeLecturers
+      .filter((l) => !scheduledLecturerIds.has(l.user_id))
+      .map((l) => ({
+        userId: l.user_id,
+        lecturerName: `${l.user.first_name} ${l.user.last_name}`.trim(),
+        department: l.department.dept_name,
+        maxWorkloadHours: l.max_workload,
+        sectionsScheduled: 0,
+        distinctCourses: 0,
+        labSections: 0,
+        weeklyContactHours: 0,
+        loadIndex: 0,
+        loadPctOfMax: 0,
+      }))
+      .sort((a, b) => a.lecturerName.localeCompare(b.lecturerName))
+
+    const lecturerRows = [...scheduledLecturerRows, ...zeroLoadLecturerRows]
 
     const allDeptNames = new Set([...catalogByDept.keys(), ...deptSchedule.keys()])
     const courseDistributionRows = [...allDeptNames]
@@ -404,6 +497,131 @@ export async function GET(request: Request) {
       })
 
     const metrics = selectedTimetable.timetable_metrics
+    const optimizationRuns = timetables.map((t) => ({
+      timetableId: t.timetable_id,
+      versionNumber: t.version_number,
+      generationType: t.generation_type,
+      generationTypeLabel: generationTypeLabel(t.generation_type),
+      status: t.status,
+      generatedAt: t.generated_at.toISOString(),
+      fitnessScore: t.timetable_metrics ? Number(t.timetable_metrics.fitness_score) : null,
+      softConstraintsScore: t.timetable_metrics ? Number(t.timetable_metrics.soft_constraints_score) : null,
+      roomUtilizationRate: t.timetable_metrics ? Number(t.timetable_metrics.room_utilization_rate) : null,
+      isValid: t.timetable_metrics?.is_valid ?? null,
+      sectionsCount: sectionsByTimetableId.get(t.timetable_id) ?? 0,
+      isActive: t.status.toLowerCase() === "active",
+    }))
+
+    const lecturerIds = [...new Set(entries.map((e) => e.user_id).filter((v): v is number => v != null))]
+    const prefByLecturer = new Map<number, { preferred: Set<number>; avoided: Set<number> }>()
+    if (lecturerIds.length > 0) {
+      const preferences = await prisma.lecturerPreference.findMany({
+        where: { user_id: { in: lecturerIds } },
+      })
+      for (const p of preferences) {
+        if (!prefByLecturer.has(p.user_id)) {
+          prefByLecturer.set(p.user_id, { preferred: new Set(), avoided: new Set() })
+        }
+        const bucket = prefByLecturer.get(p.user_id)!
+        if (p.is_preferred) bucket.preferred.add(p.slot_id)
+        else bucket.avoided.add(p.slot_id)
+      }
+    }
+
+    const lecturerPreferenceRows = [...byLecturer.entries()]
+      .map(([userId, v]) => {
+        const assigned = entries.filter((e) => e.user_id === userId)
+        const pref = prefByLecturer.get(userId)
+        let onPreferred = 0
+        let onAvoided = 0
+        let neutral = 0
+        for (const e of assigned) {
+          if (!pref || (pref.preferred.size === 0 && pref.avoided.size === 0)) {
+            neutral++
+            continue
+          }
+          if (pref.preferred.has(e.slot_id)) onPreferred++
+          else if (pref.avoided.has(e.slot_id)) onAvoided++
+          else neutral++
+        }
+        const hasPreferences = !!pref && (pref.preferred.size > 0 || pref.avoided.size > 0)
+        const complianceScore =
+          hasPreferences && assigned.length > 0
+            ? Math.round((((assigned.length - onAvoided) / assigned.length) * 1000)) / 10
+            : null
+        return {
+          userId,
+          lecturerName: v.name,
+          department: v.department,
+          sessionsAssigned: assigned.length,
+          onPreferred,
+          onAvoided,
+          neutral,
+          hasPreferences,
+          complianceScore,
+        }
+      })
+      .sort((a, b) => {
+        if (b.onAvoided !== a.onAvoided) return b.onAvoided - a.onAvoided
+        const as = a.complianceScore ?? Number.POSITIVE_INFINITY
+        const bs = b.complianceScore ?? Number.POSITIVE_INFINITY
+        return as - bs
+      })
+
+    const lecturerPreferenceSummary = {
+      scheduledLecturers: lecturerPreferenceRows.length,
+      lecturersWithPreferences: lecturerPreferenceRows.filter((r) => r.hasPreferences).length,
+      lecturersWithoutPreferences: lecturerPreferenceRows.filter((r) => !r.hasPreferences).length,
+      totalPreferredHits: lecturerPreferenceRows.reduce((s, r) => s + r.onPreferred, 0),
+      totalAvoidedViolations: lecturerPreferenceRows.reduce((s, r) => s + r.onAvoided, 0),
+      lecturersRequiringAttention: lecturerPreferenceRows.filter((r) => r.onAvoided > 0).length,
+    }
+
+    const roomTypeRows = entries.map((e) => {
+      const roomTypeLabel = decodeRoomType(e.room.room_type)
+      const roomIsLabType = roomTypeIsLab(roomTypeLabel)
+      let matchStatus: "OK" | "Hard mismatch" | "Soft mismatch" = "OK"
+      let severity: "hard" | "soft" | null = null
+      let issue = ""
+      if (e.course.is_lab && !roomIsLabType) {
+        matchStatus = "Hard mismatch"
+        severity = "hard"
+        issue = `Lab course in ${roomTypeLabel}`
+      } else if (!e.course.is_lab && roomIsLabType) {
+        matchStatus = "Hard mismatch"
+        severity = "hard"
+        issue = `Non-lab course in ${roomTypeLabel}`
+      } else if (e.course.delivery_mode === "ONLINE" && e.room.capacity > 0) {
+        matchStatus = "Soft mismatch"
+        severity = "soft"
+        issue = "Online course assigned physical room"
+      } else if (e.course.delivery_mode === "FACE_TO_FACE" && e.registered_students > e.room.capacity * 0.8) {
+        matchStatus = "Soft mismatch"
+        severity = "soft"
+        issue = `Enrollment ${e.registered_students} exceeds 80% of capacity ${e.room.capacity}`
+      }
+      return {
+        courseCode: e.course.course_code,
+        sectionNumber: e.section_number,
+        delivery: e.course.delivery_mode,
+        deliveryLabel: deliveryLabel(e.course.delivery_mode),
+        isLab: e.course.is_lab,
+        roomNumber: e.room.room_number,
+        roomTypeLabel,
+        capacity: e.room.capacity,
+        enrolled: e.registered_students,
+        matchStatus,
+        severity,
+        issue,
+      }
+    })
+
+    const roomTypeSummary = {
+      totalSections: roomTypeRows.length,
+      okCount: roomTypeRows.filter((r) => r.matchStatus === "OK").length,
+      hardMismatchCount: roomTypeRows.filter((r) => r.matchStatus === "Hard mismatch").length,
+      softMismatchCount: roomTypeRows.filter((r) => r.matchStatus === "Soft mismatch").length,
+    }
     const insights = {
       totalScheduleEntries: entries.length,
       totalRoomsInCatalog: allRooms.length,
@@ -419,6 +637,7 @@ export async function GET(request: Request) {
           ? Math.round((seatFillWeighted / seatFillWeight) * 10) / 10
           : null,
       lecturerCountScheduled: byLecturer.size,
+      lecturersWithNoAssignments: zeroLoadLecturerRows.length,
       distinctCoursesScheduled: new Set(entries.map((e) => e.course_id)).size,
       departmentsScheduled: deptSchedule.size,
     }
@@ -443,6 +662,22 @@ export async function GET(request: Request) {
       roomRows,
       lecturerRows,
       courseDistributionRows,
+      optimizationRuns,
+      conflicts: conflicts.map((c) => ({
+        conflictId: c.conflict_id,
+        type: c.conflict_type,
+        severity: c.severity,
+        courseCode: c.course_code,
+        sectionNumber: c.section_number,
+        lecturerName: c.lecturer_name,
+        roomNumber: c.room_number,
+        timeslotLabel: c.timeslot_label,
+        detail: c.detail,
+      })),
+      lecturerPreferenceRows,
+      lecturerPreferenceSummary,
+      roomTypeRows,
+      roomTypeSummary,
     })
   } catch (error) {
     console.error("[GET /api/reports/aggregates]", error)

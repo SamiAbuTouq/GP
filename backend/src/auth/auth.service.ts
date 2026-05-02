@@ -32,7 +32,7 @@ export class AuthService {
     const user = await this.usersService.findByEmail(dto.email);
 
     // Guard: user not found OR has no password hash (e.g. OAuth-only account)
-    if (!user || !user.password_hash) {
+    if (!user || !user.password_hash || !user.is_active) {
       throw new UnauthorizedException("Invalid credentials");
     }
 
@@ -99,6 +99,10 @@ export class AuthService {
     });
 
     const user = await this.usersService.findById(payload.sub);
+    if (!user.is_active) {
+      await this.revokeAllUserTokens(payload.sub);
+      throw new UnauthorizedException("User account is deactivated");
+    }
     const tokens = await this.generateTokens(user);
     await this.storeRefreshToken(user.user_id, tokens.refresh_token);
 

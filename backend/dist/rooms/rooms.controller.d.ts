@@ -10,13 +10,13 @@ export declare class RoomsController {
         capacity: number;
         isAvailable: boolean;
     }[]>;
-    findOne(id: number): Promise<{
+    findArchived(): Promise<{
         id: string;
         databaseId: number;
         type: string;
         capacity: number;
         isAvailable: boolean;
-    }>;
+    }[]>;
     create(dto: CreateRoomDto): Promise<{
         id: string;
         databaseId: number;
@@ -40,5 +40,30 @@ export declare class RoomsController {
     }>;
     remove(id: number): Promise<{
         message: string;
+        archived: boolean;
+    }>;
+    restore(id: number): Promise<{
+        message: string;
+    }>;
+    getDeletionImpact(id: number): Promise<{
+        roomId: number;
+        roomNumber: string;
+        entryCount: number;
+        timetables: {
+            timetableId: number;
+            generationType: string;
+            status: string;
+            versionNumber: number;
+        }[];
+    }>;
+    permanentlyDelete(id: number): Promise<{
+        message: string;
+    }>;
+    findOne(id: number): Promise<{
+        id: string;
+        databaseId: number;
+        type: string;
+        capacity: number;
+        isAvailable: boolean;
     }>;
 }

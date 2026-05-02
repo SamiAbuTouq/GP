@@ -25,7 +25,9 @@ async function bootstrap(): Promise<void> {
 
   // CORS — configure allowed origins via CORS_ORIGIN env var (comma-separated).
   // Never hardcode tunnel or third-party domains here.
-  const rawOrigins = process.env.CORS_ORIGIN ?? "http://localhost:3000";
+  const rawOrigins =
+    process.env.CORS_ORIGIN ??
+    "http://localhost:3000,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3002";
   const allowedOrigins = rawOrigins.split(",").map((o) => o.trim()).filter(Boolean);
   app.enableCors({
     origin: allowedOrigins,

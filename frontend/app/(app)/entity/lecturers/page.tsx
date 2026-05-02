@@ -16,8 +16,19 @@ import {
   DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, Search, Edit, Trash2, MoreHorizontal, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Eye } from "lucide-react"
+import { Plus, Search, Edit, MoreHorizontal, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Eye } from "lucide-react"
+import { GoBlocked } from "react-icons/go"
 import { ImportIcon } from "@/components/custom-icons"
 import { departments, type Department } from "@/lib/data"
 import { ImportDialog } from "@/components/import-dialog"
@@ -25,6 +36,7 @@ import { findColumn, type ParsedRow } from "@/lib/import-utils"
 import { ExportDropdownWithDialog } from "@/components/export-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type Lecturer = {
   id: string
@@ -97,8 +109,11 @@ const normalizeCourseOption = (course: unknown): CourseOption | null => {
 
 export default function LecturersPage() {
   const [lecturers, setLecturers] = useState<Lecturer[]>([])
+  const [deactivatedLecturers, setDeactivatedLecturers] = useState<Lecturer[]>([])
   const [availableCourses, setAvailableCourses] = useState<CourseOption[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingDeactivated, setLoadingDeactivated] = useState(false)
+  const [tab, setTab] = useState<"active" | "deactivated">("active")
   const [searchQuery, setSearchQuery] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -120,12 +135,41 @@ export default function LecturersPage() {
   const [pageSize, setPageSize] = useState(10)
   const [sortColumn, setSortColumn] = useState<LecturerSortColumn | null>(null)
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+  const [lecturerToDelete, setLecturerToDelete] = useState<Lecturer | null>(null)
+  const [deactivatedLecturerToPurge, setDeactivatedLecturerToPurge] = useState<Lecturer | null>(null)
+  const [deactivatedLecturerPurgeImpact, setDeactivatedLecturerPurgeImpact] = useState<{
+    entryCount: number
+    timetables: { timetableId: number; generationType: string; status: string; versionNumber: number }[]
+  } | null>(null)
+  const [loadingPurgeImpact, setLoadingPurgeImpact] = useState(false)
+  const [purging, setPurging] = useState(false)
   const { toast } = useToast()
+  const formatTimetableLabel = (t: {
+    timetableId: number
+    generationType: string
+    status: string
+    versionNumber: number
+  }) => `Timetable ${t.timetableId} (${t.status}, ${t.generationType} v${t.versionNumber})`
 
   // Fetch lecturers and courses from API
   useEffect(() => {
     fetchData()
   }, [])
+
+  useEffect(() => {
+    if (tab !== "deactivated") return
+    fetchDeactivatedLecturers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
+
+  useEffect(() => {
+    if (tab !== "deactivated") return
+    const interval = setInterval(() => {
+      fetchDeactivatedLecturers()
+    }, 15000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
 
   const fetchData = async () => {
     try {
@@ -167,6 +211,25 @@ export default function LecturersPage() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchDeactivatedLecturers = async () => {
+    try {
+      setLoadingDeactivated(true)
+      const res = await fetch("/api/lecturers/deactivated/list", { cache: "no-store" })
+      if (!res.ok) throw new Error("Failed to fetch deactivated lecturers")
+      const data = await res.json()
+      setDeactivatedLecturers(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error("Error fetching deactivated lecturers:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load deactivated lecturers. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingDeactivated(false)
     }
   }
 
@@ -337,18 +400,141 @@ export default function LecturersPage() {
       })
       
       const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
       
       if (!response.ok) {
-        toast({ title: "Error", description: data.error || "Failed to delete lecturer. Please try again.", variant: "destructive" })
+        toast({ title: "Error", description: errorMessage || "Failed to delete lecturer. Please try again.", variant: "destructive" })
         return
       }
       
       setLecturers(lecturers.filter((l) => l.id !== lecturer.id))
-      toast({ title: "Success", description: "Lecturer deleted successfully." })
+      await fetchDeactivatedLecturers()
+      toast({ title: "Success", description: "Lecturer deactivated successfully." })
     } catch (error) {
       console.error('Error deleting lecturer:', error)
       toast({ title: "Error", description: "Failed to delete lecturer. Please try again.", variant: "destructive" })
     }
+  }
+
+  const handleReactivateLecturer = async (lecturer: Lecturer) => {
+    try {
+      const response = await fetch(`/api/lecturers/${lecturer.databaseId}/reactivate`, { method: "PATCH" })
+      const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: errorMessage || "Failed to reactivate lecturer. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setDeactivatedLecturers((prev) => prev.filter((l) => l.id !== lecturer.id))
+      await fetchData()
+      toast({ title: "Success", description: "Lecturer reactivated successfully." })
+    } catch (error) {
+      console.error("Error reactivating lecturer:", error)
+      toast({
+        title: "Error",
+        description: "Failed to reactivate lecturer. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const openPurgeLecturerModal = async (lecturer: Lecturer) => {
+    try {
+      setLoadingPurgeImpact(true)
+      const response = await fetch(`/api/lecturers/${lecturer.databaseId}/purge-impact`, { cache: "no-store" })
+      const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: errorMessage || "Failed to check purge impact. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setDeactivatedLecturerToPurge(lecturer)
+      setDeactivatedLecturerPurgeImpact({
+        entryCount: Number((data as { entryCount?: unknown }).entryCount ?? 0) || 0,
+        timetables: Array.isArray((data as { timetables?: unknown }).timetables)
+          ? ((data as { timetables: unknown[] }).timetables as {
+              timetableId: number
+              generationType: string
+              status: string
+              versionNumber: number
+            }[])
+          : [],
+      })
+    } catch (error) {
+      console.error("Error checking purge impact:", error)
+      toast({
+        title: "Error",
+        description: "Failed to check purge impact. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingPurgeImpact(false)
+    }
+  }
+
+  const confirmPurgeLecturer = async () => {
+    if (!deactivatedLecturerToPurge) return
+    try {
+      setPurging(true)
+      const response = await fetch(`/api/lecturers/${deactivatedLecturerToPurge.databaseId}/purge`, {
+        method: "DELETE",
+      })
+      const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: errorMessage || "Failed to permanently remove lecturer. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setDeactivatedLecturers((prev) => prev.filter((l) => l.id !== deactivatedLecturerToPurge.id))
+      setDeactivatedLecturerToPurge(null)
+      setDeactivatedLecturerPurgeImpact(null)
+      toast({ title: "Success", description: "Lecturer permanently removed successfully." })
+    } catch (error) {
+      console.error("Error purging lecturer:", error)
+      toast({
+        title: "Error",
+        description: "Failed to permanently remove lecturer. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setPurging(false)
+    }
+  }
+
+  const confirmDeleteLecturer = async () => {
+    if (!lecturerToDelete) return
+    await handleDeleteLecturer(lecturerToDelete)
+    setLecturerToDelete(null)
   }
 
   const toggleCourse = (course: string, lecturer: Lecturer, setLecturer: (l: Lecturer) => void) => {
@@ -401,38 +587,49 @@ export default function LecturersPage() {
   }
 
   return (
-    <EntityLayout title="Lecturer Management" description="Add, edit, and manage faculty members.">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Lecturers ({sortedFilteredLecturers.length})</CardTitle>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="bg-transparent" onClick={() => setIsImportDialogOpen(true)}>
-              <ImportIcon className="mr-2 h-4 w-4" />
-              Import
-            </Button>
-            <ExportDropdownWithDialog
-              allData={sortedAllLecturers.map((l) => ({ ...l, courses: l.courses.join(", ") }))}
-              filteredData={paginatedLecturers.map((l) => ({ ...l, courses: l.courses.join(", ") }))}
-              columns={lecturerColumns}
-              filenamePrefix="lecturers"
-              pdfTitle="Lecturers"
-              totalLabel={`${lecturers.length}`}
-              filteredLabel={`${paginatedLecturers.length}`}
-              isFiltered={searchQuery !== "" || sortColumn !== null}
-              filterDescription={
-                [searchQuery ? `search: "${searchQuery}"` : null, sortColumn ? `sort: ${sortColumn} ${sortDirection}` : null]
-                  .filter(Boolean)
-                  .join(" · ") || undefined
-              }
-            />
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Lecturer
+    <Tabs value={tab} onValueChange={(v) => setTab(v as "active" | "deactivated")}>
+      <EntityLayout
+        title="Lecturer Management"
+        description="Add, edit, and manage faculty members."
+        headerActions={
+          <TabsList>
+            <TabsTrigger value="active">Lecturers</TabsTrigger>
+            <TabsTrigger value="deactivated">Deactivated</TabsTrigger>
+          </TabsList>
+        }
+      >
+        <TabsContent value="active">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0">
+              <CardTitle>Lecturers ({sortedFilteredLecturers.length})</CardTitle>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="bg-transparent" onClick={() => setIsImportDialogOpen(true)}>
+                  <ImportIcon className="mr-2 h-4 w-4" />
+                  Import
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+                <ExportDropdownWithDialog
+                  allData={sortedAllLecturers.map((l) => ({ ...l, courses: l.courses.join(", ") }))}
+                  filteredData={paginatedLecturers.map((l) => ({ ...l, courses: l.courses.join(", ") }))}
+                  columns={lecturerColumns}
+                  filenamePrefix="lecturers"
+                  pdfTitle="Lecturers"
+                  totalLabel={`${lecturers.length}`}
+                  filteredLabel={`${paginatedLecturers.length}`}
+                  isFiltered={searchQuery !== "" || sortColumn !== null}
+                  filterDescription={
+                    [searchQuery ? `search: "${searchQuery}"` : null, sortColumn ? `sort: ${sortColumn} ${sortDirection}` : null]
+                      .filter(Boolean)
+                      .join(" · ") || undefined
+                  }
+                />
+                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Lecturer
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Add New Lecturer</DialogTitle>
                   <DialogDescription>Enter the lecturer&apos;s information below.</DialogDescription>
@@ -540,9 +737,9 @@ export default function LecturersPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </div>
-        </CardHeader>
-        <CardContent>
+              </div>
+            </CardHeader>
+            <CardContent>
           <div className="mb-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -668,11 +865,11 @@ export default function LecturersPage() {
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => handleDeleteLecturer(lecturer)}
+                              className="text-destructive hover:text-destructive focus:text-destructive data-[highlighted]:text-destructive"
+                              onClick={() => setLecturerToDelete(lecturer)}
                             >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
+                              <GoBlocked className="mr-2 h-4 w-4 text-destructive" />
+                              Deactivate
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -753,8 +950,85 @@ export default function LecturersPage() {
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="deactivated">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div className="space-y-1">
+                <CardTitle>Deactivated lecturers ({deactivatedLecturers.length})</CardTitle>
+                <p className="text-sm font-normal text-muted-foreground">
+                  Deactivated lecturers are excluded from future scheduling.
+                </p>
+              </div>
+              {loadingDeactivated ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+            </CardHeader>
+            <CardContent>
+              {loadingDeactivated ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Department</TableHead>
+                        <TableHead className="w-[70px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {deactivatedLecturers.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                            No deactivated lecturers
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        deactivatedLecturers.map((lecturer) => (
+                          <TableRow key={lecturer.id}>
+                            <TableCell className="font-mono text-sm">{lecturer.id}</TableCell>
+                            <TableCell className="font-medium">{lecturer.name}</TableCell>
+                            <TableCell>{lecturer.email}</TableCell>
+                            <TableCell>
+                              <Badge className={getDepartmentColor(lecturer.department)}>{lecturer.department}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleReactivateLecturer(lecturer)}>
+                                    Reactivate
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => openPurgeLecturerModal(lecturer)}
+                                    disabled={loadingPurgeImpact}
+                                  >
+                                    Permanently Remove
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -922,6 +1196,84 @@ export default function LecturersPage() {
           return { added, duplicates, errors }
         }}
       />
-    </EntityLayout>
+
+      <AlertDialog open={lecturerToDelete !== null} onOpenChange={(open) => !open && setLecturerToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate lecturer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lecturerToDelete
+                ? `This will deactivate lecturer "${lecturerToDelete.name}" and exclude them from future scheduling.`
+                : "This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDeleteLecturer}
+            >
+              Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={deactivatedLecturerToPurge !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeactivatedLecturerToPurge(null)
+            setDeactivatedLecturerPurgeImpact(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently remove lecturer?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  This will permanently remove{" "}
+                  <span className="font-semibold text-foreground">
+                    {deactivatedLecturerToPurge?.name ?? "this lecturer"}
+                  </span>{" "}
+                  and erase their assignment from{" "}
+                  <span className="font-semibold text-foreground">{deactivatedLecturerPurgeImpact?.entryCount ?? 0}</span>{" "}
+                  schedule entries.
+                </p>
+                <div className="rounded-md border bg-muted/40 p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Affected Timetables
+                  </p>
+                  {(deactivatedLecturerPurgeImpact?.timetables?.length ?? 0) === 0 ? (
+                    <p>No timetables</p>
+                  ) : (
+                    <ul className="max-h-36 list-disc space-y-1 overflow-y-auto pl-5">
+                      {(deactivatedLecturerPurgeImpact?.timetables ?? []).map((t) => (
+                        <li key={`${t.timetableId}-${t.versionNumber}`}>{formatTimetableLabel(t)}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <p className="font-medium text-destructive">This cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={purging}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmPurgeLecturer}
+              disabled={purging || deactivatedLecturerPurgeImpact == null}
+            >
+              {purging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Permanently Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      </EntityLayout>
+    </Tabs>
   )
 }

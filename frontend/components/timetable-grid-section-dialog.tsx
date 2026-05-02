@@ -37,6 +37,10 @@ function roomCap(config: ScheduleConfig, name: string): number {
   return typeof rv === "number" ? rv : (rv.capacity ?? 0);
 }
 
+function isInternalSlotId(id: string): boolean {
+  return /^slot_\d+$/i.test((id || "").trim());
+}
+
 type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -174,7 +178,7 @@ export function TimetableGridSectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-left text-base sm:text-lg">
             <span className="font-semibold tracking-tight text-foreground">{courseHeading}</span>
@@ -205,13 +209,6 @@ export function TimetableGridSectionDialog({
         {readOnly ? (
           <div className="grid gap-3 text-sm">
             <div>
-              <div className="text-xs font-medium text-muted-foreground">Course</div>
-              <div className="font-medium text-foreground">{courseHeading}</div>
-              {showCodeInHeading ? (
-                <div className="mt-0.5 font-mono text-xs text-muted-foreground">Code {courseCode}</div>
-              ) : null}
-            </div>
-            <div>
               <div className="text-xs font-medium text-muted-foreground">Lecturer</div>
               <div className="font-medium text-foreground">{entry.lecturer}</div>
             </div>
@@ -221,7 +218,9 @@ export function TimetableGridSectionDialog({
                 {entry.timeslot_label ??
                   timeslotLongLabel(catMap.get(entry.timeslot) ?? { id: entry.timeslot, days: [] })}
               </div>
-              <div className="mt-0.5 font-mono text-xs text-muted-foreground">{entry.timeslot}</div>
+              {!isInternalSlotId(entry.timeslot) ? (
+                <div className="mt-0.5 font-mono text-xs text-muted-foreground">{entry.timeslot}</div>
+              ) : null}
             </div>
             <div>
               <div className="text-xs font-medium text-muted-foreground">Room</div>
@@ -229,12 +228,6 @@ export function TimetableGridSectionDialog({
                 {entryNeedsRoom(entry) ? entry.room || "—" : "— (online)"}
               </div>
             </div>
-            {entry.class_size != null && (
-              <div>
-                <div className="text-xs font-medium text-muted-foreground">Class size</div>
-                <div>{entry.class_size}</div>
-              </div>
-            )}
             <div>
               <div className="text-xs font-medium text-muted-foreground">Mode</div>
               <div>
@@ -283,8 +276,10 @@ export function TimetableGridSectionDialog({
                               ts === id ? "bg-primary/15 font-medium" : ""
                             }`}
                           >
-                            <span>{row ? timeslotLongLabel(row) : id}</span>
-                            <span className="font-mono text-[10px] text-muted-foreground">{id}</span>
+                            <span>{row ? timeslotLongLabel(row) : "Unlabeled timeslot"}</span>
+                            {!isInternalSlotId(id) ? (
+                              <span className="font-mono text-[10px] text-muted-foreground">{id}</span>
+                            ) : null}
                           </button>
                         </li>
                       );

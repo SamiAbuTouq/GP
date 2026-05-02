@@ -494,8 +494,20 @@ async function main() {
     if (!r.Year || !r.Semester) continue;
     semesterKeysFromRows.add(`${r.Year}|${r.Semester}`);
   }
-  const latestSemesterKeyForSections =
-    [...semesterKeysFromRows].sort(compareSemesterKeys).pop() ?? null;
+  const latestNormalKeyForSections =
+    [...semesterKeysFromRows]
+      .filter((k) => {
+        const sem = k.split("|")[1] ?? "";
+        const t = semesterType(sem);
+        return t === 1 || t === 2;
+      })
+      .sort(compareSemesterKeys)
+      .pop() ?? null;
+  const latestSummerKeyForSections =
+    [...semesterKeysFromRows]
+      .filter((k) => semesterType(k.split("|")[1] ?? "") === 3)
+      .sort(compareSemesterKeys)
+      .pop() ?? null;
 
   console.log(`Seeding ${courseSet.size} courses...`);
   const courseIdMap = new Map<string, number>(); // course_code → course_id
@@ -511,19 +523,21 @@ async function main() {
 
     const level = academicLevel(code);
     const creditHours = mostFrequentInt(info.creditSamples, 3);
-    // Distinct section numbers for this course in the latest semester present in the CSV (0 if not offered then).
-    const sectionsInLatestSemester =
-      latestSemesterKeyForSections == null
-        ? 1
+    const distinctInTerm = (semKey: string | null) =>
+      semKey == null
+        ? 0
         : new Set(
             rows
               .filter(
                 (r) =>
-                  r.Course_Number === code &&
-                  `${r.Year}|${r.Semester}` === latestSemesterKeyForSections
+                  r.Course_Number === code && `${r.Year}|${r.Semester}` === semKey,
               )
-              .map((r) => r.Section)
+              .map((r) => r.Section),
           ).size;
+    const sectionsNormalCount =
+      latestNormalKeyForSections == null ? 1 : distinctInTerm(latestNormalKeyForSections);
+    const sectionsSummerCount =
+      latestSummerKeyForSections == null ? 0 : distinctInTerm(latestSummerKeyForSections);
 
     const course = await prisma.course.upsert({
       where: { course_code: code },
@@ -534,7 +548,8 @@ async function main() {
         credit_hours: creditHours,
         delivery_mode: mode,
         is_lab: info.isLab,
-        sections: sectionsInLatestSemester,
+        sections_normal: sectionsNormalCount,
+        sections_summer: sectionsSummerCount,
       },
       create: {
         dept_id: info.deptId,
@@ -544,7 +559,8 @@ async function main() {
         credit_hours: creditHours,
         delivery_mode: mode,
         is_lab: info.isLab,
-        sections: sectionsInLatestSemester,
+        sections_normal: sectionsNormalCount,
+        sections_summer: sectionsSummerCount,
       },
     });
     courseIdMap.set(code, course.course_id);
@@ -668,16 +684,17 @@ async function main() {
   console.log(`Normalized schedule rows: ${scheduleRows.length}`);
 
   // ── 8. TIMESLOTS ─────────────────────────────────
-  // Build unique timeslots from (start_time, end_time, days_mask)
-  // to match the DB unique constraint.
-  const slotKey = (st: string, et: string, mask: number) =>
-    `${st}|${et}|${mask}`;
+  // Unique timeslots per (start_time, end_time, days_mask, is_summer, slot_type).
+  // Summer exports often include the same calendar pattern for both Traditional
+  // and Blended sections, so slot_type must be part of uniqueness.
+  const slotKey = (st: string, et: string, mask: number, isSummer: boolean, type: string) =>
+    `${st}|${et}|${mask}|${isSummer ? 1 : 0}|${type}`;
   const slotMap = new Map<string, number>(); // key → slot_id
 
   // Collect unique timeslots first
   const uniqueSlots = new Map<
     string,
-    { start: Date; end: Date; mask: number; type: string }
+    { start: Date; end: Date; mask: number; type: string; isSummer: boolean }
   >();
   for (const item of scheduleRows) {
     const r = item.row;
@@ -686,9 +703,10 @@ async function main() {
     if (!start || !end) continue;
     const mask = item.daysMask;
     const type = timeslotType(r.islab, r.Online);
-    const key = slotKey(r.Start_Time, r.End_Time, mask);
+    const isSummer = semesterType(r.Semester) === 3;
+    const key = slotKey(r.Start_Time, r.End_Time, mask, isSummer, type);
     if (!uniqueSlots.has(key)) {
-      uniqueSlots.set(key, { start, end, mask, type });
+      uniqueSlots.set(key, { start, end, mask, type, isSummer });
     }
   }
 
@@ -704,6 +722,8 @@ async function main() {
         start_time: info.start,
         end_time: info.end,
         days_mask: info.mask,
+        is_summer: info.isSummer,
+        slot_type: info.type,
       },
     });
     if (existing) {
@@ -715,6 +735,7 @@ async function main() {
           end_time: info.end,
           days_mask: info.mask,
           slot_type: info.type,
+          is_summer: info.isSummer,
         },
       });
       slotMap.set(key, slot.slot_id);
@@ -901,7 +922,9 @@ async function main() {
       skippedCount++;
       continue;
     }
-    const sk = slotKey(r.Start_Time, r.End_Time, mask);
+    const isSummerSlot = semesterType(r.Semester) === 3;
+    const type = timeslotType(r.islab, r.Online);
+    const sk = slotKey(r.Start_Time, r.End_Time, mask, isSummerSlot, type);
     const slotId = slotMap.get(sk);
     if (!slotId) {
       skippedCount++;

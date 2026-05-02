@@ -16,7 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/lib/auth-context"
-import { ApiClient, UserProfile } from "@/lib/api-client"
+import { ApiClient, ApiError, UserProfile } from "@/lib/api-client"
 import { Bell } from "@/components/animate-ui/icons/bell"
 import { AnimateIcon } from "@/components/animate-ui/icons/icon"
 
@@ -32,7 +32,13 @@ export function Header() {
         .then((data) => {
           if (mounted) setProfile(data);
         })
-        .catch((err) => console.error("Could not fetch profile in header", err));
+        .catch((err) => {
+          // Session-expiry 401 is expected during auth transitions; avoid noisy console errors.
+          if (err instanceof ApiError && err.errorType === "UNAUTHORIZED") {
+            return;
+          }
+          console.error("Could not fetch profile in header", err);
+        });
     }
 
     const unsubscribe = ApiClient.onProfileUpdate((updatedProfile) => {
@@ -53,14 +59,11 @@ export function Header() {
 
   return (
     <header
-      className="sticky top-0 z-50 flex h-14 items-center justify-between px-4 lg:px-6"
+      className="sticky top-0 z-50 flex h-12 items-center justify-between px-4 lg:px-6 bg-transparent"
     >
       <div className="flex items-center gap-3">
         <MobileSidebar />
         <Separator orientation="vertical" className="hidden h-6 bg-slate-600/35 dark:bg-white/35 md:block" />
-        <h1 className="hidden text-base font-semibold tracking-tight text-slate-900 drop-shadow-sm dark:text-white md:block">
-          University Timetabling System
-        </h1>
       </div>
 
       <div className="flex items-center gap-3">

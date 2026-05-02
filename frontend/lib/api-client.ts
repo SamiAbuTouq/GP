@@ -157,7 +157,8 @@ export class ApiClient {
   static async request<T>(
     endpoint: string,
     options: RequestInit = {},
-    skipAuthRedirect = false
+    skipAuthRedirect = false,
+    hasRetriedAfterRefresh = false,
   ): Promise<T> {
     const urls = this.buildCandidateApiUrls().map((baseUrl) => `${baseUrl}${endpoint}`);
     const headers: Record<string, string> = {
@@ -175,6 +176,12 @@ export class ApiClient {
 
     for (const url of urls) {
       try {
+        // #region agent log
+        fetch('http://127.0.0.1:7709/ingest/ec09a340-7727-4b91-930d-cfdbd393ea72',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d7b561'},body:JSON.stringify({sessionId:'d7b561',runId:'initial',hypothesisId:'H4',location:'frontend/lib/api-client.ts:180',message:'request attempt',data:{endpoint,url,hasAccessToken:Boolean(accessToken),method:(options.method??'GET')},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        // #region agent log
+        fetch('/api/_debug',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({runId:'initial',hypothesisId:'H4',location:'frontend/lib/api-client.ts:181',message:'request attempt (relay)',data:{endpoint,url,hasAccessToken:Boolean(accessToken),method:(options.method??'GET')},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         response = await fetch(url, {
           ...options,
           headers,
@@ -182,6 +189,9 @@ export class ApiClient {
         });
         break;
       } catch (error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7709/ingest/ec09a340-7727-4b91-930d-cfdbd393ea72',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d7b561'},body:JSON.stringify({sessionId:'d7b561',runId:'initial',hypothesisId:'H5',location:'frontend/lib/api-client.ts:189',message:'request network error',data:{endpoint,url,errorMessage:error instanceof Error ? error.message : 'unknown'},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         lastNetworkError = error;
       }
     }
@@ -197,6 +207,22 @@ export class ApiClient {
     }
 
     if (!response.ok) {
+      // If the access token is expired, try to refresh once and retry the original request.
+      // This keeps sessions alive as long as the HttpOnly refresh cookie is valid.
+      if (
+        response.status === 401 &&
+        !skipAuthRedirect &&
+        !hasRetriedAfterRefresh &&
+        !endpoint.startsWith("/auth/")
+      ) {
+        try {
+          await this.refresh();
+          return await this.request<T>(endpoint, options, skipAuthRedirect, true);
+        } catch {
+          // Fall through to the normal 401 handling below.
+        }
+      }
+
       // Try to parse error response from backend
       let errorMessage = 'An unexpected error occurred';
       let errorDetails: string | undefined;
@@ -220,12 +246,13 @@ export class ApiClient {
             errorDetails
           );
         case 401:
-          // For login endpoint, don't redirect - just throw the error
+          // For login/refresh flows, don't clear session or redirect.
           if (skipAuthRedirect) {
             throw new ApiError(
-              'Invalid email or password. Please check your credentials and try again.',
+              errorMessage || 'Unauthorized. Please sign in again.',
               401,
-              'INVALID_CREDENTIALS'
+              'UNAUTHORIZED',
+              errorDetails
             );
           }
           // For other endpoints, clear token and let auth context handle redirect

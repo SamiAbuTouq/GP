@@ -55,7 +55,7 @@ type NavItem = {
   icon: React.ElementType;
   animated?: boolean;
   iconSize?: number;
-  activeIconClassName?: string;
+  iconClassName?: string;
 };
 
 const DashboardNavIcon = forwardRef<AnimatedIconHandle, { className?: string; size?: number }>(
@@ -73,18 +73,18 @@ const mainNavItems: NavItem[] = [
     icon: TimetableGenerationLottieIcon,
     animated: true,
     iconSize: 22,
-    activeIconClassName: "brightness-0 invert",
+    iconClassName: "dark:brightness-0 dark:invert",
   },
-  { title: "What-If Scenarios", href: "/what-if", icon: FlaskIcon, animated: true, iconSize: 20 },
+  { title: "What-If Scenarios", href: "/dashboard/what-if", icon: FlaskIcon, animated: true, iconSize: 20 },
   { title: "Schedule Viewer", href: "/schedule", icon: EyeIcon, animated: true },
 ];
 
-const entityNavItems = [
+const entityNavItems: NavItem[] = [
   { title: "Courses", href: "/entity/courses", icon: BookOpenTextIcon, animated: true },
   { title: "Lecturers", href: "/entity/lecturers", icon: UserRoundIcon, animated: true },
   { title: "Rooms", href: "/entity/rooms", icon: DoorOpen },
   { title: "Time Slots", href: "/entity/timeslots", icon: ClockIcon, animated: true },
-  { title: "Programs", href: "/entity/programs", icon: GraduationCapIcon, animated: true },
+  { title: "Study Plans", href: "/entity/study-plans", icon: GraduationCapIcon, animated: true },
 ];
 
 const otherNavItems: NavItem[] = [
@@ -97,6 +97,7 @@ const helpNavItem = {
   icon: HelpCenterLottieIcon,
   animated: true,
   iconSize: 22,
+  iconClassName: "dark:brightness-0 dark:invert",
 };
 
 const settingsNavItem = {
@@ -122,7 +123,7 @@ function NavButton({
   isSubItem,
   animated = false,
   iconSize,
-  activeIconClassName,
+  iconClassName,
 }: {
   href: string;
   icon: React.ElementType;
@@ -134,7 +135,7 @@ function NavButton({
   isSubItem?: boolean;
   animated?: boolean;
   iconSize?: number;
-  activeIconClassName?: string;
+  iconClassName?: string;
 }) {
   const iconRef = useRef<AnimatedIconHandle | null>(null);
   const resolvedIconSize = iconSize ?? (isSubItem ? 16 : 20);
@@ -162,23 +163,23 @@ function NavButton({
                 isSubItem ? "pl-8" : "px-2",
               ),
           isActive
-            ? "text-primary-foreground hover:bg-transparent hover:text-primary-foreground"
+            ? "bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary"
             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground bg-transparent",
           className,
         )}
       >
-        {isActive && (
-          <motion.div
-            layoutId="active-pill"
-            className={`absolute inset-0 z-[-1] ${navActivePillRadiusClass} bg-primary`}
-            transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+        {isActive ? (
+          <motion.span
+            layoutId="active-nav-indicator"
+            className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-primary"
+            transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
           />
-        )}
+        ) : null}
         <span
           className={cn(
             "inline-flex shrink-0 items-center justify-center",
             collapsed && "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
-            isActive && activeIconClassName,
+            iconClassName,
           )}
           style={{ width: resolvedIconSize, height: resolvedIconSize }}
         >
@@ -254,7 +255,7 @@ function SidebarNavigation({
             onClick={onNavigate}
             animated={item.animated}
             iconSize={item.iconSize}
-            activeIconClassName={item.activeIconClassName}
+            iconClassName={item.iconClassName}
           />
         ))}
 
@@ -274,7 +275,7 @@ function SidebarNavigation({
                 onClick={onNavigate}
                 animated={item.animated}
                 iconSize={item.iconSize}
-                activeIconClassName={item.activeIconClassName}
+                iconClassName={item.iconClassName}
               />
             ))
             ) : (
@@ -318,7 +319,7 @@ function SidebarNavigation({
                     isSubItem={true}
                     animated={item.animated}
                     iconSize={item.iconSize}
-                    activeIconClassName={item.activeIconClassName}
+                    iconClassName={item.iconClassName}
                   />
                 ))}
               </CollapsibleContent>
@@ -340,7 +341,7 @@ function SidebarNavigation({
                 onClick={onNavigate}
                 animated={item.animated}
                 iconSize={item.iconSize}
-                activeIconClassName={item.activeIconClassName}
+                iconClassName={item.iconClassName}
               />
             ))}
           </div>
@@ -359,7 +360,7 @@ function SidebarNavigation({
                 onClick={onNavigate}
                 animated={item.animated}
                 iconSize={item.iconSize}
-                activeIconClassName={item.activeIconClassName}
+                iconClassName={item.iconClassName}
               />
             ))}
           </div>
@@ -414,22 +415,25 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 
   return (
-    <div className="flex h-full flex-col bg-[linear-gradient(to_bottom,transparent_56px,hsl(var(--sidebar))_56px)]">
-        {/* Logo Section */}
-        <div
-          className={cn(
-            "flex h-14 items-center transition-all duration-200 ease-in-out",
-            collapsed ? "justify-center px-2" : "gap-3 px-3",
-          )}
-        >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+    <div className="flex h-full flex-col bg-[linear-gradient(to_bottom,transparent_48px,hsl(var(--sidebar))_48px)]">
+      {/* Logo Section */}
+      <div
+        className={cn(
+          "flex h-12 items-center transition-all duration-200 ease-in-out",
+          collapsed ? "justify-center px-2" : "gap-3 px-3",
+        )}
+      >
+          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center">
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 m-auto hidden h-10 w-10 rounded-full bg-white dark:block"
+            />
             <Image
               src="/images/psut-logo.png"
               alt="PSUT Logo"
               width={36}
               height={36}
-              className="object-contain"
-              style={{ width: "auto", height: "auto" }}
+              className="relative z-10 h-9 w-9 object-contain dark:translate-x-[2px]"
             />
           </div>
           <div
@@ -469,6 +473,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               onClick={handleNavigate}
               animated={helpNavItem.animated}
               iconSize={helpNavItem.iconSize}
+            iconClassName={helpNavItem.iconClassName}
             />
           )}
           <NavButton
@@ -543,7 +548,7 @@ export function Sidebar() {
 
   return (
     <>
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-0 hidden h-14 border-b border-slate-300 dark:border-white/20 bg-[url('/images/background/C3.png')] bg-center bg-no-repeat bg-cover dark:bg-[image:linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)),url('/images/background/C3.png')] lg:block" />
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-0 hidden h-12 border-b border-sidebar-border bg-[url('/images/background/D66.png')] bg-top bg-repeat-x bg-[length:auto_48px] dark:bg-[image:linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)),url('/images/background/D66.png')] lg:block" />
       <aside
         className={cn(
           "relative z-10 hidden lg:block shrink-0 overflow-hidden",
@@ -551,7 +556,7 @@ export function Sidebar() {
           collapsed ? "w-12" : "w-56",
         )}
       >
-        <div className="pointer-events-none absolute bottom-0 right-0 top-14 w-px bg-sidebar-border" />
+        <div className="pointer-events-none absolute bottom-0 right-0 top-12 w-px bg-sidebar-border" />
         <SidebarContent />
       </aside>
     </>
@@ -600,15 +605,18 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col bg-sidebar">
-      <div className="flex h-14 items-center gap-3 border-b border-slate-300 dark:border-white/20 bg-[url('/images/background/C3.png')] bg-center bg-no-repeat bg-cover dark:bg-[image:linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)),url('/images/background/C3.png')] px-5">
-        <div className="flex h-9 w-9 items-center justify-center">
+      <div className="flex h-12 items-center gap-3 border-b border-sidebar-border bg-[url('/images/background/D66.png')] bg-top bg-repeat-x bg-[length:auto_48px] dark:bg-[image:linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)),url('/images/background/D66.png')] px-5">
+        <div className="relative flex h-9 w-9 items-center justify-center">
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 m-auto hidden h-10 w-10 rounded-full bg-white dark:block"
+          />
           <Image
             src="/images/psut-logo.png"
             alt="PSUT Logo"
             width={36}
             height={36}
-            className="object-contain"
-            style={{ width: "auto", height: "auto" }}
+            className="relative z-10 h-9 w-9 object-contain dark:translate-x-[2px]"
           />
         </div>
         <div className="flex flex-col">
@@ -630,7 +638,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               onClick={onNavigate}
               animated={item.animated}
               iconSize={item.iconSize}
-              activeIconClassName={item.activeIconClassName}
+              iconClassName={item.iconClassName}
             />
           ))}
 
@@ -673,7 +681,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                     isSubItem
                     animated={item.animated}
                     iconSize={item.iconSize}
-                    activeIconClassName={item.activeIconClassName}
+                    iconClassName={item.iconClassName}
                   />
                 ))}
               </CollapsibleContent>
@@ -692,7 +700,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 onClick={onNavigate}
                 animated={item.animated}
                 iconSize={item.iconSize}
-                activeIconClassName={item.activeIconClassName}
+                iconClassName={item.iconClassName}
               />
             ))}
           </div>}
@@ -710,7 +718,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   onClick={onNavigate}
                   animated={item.animated}
                   iconSize={item.iconSize}
-                  activeIconClassName={item.activeIconClassName}
+                  iconClassName={item.iconClassName}
                 />
               ))}
             </div>
@@ -729,6 +737,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             onClick={onNavigate}
             animated={helpNavItem.animated}
             iconSize={helpNavItem.iconSize}
+            iconClassName={helpNavItem.iconClassName}
           />
         )}
         <NavButton

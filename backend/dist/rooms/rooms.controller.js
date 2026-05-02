@@ -25,8 +25,8 @@ let RoomsController = class RoomsController {
     findAll() {
         return this.roomsService.findAll();
     }
-    findOne(id) {
-        return this.roomsService.findOne(id);
+    findArchived() {
+        return this.roomsService.findArchived();
     }
     create(dto) {
         return this.roomsService.create(dto);
@@ -40,6 +40,18 @@ let RoomsController = class RoomsController {
     remove(id) {
         return this.roomsService.remove(id);
     }
+    restore(id) {
+        return this.roomsService.restoreArchived(id);
+    }
+    getDeletionImpact(id) {
+        return this.roomsService.getDeletionImpact(id);
+    }
+    permanentlyDelete(id) {
+        return this.roomsService.permanentlyDeleteArchived(id);
+    }
+    findOne(id) {
+        return this.roomsService.findOne(id);
+    }
 };
 exports.RoomsController = RoomsController;
 __decorate([
@@ -49,12 +61,11 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "findAll", null);
 __decorate([
-    (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)('archived/list'),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
-], RoomsController.prototype, "findOne", null);
+], RoomsController.prototype, "findArchived", null);
 __decorate([
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),
@@ -84,6 +95,34 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Patch)(':id/restore'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], RoomsController.prototype, "restore", null);
+__decorate([
+    (0, common_1.Get)(':id/deletion-impact'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], RoomsController.prototype, "getDeletionImpact", null);
+__decorate([
+    (0, common_1.Delete)(':id/permanent'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], RoomsController.prototype, "permanentlyDelete", null);
+__decorate([
+    (0, common_1.Get)(':id'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], RoomsController.prototype, "findOne", null);
 exports.RoomsController = RoomsController = __decorate([
     (0, common_1.Controller)('rooms'),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),

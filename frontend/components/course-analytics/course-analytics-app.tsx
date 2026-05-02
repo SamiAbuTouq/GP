@@ -76,10 +76,14 @@ import { Badge } from '@/components/course-analytics-ui/badge'
 import { ThemeToggle } from '@/components/course-analytics/theme-toggle'
 import { PalettePicker } from '@/components/course-analytics/palette-picker'
 import { useDebounce } from '@/hooks/use-debounce'
-import { segmentedNavTabItemRadiusClass, segmentedNavTabListClassName } from '@/lib/segmented-nav-tabs'
+import { segmentedNavTabItemRadiusClass } from '@/lib/segmented-nav-tabs'
 
-/** Matches Timetable Generation tab bar styling */
-const DASHBOARD_TAB_TRIGGER_CLASS = `relative ${segmentedNavTabItemRadiusClass} px-4 py-2 text-sm font-semibold text-slate-600 shadow-none transition-colors duration-200 data-[state=active]:bg-transparent data-[state=active]:text-primary-foreground data-[state=active]:shadow-none data-[state=active]:hover:bg-transparent dark:text-slate-400 dark:data-[state=active]:bg-transparent dark:data-[state=active]:text-primary-foreground`
+/**
+ * Scope dashboard tab styles to the dashboard's own theme state (`ca-dark`) instead
+ * of the global app `.dark` class so mixed-theme shells render correctly.
+ */
+const DASHBOARD_TAB_TRIGGER_CLASS = `relative ${segmentedNavTabItemRadiusClass} px-4 py-2 text-sm font-semibold text-slate-600 shadow-none transition-colors duration-200 data-[state=active]:bg-transparent data-[state=active]:text-primary-foreground data-[state=active]:shadow-none data-[state=active]:hover:bg-transparent ca-dark:text-slate-400 ca-dark:data-[state=active]:bg-transparent ca-dark:data-[state=active]:text-primary-foreground`
+const DASHBOARD_TAB_LIST_CLASS = `flex h-auto w-full flex-wrap items-stretch justify-start gap-1 ${segmentedNavTabItemRadiusClass} border border-slate-200/80 bg-slate-100/80 p-1 shadow-inner ca-dark:border-slate-700 ca-dark:bg-slate-900/50`
 
 function DashboardActiveTabPill() {
   return (
@@ -380,7 +384,7 @@ export default function CourseAnalyticsApp({
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={segmentedNavTabListClassName}>
+          <TabsList className={DASHBOARD_TAB_LIST_CLASS}>
             <TabsTrigger value="overview" className={DASHBOARD_TAB_TRIGGER_CLASS}>
               {activeTab === 'overview' && <DashboardActiveTabPill />}
               <LayoutDashboard className="relative z-10 h-4 w-4" />

@@ -3,751 +3,736 @@ OPTIMISED TIMETABLE SCHEDULE — GWO v6
 
 SCHEDULE DETAILS:
 ----------------------------------------------------------------------
-11100      | online    | lecture | slot_133           | Sunday  Monday  Tuesday  Wednesday  Thursday | ONLINE   | Hamam Alakhras
-11100      | online    | lecture | slot_42            | Sunday  Tuesday              | ONLINE   | Emad Addin Alsheikh
-11102      | inperson  | lecture | slot_72            | Monday  Wednesday            | 201      | Dr. Samer Sawalha
-11102      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 308      | Dr. Mohammad Abu- Snober
-11102      | inperson  | lecture | slot_147           | Tuesday                      | 207      | Dr. Ibrahim Alharfialbluwi
-11103      | inperson  | lecture | slot_6             | Monday  Wednesday            | 307      | Rahmeh Ibrahim
-11103      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | 207      | Dr. Ahmad Klaib
-11103      | inperson  | lecture | slot_43            | Sunday                       | 207      | Omimah Ismail
-11103      | inperson  | lecture | slot_129           | Sunday  Monday  Tuesday      | 832      | Yasmeen Alslman
-11103      | inperson  | lecture | slot_13            | Monday  Wednesday            | 208      | Yasmeen Alslman
-11103      | inperson  | lecture | slot_45            | Thursday                     | 201      | Omimah Ismail
-11103      | inperson  | lecture | slot_52            | Tuesday                      | 201      | Dr. Samer Sawalha
-11103      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 205      | Dr. Ahmad Klaib
-11103      | inperson  | lecture | slot_95            | Tuesday                      | 304      | Sara Khader
-11103      | inperson  | lecture | slot_147           | Tuesday                      | 704      | Omimah Ismail
-11103      | inperson  | lecture | slot_48            | Sunday                       | 702      | Prof. Amer Badarneh
-11103      | inperson  | lecture | slot_13            | Monday  Wednesday            | 308      | Ahmad Bani Amer
-11103      | inperson  | lecture | slot_119           | Sunday  Monday  Tuesday  Wednesday  Thursday | 702      | Amal Saif
-11103      | inperson  | lecture | slot_134           | Sunday  Tuesday              | 302      | Abrar Alsowi
-11103      | inperson  | lecture | slot_147           | Tuesday                      | 302      | Dr. Ahmad Klaib
-11151      | inperson  | lab     | slot_143           | Tuesday                      | it301    | Mohammad Awis Lababede
-11151      | inperson  | lab     | slot_122           | Sunday  Tuesday              | ee241 security | Dr. Ahmad Altamimi
-11151      | inperson  | lab     | slot_121           | Sunday  Tuesday              | ee102 electrical | Dr. Abdullah Al-Refai
-11151      | inperson  | lab     | slot_79            | Sunday                       | ee201 logic | Farah Shatnawi
-11151      | inperson  | lab     | slot_124           | Monday  Wednesday            | ee344 networks | Sara Awajan
-11151      | inperson  | lab     | slot_79            | Sunday                       | ee244 fiber | Amal Saif
-11151      | inperson  | lab     | slot_84            | Monday                       | 811      | Omimah Ismail
-11151      | inperson  | lab     | slot_54            | Thursday                     | 811      | Mohammad Awis Lababede
-11151      | inperson  | lab     | slot_142           | Monday  Wednesday            | ee103physicsee | Sawsan Al-Odibat
-11151      | inperson  | lab     | slot_97            | Thursday                     | online   | Reem Mahafzah
-11151      | inperson  | lab     | slot_61            | Sunday                       | it302    | Farah Shatnawi
-11151      | inperson  | lab     | slot_124           | Monday  Wednesday            | it303    | Kholoud Mukdadi
-11151      | inperson  | lab     | slot_15            | Monday                       | ee244 fiber | Sara Khader
-11151      | inperson  | lab     | slot_83            | Thursday                     | ee244 fiber | Narmeen Alhyari
-11151      | inperson  | lab     | slot_122           | Sunday  Tuesday              | ee344 networks | Prof. Walid Abu Salameh
-11151      | inperson  | lab     | slot_24            | Monday                       | it102    | Ahmad Awwad
-11151      | inperson  | lab     | slot_158           | Tuesday                      | ee243 cellular | Ahmad Bani Amer
-11151      | inperson  | lab     | slot_54            | Thursday                     | it102    | Dr. Abdullah Aref
-11151      | inperson  | lab     | slot_109           | Thursday                     | 811      | Eng. Wasayif Ananzeh
-11206      | inperson  | lecture | slot_154           | Monday  Wednesday            | 703      | Dr. Nailah Almadi
-11206      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 206      | Dr. Raad Al-Qassas
-11206      | inperson  | lecture | slot_76            | Monday  Wednesday            | 301      | Dr. Nailah Almadi
-11206      | inperson  | lecture | slot_35            | Sunday                       | 202      | Ahmad Bani Amer
-11212      | inperson  | lecture | slot_118           | Sunday  Monday  Tuesday  Wednesday  Thursday | 342      | Prof. Abdallah Qusef
-11212      | inperson  | lecture | slot_5             | Monday  Wednesday            | 701      | Dr. Manaf Gharaibeh
-11212      | inperson  | lecture | slot_75            | Monday  Wednesday            | 342      | Dr. Ibrahim Alharfialbluwi
-11212      | inperson  | lecture | slot_49            | Sunday                       | 207      | Abedalrhman Alkhateeb
-11212      | inperson  | lecture | slot_104           | Tuesday                      | 207      | Prof. Abdallah Qusef
-11212      | inperson  | lecture | slot_74            | Monday  Wednesday            | 308      | Dr. Raghda Hriez
-11212      | inperson  | lecture | slot_65            | Tuesday                      | 922      | Dr. Raghda Hriez
-11213      | inperson  | lecture | slot_48            | Sunday                       | 342      | Dr. Khaled Mahmoud
-11253      | online    | lab     | slot_16            | Tuesday                      | ONLINE   | Farah Shatnawi
-11253      | online    | lab     | slot_79            | Sunday                       | ONLINE   | Jehad Ghanim
-11253      | online    | lab     | slot_148           | Monday                       | ONLINE   | Sara Awajan
-11313      | inperson  | lecture | slot_95            | Tuesday                      | 308      | Dr. Mohammed Khader
-11313      | inperson  | lecture | slot_117           | Sunday  Monday  Tuesday  Wednesday  Thursday | 305      | Prof. Amer Badarneh
-11313      | inperson  | lecture | slot_129           | Sunday  Monday  Tuesday      | 208      | Dr. Sufyan Almajali
-11313      | inperson  | lecture | slot_104           | Tuesday                      | 921      | Dr. Mohammed Khader
-11316      | inperson  | lecture | slot_154           | Monday  Wednesday            | 341      | Prof. Walid Abu Salameh
-11323      | inperson  | lecture | slot_113           | Tuesday                      | 704      | Dr. Samer Sawalha
-11323      | inperson  | lecture | slot_49            | Sunday                       | 202      | Prof. Amer Badarneh
-11323      | inperson  | lecture | slot_5             | Monday  Wednesday            | 822      | Dr. Ammar Alrashdan
-11323      | inperson  | lecture | slot_147           | Tuesday                      | 205      | Dr. Ammar Alrashdan
-11323      | inperson  | lecture | slot_113           | Tuesday                      | 303      | Dr. Ammar Alrashdan
-11335      | inperson  | lecture | slot_13            | Monday  Wednesday            | 305      | Dr. Ahmad Altamimi
-11335      | inperson  | lecture | slot_113           | Tuesday                      | 207      | Prof. Ashraf Ahmad
-11335      | inperson  | lecture | slot_44            | Tuesday                      | 822      | Dr. Mohammad Ababneh
-11354      | online    | lab     | slot_81            | Tuesday                      | ONLINE   | Eman Alnagi
-11354      | online    | lab     | slot_83            | Thursday                     | ONLINE   | Omimah Ismail
-11354      | online    | lab     | slot_136           | Monday  Wednesday            | ONLINE   | Ayat Droos
-11354      | online    | lab     | slot_17            | Wednesday                    | ONLINE   | Eman Alnagi
-11355      | online    | lab     | slot_152           | Monday                       | ONLINE   | Ayat Droos
-11355      | online    | lab     | slot_105           | Wednesday                    | ONLINE   | Shoroq Awawdeh
-11355      | online    | lab     | slot_110           | Tuesday                      | ONLINE   | Shoroq Awawdeh
-11355      | online    | lab     | slot_137           | Monday  Wednesday            | ONLINE   | Ala'A Altarazi
-11435      | inperson  | lecture | slot_43            | Sunday                       | 201      | Ayat Droos
-11435      | inperson  | lecture | slot_94            | Sunday                       | 701      | Prof. Basel Mahafzah
-11436      | inperson  | lecture | slot_48            | Sunday                       | 821      | Dr. Osama Al-Haj Hassan
-11436      | inperson  | lecture | slot_77            | Sunday  Tuesday  Thursday    | 208      | Prof. Basel Mahafzah
-11449      | online    | lecture | slot_60            | Sunday  Tuesday              | ONLINE   | Dr. Ammar Alrashdan
-11449      | online    | lecture | slot_144           | Wednesday                    | ONLINE   | Rasha Khalil
-11449      | online    | lecture | slot_1             | Sunday  Tuesday  Thursday    | ONLINE   | Dr. Ammar Alrashdan
-11464      | inperson  | lecture | slot_52            | Tuesday                      | 202      | Dr. Ammar Odeh
-11464      | inperson  | lecture | slot_77            | Sunday  Tuesday  Thursday    | 703      | Prof. Mohammad Al Nabhan
-12242      | online    | lab     | slot_106           | Monday                       | ONLINE   | Eman Alnagi
-12242      | online    | lab     | slot_86            | Sunday                       | ONLINE   | Narmeen Alhyari
-12242      | online    | lab     | slot_137           | Monday  Wednesday            | ONLINE   | Dr. Mohammad Alzoubi
-12243      | blended   | lecture | slot_66            | Sunday  Tuesday              | 703      | Dr. Sara Tedmori
-12243      | blended   | lecture | slot_139           | Monday  Wednesday            | 702      | Dr. Sara Tedmori
-12243      | blended   | lecture | slot_111           | Thursday                     | 306      | Dr. Sara Tedmori
-12264      | blended   | lecture | slot_100           | Sunday  Tuesday              | 306      | Rosana Marar
-12273      | inperson  | lecture | slot_77            | Sunday  Tuesday  Thursday    | 207      | Narmeen Alhyari
-12343      | blended   | lecture | slot_57            | Tuesday                      | 206      | Dr. Mohammad Abu- Snober
-12343      | blended   | lecture | slot_28            | Monday                       | 341      | Dr. Mohammad Abu- Snober
-12343      | blended   | lecture | slot_88            | Wednesday                    | 301      | Dr. Mohammad Ababneh
-12348      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | 301      | Dr. Baha Khasawneh
-12348      | inperson  | lecture | slot_95            | Tuesday                      | 831      | Dr. Baha Khasawneh
-12373      | inperson  | lecture | slot_113           | Tuesday                      | 307      | Dr. Yaser Saleh
-12446      | inperson  | lecture | slot_2             | Monday  Wednesday            | 821      | Prof. Hazem Hiary
-12446      | inperson  | lecture | slot_44            | Tuesday                      | 308      | Prof. Hazem Hiary
-12473      | inperson  | lecture | slot_149           | Monday  Wednesday            | 821      | Dr. Mohammad Alzoubi
-12479      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 207      | Rosana Marar
-12481      | inperson  | lecture | slot_65            | Tuesday                      | 341      | Dr. Mohammad Alzoubi
-13211      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 305      | Dr. Abdullah Al-Refai
-13211      | inperson  | lecture | slot_154           | Monday  Wednesday            | 822      | Prof. Abdallah Qusef
-13212      | inperson  | lecture | slot_134           | Sunday  Tuesday              | 305      | Dr. Firas Ghanim
-13212      | inperson  | lecture | slot_147           | Tuesday                      | 307      | Dr. Firas Ghanim
-13324      | inperson  | lecture | slot_154           | Monday  Wednesday            | 307      | Dr. Rafat Hammad
-13325      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 822      | Dr. Hazem Qattous
-13326      | blended   | lecture | slot_31            | Wednesday                    | 308      | Prof. Bassam Hammo
-13327      | inperson  | lecture | slot_140           | Wednesday  Thursday          | 307      | Dr. Hazem Qattous
-13334      | inperson  | lecture | slot_12            | Sunday  Tuesday  Thursday    | 202      | Hamam Alakhras
-13393      | inperson  | lecture | slot_145           | Tuesday                      | 341      | Dr. Abdullah Al-Refai
-13393      | inperson  | lecture | slot_120           | Sunday  Monday  Tuesday  Wednesday  Thursday | 305      | Dr. Abdullah Al-Refai
-13428      | inperson  | lecture | slot_140           | Wednesday  Thursday          | 702      | Prof. Abdallah Qusef
-13432      | inperson  | lecture | slot_7             | Sunday  Tuesday  Thursday    | 831      | Prof. Abdallah Qusef
-13434      | inperson  | lecture | slot_140           | Wednesday  Thursday          | 205      | Dr. Ahmad Altamimi
-13435      | blended   | lecture | slot_69            | Wednesday                    | 701      | Prof. Bassam Hammo
-13477      | inperson  | lecture | slot_103           | Sunday                       | 307      | Dr. Ammar Odeh
-14140      | inperson  | lecture | slot_95            | Tuesday                      | 206      | Gaith Rjoub
-14140      | inperson  | lecture | slot_132           | Sunday  Monday  Tuesday      | 832      | Dr. Bushra Alhijawi
-14140      | inperson  | lecture | slot_48            | Sunday                       | 704      | Dr. Ahmad Alzghoul
-14141      | inperson  | lab     | slot_14            | Sunday                       | it103    | Dr. Tariq Bdair
-14141      | inperson  | lab     | slot_40            | Tuesday                      | online   | Wasan A.Alma'Aitah
-14141      | inperson  | lab     | slot_18            | Thursday                     | lb706    | Dr. Tariq Bdair
-14141      | inperson  | lab     | slot_110           | Tuesday                      | it104    | Dr. Abdullah Aref
-14260      | blended   | lecture | slot_31            | Wednesday                    | 207      | Wasan A.Alma'Aitah
-14261      | blended   | lab     | slot_142           | Monday  Wednesday            | ee207 electrical | Wasan A.Alma'Aitah
-14261      | blended   | lab     | slot_23            | Sunday                       | it103    | Dr. Abdullah Aref
-14270      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 301      | Gaith Rjoub
-14270      | inperson  | lecture | slot_154           | Monday  Wednesday            | 343      | Dr. Amera Al-Amery
-14271      | inperson  | lab     | slot_99            | Sunday                       | it105    | Dr. Amera Al-Amery
-14271      | inperson  | lab     | slot_18            | Thursday                     | it302    | Dr. Osama Abdel Hay
-14271      | inperson  | lab     | slot_40            | Tuesday                      | ee103physicsee | Dr. Amera Al-Amery
-14271      | inperson  | lab     | slot_22            | Sunday                       | ee205 circuits | Wasan A.Alma'Aitah
-14330      | inperson  | lecture | slot_47            | Monday  Wednesday            | 831      | Dr. Bushra Alhijawi
-14330      | inperson  | lecture | slot_147           | Tuesday                      | 831      | Prof. Saleh Abu Soud
-14331      | inperson  | lab     | slot_93            | Tuesday                      | it103    | Dr. Tariq Bdair
-14331      | inperson  | lab     | slot_83            | Thursday                     | ee242 communications | Wasan A.Alma'Aitah
-14350      | inperson  | lecture | slot_37            | Tuesday                      | 202      | Dr. Mohammad Abdel Rahman
-14350      | inperson  | lecture | slot_47            | Monday  Wednesday            | 303      | Dr. Serin Atiani
-14362      | inperson  | lecture | slot_2             | Monday  Wednesday            | 822      | Dr. Mo'Taz Al-Hami
-14362      | inperson  | lecture | slot_35            | Sunday                       | 304      | Dr. Abdullah Aref
-14362      | inperson  | lecture | slot_77            | Sunday  Tuesday  Thursday    | 701      | Dr. Mo'Taz Al-Hami
-14362      | inperson  | lecture | slot_140           | Wednesday  Thursday          | 341      | Dr. Abdullah Aref
-14364      | inperson  | lecture | slot_94            | Sunday                       | 703      | Wasan A.Alma'Aitah
-14364      | inperson  | lecture | slot_145           | Tuesday                      | 202      | Wasan A.Alma'Aitah
-14364      | inperson  | lecture | slot_6             | Monday  Wednesday            | 821      | Dr. Amera Al-Amery
-14452      | blended   | lecture | slot_69            | Wednesday                    | 306      | Dr. Ahmad Alzghoul
-14452      | blended   | lecture | slot_62            | Monday                       | 305      | Dr. Ahmad Alzghoul
-14455      | inperson  | lecture | slot_46            | Sunday  Tuesday  Thursday    | 206      | Dr. Bushra Alhijawi
-14465      | blended   | lecture | slot_51            | Wednesday                    | 831      | Dr. Nailah Almadi
-14466      | inperson  | lecture | slot_134           | Sunday  Tuesday              | 306      | Dr. Mohammad Abdel Rahman
-14466      | inperson  | lecture | slot_78            | Monday  Wednesday            | 304      | Dr. Mohammad Abdel Rahman
-15110      | blended   | lecture | slot_29            | Monday                       | 703      | Rahmeh Ibrahim
-15110      | blended   | lecture | slot_115           | Wednesday                    | 341      | Qasem Abu Al-Haija'
-15220      | inperson  | lecture | slot_47            | Monday  Wednesday            | 208      | Dr. Manaf Gharaibeh
-15370      | inperson  | lecture | slot_145           | Tuesday                      | 704      | Prof. Mustafa Al-Fayoumi
-15483      | inperson  | lecture | slot_7             | Sunday  Tuesday  Thursday    | 208      | Dr. Mu'Awya Al-Dala'Ien
-20131      | blended   | lecture | slot_41            | Sunday  Tuesday              | 202      | Raja'A Al-Qderat
-20131      | blended   | lecture | slot_96            | Monday                       | 207      | Raja'A Al-Qderat
-20131      | blended   | lecture | slot_69            | Wednesday                    | 304      | Raja'A Al-Qderat
-20131      | blended   | lecture | slot_33            | Wednesday                    | 302      | Yousef Abu Hour
-20131      | blended   | lecture | slot_39            | Sunday  Tuesday              | 301      | Dr. Abeer Jaradat
-20132      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 202      | Prof. Fida Mohammad
-20132      | inperson  | lecture | slot_9             | Sunday  Tuesday  Thursday    | 301      | Dareen Al Shalaout
-20132      | inperson  | lecture | slot_128           | Sunday  Monday  Tuesday      | 921      | Dr. Maisa Khader
-20132      | inperson  | lecture | slot_19            | Sunday  Tuesday  Thursday    | 201      | Omar Yasin
-20132      | inperson  | lecture | slot_44            | Tuesday                      | 703      | Yousef Abu Hour
-20133      | inperson  | lecture | slot_104           | Tuesday                      | 301      | Yousef Abu Hour
-20133      | inperson  | lecture | slot_65            | Tuesday                      | 202      | Dr. Abeer Jaradat
-20133      | inperson  | lecture | slot_120           | Sunday  Monday  Tuesday  Wednesday  Thursday | 822      | Amani As-Suhiemate
-20133      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | 304      | Dr. Abeer Jaradat
-20133      | inperson  | lecture | slot_117           | Sunday  Monday  Tuesday  Wednesday  Thursday | 701      | Raja'A Al-Qderat
-20133      | inperson  | lecture | slot_104           | Tuesday                      | 302      | Dr. Maisa Khader
-20133      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 821      | Dr. Maisa Khader
-20133      | inperson  | lecture | slot_47            | Monday  Wednesday            | 202      | Omar Yasin
-20133      | inperson  | lecture | slot_104           | Tuesday                      | 304      | Prof. Mohammad Sababheh
-20133      | inperson  | lecture | slot_154           | Monday  Wednesday            | 301      | Dr. Abeer Jaradat
-20133      | inperson  | lecture | slot_72            | Monday  Wednesday            | 301      | Dareen Al Shalaout
-20133      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | 307      | Ghandi Rababa
-20133      | inperson  | lecture | slot_11            | Monday  Wednesday            | 341      | Yousef Abu Hour
-20133      | inperson  | lecture | slot_94            | Sunday                       | 341      | Prof. Mohammad Sababheh
-20134      | blended   | lecture | slot_28            | Monday                       | 201      | Prof. Fida Mohammad
-20134      | blended   | lecture | slot_68            | Monday                       | 303      | Prof. Ma'Moon Ahmed
-20134      | blended   | lecture | slot_27            | Monday                       | 303      | Prof. Ma'Moon Ahmed
-20134      | blended   | lecture | slot_29            | Monday                       | 922      | Dr. Abeer Jaradat
-20134      | blended   | lecture | slot_41            | Sunday  Tuesday              | 921      | Dr. Sahar Aleid
-20134      | blended   | lecture | slot_96            | Monday                       | 341      | Ghandi Rababa
-20135      | blended   | lecture | slot_115           | Wednesday                    | 308      | Prof. Fida Mohammad
-20140      | online    | lecture | slot_29            | Monday                       | ONLINE   | Tariq Aldaraghmeh
-20141      | inperson  | lecture | slot_77            | Sunday  Tuesday  Thursday    | 203      | Omar Zayed
-20141      | inperson  | lecture | slot_37            | Tuesday                      | 308      | Dr. Yahya Al-Khatatbeh
-20142      | inperson  | lecture | slot_145           | Tuesday                      | 201      | Dr. Yahya Al-Khatatbeh
-20142      | inperson  | lecture | slot_127           | Sunday  Monday  Tuesday      | 306      | Prof. Khaldoun Al Tarawneh
-20142      | inperson  | lecture | slot_145           | Tuesday                      | 204      | Prof. Khaldoun Al Tarawneh
-20142      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 921      | Omar Zayed
-20142      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 831      | Omar Zayed
-20142      | inperson  | lecture | slot_43            | Sunday                       | 302      | Tariq Aldaraghmeh
-20142      | inperson  | lecture | slot_103           | Sunday                       | 301      | Dr. Yahya Al-Khatatbeh
-20142      | inperson  | lecture | slot_47            | Monday  Wednesday            | 204      | Omar Zayed
-20142      | inperson  | lecture | slot_44            | Tuesday                      | 207      | Prof. Khaldoun Al Tarawneh
-20147      | inperson  | lab     | slot_97            | Thursday                     | it104    | Omar Zayed
-20147      | inperson  | lab     | slot_82            | Wednesday                    | ee241 security | Omar Zayed
-20150      | inperson  | lab     | slot_158           | Tuesday                      | ee205 circuits | Tariq Aldaraghmeh
-20150      | inperson  | lab     | slot_15            | Monday                       | it102    | Omar Zayed
-20150      | inperson  | lab     | slot_79            | Sunday                       | it102    | Tariq Aldaraghmeh
-20150      | inperson  | lab     | slot_135           | Sunday  Tuesday              | ee243 cellular | Tariq Aldaraghmeh
-20150      | inperson  | lab     | slot_71            | Thursday                     | it303    | Tariq Aldaraghmeh
-20150      | inperson  | lab     | slot_55            | Thursday                     | lb705    | Tariq Aldaraghmeh
-20150      | inperson  | lab     | slot_142           | Monday  Wednesday            | it105    | Tariq Aldaraghmeh
-20150      | inperson  | lab     | slot_16            | Tuesday                      | ee204 microprocessor | Tariq Aldaraghmeh
-20200      | blended   | lecture | slot_29            | Monday                       | 307      | Aya Hamdieh
-20200      | blended   | lecture | slot_92            | Monday                       | 307      | Hiba Abu Jamous
-20200      | blended   | lecture | slot_98            | Wednesday                    | 343      | Prof. Ayman Yasin
-20200      | blended   | lecture | slot_27            | Monday                       | 201      | Eng. Fadia El Issa
-20200      | blended   | lecture | slot_87            | Wednesday                    | 304      | Mohammad Amoura
-20200      | blended   | lecture | slot_28            | Monday                       | 205      | Eng. Jumana Abu Hamad
-20231      | inperson  | lecture | slot_46            | Sunday  Tuesday  Thursday    | 303      | Dr. Sahar Aleid
-20231      | inperson  | lecture | slot_12            | Sunday  Tuesday  Thursday    | 301      | Prof. Ma'Moon Ahmed
-20231      | inperson  | lecture | slot_104           | Tuesday                      | 831      | Dr. Sahar Aleid
-20232      | blended   | lecture | slot_59            | Sunday  Tuesday              | 206      | Prof. Mohammad Sababheh
-20232      | blended   | lecture | slot_33            | Wednesday                    | 306      | Dr. Abdullah Alsoboh
-20233      | blended   | lecture | slot_51            | Wednesday                    | 343      | Dr. Yousef Al-Qudah
-20233      | blended   | lecture | slot_67            | Sunday  Tuesday              | 204      | Raja'A Al-Qderat
-20233      | blended   | lecture | slot_89            | Wednesday                    | 343      | Dareen Al Shalaout
-20233      | blended   | lecture | slot_51            | Wednesday                    | 205      | Prof. Mahmoud Dar Assi
-20234      | inperson  | lecture | slot_77            | Sunday  Tuesday  Thursday    | 302      | Dr. Sahar Aleid
-20234      | inperson  | lecture | slot_48            | Sunday                       | 205      | Prof. Samia Bushnaq
-20234      | inperson  | lecture | slot_72            | Monday  Wednesday            | 307      | Mashhoor Al Refai
-20234      | inperson  | lecture | slot_52            | Tuesday                      | 204      | Omar Yasin
-20234      | inperson  | lecture | slot_120           | Sunday  Monday  Tuesday  Wednesday  Thursday | 341      | Omar Yasin
-20234      | inperson  | lecture | slot_119           | Sunday  Monday  Tuesday  Wednesday  Thursday | 342      | Haneen Abu Lebaa
-20234      | inperson  | lecture | slot_7             | Sunday  Tuesday  Thursday    | 307      | Dr. Sahar Aleid
-20235      | blended   | lecture | slot_42            | Sunday  Tuesday              | 201      | Yousef Abu Hour
-20235      | blended   | lecture | slot_38            | Wednesday                    | atelier ُee309 | Dr. Yousef Al-Qudah
-20235      | blended   | lecture | slot_67            | Sunday  Tuesday              | 703      | Ala'A Abu Saleem
-20235      | blended   | lecture | slot_89            | Wednesday                    | atelier ُee309 | Dr. Yousef Al-Qudah
-20331      | blended   | lecture | slot_114           | Monday                       | 305      | Prof. Mohammad Sababheh
-20333      | blended   | lecture | slot_26            | Monday                       | 202      | Prof. Samia Bushnaq
-20333      | blended   | lecture | slot_115           | Wednesday                    | 307      | Prof. Samia Bushnaq
-20335      | blended   | lecture | slot_41            | Sunday  Tuesday              | 204      | Prof. Fida Mohammad
-20335      | blended   | lecture | slot_112           | Monday                       | atelier ُee309 | Prof. Fida Mohammad
-20336      | blended   | lecture | slot_157           | Sunday  Monday  Tuesday      | 307      | Dr. Maisa Khader
-21218      | blended   | lab     | slot_142           | Monday  Wednesday            | it104    | Dr. Fares El-Faouri
-21218      | blended   | lab     | slot_124           | Monday  Wednesday            | it302    | Eng. Ayman Ghamoh
-21218      | blended   | lab     | slot_85            | Wednesday                    | ee242 communications | Eng. Ayman Ghamoh
-21218      | blended   | lab     | slot_54            | Thursday                     | ee241 security | Dr. Majd Batarseh
-21218      | blended   | lab     | slot_83            | Thursday                     | 811      | Eng. Ayman Ghamoh
-21219      | inperson  | lecture | slot_95            | Tuesday                      | 201      | Dr. Qusay Salem
-21219      | inperson  | lecture | slot_117           | Sunday  Monday  Tuesday  Wednesday  Thursday | 342      | Dr. Hamzeh Jaber
-21219      | inperson  | lecture | slot_108           | Monday  Wednesday            | 832      | Prof. Ayman Faza
-21219      | inperson  | lecture | slot_37            | Tuesday                      | 341      | Dr. Osama Abu-Sharkh
-21221      | inperson  | lecture | slot_72            | Monday  Wednesday            | 702      | Dr. Majd Batarseh
-21221      | inperson  | lecture | slot_37            | Tuesday                      | 203      | Dr. Qusay Salem
-21221      | inperson  | lecture | slot_75            | Monday  Wednesday            | 704      | Dr. Majd Batarseh
-21221      | inperson  | lecture | slot_11            | Monday  Wednesday            | 302      | Dr. Fares El-Faouri
-21221      | inperson  | lecture | slot_4             | Monday  Wednesday            | 831      | Dr. Hamzeh Jaber
-21222      | inperson  | lecture | slot_149           | Monday  Wednesday            | 822      | Dr. Qusay Salem
-21222      | inperson  | lecture | slot_77            | Sunday  Tuesday  Thursday    | 204      | Dr. Qusay Salem
-21222      | inperson  | lecture | slot_48            | Sunday                       | 701      | Dr. Hamzeh Jaber
-21222      | inperson  | lecture | slot_45            | Thursday                     | 921      | Dr. Rafat Aljarrah
-21222      | inperson  | lecture | slot_44            | Tuesday                      | 208      | Dr. Majd Batarseh
-21229      | inperson  | lab     | slot_135           | Sunday  Tuesday              | 811      | Prof. Saud Althunibat
-21229      | inperson  | lab     | slot_54            | Thursday                     | ee244 fiber | Dr. Rami Wahsheh
-21229      | inperson  | lab     | slot_131           | Sunday  Tuesday              | 811      | Prof. Ayman Faza
-21229      | inperson  | lab     | slot_148           | Monday                       | it106    | Prof. Saud Althunibat
-21229      | inperson  | lab     | slot_56            | Wednesday                    | it104    | Dr. Rafat Aljarrah
-21231      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | 308      | Dr. Hani Ahmad
-21231      | inperson  | lecture | slot_45            | Thursday                     | 207      | Dr. Hani Ahmad
-21231      | inperson  | lecture | slot_44            | Tuesday                      | 203      | Prof. Mohammad Mismar
-21231      | inperson  | lecture | slot_48            | Sunday                       | 206      | Dr. Fadi Nessir Zghoul
-21331      | inperson  | lecture | slot_52            | Tuesday                      | 822      | Dr. Ammar Abdo
-21332      | inperson  | lecture | slot_104           | Tuesday                      | 832      | Eng. Hazem Marar
-21338      | inperson  | lab     | slot_122           | Sunday  Tuesday              | it301    | Dr. Khaldoon Mhaidat
-21339      | inperson  | lab     | slot_152           | Monday                       | ee205 circuits | Dr. Ammar Abdo
-21339      | inperson  | lab     | slot_40            | Tuesday                      | it105    | Prof. Fadi Shahrouri
-22241      | inperson  | lecture | slot_19            | Sunday  Tuesday  Thursday    | 203      | Dr. Yazan Al Issa
-22241      | inperson  | lecture | slot_45            | Thursday                     | 203      | Eng. Hazem Marar
-22241      | inperson  | lecture | slot_113           | Tuesday                      | 203      | Eng. Nour Kattawi
-22241      | inperson  | lecture | slot_37            | Tuesday                      | 204      | Prof. Esam Al Qaralleh
-22241      | inperson  | lecture | slot_120           | Sunday  Monday  Tuesday  Wednesday  Thursday | 342      | Dr. Rajaa Alqudah
-22241      | inperson  | lecture | slot_49            | Sunday                       | 342      | Dr. Yazan Al-Rawashdeh
-22242      | inperson  | lecture | slot_95            | Tuesday                      | 205      | Dr. Osama Abu-Sharkh
-22320      | inperson  | lecture | slot_145           | Tuesday                      | 821      | Dr. Rajaa Alqudah
-22321      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 701      | Dr. Rajaa Alqudah
-22342      | blended   | lecture | slot_53            | Wednesday                    | 305      | Prof. Esam Al Qaralleh
-22342      | blended   | lecture | slot_57            | Tuesday                      | 203      | Prof. Esam Al Qaralleh
-22342      | blended   | lecture | slot_144           | Wednesday                    | 301      | Prof. Esam Al Qaralleh
-22342      | blended   | lecture | slot_33            | Wednesday                    | 831      | Eng. Hazem Marar
-22344      | inperson  | lecture | slot_43            | Sunday                       | atelier ُee309 | Dr. Heba Abdel-Nabi
-22348      | inperson  | lab     | slot_130           | Monday  Wednesday            | 811      | Dr. Hani Ahmad
-22348      | inperson  | lab     | slot_121           | Sunday  Tuesday              | it107    | Dr. Yazan Al Issa
-22348      | inperson  | lab     | slot_30            | Monday                       | ee204 microprocessor | Dr. Hani Ahmad
-22348      | inperson  | lab     | slot_85            | Wednesday                    | ee102 electrical | Dr. Awos Kanan
-22348      | inperson  | lab     | slot_158           | Tuesday                      | it104    | Dr. Yazan Al Issa
-22420      | inperson  | lab     | slot_14            | Sunday                       | it302    | Dr. Rajaa Alqudah
-22442      | inperson  | lecture | slot_37            | Tuesday                      | 821      | Dr. Anastassia Gharib
-22443      | inperson  | lecture | slot_94            | Sunday                       | 201      | Ramzi Saifan
-22448      | inperson  | lab     | slot_156           | Monday  Wednesday            | it104    | Eng. Hazem Marar
-22448      | inperson  | lab     | slot_24            | Monday                       | it105    | Dr. Hani Ahmad
-22448      | inperson  | lab     | slot_23            | Sunday                       | it106    | Dr. Hani Ahmad
-22449      | inperson  | lab     | slot_102           | Thursday                     | it301    | Prof. Amjed Al-Mousa
-22449      | inperson  | lab     | slot_124           | Monday  Wednesday            | online   | Dr. Rajaa Alqudah
-22449      | inperson  | lab     | slot_99            | Sunday                       | it104    | Prof. Amjed Al-Mousa
-22460      | blended   | lecture | slot_57            | Tuesday                      | 205      | Dr. Haitham Al-Ani
-22461      | inperson  | lab     | slot_126           | Monday  Wednesday            | lb705    | Prof. Amjed Al-Mousa
-22461      | inperson  | lab     | slot_70            | Monday                       | 811      | Dr. Qutaiba Al Harfi Albluwi
-22541      | inperson  | lecture | slot_47            | Monday  Wednesday            | 206      | Dr. Yazan Al Issa
-22560      | blended   | lecture | slot_144           | Wednesday                    | 201      | Eng. Nour Kattawi
-22560      | blended   | lecture | slot_100           | Sunday  Tuesday              | 201      | Dr. Qutaiba Al Harfi Albluwi
-22570      | inperson  | lecture | slot_45            | Thursday                     | 206      | Prof. Amjed Al-Mousa
-22570      | inperson  | lecture | slot_44            | Tuesday                      | 304      | Prof. Amjed Al-Mousa
-23321      | inperson  | lecture | slot_45            | Thursday                     | 306      | Dr. Rami Wahsheh
-23351      | inperson  | lecture | slot_104           | Tuesday                      | 208      | Eng. Mohamed Taha
-23351      | inperson  | lecture | slot_47            | Monday  Wednesday            | 342      | Dr. Luae' Al-Tarawneh
-23355      | inperson  | lecture | slot_128           | Sunday  Monday  Tuesday      | 306      | Eng. Mohamed Taha
-23356      | inperson  | lab     | slot_109           | Thursday                     | it105    | Dr. Luae' Al-Tarawneh
-23411      | blended   | lecture | slot_141           | Sunday  Monday  Tuesday      | 208      | Eng. Neda Al Daher
-23411      | blended   | lecture | slot_31            | Wednesday                    | 203      | Eng. Neda Al Daher
-23452      | inperson  | lecture | slot_103           | Sunday                       | 921      | Prof. Omar Bani Ahmad
-23459      | inperson  | lab     | slot_158           | Tuesday                      | it102    | Dr. Rami Wahsheh
-24311      | blended   | lecture | slot_90            | Monday                       | 703      | Eng. Ayman Ghamoh
-24411      | blended   | lecture | slot_115           | Wednesday                    | 202      | Eng. Fadia El Issa
-24411      | blended   | lecture | slot_96            | Monday                       | 306      | Eng. Fadia El Issa
-24469      | inperson  | lab     | slot_99            | Sunday                       | it103    | Dr. Rafat Aljarrah
-24471      | inperson  | lecture | slot_74            | Monday  Wednesday            | 704      | Hussam Kloub
-24471      | inperson  | lecture | slot_44            | Tuesday                      | 302      | Prof. Ahmad Tawayha
-24479      | inperson  | lab     | slot_143           | Tuesday                      | 811      | Prof. Ahmad Tawayha
-24479      | inperson  | lab     | slot_137           | Monday  Wednesday            | it103    | Prof. Ayman Faza
-24562      | blended   | lecture | slot_32            | Wednesday                    | 205      | Dr. Qusay Salem
-24567      | blended   | lecture | slot_66            | Sunday  Tuesday              | 702      | Dr. Ibrahim Abuishmais
-24568      | inperson  | lab     | slot_123           | Sunday  Tuesday              | it106    | Dr. Majd Batarseh
-25330      | inperson  | lecture | slot_35            | Sunday                       | 342      | Ramzi Saifan
-25330      | inperson  | lecture | slot_4             | Monday  Wednesday            | 921      | Eng. Islam Al Shawish
-25347      | inperson  | lecture | slot_145           | Tuesday                      | 701      | Dr. Qutaiba Al Harfi Albluwi
-25347      | inperson  | lecture | slot_95            | Tuesday                      | 703      | Dr. Enas Abulibdeh
-25420      | inperson  | lecture | slot_65            | Tuesday                      | 342      | Dr. Anastassia Gharib
-25441      | inperson  | lecture | slot_94            | Sunday                       | 831      | Dr. Anastassia Gharib
-25445      | inperson  | lab     | slot_79            | Sunday                       | it104    | Dr. Osama Abu-Sharkh
-25445      | inperson  | lab     | slot_83            | Thursday                     | it104    | Dr. Osama Abu-Sharkh
-25543      | blended   | lecture | slot_53            | Wednesday                    | 301      | Dr. Haitham Al-Ani
-25545      | inperson  | lab     | slot_61            | Sunday                       | online   | Dr. Osama Abu-Sharkh
-25545      | inperson  | lab     | slot_56            | Wednesday                    | it102    | Eng. Nour Kattawi
-25549      | inperson  | lab     | slot_121           | Sunday  Tuesday              | ee241 security | Dr. Haitham Al-Ani
-25549      | inperson  | lab     | slot_81            | Tuesday                      | it302    | Eng. Farah Abudabaseh
-25595      | blended   | lecture | slot_50            | Monday                       | 922      | Dr. Qutaiba Al Harfi Albluwi
-25596      | blended   | lecture | slot_89            | Wednesday                    | 201      | Dr. Qutaiba Al Harfi Albluwi
-31021      | online    | lecture | slot_155           | Monday  Wednesday            | ONLINE   | Dr. Sa'Da Abu Sini
-31021      | online    | lecture | slot_12            | Sunday  Tuesday  Thursday    | ONLINE   | Dr. Haya Aldalabih
-31022      | online    | lecture | slot_10            | Sunday  Tuesday  Thursday    | ONLINE   | Ashraf Thaher
-31112      | online    | lecture | slot_35            | Sunday                       | ONLINE   | Dr. Neveen Albadawi
-31112      | online    | lecture | slot_48            | Sunday                       | ONLINE   | Dr. Shereen Jad Allah
-31112      | online    | lecture | slot_8             | Sunday  Tuesday  Thursday    | ONLINE   | Eman Al Shawish
-31112      | online    | lecture | slot_44            | Tuesday                      | ONLINE   | Hanadi Abu-Qatam
-31112      | online    | lecture | slot_43            | Sunday                       | ONLINE   | Dr. Shereen Jad Allah
-31112      | online    | lecture | slot_154           | Monday  Wednesday            | ONLINE   | Dr. Haya Aldalabih
-31112      | online    | lecture | slot_10            | Sunday  Tuesday  Thursday    | ONLINE   | Dr. Sa'Da Abu Sini
-31112      | online    | lecture | slot_8             | Sunday  Tuesday  Thursday    | ONLINE   | Hanadi Abu-Qatam
-31112      | online    | lecture | slot_49            | Sunday                       | ONLINE   | Asala Bany Melhem
-31112      | online    | lecture | slot_65            | Tuesday                      | ONLINE   | Dr. Amani Ass''Ad
-31112      | online    | lecture | slot_115           | Wednesday                    | ONLINE   | Dr. Diana Alrehayel
-31122      | online    | lecture | slot_8             | Sunday  Tuesday  Thursday    | ONLINE   | Tariq Farghal
-31122      | online    | lecture | slot_95            | Tuesday                      | ONLINE   | Tagreed Kawar
-31122      | online    | lecture | slot_95            | Tuesday                      | ONLINE   | Qamar Jaamour
-31122      | online    | lecture | slot_5             | Monday  Wednesday            | ONLINE   | Prof. Ayman Yasin
-31122      | online    | lecture | slot_45            | Thursday                     | ONLINE   | Prof. Ayman Yasin
-31122      | online    | lecture | slot_77            | Sunday  Tuesday  Thursday    | ONLINE   | Dr. Eman Bani Salameh
-31122      | online    | lecture | slot_46            | Sunday  Tuesday  Thursday    | ONLINE   | Dr. Eman Bani Salameh
-31122      | online    | lecture | slot_7             | Sunday  Tuesday  Thursday    | ONLINE   | Raghda Al-Hamad
-31130      | blended   | lecture | slot_26            | Monday                       | 303      | Omar Al Duais
-31130      | blended   | lecture | slot_138           | Sunday  Monday  Tuesday      | 343      | Dr. Ahmad Shalabi
-31130      | blended   | lecture | slot_29            | Monday                       | 303      | Dr. Malak Al-Shamayleh
-31130      | blended   | lecture | slot_139           | Monday  Wednesday            | 343      | Dr. Malak Al-Shamayleh
-31130      | blended   | lecture | slot_112           | Monday                       | 343      | Zainab Khaleel
-31130      | blended   | lecture | slot_66            | Sunday  Tuesday              | 303      | Dr. Malak Al-Shamayleh
-31130      | blended   | lecture | slot_115           | Wednesday                    | 303      | Ashraf Thaher
-31130      | blended   | lecture | slot_42            | Sunday  Tuesday              | 343      | Prof. Ayman Yasin
-31130      | blended   | lecture | slot_91            | Monday                       | 343      | Musab Khalaf
-31151      | online    | lecture | slot_2             | Monday  Wednesday            | ONLINE   | Dr. Ahmad Tarawneh
-31151      | online    | lecture | slot_134           | Sunday  Tuesday              | ONLINE   | Dr. Adel Alhanahnah
-31151      | online    | lecture | slot_63            | Thursday                     | ONLINE   | Manar Ibrahim
-31151      | online    | lecture | slot_92            | Monday                       | ONLINE   | Dr. Adel Alhanahnah
-31151      | online    | lecture | slot_151           | Thursday                     | ONLINE   | Dr. Adel Alhanahnah
-31151      | online    | lecture | slot_19            | Sunday  Tuesday  Thursday    | ONLINE   | Dr. Saja Almarashdi
-31151      | online    | lecture | slot_91            | Monday                       | ONLINE   | Dr. Adel Alhanahnah
-31151      | online    | lecture | slot_65            | Tuesday                      | ONLINE   | Dr. Qusai Alrahamneh
-31152      | blended   | lecture | slot_32            | Wednesday                    | 303      | Dr. Ahmad Tarawneh
-31152      | blended   | lecture | slot_33            | Wednesday                    | 303      | Dr. Ahmad Tarawneh
-31152      | blended   | lecture | slot_41            | Sunday  Tuesday              | 303      | Shahenaz Issa
-31160      | online    | lecture | slot_4             | Monday  Wednesday            | ONLINE   | Prof. Rami Salem
-31160      | online    | lecture | slot_43            | Sunday                       | ONLINE   | Prof. Rami Salem
-31160      | online    | lecture | slot_138           | Sunday  Monday  Tuesday      | ONLINE   | Prof. Rami Salem
-31160      | online    | lecture | slot_3             | Sunday  Tuesday  Thursday    | ONLINE   | Prof. Rami Salem
-31251      | online    | lecture | slot_6             | Monday  Wednesday            | ONLINE   | Saja Al-Hajaj
-31251      | online    | lecture | slot_114           | Monday                       | ONLINE   | Saja Al-Hajaj
-31251      | online    | lecture | slot_116           | Sunday  Monday  Tuesday  Wednesday  Thursday | ONLINE   | Jumana Al-Manaseer
-31251      | online    | lecture | slot_11            | Monday  Wednesday            | ONLINE   | Saja Al-Hajaj
-31254      | online    | lecture | slot_63            | Thursday                     | ONLINE   | Dr. Abdel Reheem Abualbasal
-31254      | online    | lecture | slot_147           | Tuesday                      | ONLINE   | Dr. Abdel Reheem Abualbasal
-31254      | online    | lecture | slot_107           | Wednesday                    | ONLINE   | Afnan Mosime
-31254      | online    | lecture | slot_101           | Monday                       | ONLINE   | Dr. Mahmoud Malkawi
-31254      | online    | lecture | slot_43            | Sunday                       | ONLINE   | Hanin Damer
-31254      | online    | lecture | slot_103           | Sunday                       | ONLINE   | Hanin Damer
-31254      | online    | lecture | slot_2             | Monday  Wednesday            | ONLINE   | Dr. Mahmoud Malkawi
-31260      | blended   | lecture | slot_111           | Thursday                     | 202      | Dr. Adel Alhanahnah
-31260      | blended   | lecture | slot_100           | Sunday  Tuesday              | 921      | Hamza Alakaleek
-31261      | blended   | lecture | slot_144           | Wednesday                    | 703      | Dr. Ramzy Radeideh
-31261      | blended   | lecture | slot_60            | Sunday  Tuesday              | 303      | Dr. Ramzy Radeideh
-31264      | blended   | lecture | slot_28            | Monday                       | 202      | Dr. Qusai Alrahamneh
-31264      | blended   | lecture | slot_38            | Wednesday                    | 921      | Dr. Qusai Alrahamneh
-31264      | blended   | lecture | slot_33            | Wednesday                    | 202      | Dr. Osam Bani-Hamd
-31272      | blended   | lecture | slot_112           | Monday                       | 204      | Prof. Abdul Ghani Albaali
-31311      | blended   | lecture | slot_146           | Sunday                       | 303      | Prof. Abdul Ghani Albaali
-31311      | blended   | lecture | slot_41            | Sunday  Tuesday              | 343      | Prof. Abdul Ghani Albaali
-31311      | blended   | lecture | slot_57            | Tuesday                      | 343      | Prof. Abdul Ghani Albaali
-31351      | blended   | lecture | slot_41            | Sunday  Tuesday              | 704      | Prof. Mohammad Al Sheyab
-31351      | blended   | lecture | slot_92            | Monday                       | 703      | Prof. Mohammad Al Sheyab
-31351      | blended   | lecture | slot_90            | Monday                       | 202      | Dr. Ahmad Tarawneh
-31352      | blended   | lecture | slot_114           | Monday                       | 703      | Shahenaz Issa
-31352      | blended   | lecture | slot_64            | Thursday                     | 303      | Shahenaz Issa
-31362      | blended   | lecture | slot_33            | Wednesday                    | 203      | Prof. Mohammad Al Sheyab
-31362      | blended   | lecture | slot_101           | Monday                       | 202      | Prof. Mohammad Al Sheyab
-31362      | blended   | lecture | slot_90            | Monday                       | 831      | Prof. Mohammad Al Sheyab
-31362      | blended   | lecture | slot_58            | Sunday  Tuesday              | 202      | Dr. Alhakem Masoud
-31374      | online    | lecture | slot_151           | Thursday                     | ONLINE   | Dana Manasra
-31374      | online    | lecture | slot_52            | Tuesday                      | ONLINE   | Afnan Mosime
-31374      | online    | lecture | slot_59            | Sunday  Tuesday              | ONLINE   | Dr. Ola Al Haddid
-31374      | online    | lecture | slot_140           | Wednesday  Thursday          | ONLINE   | Dana Manasra
-31374      | online    | lecture | slot_8             | Sunday  Tuesday  Thursday    | ONLINE   | Afnan Mosime
-31374      | online    | lecture | slot_38            | Wednesday                    | ONLINE   | Fida Zakzouk
-31374      | online    | lecture | slot_78            | Monday  Wednesday            | ONLINE   | Banan Alkasasbeh
-33101      | inperson  | lecture | slot_127           | Sunday  Monday  Tuesday      | 702      | Dr. Moh'D Al-Shboul
-33101      | inperson  | lecture | slot_45            | Thursday                     | 308      | Dr. Abdel Reheem Abualbasal
-33101      | inperson  | lecture | slot_78            | Monday  Wednesday            | 704      | Prof. Serena Sandri
-33101      | inperson  | lecture | slot_94            | Sunday                       | 308      | Prof. Baker Al Serhan
-33101      | inperson  | lecture | slot_44            | Tuesday                      | 204      | Saleh Malkawi
-33101      | inperson  | lecture | slot_48            | Sunday                       | 341      | Leyla Rawashdeh
-33103      | inperson  | lecture | slot_45            | Thursday                     | 303      | Eng. Nadine Abu Tuhaimer
-33103      | inperson  | lecture | slot_65            | Tuesday                      | 704      | Hatem Al-Hindawi
-33103      | inperson  | lecture | slot_120           | Sunday  Monday  Tuesday  Wednesday  Thursday | 704      | Dr. Afnan Ghanayem
-33103      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 343      | Dr. Seif Athamneh
-33203      | blended   | lecture | slot_153           | Monday                       | 921      | Dr. Bilal Hamoud
-33203      | blended   | lecture | slot_51            | Wednesday                    | 302      | Dr. Ola Al Haddid
-33203      | blended   | lecture | slot_88            | Wednesday                    | 208      | Dr. Shatha Al-Qudah
-33204      | blended   | lecture | slot_146           | Sunday                       | 204      | Prof. Serena Sandri
-33204      | blended   | lecture | slot_28            | Monday                       | 204      | Dr. Manal Qarain
-33204      | blended   | lecture | slot_146           | Sunday                       | 201      | Dr. Nadia Sweis
-33204      | blended   | lecture | slot_88            | Wednesday                    | 201      | Dr. Nadia Sweis
-33207      | blended   | lecture | slot_26            | Monday                       | atelier ُee309 | Prof. Baker Al Serhan
-33209      | inperson  | lecture | slot_132           | Sunday  Monday  Tuesday      | 303      | Lubna Haijawi
-33209      | inperson  | lecture | slot_74            | Monday  Wednesday            | 831      | Ayah Alnouri
-33209      | inperson  | lecture | slot_47            | Monday  Wednesday            | 302      | Dr. Aseel Abu Ajamieh
-33212      | inperson  | lecture | slot_72            | Monday  Wednesday            | 305      | Dr. Mohammad Alsumadi
-33212      | inperson  | lecture | slot_7             | Sunday  Tuesday  Thursday    | 207      | Dr. Bilal Hamoud
-33218      | inperson  | lecture | slot_43            | Sunday                       | 922      | Dr. Raed Wishah
-33309      | blended   | lecture | slot_33            | Wednesday                    | 205      | Dr. Seif Athamneh
-33309      | blended   | lecture | slot_114           | Monday                       | 301      | Eng. Nadine Abu Tuhaimer
-33313      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 307      | Dr. Yazan Migdadi
-33313      | inperson  | lecture | slot_7             | Sunday  Tuesday  Thursday    | 205      | Dr. Khleef Alkhawaldeh
-33313      | inperson  | lecture | slot_147           | Tuesday                      | atelier ُee309 | Dr. Yazan Migdadi
-33317      | blended   | lecture | slot_53            | Wednesday                    | 201      | Dr. Hani Al-Abdallat
-33317      | blended   | lecture | slot_107           | Wednesday                    | 208      | Dr. Hani Al-Abdallat
-33331      | blended   | lecture | slot_32            | Wednesday                    | 202      | Leyla Rawashdeh
-33404      | blended   | lecture | slot_60            | Sunday  Tuesday              | 203      | Dr. Abdel Reheem Abualbasal
-33405      | blended   | lecture | slot_67            | Sunday  Tuesday              | 304      | Dr. Ahmad Alnsour
-33405      | blended   | lecture | slot_57            | Tuesday                      | 342      | Dr. Aseel Abu Ajamieh
-33405      | blended   | lecture | slot_64            | Thursday                     | 201      | Dr. Moh'D Al-Shboul
-33408      | inperson  | lecture | slot_7             | Sunday  Tuesday  Thursday    | 304      | Dr. Aseel Abu Ajamieh
-33409      | blended   | lecture | slot_87            | Wednesday                    | 201      | Dr. Raed Wishah
-33409      | blended   | lecture | slot_50            | Monday                       | 207      | Dr. Abdel Reheem Abualbasal
-33409      | blended   | lecture | slot_34            | Wednesday                    | 303      | Dr. Amer Al Shishany
-33432      | inperson  | lecture | slot_140           | Wednesday  Thursday          | 206      | Dr. Moh'D Al-Shboul
-33435      | blended   | lecture | slot_107           | Wednesday                    | 304      | Dr. Ahmad Alnsour
-33435      | blended   | lecture | slot_32            | Wednesday                    | 203      | Saleh Malkawi
-33439      | inperson  | lecture | slot_95            | Tuesday                      | 307      | Dr. Aseel Abu Ajamieh
-33445      | blended   | lecture | slot_101           | Monday                       | 205      | Dr. Jumana Zahedah
-33445      | blended   | lecture | slot_96            | Monday                       | 204      | Monjed Obeidat
-33445      | blended   | lecture | slot_60            | Sunday  Tuesday              | 204      | Dr. Jumana Zahedah
-33445      | blended   | lecture | slot_89            | Wednesday                    | 301      | Monjed Obeidat
-34101      | inperson  | lecture | slot_11            | Monday  Wednesday            | 208      | Dr. Salem Alhababsah
-34101      | inperson  | lecture | slot_37            | Tuesday                      | 304      | Zain Rabbaa
-34101      | inperson  | lecture | slot_47            | Monday  Wednesday            | 203      | Ezzat Ghaidan
-34101      | inperson  | lecture | slot_147           | Tuesday                      | 204      | Asma Al Znaimat
-34101      | inperson  | lecture | slot_149           | Monday  Wednesday            | 922      | Dr. Muhannad Atmeh
-34101      | inperson  | lecture | slot_77            | Sunday  Tuesday  Thursday    | 307      | Asma Al Znaimat
-34102      | inperson  | lecture | slot_72            | Monday  Wednesday            | 308      | Dr. Anan Srouji
-34102      | inperson  | lecture | slot_103           | Sunday                       | 302      | Dr. Anan Srouji
-34115      | blended   | lecture | slot_59            | Sunday  Tuesday              | 205      | Natali Abdel Rahim
-34115      | blended   | lecture | slot_151           | Thursday                     | 204      | Dr. Majd Iskandrani
-34115      | blended   | lecture | slot_51            | Wednesday                    | 922      | Natali Abdel Rahim
-34115      | blended   | lecture | slot_34            | Wednesday                    | 306      | Dr. Anas Aljbour
-34115      | blended   | lecture | slot_68            | Monday                       | 341      | Prof. Mona Almwalla
-34115      | blended   | lecture | slot_90            | Monday                       | 204      | Dr. Suleiman Mohammad
-34115      | blended   | lecture | slot_31            | Wednesday                    | 306      | Ja''Far Irshoud
-34204      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 301      | Dr. Rami Alzebdieh
-34205      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 302      | Dr. Bassam Maali
-34205      | inperson  | lecture | slot_104           | Tuesday                      | 821      | Dr. Abdulhadi Ramadan
-34216      | blended   | lecture | slot_91            | Monday                       | 203      | Dr. Rami Alzebdieh
-34216      | blended   | lecture | slot_42            | Sunday  Tuesday              | 922      | Dr. Najib Shrydeh
-34227      | inperson  | lecture | slot_47            | Monday  Wednesday            | 922      | Dr. Muhannad Atmeh
-34231      | blended   | lecture | slot_112           | Monday                       | 822      | Asma Al Znaimat
-34233      | online    | lecture | slot_50            | Monday                       | ONLINE   | Dr. Abdel Razaq Farah Freihat
-34307      | inperson  | lecture | slot_12            | Sunday  Tuesday  Thursday    | 341      | Prof. Modar Abdullatif
-34311      | inperson  | lecture | slot_73            | Monday  Wednesday            | 302      | Dr. Anan Srouji
-34311      | inperson  | lecture | slot_95            | Tuesday                      | 305      | Dr. Anan Srouji
-34313      | inperson  | lecture | slot_145           | Tuesday                      | 702      | Ezzat Ghaidan
-34314      | blended   | lecture | slot_63            | Thursday                     | 202      | Fernando Garicia
-34314      | blended   | lecture | slot_98            | Wednesday                    | 201      | Fernando Garicia
-34314      | blended   | lecture | slot_101           | Monday                       | 301      | Fernando Garicia
-34321      | blended   | lecture | slot_144           | Wednesday                    | 204      | Dr. Salem Alhababsah
-34321      | blended   | lecture | slot_101           | Monday                       | 203      | Dr. Hala Zaidan
-34321      | blended   | lecture | slot_100           | Sunday  Tuesday              | atelier ُee309 | Dr. Hala Zaidan
-34324      | inperson  | lecture | slot_52            | Tuesday                      | 305      | Dr. Muhannad Atmeh
-34324      | inperson  | lecture | slot_116           | Sunday  Monday  Tuesday  Wednesday  Thursday | atelier ُee309 | Dr. Muhannad Atmeh
-34326      | blended   | lecture | slot_29            | Monday                       | 201      | Dr. Rasha Alghazzawi
-34326      | blended   | lecture | slot_63            | Thursday                     | 307      | Dr. Rasha Alghazzawi
-34332      | inperson  | lecture | slot_104           | Tuesday                      | 307      | Dr. Salem Alhababsah
-34332      | inperson  | lecture | slot_37            | Tuesday                      | 306      | Radhi Al-Hamadeen
-34414      | blended   | lecture | slot_69            | Wednesday                    | 204      | Prof. Modar Abdullatif
-34415      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 304      | Dr. Rami Alzebdieh
-34415      | inperson  | lecture | slot_19            | Sunday  Tuesday  Thursday    | 921      | Dr. Bassam Maali
-34432      | blended   | lecture | slot_34            | Wednesday                    | 206      | Dr. Salem Alhababsah
-34439      | online    | lecture | slot_74            | Monday  Wednesday            | ONLINE   | Dr. Suleiman Mohammad
-34439      | online    | lecture | slot_2             | Monday  Wednesday            | ONLINE   | Dr. Suleiman Mohammad
-35101      | blended   | lecture | slot_146           | Sunday                       | 343      | Taghreed Khirfan
-35101      | blended   | lecture | slot_33            | Wednesday                    | 921      | Rand Badran
-35101      | blended   | lecture | slot_60            | Sunday  Tuesday              | 202      | Dr. Amer Badran
-35103      | blended   | lecture | slot_157           | Sunday  Monday  Tuesday      | 201      | Farah Alshraiedeh
-35103      | blended   | lecture | slot_115           | Wednesday                    | 342      | Farah Alshraiedeh
-35202      | inperson  | lecture | slot_45            | Thursday                     | 343      | Dr. Noor Alkhdierat
-35202      | inperson  | lecture | slot_48            | Sunday                       | 703      | Nada Ghesh
-35202      | inperson  | lecture | slot_49            | Sunday                       | 704      | Nada Ghesh
-35215      | blended   | lecture | slot_39            | Sunday  Tuesday              | 208      | Prof. Shafig Al-Haddad
-35215      | blended   | lecture | slot_29            | Monday                       | 821      | Dr. Amer Badran
-35217      | blended   | lecture | slot_115           | Wednesday                    | 704      | Nada Alkhawaja
-35217      | blended   | lecture | slot_88            | Wednesday                    | 343      | Rand Obeidat
-35218      | blended   | lecture | slot_151           | Thursday                     | 202      | Dr. Mohanned Al-Arabiat
-35218      | blended   | lecture | slot_68            | Monday                       | 202      | Saja Alzu'Bi
-35218      | blended   | lecture | slot_111           | Thursday                     | 303      | Saja Alzu'Bi
-35219      | blended   | lecture | slot_139           | Monday  Wednesday            | 203      | Dr. Amer Badran
-35219      | blended   | lecture | slot_32            | Wednesday                    | 204      | Dr. Amer Badran
-35233      | blended   | lecture | slot_26            | Monday                       | 201      | Rand Badran
-35233      | blended   | lecture | slot_67            | Sunday  Tuesday              | 343      | Rand Badran
-35233      | blended   | lecture | slot_139           | Monday  Wednesday            | 205      | Esraa Rababa
-35233      | blended   | lecture | slot_100           | Sunday  Tuesday              | 308      | Esraa Rababa
-35235      | inperson  | lecture | slot_6             | Monday  Wednesday            | 921      | Rama Idries
-35235      | inperson  | lecture | slot_19            | Sunday  Tuesday  Thursday    | 343      | Rama Idries
-35308      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 822      | Dr. Rand Irshaidat
-35314      | blended   | lecture | slot_41            | Sunday  Tuesday              | 702      | Saja Alzu'Bi
-35314      | blended   | lecture | slot_63            | Thursday                     | 302      | Saja Alzu'Bi
-35319      | blended   | lecture | slot_41            | Sunday  Tuesday              | 203      | Prof. Shafig Al-Haddad
-35319      | blended   | lecture | slot_28            | Monday                       | 206      | Dr. Ammar Qasaimeh
-35323      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 304      | Dima Abu Gharbeya
-35323      | inperson  | lecture | slot_52            | Tuesday                      | 831      | Noor Al-Jayyousi
-35326      | online    | lecture | slot_1             | Sunday  Tuesday  Thursday    | ONLINE   | Tariq Abdrabbo
-35326      | online    | lecture | slot_88            | Wednesday                    | ONLINE   | Saja Alzu'Bi
-35336      | blended   | lecture | slot_50            | Monday                       | 306      | Dr. Mohammad Alrousan
-35336      | blended   | lecture | slot_26            | Monday                       | 205      | Dr. Mohammad Alrousan
-35407      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 306      | Dr. Dhia' Qasim
-35407      | inperson  | lecture | slot_43            | Sunday                       | 822      | Dr. Dhia' Qasim
-35408      | blended   | lecture | slot_144           | Wednesday                    | 207      | Tariq Abdrabbo
-35408      | blended   | lecture | slot_100           | Sunday  Tuesday              | 303      | Tariq Abdrabbo
-35409      | inperson  | lecture | slot_155           | Monday  Wednesday            | 302      | Dr. Mohammad Al Haj Eid
-35409      | inperson  | lecture | slot_43            | Sunday                       | ee124    | Noor Al-Jayyousi
-35416      | blended   | lecture | slot_36            | Monday                       | 202      | Prof. Mohammad Al-Khasawneh
-35416      | blended   | lecture | slot_33            | Wednesday                    | 207      | Prof. Mohammad Al-Khasawneh
-35419      | online    | lecture | slot_111           | Thursday                     | ONLINE   | Farah Alshraiedeh
-35424      | inperson  | lecture | slot_113           | Tuesday                      | 341      | Dr. Amer Badran
-35424      | inperson  | lecture | slot_45            | Thursday                     | 831      | Dr. Mohammd Abuhashesh
-35435      | blended   | lecture | slot_64            | Thursday                     | 205      | Dr. Ammar Qasaimeh
-35435      | blended   | lecture | slot_100           | Sunday  Tuesday              | 202      | Dr. Ammar Qasaimeh
-35436      | blended   | lecture | slot_28            | Monday                       | 207      | Rand Badran
-35437      | blended   | lecture | slot_138           | Sunday  Monday  Tuesday      | 206      | Dr. Mohammad Alrousan
-35437      | blended   | lecture | slot_112           | Monday                       | 302      | Dr. Mohammad Alrousan
-36111      | inperson  | lecture | slot_52            | Tuesday                      | 303      | Dr. Saif Aldean Qawasmeh
-36111      | inperson  | lecture | slot_155           | Monday  Wednesday            | 822      | Hiba Alsaidi
-36112      | inperson  | lecture | slot_120           | Sunday  Monday  Tuesday  Wednesday  Thursday | 702      | Ahmad Shawaqfeh
-36112      | inperson  | lecture | slot_52            | Tuesday                      | 341      | Eng. Ghayd'A Al Hyasat
-36113      | inperson  | lab     | slot_123           | Sunday  Tuesday              | online   | Ahmad Shawaqfeh
-36113      | inperson  | lab     | slot_79            | Sunday                       | it105    | Hiba Alsaidi
-36202      | inperson  | lecture | slot_4             | Monday  Wednesday            | 701      | Layla Malas
-36202      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 701      | Dr. Majdi Rawashdeh
-36203      | blended   | lecture | slot_60            | Sunday  Tuesday              | 201      | Dr. Majdi Rawashdeh
-36203      | blended   | lecture | slot_141           | Sunday  Monday  Tuesday      | 302      | Dr. Ahmad Abushakra
-36232      | blended   | lecture | slot_38            | Wednesday                    | 302      | Dana Bani-Mohamad
-36232      | blended   | lecture | slot_27            | Monday                       | 207      | Dana Bani-Mohamad
-36232      | blended   | lecture | slot_92            | Monday                       | 702      | Dr. Ahmad Abushakra
-36232      | blended   | lecture | slot_114           | Monday                       | 304      | Seba Abualhayja'A
-36251      | inperson  | lab     | slot_137           | Monday  Wednesday            | ee241 security | Hiba Alsaidi
-36251      | inperson  | lab     | slot_156           | Monday  Wednesday            | it303    | Dr. Rami Ibrahim
-36301      | blended   | lecture | slot_144           | Wednesday                    | 821      | Hiba Alsaidi
-36312      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 702      | Layla Malas
-36312      | inperson  | lecture | slot_147           | Tuesday                      | 301      | Dr. Majdi Rawashdeh
-36316      | blended   | lecture | slot_67            | Sunday  Tuesday              | 205      | Dr. Fadi Qutaishat
-36316      | blended   | lecture | slot_98            | Wednesday                    | 703      | Dr. Dalia Al-Eisawi
-36331      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | 822      | Dr. Ahmad Abushakra
-36331      | inperson  | lecture | slot_140           | Wednesday  Thursday          | 303      | Dr. Ahmad Abushakra
-36334      | blended   | lecture | slot_36            | Monday                       | 831      | Dr. Rami Ibrahim
-36334      | blended   | lecture | slot_111           | Thursday                     | 201      | Dr. Rami Ibrahim
-36336      | inperson  | lecture | slot_94            | Sunday                       | 304      | Dr. Luay Anaya
-36336      | inperson  | lecture | slot_47            | Monday  Wednesday            | 821      | Dr. Luay Anaya
-36339      | online    | lecture | slot_44            | Tuesday                      | ONLINE   | Ahmad Shawaqfeh
-36357      | inperson  | lab     | slot_102           | Thursday                     | it104    | Dr. Ahmad Abushakra
-36357      | inperson  | lab     | slot_121           | Sunday  Tuesday              | it301    | Layla Malas
-36402      | blended   | lecture | slot_64            | Thursday                     | 307      | Dr. Mohammad Al-Omari
-36402      | blended   | lecture | slot_57            | Tuesday                      | 922      | Dr. Mohammad Al-Omari
-36404      | blended   | lecture | slot_151           | Thursday                     | 201      | Dr. Dalia Al-Eisawi
-36405      | inperson  | lecture | slot_129           | Sunday  Monday  Tuesday      | 821      | Ahmad Shawaqfeh
-36405      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | 832      | Layla Malas
-36406      | inperson  | lecture | slot_35            | Sunday                       | ee124    | Dr. Wa'El Aletaiwi
-36415      | blended   | lecture | slot_115           | Wednesday                    | 208      | Eng. Ghayd'A Al Hyasat
-36428      | blended   | lecture | slot_88            | Wednesday                    | 202      | Dr. Noor Damer
-36435      | blended   | lecture | slot_153           | Monday                       | 204      | Dr. Luay Anaya
-36435      | blended   | lecture | slot_146           | Sunday                       | 202      | Dr. Luay Anaya
-36436      | blended   | lecture | slot_31            | Wednesday                    | 204      | Dr. Fadi Qutaishat
-11223      | inperson  | lecture | slot_147           | Tuesday                      | 304      | Dr. Nailah Almadi
-12351      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 704      | Dr. Yaser Saleh
-12354      | inperson  | lecture | slot_45            | Thursday                     | 204      | Ahmad Awwad
-12447      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | 831      | Dr. Muhanna Muhanna
-12467      | blended   | lecture | slot_36            | Monday                       | 308      | Dr. Alhakem Masoud
-12471      | inperson  | lecture | slot_65            | Tuesday                      | 207      | Rosana Marar
-13431      | inperson  | lecture | slot_94            | Sunday                       | atelier ُee309 | Dr. Firas Ghanim
-14351      | inperson  | lecture | slot_6             | Monday  Wednesday            | 922      | Prof. Moh'D Azzeh
-14357      | blended   | lecture | slot_27            | Monday                       | 208      | Dr. Serin Atiani
-14357      | blended   | lecture | slot_96            | Monday                       | 206      | Dr. Serin Atiani
-14456      | blended   | lecture | slot_91            | Monday                       | 704      | Remah Bani Younisse
-14458      | blended   | lecture | slot_62            | Monday                       | 206      | Dr. Tariq Bdair
-14469      | blended   | lecture | slot_68            | Monday                       | 208      | Abedalrhman Alkhateeb
-15321      | inperson  | lecture | slot_113           | Tuesday                      | 703      | Prof. Mohammad Al-Khasawneh
-15322      | inperson  | lab     | slot_17            | Wednesday                    | it102    | Prof. Mohammad Al Nabhan
-15322      | inperson  | lab     | slot_23            | Sunday                       | it303    | Prof. Mohammad Al Nabhan
-15361      | blended   | lecture | slot_51            | Wednesday                    | 704      | Dr. Mu'Awya Al-Dala'Ien
-15422      | inperson  | lecture | slot_10            | Sunday  Tuesday  Thursday    | 308      | Dr. Khaled Mahmoud
-15493      | inperson  | lecture | slot_4             | Monday  Wednesday            | 922      | Qasem Abu Al-Haija'
-21431      | inperson  | lecture | slot_47            | Monday  Wednesday            | ee124    | Prof. Fadi Shahrouri
-21432      | blended   | lecture | slot_41            | Sunday  Tuesday              | 207      | Dr. Rami Wahsheh
-21439      | inperson  | lab     | slot_82            | Wednesday                    | it107    | Prof. Fadi Shahrouri
-21581      | blended   | lecture | slot_60            | Sunday  Tuesday              | atelier ُee309 | Dr. Mohammad Abdel-Majeed
-22582      | inperson  | lecture | slot_154           | Monday  Wednesday            | 305      | Prof. Amjed Al-Mousa
-23454      | blended   | lecture | slot_38            | Wednesday                    | 206      | Dr. Luae' Al-Tarawneh
-23455      | inperson  | lab     | slot_99            | Sunday                       | ee207 electrical | Dr. Rami Wahsheh
-23457      | blended   | lecture | slot_36            | Monday                       | 303      | Prof. Osamah Badarneh
-24467      | inperson  | lecture | slot_47            | Monday  Wednesday            | 304      | Dr. Hamzeh Jaber
-24470      | inperson  | lecture | slot_132           | Sunday  Monday  Tuesday      | 306      | Prof. Ayman Faza
-27251      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | 921      | Prof. Abdallah Al Zoubi
-33322      | blended   | lecture | slot_29            | Monday                       | 204      | Dr. Khleef Alkhawaldeh
-33322      | blended   | lecture | slot_88            | Wednesday                    | 203      | Dr. Khleef Alkhawaldeh
-34206      | inperson  | lecture | slot_103           | Sunday                       | 821      | Asma Al Znaimat
-35421      | inperson  | lecture | slot_43            | Sunday                       | 204      | Farah Alshraiedeh
-15200      | inperson  | lecture | slot_140           | Wednesday  Thursday          | 832      | Dr. Ahmad Alzghoul
-15201      | inperson  | lab     | slot_40            | Tuesday                      | ee205 circuits | Rahmeh Ibrahim
-15420      | blended   | lecture | slot_98            | Wednesday                    | 832      | Dr. Oraib Abualganam
-15460      | inperson  | lecture | slot_44            | Tuesday                      | 201      | Prof. Ja'Afer Alsaraireh
-22583      | blended   | lecture | slot_87            | Wednesday                    | 206      | Dr. Awos Kanan
-23576      | blended   | lecture | slot_111           | Thursday                     | 821      | Prof. Ashraf Tahat
-25520      | inperson  | lecture | slot_47            | Monday  Wednesday            | 701      | Eng. Farah Abudabaseh
-27351      | inperson  | lecture | slot_145           | Tuesday                      | 703      | Dr. Mohammad Alja'Afreh
-27352      | inperson  | lab     | slot_152           | Monday                       | it301    | Dr. Mohammad Alja'Afreh
-11325      | inperson  | lecture | slot_94            | Sunday                       | 307      | Prof. Ebaa Fayyoumi
-12159      | blended   | lecture | slot_64            | Thursday                     | 203      | Narmeen Alhyari
-15261      | inperson  | lecture | slot_113           | Tuesday                      | 204      | Rahmeh Ibrahim
-15261      | inperson  | lecture | slot_45            | Thursday                     | 208      | Rahmeh Ibrahim
-15262      | inperson  | lab     | slot_80            | Monday                       | it104    | Radan Akhoirshiedah
-15262      | inperson  | lab     | slot_25            | Thursday                     | ee207 electrical | Al Maha Abu Zuraiq
-15310      | inperson  | lecture | slot_95            | Tuesday                      | 701      | Prof. Mustafa Al-Fayoumi
-15421      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 302      | Prof. Mohammad Al Nabhan
-15423      | inperson  | lecture | slot_103           | Sunday                       | 207      | Dr. Mohammad Ababneh
-22462      | inperson  | lab     | slot_97            | Thursday                     | it301    | Dr. Abdullah Hayajneh
-22462      | inperson  | lab     | slot_130           | Monday  Wednesday            | it105    | Dr. Abdullah Hayajneh
-22462      | inperson  | lab     | slot_148           | Monday                       | ee242 communications | Dr. Abdullah Hayajneh
-24588      | blended   | lecture | slot_31            | Wednesday                    | 202      | Dr. Ibrahim Abuishmais
-25541      | blended   | lecture | slot_69            | Wednesday                    | 206      | Eng. Farah Abudabaseh
-27353      | inperson  | lecture | slot_94            | Sunday                       | 206      | Dr. Luae' Al-Tarawneh
-27353      | inperson  | lecture | slot_65            | Tuesday                      | 301      | Dr. Luae' Al-Tarawneh
-33326      | inperson  | lecture | slot_65            | Tuesday                      | 832      | Dr. Mohammad Alsumadi
-33434      | inperson  | lecture | slot_10            | Sunday  Tuesday  Thursday    | 922      | Dr. Ola Al Haddid
-12267      | blended   | lecture | slot_41            | Sunday  Tuesday              | 342      | Dr. Alhakem Masoud
-15312      | inperson  | lecture | slot_7             | Sunday  Tuesday  Thursday    | atelier ُee309 | Prof. Emad Eddien Abdallah
-15313      | inperson  | lab     | slot_109           | Thursday                     | ee241 security | Radan Akhoirshiedah
-15350      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 343      | Dr. Khaled Mahmoud
-22210      | inperson  | lab     | slot_135           | Sunday  Tuesday              | it102    | Dr. Mohammad Alja'Afreh
-22210      | inperson  | lab     | slot_150           | Sunday                       | lb706    | Prof. Saud Althunibat
-22210      | inperson  | lab     | slot_71            | Thursday                     | 811      | Prof. Amjed Al-Mousa
-22210      | inperson  | lab     | slot_109           | Thursday                     | it103    | Dr. Anastassia Gharib
-27355      | inperson  | lecture | slot_48            | Sunday                       | 203      | Dr. Rami Wahsheh
-27355      | inperson  | lecture | slot_113           | Tuesday                      | 205      | Dr. Rami Wahsheh
-27450      | blended   | lecture | slot_69            | Wednesday                    | 207      | Prof. Abdallah Al Zoubi
-33342      | inperson  | lecture | slot_43            | Sunday                       | 203      | Prof. Serena Sandri
-36110      | inperson  | lecture | slot_49            | Sunday                       | 922      | Dr. Amer Al Shishany
-36110      | inperson  | lecture | slot_37            | Tuesday                      | 921      | Dr. Dalia Al-Eisawi
-36110      | inperson  | lecture | slot_147           | Tuesday                      | 206      | Dr. Dalia Al-Eisawi
-36110      | inperson  | lecture | slot_154           | Monday  Wednesday            | 205      | Dr. Saif Aldean Qawasmeh
-36110      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 207      | Dr. Abdallah Abu Madi
-12266      | inperson  | lecture | slot_65            | Tuesday                      | 921      | Narmeen Alhyari
-12275      | inperson  | lecture | slot_37            | Tuesday                      | 342      | Dr. Yaser Saleh
-13494      | inperson  | lecture | slot_52            | Tuesday                      | 832      | Dr. Mohammad Abdellatif
-15382      | inperson  | lecture | slot_45            | Thursday                     | 302      | Dr. Mu'Awya Al-Dala'Ien
-15411      | blended   | lecture | slot_32            | Wednesday                    | 207      | Dr. Mohammad Ababneh
-15412      | inperson  | lab     | slot_142           | Monday  Wednesday            | online   | Tasnim Al Harasis
-15412      | inperson  | lab     | slot_126           | Monday  Wednesday            | it301    | Ahmed Al Takrouri Altamimi
-15433      | inperson  | lecture | slot_95            | Tuesday                      | 922      | Prof. Khair Eddin Sabri
-27453      | inperson  | lecture | slot_47            | Monday  Wednesday            | 921      | Dr. Zaid Haymoor
-27454      | inperson  | lab     | slot_83            | Thursday                     | ee243 cellular | Dr. Mohammad Alja'Afreh
-27541      | inperson  | lecture | slot_48            | Sunday                       | ee124    | Dr. Mohammad Alja'Afreh
-27542      | inperson  | lab     | slot_17            | Wednesday                    | ee205 circuits | Dr. Mohammad Alja'Afreh
-33102      | inperson  | lecture | slot_19            | Sunday  Tuesday  Thursday    | 305      | Dr. Moh'D Tabishat
-33102      | inperson  | lecture | slot_72            | Monday  Wednesday            | 832      | Eng. Nadine Abu Tuhaimer
-33102      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 703      | Eng. Nadine Abu Tuhaimer
-33102      | inperson  | lecture | slot_154           | Monday  Wednesday            | 207      | Dr. Shatha Al-Qudah
-35107      | blended   | lecture | slot_41            | Sunday  Tuesday              | 302      | Tariq Abdrabbo
-35107      | blended   | lecture | slot_29            | Monday                       | 206      | Tariq Abdrabbo
-36120      | inperson  | lecture | slot_145           | Tuesday                      | 303      | Dr. Wa'El Aletaiwi
-36120      | inperson  | lecture | slot_12            | Sunday  Tuesday  Thursday    | 305      | Dr. Saif Aldean Qawasmeh
-36120      | inperson  | lecture | slot_94            | Sunday                       | 305      | Eng. Ghayd'A Al Hyasat
-36120      | inperson  | lecture | slot_104           | Tuesday                      | 703      | Dr. Saif Aldean Qawasmeh
-36120      | inperson  | lecture | slot_49            | Sunday                       | 301      | Dr. Wa'El Aletaiwi
-36120      | inperson  | lecture | slot_49            | Sunday                       | 341      | Dr. Rami Ibrahim
-36220      | inperson  | lecture | slot_43            | Sunday                       | 208      | Dr. Noor Damer
-36220      | inperson  | lecture | slot_154           | Monday  Wednesday            | 308      | Layla Malas
-27411      | blended   | lecture | slot_42            | Sunday  Tuesday              | 203      | Eng. Neda Al Daher
-12362      | inperson  | lecture | slot_48            | Sunday                       | 208      | Narmeen Alhyari
-15381      | inperson  | lecture | slot_47            | Monday  Wednesday            | 306      | Rana Maali
-15410      | inperson  | lecture | slot_154           | Monday  Wednesday            | 201      | Prof. Mustafa Al-Fayoumi
-15453      | inperson  | lecture | slot_103           | Sunday                       | 208      | Rana Maali
-15453      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 704      | Rana Maali
-25430      | blended   | lecture | slot_101           | Monday                       | 304      | Dr. Haitham Al-Ani
-25521      | inperson  | lab     | slot_18            | Thursday                     | ee241 security | Dr. Haitham Al-Ani
-25586      | blended   | lecture | slot_91            | Monday                       | 701      | Dr. Enas Abulibdeh
-27551      | blended   | lecture | slot_138           | Sunday  Monday  Tuesday      | 205      | Prof. Ashraf Tahat
-27552      | inperson  | lab     | slot_79            | Sunday                       | ee242 communications | Prof. Ashraf Tahat
-34239      | online    | lecture | slot_134           | Sunday  Tuesday              | ONLINE   | Dr. Rasha Alghazzawi
-11447      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 922      | Dr. Raad Al-Qassas
-12379      | inperson  | lecture | slot_12            | Sunday  Tuesday  Thursday    | 307      | Rosana Marar
-15494      | inperson  | lecture | slot_7             | Sunday  Tuesday  Thursday    | 305      | Prof. Mohammad Al Nabhan
-21573      | blended   | lecture | slot_26            | Monday                       | 305      | Dr. Mohammad Abdel-Majeed
-25560      | blended   | lecture | slot_111           | Thursday                     | 307      | Prof. Ali Al Haj
-27321      | inperson  | lecture | slot_45            | Thursday                     | 205      | Prof. Abdallah Al Zoubi
-27456      | inperson  | lab     | slot_109           | Thursday                     | it102    | Prof. Saud Althunibat
-27585      | inperson  | lecture | slot_37            | Tuesday                      | 206      | Dr. Zaid Haymoor
-31211      | blended   | lecture | slot_151           | Thursday                     | 206      | Prof. Rami Salem
-34226      | blended   | lecture | slot_144           | Wednesday                    | 922      | Dr. Rasha Alghazzawi
-34226      | blended   | lecture | slot_69            | Wednesday                    | 921      | Dr. Rasha Alghazzawi
-36302      | blended   | lecture | slot_67            | Sunday  Tuesday              | 203      | Dr. Noor Damer
-36302      | blended   | lecture | slot_57            | Tuesday                      | 208      | Dr. Noor Damer
+11100      | online    | lecture | slot_74            | Monday                       | ONLINE   | Rasha Khalil
+11100      | online    | lecture | slot_37            | Tuesday                      | ONLINE   | Ala'A Altarazi
+11102      | inperson  | lecture | slot_13            | Monday  Wednesday            | 305      | Amal Saif
+11102      | inperson  | lecture | slot_96            | Tuesday                      | 204      | Dr. Abdullah Al-Refai
+11102      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 342      | Ahmad Bani Amer
+11103      | inperson  | lecture | slot_52            | Sunday  Tuesday              | 205      | Ala'A Altarazi
+11103      | inperson  | lecture | slot_33            | Wednesday                    | 208      | Dr. Samer Sawalha
+11103      | inperson  | lecture | slot_101           | Sunday  Tuesday              | 201      | Amal Saif
+11103      | inperson  | lecture | slot_124           | Monday                       | 203      | Kholoud Mukdadi
+11103      | inperson  | lecture | slot_54            | Sunday                       | 203      | Kholoud Mukdadi
+11103      | inperson  | lecture | slot_28            | Monday                       | 341      | Omimah Ismail
+11103      | inperson  | lecture | slot_19            | Sunday  Tuesday  Thursday    | 202      | Emad Addin Alsheikh
+11103      | inperson  | lecture | slot_105           | Monday  Wednesday            | 305      | Rahmeh Ibrahim
+11103      | inperson  | lecture | slot_101           | Sunday  Tuesday              | 308      | Dr. Manaf Gharaibeh
+11103      | inperson  | lecture | slot_122           | Monday                       | 208      | Dr. Osama Al-Haj Hassan
+11103      | inperson  | lecture | slot_33            | Wednesday                    | 307      | Omimah Ismail
+11103      | inperson  | lecture | slot_66            | Tuesday                      | 703      | Dr. Manaf Gharaibeh
+11103      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | 304      | Ahmad Bani Amer
+11103      | inperson  | lecture | slot_54            | Sunday                       | 205      | Sara Khader
+11103      | inperson  | lecture | slot_217           | Tuesday                      | 703      | Prof. Mohammad Al Nabhan
+11151      | inperson  | lab     | slot_68            | Thursday                     | 811      | Omimah Ismail
+11151      | inperson  | lab     | slot_24            | Monday                       | 811      | Emad Addin Alsheikh
+11151      | inperson  | lab     | slot_21            | Wednesday                    | 811      | Kholoud Mukdadi
+11151      | inperson  | lab     | slot_118           | Sunday                       | it302    | Dr. Baha Khasawneh
+11151      | inperson  | lab     | slot_103           | Thursday                     | 811      | Eman Yasin
+11151      | inperson  | lab     | slot_139           | Thursday                     | online   | Dr. Baha Khasawneh
+11151      | inperson  | lab     | slot_114           | Wednesday                    | it106    | Farah Shatnawi
+11151      | inperson  | lab     | slot_143           | Wednesday                    | online   | Dr. Ahmad Klaib
+11151      | inperson  | lab     | slot_25            | Thursday                     | ee201 logic | Dr. Ahmad Altamimi
+11151      | inperson  | lab     | slot_77            | Tuesday                      | ee241 security | Eng. Wasayif Ananzeh
+11151      | inperson  | lab     | slot_47            | Tuesday                      | 811      | Ahmad Awwad
+11151      | inperson  | lab     | slot_113           | Tuesday                      | it301    | Dr. Rania Alzubaidi
+11151      | inperson  | lab     | slot_209           | Tuesday                      | it102    | Hamam Alakhras
+11151      | inperson  | lab     | slot_139           | Thursday                     | it102    | Eng. Wasayif Ananzeh
+11151      | inperson  | lab     | slot_159           | Thursday                     | online   | Sara Awajan
+11151      | inperson  | lab     | slot_118           | Sunday                       | ee201 logic | Ashwaq Khalil
+11206      | inperson  | lecture | slot_66            | Tuesday                      | 206      | Dr. Ahmad Alzghoul
+11206      | inperson  | lecture | slot_46            | Wednesday                    | 702      | Dr. Nailah Almadi
+11206      | inperson  | lecture | slot_129           | Monday                       | 203      | Prof. Anas Abu Taleb
+11206      | inperson  | lecture | slot_161           | Wednesday                    | 703      | Ahmad Bani Amer
+11212      | inperson  | lecture | slot_94            | Sunday  Tuesday  Thursday    | 704      | Dr. Ibrahim Alharfialbluwi
+11212      | inperson  | lecture | slot_63            | Sunday                       | 308      | Prof. Abdallah Qusef
+11212      | inperson  | lecture | slot_35            | Sunday                       | 341      | Dr. Ibrahim Alharfialbluwi
+11212      | inperson  | lecture | slot_19            | Sunday  Tuesday  Thursday    | 302      | Prof. Abdallah Qusef
+11212      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 304      | Abedalrhman Alkhateeb
+11212      | inperson  | lecture | slot_65            | Wednesday                    | 203      | Prof. Abdallah Qusef
+11212      | inperson  | lecture | slot_170           | Monday                       | 343      | Dr. Mohammed Khader
+11213      | inperson  | lecture | slot_7             | Sunday  Tuesday  Thursday    | 304      | Dr. Khaled Mahmoud
+11253      | online    | lab     | slot_17            | Wednesday                    | ONLINE   | Remah Bani Younisse
+11253      | online    | lab     | slot_159           | Thursday                     | ONLINE   | Yousef Yaseen
+11253      | online    | lab     | slot_22            | Sunday                       | ONLINE   | Ayat Droos
+11313      | inperson  | lecture | slot_121           | Wednesday                    | 304      | Prof. Ebaa Fayyoumi
+11313      | inperson  | lecture | slot_53            | Wednesday                    | 208      | Dr. Mohammed Khader
+11313      | inperson  | lecture | slot_2             | Monday  Wednesday            | 701      | Dr. Ibrahim Alharfialbluwi
+11313      | inperson  | lecture | slot_63            | Sunday                       | 302      | Dr. Sufyan Almajali
+11316      | inperson  | lecture | slot_104           | Monday  Wednesday            | 343      | Prof. Walid Abu Salameh
+11323      | inperson  | lecture | slot_36            | Monday                       | 206      | Prof. Ebaa Fayyoumi
+11323      | inperson  | lecture | slot_101           | Sunday  Tuesday              | 208      | Eman Alnagi
+11323      | inperson  | lecture | slot_170           | Monday                       | 201      | Eman Alnagi
+11323      | inperson  | lecture | slot_212           | Wednesday                    | 201      | Dr. Samer Sawalha
+11323      | inperson  | lecture | slot_128           | Tuesday                      | 301      | Dr. Nailah Almadi
+11335      | inperson  | lecture | slot_26            | Monday                       | 302      | Dr. Ahmad Altamimi
+11335      | inperson  | lecture | slot_121           | Wednesday                    | 202      | Prof. Basel Mahafzah
+11335      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | atelier ُee309 | Dr. Mohammad Ababneh
+11354      | online    | lab     | slot_150           | Thursday                     | ONLINE   | Rahmeh Ibrahim
+11354      | online    | lab     | slot_218           | Monday                       | ONLINE   | Rahmeh Ibrahim
+11354      | online    | lab     | slot_76            | Monday                       | ONLINE   | Omimah Ismail
+11354      | online    | lab     | slot_76            | Monday                       | ONLINE   | Mohammad Awis Lababede
+11355      | online    | lab     | slot_218           | Monday                       | ONLINE   | Shoroq Awawdeh
+11355      | online    | lab     | slot_113           | Tuesday                      | ONLINE   | Ayat Droos
+11355      | online    | lab     | slot_70            | Wednesday                    | ONLINE   | Ayat Droos
+11355      | online    | lab     | slot_143           | Wednesday                    | ONLINE   | Ashaar Alkhamaiseh
+11435      | inperson  | lecture | slot_28            | Monday                       | 342      | Prof. Mohammad Al Nabhan
+11435      | inperson  | lecture | slot_170           | Monday                       | atelier ُee309 | Prof. Basel Mahafzah
+11436      | inperson  | lecture | slot_29            | Monday                       | 341      | Dr. Osama Al-Haj Hassan
+11436      | inperson  | lecture | slot_86            | Sunday  Tuesday              | 308      | Dr. Osama Al-Haj Hassan
+11449      | online    | lecture | slot_132           | Wednesday                    | ONLINE   | Dr. Ammar Alrashdan
+11449      | online    | lecture | slot_119           | Wednesday                    | ONLINE   | Prof. Basel Mahafzah
+11449      | online    | lecture | slot_93            | Monday  Wednesday            | ONLINE   | Rasha Khalil
+11464      | inperson  | lecture | slot_46            | Wednesday                    | 307      | Prof. Mohammad Al Nabhan
+11464      | inperson  | lecture | slot_170           | Monday                       | 208      | Dr. Ammar Odeh
+12243      | blended   | lecture | slot_100           | Wednesday                    | 302      | Dr. Sara Tedmori
+12243      | blended   | lecture | slot_43            | Monday                       | 204      | Dr. Sara Tedmori
+12243      | blended   | lecture | slot_214           | Sunday                       | 301      | Dr. Mohammad Abu- Snober
+12264      | blended   | lecture | slot_88            | Sunday  Tuesday              | 202      | Rosana Marar
+12273      | inperson  | lecture | slot_104           | Monday  Wednesday            | 704      | Dr. Yaser Saleh
+12343      | blended   | lecture | slot_40            | Wednesday                    | 832      | Dr. Mohammad Ababneh
+12343      | blended   | lecture | slot_60            | Monday  Wednesday            | 205      | Dr. Mohammad Abu- Snober
+12343      | blended   | lecture | slot_134           | Sunday  Tuesday              | 201      | Dr. Mohammad Abu- Snober
+12348      | inperson  | lecture | slot_124           | Monday                       | 343      | Hala Alkhasoneh
+12348      | inperson  | lecture | slot_32            | Wednesday                    | 307      | Dr. Rania Alzubaidi
+12364      | inperson  | lecture | slot_160           | Sunday  Tuesday              | 704      | Rosana Marar
+12367      | inperson  | lecture | slot_123           | Monday                       | 831      | Rosana Marar
+12373      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 306      | Dr. Yaser Saleh
+12446      | inperson  | lecture | slot_213           | Tuesday                      | 206      | Dr. Baha Khasawneh
+12446      | inperson  | lecture | slot_94            | Sunday  Tuesday  Thursday    | 301      | Dr. Baha Khasawneh
+12473      | inperson  | lecture | slot_53            | Wednesday                    | 206      | Narmeen Alhyari
+12479      | inperson  | lecture | slot_141           | Sunday                       | 303      | Rosana Marar
+12481      | inperson  | lecture | slot_66            | Tuesday                      | 701      | Dr. Mohammad Alzoubi
+13211      | inperson  | lecture | slot_46            | Wednesday                    | 701      | Prof. Abdallah Qusef
+13211      | inperson  | lecture | slot_7             | Sunday  Tuesday  Thursday    | 208      | Dr. Abdullah Al-Refai
+13212      | inperson  | lecture | slot_32            | Wednesday                    | 701      | Dr. Firas Ghanim
+13212      | inperson  | lecture | slot_10            | Sunday  Tuesday  Thursday    | 821      | Dr. Firas Ghanim
+13324      | inperson  | lecture | slot_65            | Wednesday                    | 821      | Dr. Rafat Hammad
+13325      | inperson  | lecture | slot_56            | Thursday                     | 306      | Dr. Rania Alzubaidi
+13326      | blended   | lecture | slot_39            | Monday                       | 302      | Dr. Firas Ghanim
+13327      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 702      | Dr. Mohammadnoor Injadat
+13334      | inperson  | lecture | slot_87            | Sunday  Tuesday              | 208      | Dr. Mohammad Al-Oudat
+13393      | inperson  | lecture | slot_122           | Monday                       | 306      | Dr. Abdullah Al-Refai
+13393      | inperson  | lecture | slot_2             | Monday  Wednesday            | 702      | Dr. Abdullah Al-Refai
+13428      | inperson  | lecture | slot_86            | Sunday  Tuesday              | 701      | Prof. Abdallah Qusef
+13432      | inperson  | lecture | slot_109           | Sunday  Tuesday  Thursday    | 206      | Prof. Abdallah Qusef
+13434      | inperson  | lecture | slot_219           | Wednesday                    | 305      | Dr. Ahmad Altamimi
+13435      | blended   | lecture | slot_57            | Sunday  Tuesday  Thursday    | 341      | Prof. Bassam Hammo
+13477      | inperson  | lecture | slot_62            | Sunday                       | 342      | Dr. Samer Elkababji
+14140      | inperson  | lecture | slot_86            | Sunday  Tuesday              | 205      | Gaith Rjoub
+14140      | inperson  | lecture | slot_213           | Tuesday                      | 306      | Prof. Amer Badarneh
+14140      | inperson  | lecture | slot_63            | Sunday                       | 821      | Dr. Omar Alqawasmeh
+14141      | inperson  | lab     | slot_125           | Tuesday                      | it104    | Eng. Wasayif Ananzeh
+14141      | inperson  | lab     | slot_139           | Thursday                     | ee242 communications | Dr. Omar Alqawasmeh
+14141      | inperson  | lab     | slot_17            | Wednesday                    | online   | Dr. Tariq Bdair
+14141      | inperson  | lab     | slot_139           | Thursday                     | it104    | Dr. Tariq Bdair
+14260      | blended   | lecture | slot_147           | Monday  Wednesday            | 306      | Prof. Moh'D Azzeh
+14261      | blended   | lab     | slot_143           | Wednesday                    | it303    | Dr. Abdullah Aref
+14261      | blended   | lab     | slot_116           | Monday                       | it302    | Dr. Amera Al-Amery
+14270      | inperson  | lecture | slot_9             | Sunday  Tuesday  Thursday    | 704      | Gaith Rjoub
+14270      | inperson  | lecture | slot_160           | Sunday  Tuesday              | 205      | Dr. Amera Al-Amery
+14271      | inperson  | lab     | slot_83            | Sunday                       | it101    | Wasan A.Alma'Aitah
+14271      | inperson  | lab     | slot_116           | Monday                       | ee103physicsee | Dr. Serin Atiani
+14271      | inperson  | lab     | slot_156           | Tuesday                      | ee207 electrical | Dr. Samer Elkababji
+14271      | inperson  | lab     | slot_17            | Wednesday                    | it104    | Wasan A.Alma'Aitah
+14330      | inperson  | lecture | slot_169           | Monday  Wednesday            | 822      | Prof. Saleh Abu Soud
+14330      | inperson  | lecture | slot_168           | Tuesday                      | 304      | Dr. Abdullah Aref
+14331      | inperson  | lab     | slot_21            | Wednesday                    | it102    | Dr. Abdullah Aref
+14331      | inperson  | lab     | slot_77            | Tuesday                      | lb705    | Dr. Tariq Bdair
+14350      | inperson  | lecture | slot_56            | Thursday                     | 305      | Dr. Mohammad Abdel Rahman
+14350      | inperson  | lecture | slot_216           | Thursday                     | 308      | Dr. Serin Atiani
+14362      | inperson  | lecture | slot_19            | Sunday  Tuesday  Thursday    | 203      | Dr. Mo'Taz Al-Hami
+14362      | inperson  | lecture | slot_67            | Wednesday                    | 205      | Dr. Mo'Taz Al-Hami
+14362      | inperson  | lecture | slot_105           | Monday  Wednesday            | 302      | Dr. Abdullah Aref
+14362      | inperson  | lecture | slot_54            | Sunday                       | 204      | Dr. Abdullah Aref
+14364      | inperson  | lecture | slot_37            | Tuesday                      | 202      | Dr. Osama Abdel Hay
+14364      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 304      | Dr. Osama Abdel Hay
+14364      | inperson  | lecture | slot_227           | Monday  Wednesday            | 204      | Dr. Osama Abdel Hay
+14452      | blended   | lecture | slot_225           | Monday  Wednesday            | 922      | Dr. Ahmad Alzghoul
+14452      | blended   | lecture | slot_162           | Sunday                       | 201      | Dr. Ahmad Alzghoul
+14455      | inperson  | lecture | slot_55            | Tuesday                      | 305      | Dr. Bushra Alhijawi
+14465      | blended   | lecture | slot_163           | Tuesday                      | 343      | Dr. Serin Atiani
+14466      | inperson  | lecture | slot_29            | Monday                       | 822      | Dr. Mohammad Abdel Rahman
+14466      | inperson  | lecture | slot_62            | Sunday                       | 701      | Dr. Mohammad Abdel Rahman
+15110      | blended   | lecture | slot_58            | Sunday  Tuesday  Thursday    | 921      | Yousef Yaseen
+15110      | blended   | lecture | slot_163           | Tuesday                      | 201      | Qasem Abu Al-Haija'
+15220      | inperson  | lecture | slot_161           | Wednesday                    | 922      | Dr. Raad Al-Qassas
+15483      | inperson  | lecture | slot_101           | Sunday  Tuesday              | 341      | Dr. Mu'Awya Al-Dala'Ien
+20131      | blended   | lecture | slot_152           | Wednesday                    | 201      | Yousef Abu Hour
+20131      | blended   | lecture | slot_211           | Sunday  Tuesday  Thursday    | 307      | Ghandi Rababa
+20131      | blended   | lecture | slot_210           | Monday  Wednesday            | 304      | Raja'A Al-Qderat
+20131      | blended   | lecture | slot_72            | Tuesday                      | 201      | Yousef Abu Hour
+20131      | blended   | lecture | slot_39            | Monday                       | 307      | Ghandi Rababa
+20132      | inperson  | lecture | slot_6             | Monday  Wednesday            | 308      | Dr. Ahmed Ghatasheh
+20132      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 305      | Prof. Fida Mohammad
+20132      | inperson  | lecture | slot_121           | Wednesday                    | 341      | Yousef Abu Hour
+20132      | inperson  | lecture | slot_93            | Monday  Wednesday            | 206      | Dareen Al Shalaout
+20132      | inperson  | lecture | slot_96            | Tuesday                      | 821      | Amani As-Suhiemate
+20133      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | 822      | Dr. Maisa Khader
+20133      | inperson  | lecture | slot_32            | Wednesday                    | 702      | Dr. Maisa Khader
+20133      | inperson  | lecture | slot_141           | Sunday                       | 701      | Omar Yasin
+20133      | inperson  | lecture | slot_29            | Monday                       | 308      | Prof. Mohammad Sababheh
+20133      | inperson  | lecture | slot_66            | Tuesday                      | 208      | Dr. Abeer Jaradat
+20133      | inperson  | lecture | slot_62            | Sunday                       | 307      | Prof. Fida Mohammad
+20133      | inperson  | lecture | slot_219           | Wednesday                    | 207      | Omar Yasin
+20133      | inperson  | lecture | slot_36            | Monday                       | 301      | Dr. Sahar Aleid
+20133      | inperson  | lecture | slot_4             | Monday  Wednesday            | 701      | Amani As-Suhiemate
+20133      | inperson  | lecture | slot_53            | Wednesday                    | 302      | Amani As-Suhiemate
+20133      | inperson  | lecture | slot_93            | Monday  Wednesday            | 301      | Ghandi Rababa
+20133      | inperson  | lecture | slot_128           | Tuesday                      | 307      | Prof. Mohammad Sababheh
+20133      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | 305      | Amani As-Suhiemate
+20133      | inperson  | lecture | slot_28            | Monday                       | 832      | Yousef Abu Hour
+20134      | blended   | lecture | slot_57            | Sunday  Tuesday  Thursday    | 201      | Dr. Sahar Aleid
+20134      | blended   | lecture | slot_137           | Monday                       | 202      | Raja'A Al-Qderat
+20134      | blended   | lecture | slot_134           | Sunday  Tuesday              | atelier ُee309 | Raja'A Al-Qderat
+20134      | blended   | lecture | slot_172           | Wednesday                    | 308      | Prof. Ma'Moon Ahmed
+20134      | blended   | lecture | slot_43            | Monday                       | 302      | Prof. Ma'Moon Ahmed
+20134      | blended   | lecture | slot_215           | Tuesday                      | 301      | Omar Yasin
+20135      | blended   | lecture | slot_90            | Monday                       | 202      | Prof. Fida Mohammad
+20140      | online    | lecture | slot_2             | Monday  Wednesday            | ONLINE   | Prof. Khaldoun Al Tarawneh
+20141      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 822      | Tariq Aldaraghmeh
+20141      | inperson  | lecture | slot_101           | Sunday  Tuesday              | 304      | Prof. Khaldoun Al Tarawneh
+20142      | inperson  | lecture | slot_36            | Monday                       | 205      | Omar Zayed
+20142      | inperson  | lecture | slot_46            | Wednesday                    | 204      | Tariq Aldaraghmeh
+20142      | inperson  | lecture | slot_62            | Sunday                       | 306      | Prof. Khaldoun Al Tarawneh
+20142      | inperson  | lecture | slot_128           | Tuesday                      | 343      | Dr. Yahya Al-Khatatbeh
+20142      | inperson  | lecture | slot_52            | Sunday  Tuesday              | 343      | Omar Zayed
+20142      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 306      | Prof. Khaldoun Al Tarawneh
+20142      | inperson  | lecture | slot_35            | Sunday                       | 305      | Dr. Yahya Al-Khatatbeh
+20142      | inperson  | lecture | slot_79            | Sunday  Tuesday              | 306      | Dr. Yahya Al-Khatatbeh
+20142      | inperson  | lecture | slot_56            | Thursday                     | 704      | Dr. Yahya Al-Khatatbeh
+20147      | inperson  | lab     | slot_81            | Thursday                     | ee205 circuits | Omar Zayed
+20147      | inperson  | lab     | slot_70            | Wednesday                    | 811      | Tariq Aldaraghmeh
+20150      | inperson  | lab     | slot_117           | Wednesday                    | it102    | Omar Zayed
+20150      | inperson  | lab     | slot_102           | Monday                       | online   | Omar Zayed
+20150      | inperson  | lab     | slot_23            | Sunday                       | it102    | Tariq Aldaraghmeh
+20150      | inperson  | lab     | slot_125           | Tuesday                      | online   | Omar Zayed
+20150      | inperson  | lab     | slot_159           | Thursday                     | 811      | Tariq Aldaraghmeh
+20150      | inperson  | lab     | slot_102           | Monday                       | ee102 electrical | Tariq Aldaraghmeh
+20150      | inperson  | lab     | slot_133           | Sunday                       | ee204 microprocessor | Tariq Aldaraghmeh
+20150      | inperson  | lab     | slot_15            | Monday                       | ee242 communications | Tariq Aldaraghmeh
+20200      | blended   | lecture | slot_223           | Thursday                     | 201      | Eng. Mohamed Ibrahim
+20200      | blended   | lecture | slot_225           | Monday  Wednesday            | 306      | Mohammad Amoura
+20200      | blended   | lecture | slot_167           | Monday                       | 821      | Aya Hamdieh
+20200      | blended   | lecture | slot_153           | Sunday  Tuesday  Thursday    | 203      | Aya Hamdieh
+20200      | blended   | lecture | slot_172           | Wednesday                    | 703      | Prof. Abdallah Al Zoubi
+20200      | blended   | lecture | slot_72            | Tuesday                      | 205      | Aya Hamdieh
+20231      | inperson  | lecture | slot_127           | Sunday                       | 301      | Prof. Mohammad Sababheh
+20231      | inperson  | lecture | slot_9             | Sunday  Tuesday  Thursday    | 203      | Dr. Abeer Jaradat
+20231      | inperson  | lecture | slot_170           | Monday                       | 307      | Prof. Ma'Moon Ahmed
+20232      | blended   | lecture | slot_42            | Wednesday                    | 342      | Prof. Ma'Moon Ahmed
+20232      | blended   | lecture | slot_167           | Monday                       | 343      | Dr. Abdullah Alsoboh
+20233      | blended   | lecture | slot_73            | Sunday  Tuesday              | 922      | Dr. Abeer Jaradat
+20233      | blended   | lecture | slot_171           | Monday                       | 306      | Prof. Fida Mohammad
+20233      | blended   | lecture | slot_210           | Monday  Wednesday            | 832      | Dareen Al Shalaout
+20233      | blended   | lecture | slot_158           | Sunday  Tuesday  Thursday    | 208      | Dareen Al Shalaout
+20234      | inperson  | lecture | slot_65            | Wednesday                    | 202      | Omar Yasin
+20234      | inperson  | lecture | slot_123           | Monday                       | 702      | Dr. Maisa Khader
+20234      | inperson  | lecture | slot_217           | Tuesday                      | 204      | Dr. Sahar Aleid
+20234      | inperson  | lecture | slot_66            | Tuesday                      | 301      | Dr. Sahar Aleid
+20234      | inperson  | lecture | slot_122           | Monday                       | 303      | Dareen Al Shalaout
+20234      | inperson  | lecture | slot_93            | Monday  Wednesday            | 302      | Dr. Sahar Aleid
+20234      | inperson  | lecture | slot_64            | Monday                       | atelier ُee309 | Omar Yasin
+20235      | blended   | lecture | slot_140           | Sunday  Tuesday  Thursday    | 822      | Ala'A Abu Saleem
+20235      | blended   | lecture | slot_43            | Monday                       | 201      | Dr. Yousef Al-Qudah
+20235      | blended   | lecture | slot_135           | Monday                       | 204      | Dr. Yousef Al-Qudah
+20235      | blended   | lecture | slot_147           | Monday  Wednesday            | 341      | Yousef Abu Hour
+20331      | blended   | lecture | slot_92            | Thursday                     | 821      | Prof. Ma'Moon Ahmed
+20333      | blended   | lecture | slot_137           | Monday                       | 203      | Prof. Samia Bushnaq
+20333      | blended   | lecture | slot_82            | Sunday  Tuesday              | 202      | Prof. Samia Bushnaq
+20335      | blended   | lecture | slot_148           | Monday  Wednesday            | 204      | Dr. Maisa Khader
+20335      | blended   | lecture | slot_71            | Sunday  Tuesday              | 342      | Prof. Mohammad Sababheh
+20336      | blended   | lecture | slot_153           | Sunday  Tuesday  Thursday    | 305      | Prof. Mohammad Sababheh
+21218      | blended   | lab     | slot_233           | Tuesday                      | it105    | Dr. Ibrahim Abuishmais
+21218      | blended   | lab     | slot_76            | Monday                       | it102    | Dr. Khaldoon Mhaidat
+21218      | blended   | lab     | slot_102           | Monday                       | ee241 security | Dr. Hani Ahmad
+21218      | blended   | lab     | slot_154           | Sunday                       | it104    | Dr. Mohammad Alja'Afreh
+21218      | blended   | lab     | slot_68            | Thursday                     | ee241 security | Dr. Fares El-Faouri
+21219      | inperson  | lecture | slot_52            | Sunday  Tuesday              | 202      | Dr. Osama Abu-Sharkh
+21219      | inperson  | lecture | slot_65            | Wednesday                    | 206      | Dr. Ibrahim Abuishmais
+21219      | inperson  | lecture | slot_79            | Sunday  Tuesday              | 307      | Dr. Qusay Salem
+21219      | inperson  | lecture | slot_141           | Sunday                       | 206      | Dr. Hamzeh Jaber
+21221      | inperson  | lecture | slot_10            | Sunday  Tuesday  Thursday    | 301      | Dr. Rafat Aljarrah
+21221      | inperson  | lecture | slot_104           | Monday  Wednesday            | 308      | Dr. Rafat Aljarrah
+21221      | inperson  | lecture | slot_87            | Sunday  Tuesday              | 205      | Prof. Ayman Faza
+21221      | inperson  | lecture | slot_28            | Monday                       | 701      | Dr. Hani Ahmad
+21221      | inperson  | lecture | slot_29            | Monday                       | 703      | Prof. Mohammad Mismar
+21222      | inperson  | lecture | slot_124           | Monday                       | 304      | Dr. Hamzeh Jaber
+21222      | inperson  | lecture | slot_119           | Wednesday                    | 342      | Dr. Majd Batarseh
+21222      | inperson  | lecture | slot_64            | Monday                       | 202      | Dr. Omar Mohamed
+21222      | inperson  | lecture | slot_33            | Wednesday                    | 343      | Prof. Ayman Faza
+21222      | inperson  | lecture | slot_53            | Wednesday                    | 304      | Hussam Kloub
+21229      | inperson  | lab     | slot_18            | Thursday                     | it102    | Prof. Ahmad Tawayha
+21229      | inperson  | lab     | slot_218           | Monday                       | it302    | Prof. Fadi Shahrouri
+21229      | inperson  | lab     | slot_118           | Sunday                       | it104    | Prof. Mohammad Mismar
+21229      | inperson  | lab     | slot_113           | Tuesday                      | it104    | Prof. Saud Althunibat
+21229      | inperson  | lab     | slot_117           | Wednesday                    | ee242 communications | Dr. Khaldoon Mhaidat
+21231      | inperson  | lecture | slot_55            | Tuesday                      | 308      | Dr. Fadi Nessir Zghoul
+21231      | inperson  | lecture | slot_169           | Monday  Wednesday            | 921      | Dr. Fadi Nessir Zghoul
+21231      | inperson  | lecture | slot_227           | Monday  Wednesday            | 201      | Dr. Ammar Abdo
+21231      | inperson  | lecture | slot_87            | Sunday  Tuesday              | 305      | Dr. Hani Ahmad
+21331      | inperson  | lecture | slot_217           | Tuesday                      | 206      | Prof. Fadi Shahrouri
+21332      | inperson  | lecture | slot_108           | Monday  Wednesday            | 821      | Dr. Khaldoon Mhaidat
+21338      | inperson  | lab     | slot_111           | Sunday                       | ee241 security | Dr. Fadi Nessir Zghoul
+21339      | inperson  | lab     | slot_77            | Tuesday                      | online   | Dr. Ammar Abdo
+21339      | inperson  | lab     | slot_157           | Wednesday                    | it103    | Dr. Mohammad Abdel-Majeed
+22241      | inperson  | lecture | slot_53            | Wednesday                    | 301      | Prof. Ahmad Hiasat
+22241      | inperson  | lecture | slot_27            | Monday                       | 703      | Eng. Nour Kattawi
+22241      | inperson  | lecture | slot_138           | Monday                       | 206      | Dr. Rajaa Alqudah
+22241      | inperson  | lecture | slot_101           | Sunday  Tuesday              | 831      | Prof. Ahmad Hiasat
+22241      | inperson  | lecture | slot_96            | Tuesday                      | 207      | Prof. Ahmad Hiasat
+22241      | inperson  | lecture | slot_213           | Tuesday                      | 302      | Dr. Yazan Al-Rawashdeh
+22242      | inperson  | lecture | slot_160           | Sunday  Tuesday              | 703      | Dr. Qutaiba Al Harfi Albluwi
+22320      | inperson  | lecture | slot_227           | Monday  Wednesday            | 307      | Dr. Rajaa Alqudah
+22321      | inperson  | lecture | slot_142           | Tuesday                      | 206      | Dr. Mohammad Abdel-Majeed
+22342      | blended   | lecture | slot_232           | Sunday                       | 203      | Prof. Esam Al Qaralleh
+22342      | blended   | lecture | slot_211           | Sunday  Tuesday  Thursday    | 203      | Eng. Hazem Marar
+22342      | blended   | lecture | slot_61            | Monday                       | 202      | Eng. Hazem Marar
+22342      | blended   | lecture | slot_72            | Tuesday                      | 204      | Prof. Esam Al Qaralleh
+22344      | inperson  | lecture | slot_128           | Tuesday                      | 306      | Prof. Esam Al Qaralleh
+22348      | inperson  | lab     | slot_114           | Wednesday                    | it102    | Dr. Yazan Al-Rawashdeh
+22348      | inperson  | lab     | slot_209           | Tuesday                      | 811      | Prof. Amjed Al-Mousa
+22348      | inperson  | lab     | slot_144           | Monday                       | online   | Dr. Rajaa Alqudah
+22348      | inperson  | lab     | slot_16            | Tuesday                      | it105    | Dr. Osama Abu-Sharkh
+22348      | inperson  | lab     | slot_233           | Tuesday                      | ee241 security | Dr. Abdullah Hayajneh
+22420      | inperson  | lab     | slot_111           | Sunday                       | it301    | Prof. Amjed Al-Mousa
+22442      | inperson  | lecture | slot_109           | Sunday  Tuesday  Thursday    | 202      | Prof. Esam Al Qaralleh
+22443      | inperson  | lecture | slot_64            | Monday                       | 203      | Ramzi Saifan
+22448      | inperson  | lab     | slot_209           | Tuesday                      | it104    | Dr. Hani Ahmad
+22448      | inperson  | lab     | slot_21            | Wednesday                    | ee201 logic | Eng. Hazem Marar
+22448      | inperson  | lab     | slot_76            | Monday                       | online   | Dr. Hani Ahmad
+22449      | inperson  | lab     | slot_23            | Sunday                       | it105    | Dr. Rajaa Alqudah
+22449      | inperson  | lab     | slot_133           | Sunday                       | it103    | Dr. Anastassia Gharib
+22449      | inperson  | lab     | slot_69            | Thursday                     | it101    | Dr. Osama Abu-Sharkh
+22460      | blended   | lecture | slot_215           | Tuesday                      | 205      | Eng. Farah Abudabaseh
+22461      | inperson  | lab     | slot_150           | Thursday                     | 811      | Prof. Ali Al Haj
+22461      | inperson  | lab     | slot_159           | Thursday                     | it301    | Prof. Amjed Al-Mousa
+22541      | inperson  | lecture | slot_161           | Wednesday                    | 921      | Prof. Amjed Al-Mousa
+22560      | blended   | lecture | slot_215           | Tuesday                      | 206      | Dr. Qutaiba Al Harfi Albluwi
+22560      | blended   | lecture | slot_214           | Sunday                       | 207      | Dr. Qutaiba Al Harfi Albluwi
+22570      | inperson  | lecture | slot_110           | Monday  Wednesday            | 704      | Dr. Heba Abdel-Nabi
+22570      | inperson  | lecture | slot_55            | Tuesday                      | 821      | Dr. Safwan Wshah
+23321      | inperson  | lecture | slot_56            | Thursday                     | 702      | Prof. Abdallah Al Zoubi
+23351      | inperson  | lecture | slot_52            | Sunday  Tuesday              | 204      | Dr. Mohammad Abdel Rahman
+23351      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 343      | Dr. Mohammad Abdel Rahman
+23355      | inperson  | lecture | slot_13            | Monday  Wednesday            | 703      | Prof. Omar Bani Ahmad
+23356      | inperson  | lab     | slot_222           | Sunday                       | 811      | Prof. Abdallah Al Zoubi
+23411      | blended   | lecture | slot_90            | Monday                       | 201      | Eng. Neda Al Daher
+23411      | blended   | lecture | slot_42            | Wednesday                    | 206      | Eng. Neda Al Daher
+23452      | inperson  | lecture | slot_141           | Sunday                       | 308      | Dr. Rami Wahsheh
+23459      | inperson  | lab     | slot_159           | Thursday                     | it107    | Prof. Ashraf Tahat
+24311      | blended   | lecture | slot_172           | Wednesday                    | 203      | Eng. Ayman Ghamoh
+24411      | blended   | lecture | slot_90            | Monday                       | 203      | Eng. Fadia El Issa
+24411      | blended   | lecture | slot_92            | Thursday                     | 304      | Eng. Fadia El Issa
+24469      | inperson  | lab     | slot_69            | Thursday                     | it105    | Dr. Omar Mohamed
+24471      | inperson  | lecture | slot_122           | Monday                       | 304      | Prof. Ahmad Tawayha
+24471      | inperson  | lecture | slot_66            | Tuesday                      | 921      | Prof. Ahmad Tawayha
+24479      | inperson  | lab     | slot_117           | Wednesday                    | 811      | Dr. Fadi Nessir Zghoul
+24479      | inperson  | lab     | slot_118           | Sunday                       | ee241 security | Prof. Ahmad Tawayha
+24562      | blended   | lecture | slot_220           | Thursday                     | 201      | Dr. Qusay Salem
+24567      | blended   | lecture | slot_166           | Monday  Wednesday            | 205      | Dr. Ibrahim Abuishmais
+24568      | inperson  | lab     | slot_157           | Wednesday                    | it101    | Dr. Majd Batarseh
+25330      | inperson  | lecture | slot_33            | Wednesday                    | 702      | Eng. Nour Kattawi
+25330      | inperson  | lecture | slot_161           | Wednesday                    | 831      | Prof. Ali Al Haj
+25347      | inperson  | lecture | slot_121           | Wednesday                    | 821      | Dr. Qutaiba Al Harfi Albluwi
+25347      | inperson  | lecture | slot_170           | Monday                       | 704      | Dr. Enas Abulibdeh
+25420      | inperson  | lecture | slot_128           | Tuesday                      | 207      | Ramzi Saifan
+25441      | inperson  | lecture | slot_122           | Monday                       | 702      | Dr. Anastassia Gharib
+25445      | inperson  | lab     | slot_23            | Sunday                       | online   | Dr. Osama Abu-Sharkh
+25445      | inperson  | lab     | slot_131           | Thursday                     | it102    | Dr. Osama Abu-Sharkh
+25543      | blended   | lecture | slot_214           | Sunday                       | 303      | Dr. Haitham Al-Ani
+25545      | inperson  | lab     | slot_155           | Monday                       | 811      | Eng. Nour Kattawi
+25545      | inperson  | lab     | slot_24            | Monday                       | it105    | Eng. Farah Abudabaseh
+25549      | inperson  | lab     | slot_157           | Wednesday                    | ee241 security | Eng. Farah Abudabaseh
+25549      | inperson  | lab     | slot_154           | Sunday                       | it302    | Prof. Ali Al Haj
+25595      | blended   | lecture | slot_99            | Monday                       | ee124    | Dr. Qutaiba Al Harfi Albluwi
+25596      | blended   | lecture | slot_126           | Monday                       | 307      | Dr. Haitham Al-Ani
+31021      | online    | lecture | slot_20            | Sunday  Tuesday  Thursday    | ONLINE   | Dr. Shereen Jad Allah
+31021      | online    | lecture | slot_170           | Monday                       | ONLINE   | Dr. Shereen Jad Allah
+31022      | online    | lecture | slot_28            | Monday                       | ONLINE   | Tariq Farghal
+31112      | online    | lecture | slot_57            | Sunday  Tuesday  Thursday    | ONLINE   | Asala Bany Melhem
+31112      | online    | lecture | slot_121           | Wednesday                    | ONLINE   | Dr. Amani Ass''Ad
+31112      | online    | lecture | slot_57            | Sunday  Tuesday  Thursday    | ONLINE   | Dr. Haneen Seder
+31112      | online    | lecture | slot_35            | Sunday                       | ONLINE   | Dr. Sa'Da Abu Sini
+31112      | online    | lecture | slot_162           | Sunday                       | ONLINE   | Dr. Neveen Albadawi
+31112      | online    | lecture | slot_121           | Wednesday                    | ONLINE   | Prof. Rami Salem
+31112      | online    | lecture | slot_13            | Monday  Wednesday            | ONLINE   | Dr. Haya Aldalabih
+31112      | online    | lecture | slot_168           | Tuesday                      | ONLINE   | Asala Bany Melhem
+31112      | online    | lecture | slot_41            | Monday                       | ONLINE   | Dr. Haya Aldalabih
+31112      | online    | lecture | slot_142           | Tuesday                      | ONLINE   | Hanadi Abu-Qatam
+31112      | online    | lecture | slot_46            | Wednesday                    | ONLINE   | Dr. Shereen Jad Allah
+31122      | online    | lecture | slot_127           | Sunday                       | ONLINE   | Musab Khalaf
+31122      | online    | lecture | slot_11            | Monday  Wednesday            | ONLINE   | Prof. Mahmoud Qudah
+31122      | online    | lecture | slot_107           | Monday  Wednesday            | ONLINE   | Sara Izzeldeen
+31122      | online    | lecture | slot_9             | Sunday  Tuesday  Thursday    | ONLINE   | Dr. Ayah Ahmad
+31122      | online    | lecture | slot_50            | Sunday  Tuesday  Thursday    | ONLINE   | Musab Khalaf
+31122      | online    | lecture | slot_163           | Tuesday                      | ONLINE   | Prof. Ayman Yasin
+31122      | online    | lecture | slot_106           | Monday  Wednesday            | ONLINE   | Nirvan Moustafa
+31122      | online    | lecture | slot_135           | Monday                       | ONLINE   | Nirvan Moustafa
+31130      | blended   | lecture | slot_232           | Sunday                       | 201      | Dr. Malak Al-Shamayleh
+31130      | blended   | lecture | slot_148           | Monday  Wednesday            | 201      | Omar Al Duais
+31130      | blended   | lecture | slot_88            | Sunday  Tuesday              | atelier ُee309 | Edebean Alsharaiheh
+31130      | blended   | lecture | slot_126           | Monday                       | 205      | Dr. Malak Al-Shamayleh
+31130      | blended   | lecture | slot_167           | Monday                       | 204      | Zainab Khaleel
+31130      | blended   | lecture | slot_165           | Monday  Wednesday            | 206      | Tariq Farghal
+31130      | blended   | lecture | slot_72            | Tuesday                      | 202      | Dr. Ahmad Shalabi
+31130      | blended   | lecture | slot_44            | Sunday  Tuesday  Thursday    | atelier ُee309 | Ahamad Abdelraziq
+31130      | blended   | lecture | slot_73            | Sunday  Tuesday              | 201      | Ahamad Abdelraziq
+31151      | online    | lecture | slot_48            | Sunday  Tuesday              | ONLINE   | Dr. Adel Alhanahnah
+31151      | online    | lecture | slot_121           | Wednesday                    | ONLINE   | Dr. Emad Alshdouh
+31151      | online    | lecture | slot_140           | Sunday  Tuesday  Thursday    | ONLINE   | Manar Ibrahim
+31151      | online    | lecture | slot_120           | Wednesday                    | ONLINE   | Dr. Ahmad Tarawneh
+31151      | online    | lecture | slot_160           | Sunday  Tuesday              | ONLINE   | Dr. Adel Alhanahnah
+31151      | online    | lecture | slot_165           | Monday  Wednesday            | ONLINE   | Dr. Adel Alhanahnah
+31151      | online    | lecture | slot_97            | Sunday  Tuesday              | ONLINE   | Dr. Ikhlas Al Jaafreh
+31151      | online    | lecture | slot_162           | Sunday                       | ONLINE   | Dr. Ramzy Radeideh
+31152      | blended   | lecture | slot_82            | Sunday  Tuesday              | 204      | Dr. Ahmad Tarawneh
+31152      | blended   | lecture | slot_147           | Monday  Wednesday            | 821      | Shahenaz Issa
+31152      | blended   | lecture | slot_152           | Wednesday                    | 202      | Shahenaz Issa
+31251      | online    | lecture | slot_169           | Monday  Wednesday            | ONLINE   | Saja Al-Hajaj
+31251      | online    | lecture | slot_73            | Sunday  Tuesday              | ONLINE   | Jumana Al-Manaseer
+31251      | online    | lecture | slot_54            | Sunday                       | ONLINE   | Saja Al-Hajaj
+31251      | online    | lecture | slot_128           | Tuesday                      | ONLINE   | Saja Al-Hajaj
+31254      | online    | lecture | slot_162           | Sunday                       | ONLINE   | Dr. Abdel Reheem Abualbasal
+31254      | online    | lecture | slot_92            | Thursday                     | ONLINE   | Hanin Damer
+31254      | online    | lecture | slot_142           | Tuesday                      | ONLINE   | Nadia Alkhateeb
+31254      | online    | lecture | slot_104           | Monday  Wednesday            | ONLINE   | Mohammad Almomani
+31254      | online    | lecture | slot_216           | Thursday                     | ONLINE   | Hadeel Alomari
+31254      | online    | lecture | slot_43            | Monday                       | ONLINE   | Arab Abu-Afeefeh
+31254      | online    | lecture | slot_91            | Thursday                     | ONLINE   | Dr. Ghadeer Khuffash
+31260      | blended   | lecture | slot_162           | Sunday                       | 202      | Hamza Alakaleek
+31260      | blended   | lecture | slot_90            | Monday                       | 308      | Dr. Adel Alhanahnah
+31261      | blended   | lecture | slot_45            | Sunday  Tuesday              | 201      | Dr. Ramzy Radeideh
+31261      | blended   | lecture | slot_214           | Sunday                       | 202      | Dr. Ramzy Radeideh
+31264      | blended   | lecture | slot_72            | Tuesday                      | 207      | Dr. Osam Bani-Hamd
+31264      | blended   | lecture | slot_88            | Sunday  Tuesday              | 304      | Dr. Osam Bani-Hamd
+31264      | blended   | lecture | slot_49            | Wednesday                    | 203      | Dr. Osam Bani-Hamd
+31272      | blended   | lecture | slot_57            | Sunday  Tuesday  Thursday    | 205      | Prof. Abdul Ghani Albaali
+31311      | blended   | lecture | slot_215           | Tuesday                      | 203      | Prof. Abdul Ghani Albaali
+31311      | blended   | lecture | slot_50            | Sunday  Tuesday  Thursday    | 204      | Prof. Abdul Ghani Albaali
+31311      | blended   | lecture | slot_38            | Wednesday                    | 203      | Prof. Abdul Ghani Albaali
+31351      | blended   | lecture | slot_220           | Thursday                     | 343      | Dr. Ahmad Tarawneh
+31351      | blended   | lecture | slot_88            | Sunday  Tuesday              | 207      | Shahenaz Issa
+31351      | blended   | lecture | slot_72            | Tuesday                      | 203      | Prof. Mohammad Al Sheyab
+31352      | blended   | lecture | slot_225           | Monday  Wednesday            | 207      | Shahenaz Issa
+31352      | blended   | lecture | slot_98            | Sunday  Tuesday              | 208      | Shahenaz Issa
+31362      | blended   | lecture | slot_166           | Monday  Wednesday            | 301      | Dr. Lina Jazrawi
+31362      | blended   | lecture | slot_80            | Monday  Wednesday            | 204      | Dr. Alhakem Masoud
+31362      | blended   | lecture | slot_82            | Sunday  Tuesday              | 307      | Dr. Lina Jazrawi
+31362      | blended   | lecture | slot_60            | Monday  Wednesday            | 202      | Dr. Lina Jazrawi
+31374      | online    | lecture | slot_96            | Tuesday                      | ONLINE   | Hadeel Alomari
+31374      | online    | lecture | slot_33            | Wednesday                    | ONLINE   | Fida Zakzouk
+31374      | online    | lecture | slot_142           | Tuesday                      | ONLINE   | Dr. Ola Al Haddid
+31374      | online    | lecture | slot_88            | Sunday  Tuesday              | ONLINE   | Nour Aljaouni
+31374      | online    | lecture | slot_104           | Monday  Wednesday            | ONLINE   | Banan Alkasasbeh
+31374      | online    | lecture | slot_2             | Monday  Wednesday            | ONLINE   | Dr. Bilal Hamoud
+31374      | online    | lecture | slot_64            | Monday                       | ONLINE   | Ghadir Alkhozondar
+33101      | inperson  | lecture | slot_109           | Sunday  Tuesday  Thursday    | 305      | Dr. Abdel Reheem Abualbasal
+33101      | inperson  | lecture | slot_110           | Monday  Wednesday            | 822      | Prof. Baker Al Serhan
+33101      | inperson  | lecture | slot_170           | Monday                       | 202      | Dr. Moh'D Tabishat
+33101      | inperson  | lecture | slot_10            | Sunday  Tuesday  Thursday    | 831      | Leyla Rawashdeh
+33101      | inperson  | lecture | slot_52            | Sunday  Tuesday              | 307      | Prof. Baker Al Serhan
+33101      | inperson  | lecture | slot_227           | Monday  Wednesday            | 701      | Leyla Rawashdeh
+33103      | inperson  | lecture | slot_106           | Monday  Wednesday            | 342      | Dr. Mohammad Alsumadi
+33103      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 207      | Dr. Manal Qarain
+33103      | inperson  | lecture | slot_170           | Monday                       | 302      | Dr. Hani Al-Abdallat
+33103      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 921      | Dr. Mohammad Alsumadi
+33203      | blended   | lecture | slot_50            | Sunday  Tuesday  Thursday    | 832      | Eng. Nadine Abu Tuhaimer
+33203      | blended   | lecture | slot_51            | Monday  Wednesday            | 207      | Prof. Baker Al Serhan
+33203      | blended   | lecture | slot_162           | Sunday                       | 301      | Dr. Bilal Hamoud
+33204      | blended   | lecture | slot_147           | Monday  Wednesday            | 204      | Dr. Nadia Sweis
+33204      | blended   | lecture | slot_73            | Sunday  Tuesday              | 821      | Dr. Abdel Reheem Abualbasal
+33204      | blended   | lecture | slot_137           | Monday                       | 206      | Dr. Nadia Sweis
+33204      | blended   | lecture | slot_148           | Monday  Wednesday            | 207      | Dr. Nadia Sweis
+33207      | blended   | lecture | slot_214           | Sunday                       | 204      | Dr. Dalia Mustafa
+33209      | inperson  | lecture | slot_67            | Wednesday                    | 922      | Ayah Alnouri
+33209      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 208      | Dr. Aseel Abu Ajamieh
+33209      | inperson  | lecture | slot_66            | Tuesday                      | 302      | Dr. Ola Al Haddid
+33212      | inperson  | lecture | slot_101           | Sunday  Tuesday              | 302      | Dr. Mohammad Alsumadi
+33212      | inperson  | lecture | slot_219           | Wednesday                    | 306      | Dr. Mohammad Alsumadi
+33218      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 701      | Dr. Ola Al Haddid
+33309      | blended   | lecture | slot_171           | Monday                       | 305      | Eng. Nadine Abu Tuhaimer
+33309      | blended   | lecture | slot_97            | Sunday  Tuesday              | 832      | Seba Abualhayja'A
+33313      | inperson  | lecture | slot_124           | Monday                       | 702      | Dr. Yazan Migdadi
+33313      | inperson  | lecture | slot_85            | Sunday  Tuesday              | 704      | Dr. Yazan Migdadi
+33313      | inperson  | lecture | slot_46            | Wednesday                    | 343      | Dr. Shatha Al-Qudah
+33317      | blended   | lecture | slot_84            | Monday  Wednesday            | 202      | Dr. Khleef Alkhawaldeh
+33317      | blended   | lecture | slot_48            | Sunday  Tuesday              | 701      | Dr. Shatha Al-Qudah
+33331      | blended   | lecture | slot_211           | Sunday  Tuesday  Thursday    | 342      | Dr. Bilal Hamoud
+33404      | blended   | lecture | slot_147           | Monday  Wednesday            | 303      | Dr. Abdel Reheem Abualbasal
+33405      | blended   | lecture | slot_145           | Wednesday                    | 202      | Dina Ayoub
+33405      | blended   | lecture | slot_149           | Wednesday                    | 306      | Dina Ayoub
+33405      | blended   | lecture | slot_38            | Wednesday                    | 701      | Dr. Moh'D Al-Shboul
+33408      | inperson  | lecture | slot_63            | Sunday                       | 206      | Dr. Raed Wishah
+33432      | inperson  | lecture | slot_106           | Monday  Wednesday            | 306      | Dr. Moh'D Al-Shboul
+33435      | blended   | lecture | slot_132           | Wednesday                    | 201      | Saleh Malkawi
+33435      | blended   | lecture | slot_88            | Sunday  Tuesday              | 201      | Dr. Bilal Hamoud
+33439      | inperson  | lecture | slot_62            | Sunday                       | 341      | Dr. Hani Al-Abdallat
+33445      | blended   | lecture | slot_220           | Thursday                     | 831      | Bashar Al-Btoosh
+33445      | blended   | lecture | slot_215           | Tuesday                      | 204      | Dr. Jumana Zahedah
+33445      | blended   | lecture | slot_59            | Monday  Wednesday            | 301      | Bashar Al-Btoosh
+33445      | blended   | lecture | slot_48            | Sunday  Tuesday              | 202      | Dr. Jumana Zahedah
+34101      | inperson  | lecture | slot_101           | Sunday  Tuesday              | 206      | Ezzat Ghaidan
+34101      | inperson  | lecture | slot_79            | Sunday  Tuesday              | 341      | Ezzat Ghaidan
+34101      | inperson  | lecture | slot_9             | Sunday  Tuesday  Thursday    | 342      | Dr. Muhannad Atmeh
+34101      | inperson  | lecture | slot_120           | Wednesday                    | 304      | Zain Rabbaa
+34101      | inperson  | lecture | slot_12            | Sunday  Tuesday  Thursday    | 342      | Dr. Anan Srouji
+34101      | inperson  | lecture | slot_10            | Sunday  Tuesday  Thursday    | 343      | Asma Al Znaimat
+34102      | inperson  | lecture | slot_62            | Sunday                       | 308      | Dr. Rami Alzebdieh
+34102      | inperson  | lecture | slot_127           | Sunday                       | 207      | Dr. Rami Alzebdieh
+34115      | blended   | lecture | slot_58            | Sunday  Tuesday  Thursday    | 922      | Dr. Najib Shrydeh
+34115      | blended   | lecture | slot_153           | Sunday  Tuesday  Thursday    | atelier ُee309 | Dr. Majd Iskandrani
+34115      | blended   | lecture | slot_90            | Monday                       | 343      | Dr. Najib Shrydeh
+34115      | blended   | lecture | slot_90            | Monday                       | 208      | Dr. Majd Iskandrani
+34115      | blended   | lecture | slot_152           | Wednesday                    | 204      | Dr. Majd Iskandrani
+34115      | blended   | lecture | slot_72            | Tuesday                      | 341      | Hamed Almahadin
+34204      | inperson  | lecture | slot_64            | Monday                       | 342      | Dr. Anan Srouji
+34205      | inperson  | lecture | slot_96            | Tuesday                      | atelier ُee309 | Dr. Muhannad Atmeh
+34205      | inperson  | lecture | slot_213           | Tuesday                      | 208      | Ezzat Ghaidan
+34216      | blended   | lecture | slot_71            | Sunday  Tuesday              | 701      | Dr. Anas Aljbour
+34216      | blended   | lecture | slot_91            | Thursday                     | 306      | Dr. Rasmi Meqbel
+34227      | inperson  | lecture | slot_142           | Tuesday                      | 922      | Dr. Abdulhadi Ramadan
+34231      | blended   | lecture | slot_80            | Monday  Wednesday            | 201      | Asma Al Znaimat
+34233      | online    | lecture | slot_11            | Monday  Wednesday            | ONLINE   | Dr. Abdel Razaq Farah Freihat
+34307      | inperson  | lecture | slot_31            | Wednesday                    | 921      | Dr. Bassam Maali
+34311      | inperson  | lecture | slot_86            | Sunday  Tuesday              | 301      | Prof. Mishiel Suwaidan
+34311      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | 343      | Dr. Anan Srouji
+34313      | inperson  | lecture | slot_56            | Thursday                     | 832      | Dr. Rami Alzebdieh
+34314      | blended   | lecture | slot_167           | Monday                       | 921      | Fernando Garicia
+34314      | blended   | lecture | slot_57            | Sunday  Tuesday  Thursday    | 831      | Fernando Garicia
+34314      | blended   | lecture | slot_43            | Monday                       | 208      | Dr. Suleiman Mohammad
+34321      | blended   | lecture | slot_167           | Monday                       | 303      | Dr. Hala Zaidan
+34321      | blended   | lecture | slot_166           | Monday  Wednesday            | 304      | Dr. Muhannad Atmeh
+34321      | blended   | lecture | slot_71            | Sunday  Tuesday              | 305      | Dr. Salem Alhababsah
+34324      | inperson  | lecture | slot_96            | Tuesday                      | 206      | Dr. Abdulhadi Ramadan
+34324      | inperson  | lecture | slot_120           | Wednesday                    | 208      | Dr. Abdulhadi Ramadan
+34326      | blended   | lecture | slot_98            | Sunday  Tuesday              | 202      | Dr. Rasha Alghazzawi
+34326      | blended   | lecture | slot_145           | Wednesday                    | 343      | Dr. Rasha Alghazzawi
+34332      | inperson  | lecture | slot_138           | Monday                       | 702      | Radhi Al-Hamadeen
+34332      | inperson  | lecture | slot_93            | Monday  Wednesday            | 303      | Dr. Salem Alhababsah
+34414      | blended   | lecture | slot_34            | Wednesday                    | 205      | Dr. Melina Al-Hasan
+34415      | inperson  | lecture | slot_96            | Tuesday                      | 822      | Dr. Bassam Maali
+34415      | inperson  | lecture | slot_122           | Monday                       | 704      | Dr. Bassam Maali
+34432      | blended   | lecture | slot_97            | Sunday  Tuesday              | 205      | Radhi Al-Hamadeen
+34439      | online    | lecture | slot_171           | Monday                       | ONLINE   | Dr. Suleiman Mohammad
+34439      | online    | lecture | slot_96            | Tuesday                      | ONLINE   | Dr. Suleiman Mohammad
+35101      | blended   | lecture | slot_45            | Sunday  Tuesday              | 303      | Dr. Dhia' Qasim
+35101      | blended   | lecture | slot_73            | Sunday  Tuesday              | 341      | Dr. Fandi Omeish
+35101      | blended   | lecture | slot_82            | Sunday  Tuesday              | 201      | Dr. Mohammd Abuhashesh
+35103      | blended   | lecture | slot_42            | Wednesday                    | 203      | Dr. Fandi Omeish
+35103      | blended   | lecture | slot_147           | Monday  Wednesday            | 342      | Farah Alshraiedeh
+35202      | inperson  | lecture | slot_86            | Sunday  Tuesday              | 302      | Dr. Rand Irshaidat
+35202      | inperson  | lecture | slot_36            | Monday                       | 701      | Nada Ghesh
+35202      | inperson  | lecture | slot_122           | Monday                       | 343      | Dr. Rand Irshaidat
+35215      | blended   | lecture | slot_42            | Wednesday                    | 301      | Prof. Shafig Al-Haddad
+35215      | blended   | lecture | slot_39            | Monday                       | 303      | Prof. Shafig Al-Haddad
+35217      | blended   | lecture | slot_164           | Thursday                     | 307      | Prof. Ala'Eddin Ahmad
+35217      | blended   | lecture | slot_146           | Sunday  Tuesday  Thursday    | 308      | Dr. Zainah Qasem
+35218      | blended   | lecture | slot_57            | Sunday  Tuesday  Thursday    | 922      | Dr. Zainah Qasem
+35218      | blended   | lecture | slot_167           | Monday                       | 201      | Dr. Dua''A Abushariah
+35218      | blended   | lecture | slot_134           | Sunday  Tuesday              | 207      | Dr. Ala' Dandis
+35219      | blended   | lecture | slot_38            | Wednesday                    | 206      | Prof. Shafig Al-Haddad
+35219      | blended   | lecture | slot_41            | Monday                       | 205      | Saja Alzu'Bi
+35233      | blended   | lecture | slot_140           | Sunday  Tuesday  Thursday    | 701      | Rand Badran
+35233      | blended   | lecture | slot_130           | Wednesday                    | 205      | Esraa Rababa
+35233      | blended   | lecture | slot_223           | Thursday                     | 206      | Rand Badran
+35233      | blended   | lecture | slot_91            | Thursday                     | 308      | Esraa Rababa
+35235      | inperson  | lecture | slot_110           | Monday  Wednesday            | 831      | Taghreed Khirfan
+35235      | inperson  | lecture | slot_87            | Sunday  Tuesday              | 303      | Rama Idries
+35308      | inperson  | lecture | slot_79            | Sunday  Tuesday              | 704      | Saja Alzu'Bi
+35314      | blended   | lecture | slot_149           | Wednesday                    | 203      | Saja Alzu'Bi
+35314      | blended   | lecture | slot_45            | Sunday  Tuesday              | 203      | Dr. Mohammd Abuhashesh
+35319      | blended   | lecture | slot_147           | Monday  Wednesday            | 207      | Prof. Ala'Eddin Ahmad
+35319      | blended   | lecture | slot_220           | Thursday                     | 307      | Dr. Ammar Qasaimeh
+35323      | inperson  | lecture | slot_64            | Monday                       | 341      | Dr. Rand Irshaidat
+35323      | inperson  | lecture | slot_35            | Sunday                       | 306      | Dima Abu Gharbeya
+35326      | online    | lecture | slot_96            | Tuesday                      | ONLINE   | Saja Alzu'Bi
+35326      | online    | lecture | slot_147           | Monday  Wednesday            | ONLINE   | Dr. Amer Badran
+35336      | blended   | lecture | slot_214           | Sunday                       | 302      | Dr. Mohammad Alrousan
+35336      | blended   | lecture | slot_57            | Sunday  Tuesday  Thursday    | 203      | Dr. Mohammad Alrousan
+35407      | inperson  | lecture | slot_127           | Sunday                       | 343      | Dr. Mohammad Al Haj Eid
+35407      | inperson  | lecture | slot_109           | Sunday  Tuesday  Thursday    | 208      | Dr. Mohammad Al Haj Eid
+35408      | blended   | lecture | slot_167           | Monday                       | 922      | Tariq Abdrabbo
+35408      | blended   | lecture | slot_162           | Sunday                       | 831      | Tariq Abdrabbo
+35409      | inperson  | lecture | slot_160           | Sunday  Tuesday              | 341      | Dr. Dhia' Qasim
+35409      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 206      | Dr. Dhia' Qasim
+35416      | blended   | lecture | slot_59            | Monday  Wednesday            | 304      | Nada Ghesh
+35416      | blended   | lecture | slot_88            | Sunday  Tuesday              | 303      | Prof. Mohammad Al-Khasawneh
+35419      | online    | lecture | slot_43            | Monday                       | ONLINE   | Dima Abu Gharbeya
+35424      | inperson  | lecture | slot_142           | Tuesday                      | 303      | Tariq Abdrabbo
+35424      | inperson  | lecture | slot_27            | Monday                       | atelier ُee309 | Prof. Shafig Al-Haddad
+35435      | blended   | lecture | slot_91            | Thursday                     | 204      | Dr. Ammar Qasaimeh
+35435      | blended   | lecture | slot_50            | Sunday  Tuesday  Thursday    | 342      | Dr. Ammar Qasaimeh
+35436      | blended   | lecture | slot_232           | Sunday                       | 205      | Dr. Dhia' Qasim
+35437      | blended   | lecture | slot_130           | Wednesday                    | 302      | Dr. Mohammad Alrousan
+35437      | blended   | lecture | slot_51            | Monday  Wednesday            | 305      | Dr. Mohammad Alrousan
+36111      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 305      | Dr. Fuad Hejjeh
+36111      | inperson  | lecture | slot_79            | Sunday  Tuesday              | 702      | Dr. Fuad Hejjeh
+36112      | inperson  | lecture | slot_46            | Wednesday                    | 341      | Dr. Fuad Hejjeh
+36112      | inperson  | lecture | slot_56            | Thursday                     | 207      | Dr. Fuad Hejjeh
+36113      | inperson  | lab     | slot_125           | Tuesday                      | it302    | Ahmad Shawaqfeh
+36113      | inperson  | lab     | slot_77            | Tuesday                      | it302    | Hiba Alsaidi
+36202      | inperson  | lecture | slot_32            | Wednesday                    | 206      | Dr. Ahmad Abushakra
+36202      | inperson  | lecture | slot_107           | Monday  Wednesday            | 308      | Dr. Majdi Rawashdeh
+36203      | blended   | lecture | slot_82            | Sunday  Tuesday              | 205      | Dr. Fadi Qutaishat
+36203      | blended   | lecture | slot_126           | Monday                       | 301      | Dr. Majdi Rawashdeh
+36232      | blended   | lecture | slot_211           | Sunday  Tuesday  Thursday    | 922      | Dr. Luay Anaya
+36232      | blended   | lecture | slot_136           | Monday                       | 704      | Seba Abualhayja'A
+36232      | blended   | lecture | slot_73            | Sunday  Tuesday              | 832      | Seba Abualhayja'A
+36232      | blended   | lecture | slot_130           | Wednesday                    | 303      | Dana Bani-Mohamad
+36251      | inperson  | lab     | slot_151           | Tuesday                      | ee242 communications | Rasha Khalil
+36251      | inperson  | lab     | slot_112           | Monday                       | it303    | Hiba Alsaidi
+36301      | blended   | lecture | slot_214           | Sunday                       | 206      | Eng. Osama Al-Mrayat
+36312      | inperson  | lecture | slot_123           | Monday                       | 343      | Layla Malas
+36312      | inperson  | lecture | slot_213           | Tuesday                      | 301      | Dr. Majdi Rawashdeh
+36316      | blended   | lecture | slot_39            | Monday                       | 204      | Dr. Fadi Qutaishat
+36316      | blended   | lecture | slot_145           | Wednesday                    | 205      | Dr. Fadi Qutaishat
+36331      | inperson  | lecture | slot_37            | Tuesday                      | 204      | Dr. Ahmad Abushakra
+36331      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 207      | Dr. Luay Anaya
+36334      | blended   | lecture | slot_165           | Monday  Wednesday            | 201      | Dr. Rami Ibrahim
+36334      | blended   | lecture | slot_92            | Thursday                     | 205      | Eng. Ghayd'A Al Hyasat
+36336      | inperson  | lecture | slot_31            | Wednesday                    | 307      | Dr. Luay Anaya
+36336      | inperson  | lecture | slot_67            | Wednesday                    | 307      | Dr. Ahmad Abushakra
+36339      | online    | lecture | slot_28            | Monday                       | ONLINE   | Ahmad Shawaqfeh
+36357      | inperson  | lab     | slot_83            | Sunday                       | it303    | Layla Malas
+36357      | inperson  | lab     | slot_83            | Sunday                       | ee243 cellular | Dr. Ahmad Abushakra
+36402      | blended   | lecture | slot_135           | Monday                       | 203      | Dr. Mohammad Al-Omari
+36402      | blended   | lecture | slot_82            | Sunday  Tuesday              | 207      | Dr. Mohammad Al-Omari
+36404      | blended   | lecture | slot_45            | Sunday  Tuesday              | 202      | Dr. Dalia Al-Eisawi
+36405      | inperson  | lecture | slot_95            | Monday                       | 703      | Ahmad Shawaqfeh
+36405      | inperson  | lecture | slot_54            | Sunday                       | 821      | Dr. Wa'El Aletaiwi
+36406      | inperson  | lecture | slot_4             | Monday  Wednesday            | 703      | Dr. Ahmad Abushakra
+36415      | blended   | lecture | slot_132           | Wednesday                    | 704      | Eng. Ghayd'A Al Hyasat
+36428      | blended   | lecture | slot_136           | Monday                       | 203      | Dr. Noor Damer
+36435      | blended   | lecture | slot_99            | Monday                       | 205      | Dr. Luay Anaya
+36435      | blended   | lecture | slot_44            | Sunday  Tuesday  Thursday    | 203      | Dr. Luay Anaya
+36436      | blended   | lecture | slot_163           | Tuesday                      | 306      | Dr. Fadi Qutaishat
+11223      | inperson  | lecture | slot_27            | Monday                       | 701      | Dr. Raghda Hriez
+12351      | inperson  | lecture | slot_65            | Wednesday                    | 831      | Dr. Alhakem Masoud
+12354      | inperson  | lecture | slot_217           | Tuesday                      | 306      | Dr. Mohammad Alzoubi
+12447      | inperson  | lecture | slot_123           | Monday                       | 921      | Dr. Muhanna Muhanna
+12467      | blended   | lecture | slot_59            | Monday  Wednesday            | 305      | Narmeen Alhyari
+12471      | inperson  | lecture | slot_122           | Monday                       | 307      | Rosana Marar
+13431      | inperson  | lecture | slot_109           | Sunday  Tuesday  Thursday    | 204      | Dr. Firas Ghanim
+14351      | inperson  | lecture | slot_8             | Sunday  Tuesday  Thursday    | 704      | Prof. Moh'D Azzeh
+14357      | blended   | lecture | slot_80            | Monday  Wednesday            | 208      | Dr. Omar Alqawasmeh
+14357      | blended   | lecture | slot_162           | Sunday                       | 204      | Dr. Serin Atiani
+14456      | blended   | lecture | slot_90            | Monday                       | 302      | Remah Bani Younisse
+14458      | blended   | lecture | slot_134           | Sunday  Tuesday              | 306      | Dr. Tariq Bdair
+14469      | blended   | lecture | slot_51            | Monday  Wednesday            | 208      | Dr. Fadi Almahamid
+15321      | inperson  | lecture | slot_127           | Sunday                       | 305      | Qasem Abu Al-Haija'
+15322      | inperson  | lab     | slot_218           | Monday                       | it301    | Yousef Yaseen
+15322      | inperson  | lab     | slot_81            | Thursday                     | ee101 electrical | Ahmad Musleh
+15361      | blended   | lecture | slot_132           | Wednesday                    | 303      | Dr. Mu'Awya Al-Dala'Ien
+15422      | inperson  | lecture | slot_36            | Monday                       | 304      | Dr. Khaled Mahmoud
+15493      | inperson  | lecture | slot_55            | Tuesday                      | 343      | Qasem Abu Al-Haija'
+21431      | inperson  | lecture | slot_120           | Wednesday                    | 303      | Prof. Fadi Shahrouri
+21432      | blended   | lecture | slot_84            | Monday  Wednesday            | 207      | Dr. Rami Wahsheh
+21439      | inperson  | lab     | slot_15            | Monday                       | it105    | Prof. Fadi Shahrouri
+21581      | blended   | lecture | slot_60            | Monday  Wednesday            | atelier ُee309 | Prof. Ahmad Tawayha
+22582      | inperson  | lecture | slot_127           | Sunday                       | ee124    | Dr. Awos Kanan
+23454      | blended   | lecture | slot_43            | Monday                       | 303      | Dr. Mohammad Alja'Afreh
+23455      | inperson  | lab     | slot_25            | Thursday                     | it103    | Prof. Raed Mesleh
+23457      | blended   | lecture | slot_90            | Monday                       | 307      | Prof. Osamah Badarneh
+24467      | inperson  | lecture | slot_119           | Wednesday                    | 302      | Dr. Hani Ahmad
+24470      | inperson  | lecture | slot_160           | Sunday  Tuesday              | 301      | Prof. Ayman Faza
+27251      | inperson  | lecture | slot_63            | Sunday                       | 204      | Prof. Abdallah Al Zoubi
+33322      | blended   | lecture | slot_225           | Monday  Wednesday            | 308      | Dr. Hani Al-Abdallat
+33322      | blended   | lecture | slot_39            | Monday                       | 701      | Dr. Hani Al-Abdallat
+34206      | inperson  | lecture | slot_33            | Wednesday                    | 832      | Asma Al Znaimat
+35421      | inperson  | lecture | slot_161           | Wednesday                    | 302      | Rand Badran
+15200      | inperson  | lecture | slot_93            | Monday  Wednesday            | 703      | Zein Ashi
+15201      | inperson  | lab     | slot_114           | Wednesday                    | it302    | Hamam Alakhras
+15420      | blended   | lecture | slot_126           | Monday                       | 206      | Dr. Oraib Abualganam
+15460      | inperson  | lecture | slot_120           | Wednesday                    | ee124    | Eng. Mohammad Al Balawi
+22583      | blended   | lecture | slot_89            | Wednesday                    | 201      | Dr. Awos Kanan
+23576      | blended   | lecture | slot_39            | Monday                       | 201      | Prof. Ashraf Tahat
+25520      | inperson  | lecture | slot_28            | Monday                       | ee124    | Eng. Farah Abudabaseh
+27351      | inperson  | lecture | slot_216           | Thursday                     | ee124    | Dr. Mohammad Alja'Afreh
+27352      | inperson  | lab     | slot_25            | Thursday                     | it105    | Dr. Zaid Haymoor
+11325      | inperson  | lecture | slot_1             | Sunday  Tuesday  Thursday    | atelier ُee309 | Dr. Ammar Alrashdan
+12159      | blended   | lecture | slot_82            | Sunday  Tuesday              | 208      | Narmeen Alhyari
+15261      | inperson  | lecture | slot_31            | Wednesday                    | 702      | Rahmeh Ibrahim
+15261      | inperson  | lecture | slot_86            | Sunday  Tuesday              | 822      | Rahmeh Ibrahim
+15262      | inperson  | lab     | slot_114           | Wednesday                    | it301    | Ahmed Al Takrouri Altamimi
+15262      | inperson  | lab     | slot_144           | Monday                       | it104    | Al Maha Abu Zuraiq
+15421      | inperson  | lecture | slot_33            | Wednesday                    | 921      | Prof. Mohammad Al Nabhan
+15423      | inperson  | lecture | slot_36            | Monday                       | 702      | Dr. Mohammad Ababneh
+22462      | inperson  | lab     | slot_25            | Thursday                     | it302    | Dr. Qutaiba Al Harfi Albluwi
+22462      | inperson  | lab     | slot_150           | Thursday                     | it302    | Dr. Abdullah Hayajneh
+22462      | inperson  | lab     | slot_209           | Tuesday                      | it301    | Dr. Heba Abdel-Nabi
+24588      | blended   | lecture | slot_97            | Sunday  Tuesday              | 208      | Dr. Ibrahim Abuishmais
+25541      | blended   | lecture | slot_72            | Tuesday                      | 704      | Eng. Farah Abudabaseh
+27353      | inperson  | lecture | slot_46            | Wednesday                    | 821      | Dr. Luae' Al-Tarawneh
+27353      | inperson  | lecture | slot_67            | Wednesday                    | 704      | Eng. Osama Al-Mrayat
+33326      | inperson  | lecture | slot_120           | Wednesday                    | 704      | Ayah Alnouri
+33434      | inperson  | lecture | slot_138           | Monday                       | 831      | Dr. Ola Al Haddid
+12267      | blended   | lecture | slot_214           | Sunday                       | 208      | Dr. Alhakem Masoud
+15312      | inperson  | lecture | slot_93            | Monday  Wednesday            | 342      | Prof. Ja'Afer Alsaraireh
+15313      | inperson  | lab     | slot_116           | Monday                       | online   | Hamam Alakhras
+15350      | inperson  | lecture | slot_86            | Sunday  Tuesday              | 307      | Dr. Khaled Mahmoud
+22210      | inperson  | lab     | slot_70            | Wednesday                    | it107    | Prof. Amjed Al-Mousa
+22210      | inperson  | lab     | slot_150           | Thursday                     | online   | Prof. Saud Althunibat
+22210      | inperson  | lab     | slot_111           | Sunday                       | 811      | Prof. Osamah Badarneh
+22210      | inperson  | lab     | slot_114           | Wednesday                    | it303    | Dr. Anastassia Gharib
+27355      | inperson  | lecture | slot_121           | Wednesday                    | atelier ُee309 | Dr. Rami Wahsheh
+27355      | inperson  | lecture | slot_93            | Monday  Wednesday            | 341      | Dr. Rami Wahsheh
+27450      | blended   | lecture | slot_148           | Monday  Wednesday            | 306      | Eng. Mohamed Taha
+33342      | inperson  | lecture | slot_160           | Sunday  Tuesday              | 822      | Dr. Nadia Sweis
+36110      | inperson  | lecture | slot_2             | Monday  Wednesday            | 832      | Dr. Amer Al Shishany
+36110      | inperson  | lecture | slot_26            | Monday                       | 303      | Seba Abualhayja'A
+36110      | inperson  | lecture | slot_101           | Sunday  Tuesday              | 204      | Dr. Abdallah Abu Madi
+36110      | inperson  | lecture | slot_124           | Monday                       | 821      | Dr. Amer Al Shishany
+36110      | inperson  | lecture | slot_122           | Monday                       | 341      | Dr. Ahmad Abushakra
+12266      | inperson  | lecture | slot_7             | Sunday  Tuesday  Thursday    | 207      | Narmeen Alhyari
+12275      | inperson  | lecture | slot_63            | Sunday                       | 832      | Dr. Mohammad Alzoubi
+15382      | inperson  | lecture | slot_217           | Tuesday                      | 307      | Prof. Khair Eddin Sabri
+15411      | blended   | lecture | slot_167           | Monday                       | 302      | Dr. Mohammad Ababneh
+15412      | inperson  | lab     | slot_224           | Monday                       | it301    | Rana Maali
+15412      | inperson  | lab     | slot_81            | Thursday                     | it104    | Hebah Abu Kaf
+15433      | inperson  | lecture | slot_142           | Tuesday                      | 306      | Prof. Khair Eddin Sabri
+27453      | inperson  | lecture | slot_66            | Tuesday                      | ee124    | Dr. Zaid Haymoor
+27454      | inperson  | lab     | slot_17            | Wednesday                    | it105    | Dr. Mohammad Alja'Afreh
+27541      | inperson  | lecture | slot_120           | Wednesday                    | 703      | Dr. Mohammad Alja'Afreh
+27542      | inperson  | lab     | slot_156           | Tuesday                      | it101    | Dr. Mohammad Alja'Afreh
+33102      | inperson  | lecture | slot_105           | Monday  Wednesday            | 342      | Dr. Aseel Abu Ajamieh
+33102      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 307      | Dr. Shatha Al-Qudah
+33102      | inperson  | lecture | slot_108           | Monday  Wednesday            | 306      | Dr. Aseel Abu Ajamieh
+33102      | inperson  | lecture | slot_9             | Sunday  Tuesday  Thursday    | 205      | Dr. Moh'D Tabishat
+35107      | blended   | lecture | slot_92            | Thursday                     | 201      | Tariq Abdrabbo
+35107      | blended   | lecture | slot_99            | Monday                       | 206      | Tariq Abdrabbo
+36120      | inperson  | lecture | slot_101           | Sunday  Tuesday              | 303      | Eng. Ghayd'A Al Hyasat
+36120      | inperson  | lecture | slot_3             | Sunday  Tuesday  Thursday    | 308      | Dr. Rami Ibrahim
+36120      | inperson  | lecture | slot_123           | Monday                       | 704      | Dr. Rami Ibrahim
+36120      | inperson  | lecture | slot_55            | Tuesday                      | 703      | Dr. Saif Aldean Qawasmeh
+36120      | inperson  | lecture | slot_4             | Monday  Wednesday            | 832      | Dr. Wa'El Aletaiwi
+36120      | inperson  | lecture | slot_129           | Monday                       | 207      | Dr. Rami Ibrahim
+36220      | inperson  | lecture | slot_63            | Sunday                       | 306      | Layla Malas
+36220      | inperson  | lecture | slot_86            | Sunday  Tuesday              | 821      | Dr. Noor Damer
+27411      | blended   | lecture | slot_45            | Sunday  Tuesday              | 206      | Eng. Neda Al Daher
+12362      | inperson  | lecture | slot_79            | Sunday  Tuesday              | ee124    | Narmeen Alhyari
+15381      | inperson  | lecture | slot_96            | Tuesday                      | 302      | Rana Maali
+15410      | inperson  | lecture | slot_65            | Wednesday                    | 208      | Prof. Mustafa Al-Fayoumi
+15453      | inperson  | lecture | slot_216           | Thursday                     | 702      | Eng. Mohammad Al Balawi
+15453      | inperson  | lecture | slot_87            | Sunday  Tuesday              | 921      | Eng. Mohammad Al Balawi
+25430      | blended   | lecture | slot_146           | Sunday  Tuesday  Thursday    | 203      | Dr. Haitham Al-Ani
+25521      | inperson  | lab     | slot_143           | Wednesday                    | ee103physicsee | Dr. Haitham Al-Ani
+25586      | blended   | lecture | slot_84            | Monday  Wednesday            | 822      | Dr. Enas Abulibdeh
+27551      | blended   | lecture | slot_84            | Monday  Wednesday            | 301      | Prof. Ashraf Tahat
+27552      | inperson  | lab     | slot_21            | Wednesday                    | ee241 security | Prof. Ashraf Tahat
+34239      | online    | lecture | slot_163           | Tuesday                      | ONLINE   | Dr. Rasha Alghazzawi
+11447      | inperson  | lecture | slot_138           | Monday                       | ee124    | Dr. Raad Al-Qassas
+12379      | inperson  | lecture | slot_20            | Sunday  Tuesday  Thursday    | 302      | Rosana Marar
+15494      | inperson  | lecture | slot_10            | Sunday  Tuesday  Thursday    | 342      | Prof. Mohammad Al Nabhan
+21573      | blended   | lecture | slot_98            | Sunday  Tuesday              | 343      | Dr. Mohammad Abdel-Majeed
+25560      | blended   | lecture | slot_172           | Wednesday                    | 202      | Prof. Ali Al Haj
+27321      | inperson  | lecture | slot_95            | Monday                       | 831      | Prof. Abdallah Al Zoubi
+27456      | inperson  | lab     | slot_222           | Sunday                       | it105    | Prof. Saud Althunibat
+27585      | inperson  | lecture | slot_67            | Wednesday                    | 343      | Dr. Zaid Haymoor
+31211      | blended   | lecture | slot_158           | Sunday  Tuesday  Thursday    | 302      | Prof. Rami Salem
+34226      | blended   | lecture | slot_73            | Sunday  Tuesday              | 831      | Dr. Rasha Alghazzawi
+34226      | blended   | lecture | slot_60            | Monday  Wednesday            | 831      | Dr. Rasha Alghazzawi
+36302      | blended   | lecture | slot_82            | Sunday  Tuesday              | 302      | Dr. Noor Damer
+36302      | blended   | lecture | slot_92            | Thursday                     | 703      | Dr. Noor Damer
 
-Final Fitness: 699.3646
-Hard Conflicts: 0
+Final Fitness: 8.0000
+Hard Conflicts: 1

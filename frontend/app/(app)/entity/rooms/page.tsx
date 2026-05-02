@@ -19,12 +19,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   Plus,
   Search,
   Edit,
   Trash2,
+  Archive,
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
@@ -41,6 +52,7 @@ import { findColumn, type ParsedRow } from "@/lib/import-utils"
 import { ExportDropdownWithDialog } from "@/components/export-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type Room = {
   id: string
@@ -73,7 +85,10 @@ function sortRoomsCopy(
 
 export default function RoomsPage() {
   const [rooms, setRooms] = useState<Room[]>([])
+  const [archivedRooms, setArchivedRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingArchived, setLoadingArchived] = useState(false)
+  const [tab, setTab] = useState<"active" | "archived">("active")
   const [searchQuery, setSearchQuery] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingRoom, setEditingRoom] = useState<Room | null>(null)
@@ -85,12 +100,42 @@ export default function RoomsPage() {
   const [sortColumn, setSortColumn] = useState<RoomSortColumn | null>(null)
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [pendingAvailabilityIds, setPendingAvailabilityIds] = useState<Set<string>>(new Set())
+  const [roomToDelete, setRoomToDelete] = useState<Room | null>(null)
+  const [archivedRoomToPermanentlyDelete, setArchivedRoomToPermanentlyDelete] =
+    useState<Room | null>(null)
+  const [archivedRoomDeletionImpact, setArchivedRoomDeletionImpact] = useState<{
+    entryCount: number
+    timetables: { timetableId: number; generationType: string; status: string; versionNumber: number }[]
+  } | null>(null)
+  const [loadingDeletionImpact, setLoadingDeletionImpact] = useState(false)
+  const [permanentlyDeleting, setPermanentlyDeleting] = useState(false)
   const { toast } = useToast()
+  const formatTimetableLabel = (t: {
+    timetableId: number
+    generationType: string
+    status: string
+    versionNumber: number
+  }) => `Timetable ${t.timetableId} (${t.status}, ${t.generationType} v${t.versionNumber})`
 
   // Fetch rooms from API
   useEffect(() => {
     fetchRooms()
   }, [])
+
+  useEffect(() => {
+    if (tab !== "archived") return
+    fetchArchivedRooms()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
+
+  useEffect(() => {
+    if (tab !== "archived") return
+    const interval = setInterval(() => {
+      fetchArchivedRooms()
+    }, 15000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
 
   const fetchRooms = async () => {
     try {
@@ -108,6 +153,25 @@ export default function RoomsPage() {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchArchivedRooms = async () => {
+    try {
+      setLoadingArchived(true)
+      const response = await fetch("/api/rooms/archived/list", { cache: "no-store" })
+      if (!response.ok) throw new Error("Failed to fetch archived rooms")
+      const data = (await response.json()) as unknown[]
+      setArchivedRooms(Array.isArray(data) ? (data as Room[]) : [])
+    } catch (error) {
+      console.error("Error fetching archived rooms:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load archived rooms. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingArchived(false)
     }
   }
 
@@ -247,29 +311,152 @@ export default function RoomsPage() {
       })
       
       const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
       
       if (!response.ok) {
         toast({
           title: "Error",
-          description: data.error || "Failed to delete room. Please try again.",
+          description: errorMessage || "Failed to archive room. Please try again.",
           variant: "destructive",
         })
         return
       }
       
       setRooms(rooms.filter((r) => r.id !== room.id))
+      await fetchArchivedRooms()
       toast({
         title: "Success",
-        description: "Room deleted successfully.",
+        description: `${room.id} archived — it won't be used in future scheduling`,
       })
     } catch (error) {
       console.error('Error deleting room:', error)
       toast({
         title: "Error",
-        description: "Failed to delete room. Please try again.",
+        description: "Failed to archive room. Please try again.",
         variant: "destructive",
       })
     }
+  }
+
+  const handleRestoreArchivedRoom = async (room: Room) => {
+    try {
+      const response = await fetch(`/api/rooms/${room.databaseId}/restore`, { method: "PATCH" })
+      const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: errorMessage || "Failed to restore room. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setArchivedRooms((prev) => prev.filter((r) => r.id !== room.id))
+      await fetchRooms()
+      toast({ title: "Success", description: "Room restored successfully." })
+    } catch (error) {
+      console.error("Error restoring room:", error)
+      toast({
+        title: "Error",
+        description: "Failed to restore room. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const openPermanentDeleteRoomModal = async (room: Room) => {
+    try {
+      setLoadingDeletionImpact(true)
+      const response = await fetch(`/api/rooms/${room.databaseId}/deletion-impact`, { cache: "no-store" })
+      const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: errorMessage || "Failed to check deletion impact. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setArchivedRoomToPermanentlyDelete(room)
+      setArchivedRoomDeletionImpact({
+        entryCount: Number((data as { entryCount?: unknown }).entryCount ?? 0) || 0,
+        timetables: Array.isArray((data as { timetables?: unknown }).timetables)
+          ? ((data as { timetables: unknown[] }).timetables as {
+              timetableId: number
+              generationType: string
+              status: string
+              versionNumber: number
+            }[])
+          : [],
+      })
+    } catch (error) {
+      console.error("Error checking deletion impact:", error)
+      toast({
+        title: "Error",
+        description: "Failed to check deletion impact. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingDeletionImpact(false)
+    }
+  }
+
+  const confirmPermanentDeleteArchivedRoom = async () => {
+    if (!archivedRoomToPermanentlyDelete) return
+    try {
+      setPermanentlyDeleting(true)
+      const response = await fetch(`/api/rooms/${archivedRoomToPermanentlyDelete.databaseId}/permanent`, {
+        method: "DELETE",
+      })
+      const data = await response.json()
+      const errorMessage =
+        (typeof data?.message === "string" && data.message) ||
+        (Array.isArray(data?.message) ? data.message.join(", ") : undefined) ||
+        data?.error
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: errorMessage || "Failed to permanently delete room. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setArchivedRooms((prev) => prev.filter((r) => r.id !== archivedRoomToPermanentlyDelete.id))
+      setArchivedRoomToPermanentlyDelete(null)
+      setArchivedRoomDeletionImpact(null)
+      toast({ title: "Success", description: "Room permanently deleted successfully." })
+    } catch (error) {
+      console.error("Error permanently deleting room:", error)
+      toast({
+        title: "Error",
+        description: "Failed to permanently delete room. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setPermanentlyDeleting(false)
+    }
+  }
+
+  const confirmDeleteRoom = async () => {
+    if (!roomToDelete) return
+    await handleDeleteRoom(roomToDelete)
+    setRoomToDelete(null)
   }
 
   const handleToggleAvailability = async (room: Room) => {
@@ -355,38 +542,57 @@ export default function RoomsPage() {
   }
 
   return (
-    <EntityLayout title="Room Management" description="Add, edit, and manage classrooms and labs.">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Rooms ({sortedFilteredRooms.length})</CardTitle>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="bg-transparent" onClick={() => setIsImportDialogOpen(true)}>
-              <ImportIcon className="mr-2 h-4 w-4" />
-              Import
-            </Button>
-            <ExportDropdownWithDialog
-              allData={sortedAllRooms.map((r) => ({ ...r, isAvailable: r.isAvailable ? "Yes" : "No" }))}
-              filteredData={paginatedRooms.map((r) => ({ ...r, isAvailable: r.isAvailable ? "Yes" : "No" }))}
-              columns={roomColumns}
-              filenamePrefix="rooms"
-              pdfTitle="Rooms"
-              totalLabel={`${rooms.length}`}
-              filteredLabel={`${paginatedRooms.length}`}
-              isFiltered={searchQuery !== "" || sortColumn != null}
-              filterDescription={
-                [searchQuery ? `search: "${searchQuery}"` : null, sortColumn ? `sort: capacity ${sortDirection}` : null]
-                  .filter(Boolean)
-                  .join(" · ") || undefined
-              }
-            />
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Room
+    <Tabs value={tab} onValueChange={(v) => setTab(v as "active" | "archived")}>
+      <EntityLayout
+        title="Room Management"
+        description="Add, edit, and manage classrooms and labs."
+        headerActions={
+          <TabsList>
+            <TabsTrigger value="active">Rooms</TabsTrigger>
+            <TabsTrigger value="archived">Archived</TabsTrigger>
+          </TabsList>
+        }
+      >
+        <TabsContent value="active">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0">
+              <CardTitle>Rooms ({sortedFilteredRooms.length})</CardTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-transparent"
+                  onClick={() => setIsImportDialogOpen(true)}
+                >
+                  <ImportIcon className="mr-2 h-4 w-4" />
+                  Import
                 </Button>
-              </DialogTrigger>
-              <DialogContent>
+                <ExportDropdownWithDialog
+                  allData={sortedAllRooms.map((r) => ({ ...r, isAvailable: r.isAvailable ? "Yes" : "No" }))}
+                  filteredData={paginatedRooms.map((r) => ({ ...r, isAvailable: r.isAvailable ? "Yes" : "No" }))}
+                  columns={roomColumns}
+                  filenamePrefix="rooms"
+                  pdfTitle="Rooms"
+                  totalLabel={`${rooms.length}`}
+                  filteredLabel={`${paginatedRooms.length}`}
+                  isFiltered={searchQuery !== "" || sortColumn != null}
+                  filterDescription={
+                    [
+                      searchQuery ? `search: "${searchQuery}"` : null,
+                      sortColumn ? `sort: capacity ${sortDirection}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || undefined
+                  }
+                />
+                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Room
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add New Room</DialogTitle>
                   <DialogDescription>Enter the room information below.</DialogDescription>
@@ -445,9 +651,9 @@ export default function RoomsPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </div>
-        </CardHeader>
-        <CardContent>
+              </div>
+            </CardHeader>
+            <CardContent>
           <div className="mb-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -528,9 +734,12 @@ export default function RoomsPage() {
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteRoom(room)}>
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
+                            <DropdownMenuItem
+                              className="text-destructive hover:text-destructive focus:text-destructive data-[highlighted]:text-destructive"
+                              onClick={() => setRoomToDelete(room)}
+                            >
+                              <Archive className="mr-2 h-4 w-4 text-destructive" />
+                              Archive
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -611,8 +820,83 @@ export default function RoomsPage() {
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="archived">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div className="space-y-1">
+                <CardTitle>Archived rooms ({archivedRooms.length})</CardTitle>
+                <p className="text-sm font-normal text-muted-foreground">
+                  Archived rooms are excluded from future scheduling.
+                </p>
+              </div>
+              {loadingArchived ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+            </CardHeader>
+            <CardContent>
+              {loadingArchived ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Room Number</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Capacity</TableHead>
+                        <TableHead className="w-[70px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {archivedRooms.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                            No archived rooms
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        archivedRooms.map((room) => (
+                          <TableRow key={room.id}>
+                            <TableCell className="font-mono font-medium">{room.id}</TableCell>
+                            <TableCell>
+                              <Badge className={getTypeColor(room.type)}>{room.type}</Badge>
+                            </TableCell>
+                            <TableCell>{room.capacity} seats</TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleRestoreArchivedRoom(room)}>
+                                    Restore
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => openPermanentDeleteRoomModal(room)}
+                                    disabled={loadingDeletionImpact}
+                                  >
+                                    Permanently Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
       {/* Edit Dialog */}
       <Dialog open={!!editingRoom} onOpenChange={(open) => !open && setEditingRoom(null)}>
@@ -726,6 +1010,80 @@ export default function RoomsPage() {
           return { added, duplicates, errors }
         }}
       />
-    </EntityLayout>
+
+      <AlertDialog open={roomToDelete !== null} onOpenChange={(open) => !open && setRoomToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive room?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {roomToDelete
+                ? `Room "${roomToDelete.id}" will be archived. Archived rooms are excluded from future scheduling.`
+                : "Archived rooms are excluded from future scheduling."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDeleteRoom}
+            >
+              Archive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={archivedRoomToPermanentlyDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setArchivedRoomToPermanentlyDelete(null)
+            setArchivedRoomDeletionImpact(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete room?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  This will permanently remove this room and delete{" "}
+                  <span className="font-semibold text-foreground">{archivedRoomDeletionImpact?.entryCount ?? 0}</span>{" "}
+                  schedule entries.
+                </p>
+                <div className="rounded-md border bg-muted/40 p-3">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Affected Timetables
+                  </p>
+                  {(archivedRoomDeletionImpact?.timetables?.length ?? 0) === 0 ? (
+                    <p>No timetables</p>
+                  ) : (
+                    <ul className="max-h-36 list-disc space-y-1 overflow-y-auto pl-5">
+                      {(archivedRoomDeletionImpact?.timetables ?? []).map((t) => (
+                        <li key={`${t.timetableId}-${t.versionNumber}`}>{formatTimetableLabel(t)}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <p className="font-medium text-destructive">This cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={permanentlyDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmPermanentDeleteArchivedRoom}
+              disabled={permanentlyDeleting || archivedRoomDeletionImpact == null}
+            >
+              {permanentlyDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Permanently Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      </EntityLayout>
+    </Tabs>
   )
 }

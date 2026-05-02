@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -23,9 +24,9 @@ export class LecturersController {
     return this.lecturersService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.lecturersService.findOne(id);
+  @Get('deactivated/list')
+  findDeactivated() {
+    return this.lecturersService.findDeactivated();
   }
 
   @Post()
@@ -41,5 +42,25 @@ export class LecturersController {
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.lecturersService.remove(id);
+  }
+
+  @Patch(':id/reactivate')
+  reactivate(@Param('id', ParseIntPipe) id: number) {
+    return this.lecturersService.reactivate(id);
+  }
+
+  @Get(':id/purge-impact')
+  getPurgeImpact(@Param('id', ParseIntPipe) id: number) {
+    return this.lecturersService.getPurgeImpact(id);
+  }
+
+  @Delete(':id/purge')
+  purge(@Param('id', ParseIntPipe) id: number) {
+    return this.lecturersService.purgeDeactivated(id);
+  }
+
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.lecturersService.findOne(id);
   }
 }

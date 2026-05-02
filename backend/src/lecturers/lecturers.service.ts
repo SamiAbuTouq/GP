@@ -86,6 +86,9 @@ export class LecturersService {
 
     const map = new Map<number, number>();
     for (const row of rows) {
+      if (row.user_id == null) {
+        continue;
+      }
       const ch = row.course.credit_hours;
       map.set(row.user_id, (map.get(row.user_id) ?? 0) + ch);
     }
@@ -111,6 +114,7 @@ export class LecturersService {
       : new Map<number, number>();
 
     const lecturers = await this.prisma.lecturer.findMany({
+      where: { user: { is_active: true } },
       include: {
         user: true,
         department: true,
@@ -154,6 +158,9 @@ export class LecturersService {
     });
 
     if (!lecturer) {
+      throw new NotFoundException(`Lecturer with ID ${id} not found`);
+    }
+    if (!lecturer.user.is_active) {
       throw new NotFoundException(`Lecturer with ID ${id} not found`);
     }
 
@@ -260,7 +267,7 @@ export class LecturersService {
     // Add courses the lecturer can teach
     if (dto.courses && dto.courses.length > 0) {
       const courses = await this.prisma.course.findMany({
-        where: { course_code: { in: dto.courses } },
+        where: { course_code: { in: dto.courses }, is_active: true },
       });
 
       await this.prisma.lecturerCanTeachCourse.createMany({
@@ -360,7 +367,7 @@ export class LecturersService {
       // Add new course assignments
       if (dto.courses.length > 0) {
         const courses = await this.prisma.course.findMany({
-          where: { course_code: { in: dto.courses } },
+          where: { course_code: { in: dto.courses }, is_active: true },
         });
 
         await this.prisma.lecturerCanTeachCourse.createMany({
@@ -378,17 +385,128 @@ export class LecturersService {
   async remove(id: number) {
     const existing = await this.prisma.lecturer.findUnique({
       where: { user_id: id },
+      include: { user: { select: { is_active: true } } },
     });
 
     if (!existing) {
       throw new NotFoundException(`Lecturer with ID ${id} not found`);
     }
 
-    // Delete lecturer (user will cascade)
-    await this.prisma.user.delete({
+    if (!existing.user.is_active) {
+      return { message: 'Lecturer already deactivated' };
+    }
+
+    await this.prisma.user.update({
       where: { user_id: id },
+      data: { is_active: false },
     });
 
-    return { message: 'Lecturer deleted successfully' };
+    return { message: 'Lecturer deactivated successfully' };
+  }
+
+  async findDeactivated() {
+    const lecturers = await this.prisma.lecturer.findMany({
+      where: { user: { is_active: false } },
+      include: {
+        user: true,
+        department: true,
+      },
+      orderBy: { user: { first_name: 'asc' } },
+    });
+
+    return lecturers.map((lecturer) => ({
+      id: `LEC${String(lecturer.user_id).padStart(3, '0')}`,
+      databaseId: lecturer.user_id,
+      name: `${lecturer.user.first_name} ${lecturer.user.last_name}`,
+      email: lecturer.user.email,
+      department: lecturer.department.dept_name,
+      departmentId: lecturer.dept_id,
+      maxWorkload: lecturer.max_workload ?? STANDARD_MAX_WORKLOAD_HOURS,
+      isAvailable: lecturer.is_available,
+    }));
+  }
+
+  async reactivate(id: number) {
+    const existing = await this.prisma.lecturer.findUnique({
+      where: { user_id: id },
+      include: { user: { select: { user_id: true } } },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Lecturer with ID ${id} not found`);
+    }
+
+    await this.prisma.user.update({
+      where: { user_id: id },
+      data: { is_active: true },
+    });
+    return { message: 'Lecturer reactivated successfully' };
+  }
+
+  async getPurgeImpact(id: number) {
+    const lecturer = await this.prisma.lecturer.findUnique({
+      where: { user_id: id },
+      include: {
+        user: { select: { first_name: true, last_name: true, is_active: true } },
+      },
+    });
+    if (!lecturer) {
+      throw new NotFoundException(`Lecturer with ID ${id} not found`);
+    }
+
+    const entries = await this.prisma.sectionScheduleEntry.findMany({
+      where: { user_id: id },
+      select: {
+        timetable_id: true,
+        timetable: {
+          select: { generation_type: true, status: true, version_number: true },
+        },
+      },
+      distinct: ['timetable_id'],
+      orderBy: { timetable_id: 'asc' },
+    });
+
+    return {
+      lecturerUserId: id,
+      lecturerName: `${lecturer.user.first_name} ${lecturer.user.last_name}`.trim(),
+      isActive: lecturer.user.is_active,
+      entryCount: await this.prisma.sectionScheduleEntry.count({ where: { user_id: id } }),
+      timetables: entries.map((entry) => ({
+        timetableId: entry.timetable_id,
+        generationType: entry.timetable.generation_type,
+        status: entry.timetable.status,
+        versionNumber: entry.timetable.version_number,
+      })),
+    };
+  }
+
+  async purgeDeactivated(id: number) {
+    const lecturer = await this.prisma.lecturer.findUnique({
+      where: { user_id: id },
+      include: {
+        user: { select: { first_name: true, last_name: true, is_active: true } },
+      },
+    });
+    if (!lecturer) {
+      throw new NotFoundException(`Lecturer with ID ${id} not found`);
+    }
+    if (lecturer.user.is_active) {
+      throw new ConflictException('Deactivate lecturer before purging.');
+    }
+
+    const fullName = `${lecturer.user.first_name} ${lecturer.user.last_name}`.trim();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.sectionScheduleEntry.updateMany({
+        where: { user_id: id },
+        data: {
+          lecturer_name_snapshot: fullName,
+          user_id: null,
+        },
+      });
+      await tx.user.delete({
+        where: { user_id: id },
+      });
+    });
+
+    return { message: 'Lecturer purged successfully' };
   }
 }

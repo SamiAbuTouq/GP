@@ -1,44 +1,43 @@
 {
   "Computer Science": {
     "Year 1": {
-      "Semester 1": [
-        11102,
-        20132,
-        20141,
+      "First Semester": [
         20147,
         31122,
         31151,
         31160
       ],
-      "Semester 2": [
+      "Second Semester": [
         11103,
         11151,
         20133,
         20134,
         20142,
-        31112
-      ]
+        31112,
+        2
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
-        11206,
-        11253,
-        20135,
-        20200,
+      "First Semester": [
         20234,
-        31251
+        31251,
+        95,
+        6
       ],
-      "Semester 2": [
-        11212,
+      "Second Semester": [
         11316,
         12242,
         12243,
         20233,
-        22241
-      ]
+        22241,
+        5,
+        93
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         11313,
         11323,
         11354,
@@ -46,7 +45,7 @@
         22342,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         11335,
         11355,
         11449,
@@ -54,29 +53,31 @@
         14330,
         20333,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         11435,
         11493,
         22541,
         31254,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         11464,
         11494,
         20336,
         31374,
         1,
         0
-      ]
+      ],
+      "Summer Semester": []
     }
   },
   "Software Engineering": {
     "Year 1": {
-      "Semester 1": [
+      "First Semester": [
         11102,
         20132,
         31112,
@@ -84,17 +85,18 @@
         31160,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         11103,
         11151,
         20134,
         31151,
         31374,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
+      "First Semester": [
         11206,
         11253,
         20133,
@@ -102,17 +104,18 @@
         31251,
         31254
       ],
-      "Semester 2": [
+      "Second Semester": [
         11212,
         12343,
         13211,
         20234,
         22241,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         11323,
         11354,
         12242,
@@ -121,16 +124,17 @@
         13324,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         11313,
         13326,
         20233,
         22342,
         1
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         11335,
         11355,
         11449,
@@ -140,18 +144,19 @@
         13491,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         11435,
         13428,
         13435,
         13493,
         1
-      ]
+      ],
+      "Summer Semester": []
     }
   },
   "Data Science and Artificial Intelligence": {
     "Year 1": {
-      "Semester 1": [
+      "First Semester": [
         11102,
         20132,
         31121,
@@ -159,17 +164,18 @@
         31153,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         11103,
         11151,
         14140,
         20133,
         20134,
         31111
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
+      "First Semester": [
         11206,
         11253,
         14260,
@@ -178,17 +184,18 @@
         20234,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         11212,
         14270,
         14362,
         20200,
         31251,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         11313,
         11323,
         11335,
@@ -197,16 +204,17 @@
         14330,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         11436,
         13477,
         14350,
         14364,
         14465
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         11449,
         11464,
         14351,
@@ -215,16 +223,17 @@
         14492,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         14493,
         0,
         1
-      ]
+      ],
+      "Summer Semester": []
     }
   },
   "Computer Graphics and Animation": {
     "Year 1": {
-      "Semester 1": [
+      "First Semester": [
         11102,
         20132,
         31112,
@@ -232,17 +241,18 @@
         31151,
         31160
       ],
-      "Semester 2": [
+      "Second Semester": [
         11103,
         11151,
         20133,
         20134,
         31251,
         12159
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
+      "First Semester": [
         11206,
         11253,
         12162,
@@ -250,17 +260,18 @@
         12273,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         12275,
         12243,
         12266,
         20200,
         20233,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         12348,
         12351,
         12367,
@@ -268,35 +279,37 @@
         12362,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         12324,
         12364,
         12354,
         31254,
         20234,
         1
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         12449,
         12442,
         12481,
         12494,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         11449,
         12446,
         12495,
         31374,
         1
-      ]
+      ],
+      "Summer Semester": []
     }
   },
   "Cyber Security": {
     "Year 1": {
-      "Semester 1": [
+      "First Semester": [
         11102,
         20132,
         20134,
@@ -304,17 +317,18 @@
         31122,
         31160
       ],
-      "Semester 2": [
+      "Second Semester": [
         11103,
         11151,
         15110,
         20133,
         31251,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
+      "First Semester": [
         15200,
         15201,
         15220,
@@ -322,17 +336,18 @@
         20234,
         31151
       ],
-      "Semester 2": [
+      "Second Semester": [
         11213,
         11223,
         15261,
         15262,
         20200,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         11335,
         15310,
         15312,
@@ -340,17 +355,18 @@
         15350,
         31254
       ],
-      "Semester 2": [
+      "Second Semester": [
         15321,
         15322,
         15361,
         15381,
         15382,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         15410,
         15411,
         15412,
@@ -358,18 +374,19 @@
         15491,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         15453,
         15483,
         15492,
         31374,
         1
-      ]
+      ],
+      "Summer Semester": []
     }
   },
   "Communications Engineering / Internet of Things": {
     "Year 1": {
-      "Semester 1": [
+      "First Semester": [
         20132,
         20140,
         20141,
@@ -378,7 +395,7 @@
         31151,
         31160
       ],
-      "Semester 2": [
+      "Second Semester": [
         11103,
         11151,
         20133,
@@ -386,10 +403,11 @@
         20142,
         20150,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
+      "First Semester": [
         20200,
         20231,
         20232,
@@ -398,7 +416,7 @@
         21221,
         22210
       ],
-      "Semester 2": [
+      "Second Semester": [
         21218,
         21222,
         21229,
@@ -406,10 +424,11 @@
         22241,
         22242,
         31251
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         20331,
         20335,
         21338,
@@ -417,17 +436,18 @@
         27353,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         11325,
         22348,
         27321,
         27351,
         27355,
         31254
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         24471,
         27420,
         27441,
@@ -436,7 +456,7 @@
         27456,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         27430,
         27451,
         27452,
@@ -444,10 +464,11 @@
         27471,
         31374,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 5": {
-      "Semester 1": [
+      "First Semester": [
         22570,
         27520,
         27550,
@@ -455,18 +476,19 @@
         27591,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         24411,
         27411,
         27570,
         27592,
         1
-      ]
+      ],
+      "Summer Semester": []
     }
   },
   "Electronics Engineering": {
     "Year 1": {
-      "Semester 1": [
+      "First Semester": [
         20132,
         20140,
         20141,
@@ -475,7 +497,7 @@
         31160,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         11103,
         11151,
         20133,
@@ -483,10 +505,11 @@
         20150,
         31122,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
+      "First Semester": [
         20200,
         20231,
         20232,
@@ -495,17 +518,18 @@
         21221,
         22210
       ],
-      "Semester 2": [
+      "Second Semester": [
         20234,
         21222,
         21229,
         21231,
         22241,
         31251
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         20331,
         21331,
         21338,
@@ -514,7 +538,7 @@
         27353,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         20333,
         20335,
         21332,
@@ -522,17 +546,18 @@
         22348,
         27321,
         27356
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         21432,
         22442,
         24471,
         24479,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         21431,
         21439,
         24361,
@@ -540,10 +565,11 @@
         27411,
         27456,
         27459
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 5": {
-      "Semester 1": [
+      "First Semester": [
         21531,
         21572,
         21579,
@@ -551,18 +577,19 @@
         27550,
         31374
       ],
-      "Semester 2": [
+      "Second Semester": [
         21574,
         21592,
         24467,
         31254,
         1
-      ]
+      ],
+      "Summer Semester": []
     }
   },
   "Computer Engineering": {
     "Year 1": {
-      "Semester 1": [
+      "First Semester": [
         20132,
         20140,
         20141,
@@ -571,7 +598,7 @@
         31160,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         11103,
         11151,
         20133,
@@ -579,10 +606,11 @@
         20142,
         20150,
         31112
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
+      "First Semester": [
         11206,
         11253,
         20200,
@@ -591,7 +619,7 @@
         21221,
         22210
       ],
-      "Semester 2": [
+      "Second Semester": [
         11212,
         20234,
         21219,
@@ -599,10 +627,11 @@
         21229,
         21231,
         22241
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         21218,
         22320,
         22348,
@@ -610,17 +639,18 @@
         27353,
         31251
       ],
-      "Semester 2": [
+      "Second Semester": [
         20335,
         21332,
         21339,
         22321,
         22344,
         27355
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         20333,
         22420,
         22442,
@@ -629,7 +659,7 @@
         22462,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         11323,
         22448,
         22449,
@@ -638,27 +668,29 @@
         24479,
         27411,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 5": {
-      "Semester 1": [
+      "First Semester": [
         11313,
         22560,
         22591,
         31254,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         22570,
         22592,
         31374,
         1
-      ]
+      ],
+      "Summer Semester": []
     }
   },
   "Networks and Information Security Engineering": {
     "Year 1": {
-      "Semester 1": [
+      "First Semester": [
         20132,
         20140,
         20141,
@@ -667,7 +699,7 @@
         31151,
         31160
       ],
-      "Semester 2": [
+      "Second Semester": [
         11103,
         11151,
         20133,
@@ -675,10 +707,11 @@
         20142,
         20150,
         31112
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
+      "First Semester": [
         11206,
         11253,
         20231,
@@ -687,17 +720,18 @@
         22210,
         22241
       ],
-      "Semester 2": [
+      "Second Semester": [
         11212,
         20200,
         20335,
         21219,
         21222,
         25330
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         11323,
         21231,
         22348,
@@ -705,7 +739,7 @@
         25347,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         20234,
         22449,
         22460,
@@ -713,10 +747,11 @@
         25441,
         27353,
         31251
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         22442,
         22560,
         24411,
@@ -725,7 +760,7 @@
         31374,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         20333,
         22448,
         22570,
@@ -733,28 +768,30 @@
         25545,
         27355,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 5": {
-      "Semester 1": [
+      "First Semester": [
         25520,
         25521,
         25591,
         31254,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         25543,
         25549,
         25592,
         27411,
         1
-      ]
+      ],
+      "Summer Semester": []
     }
   },
   "Electrical Power and Energy Engineering": {
     "Year 1": {
-      "Semester 1": [
+      "First Semester": [
         20132,
         20140,
         20141,
@@ -763,7 +800,7 @@
         31160,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         11103,
         11151,
         20133,
@@ -771,10 +808,11 @@
         20150,
         31122,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
+      "First Semester": [
         20200,
         20231,
         20232,
@@ -783,17 +821,18 @@
         21221,
         22210
       ],
-      "Semester 2": [
+      "Second Semester": [
         20234,
         20331,
         21222,
         21229,
         21231,
         22241
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         21331,
         21338,
         24322,
@@ -802,17 +841,18 @@
         27353,
         31251
       ],
-      "Semester 2": [
+      "Second Semester": [
         20333,
         20335,
         22348,
         24311,
         24361,
         27356
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         22442,
         24462,
         24463,
@@ -821,17 +861,18 @@
         24479,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         24411,
         24467,
         24469,
         24470,
         27411,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 5": {
-      "Semester 1": [
+      "First Semester": [
         24562,
         24568,
         24575,
@@ -839,18 +880,19 @@
         24591,
         31374
       ],
-      "Semester 2": [
+      "Second Semester": [
         24569,
         24574,
         24592,
         31254,
         1
-      ]
+      ],
+      "Summer Semester": []
     }
   },
   "Business Administration": {
     "Year 1": {
-      "Semester 1": [
+      "First Semester": [
         33103,
         31122,
         31160,
@@ -858,16 +900,17 @@
         31112,
         20131
       ],
-      "Semester 2": [
+      "Second Semester": [
         36101,
         36111,
         34101,
         31151,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
+      "First Semester": [
         33204,
         31251,
         35101,
@@ -875,17 +918,18 @@
         33218,
         20235
       ],
-      "Semester 2": [
+      "Second Semester": [
         36232,
         35218,
         34115,
         33203,
         33212,
         1
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         31374,
         34321,
         33331,
@@ -893,35 +937,37 @@
         33317,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         36334,
         33409,
         33313,
         1,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         31254,
         33404,
         33405,
         33439,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         33499,
         33445,
         33435,
         33408,
         0,
         1
-      ]
+      ],
+      "Summer Semester": []
     }
   },
   "E-Marketing and Social Media": {
     "Year 1": {
-      "Semester 1": [
+      "First Semester": [
         36101,
         35101,
         31122,
@@ -929,16 +975,17 @@
         31112,
         31151
       ],
-      "Semester 2": [
+      "Second Semester": [
         35103,
         35105,
         33101,
         36111,
         20131
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
+      "First Semester": [
         36232,
         35202,
         33103,
@@ -946,16 +993,17 @@
         34101,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         35217,
         35218,
         35233,
         35235,
         31251
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         35314,
         35215,
         35336,
@@ -963,35 +1011,37 @@
         1,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         35397,
         35437,
         35326,
         35323,
         0,
         1
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         35408,
         31254,
         35416,
         35407,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         35424,
         33499,
         31374,
         35435,
         1
-      ]
+      ],
+      "Summer Semester": []
     }
   },
   "Accounting": {
     "Year 1": {
-      "Semester 1": [
+      "First Semester": [
         33103,
         31122,
         31160,
@@ -999,16 +1049,17 @@
         31112,
         20131
       ],
-      "Semester 2": [
+      "Second Semester": [
         33101,
         36110,
         34102,
         31151,
         20235
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
+      "First Semester": [
         36120,
         35101,
         34226,
@@ -1016,17 +1067,18 @@
         34115,
         33102
       ],
-      "Semester 2": [
+      "Second Semester": [
         33204,
         34321,
         34239,
         34205,
         34216,
         31251
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         34341,
         34227,
         34307,
@@ -1034,17 +1086,18 @@
         0,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         31254,
         34327,
         34332,
         0,
         1,
         1
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         33445,
         34432,
         34313,
@@ -1052,18 +1105,19 @@
         1,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         33423,
         34499,
         34415,
         31374,
         1
-      ]
+      ],
+      "Summer Semester": []
     }
   },
   "Business Information Technology": {
     "Year 1": {
-      "Semester 1": [
+      "First Semester": [
         31122,
         36101,
         31160,
@@ -1071,16 +1125,17 @@
         31112,
         20131
       ],
-      "Semester 2": [
+      "Second Semester": [
         36111,
         33103,
         33101,
         11102,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 2": {
-      "Semester 1": [
+      "First Semester": [
         31251,
         35101,
         36113,
@@ -1088,17 +1143,18 @@
         20235,
         0
       ],
-      "Semester 2": [
+      "Second Semester": [
         36232,
         31374,
         36339,
         34101,
         36202,
         0
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 3": {
-      "Semester 1": [
+      "First Semester": [
         36251,
         36203,
         36334,
@@ -1106,29 +1162,31 @@
         33405,
         31254
       ],
-      "Semester 2": [
+      "Second Semester": [
         36301,
         36316,
         36357,
         36336,
         1
-      ]
+      ],
+      "Summer Semester": []
     },
     "Year 4": {
-      "Semester 1": [
+      "First Semester": [
         36428,
         36415,
         36435,
         36312,
         1
       ],
-      "Semester 2": [
+      "Second Semester": [
         36436,
         36402,
         36404,
         36499,
         1
-      ]
+      ],
+      "Summer Semester": []
     }
   }
 }

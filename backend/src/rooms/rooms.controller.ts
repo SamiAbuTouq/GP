@@ -24,9 +24,9 @@ export class RoomsController {
     return this.roomsService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.roomsService.findOne(id);
+  @Get('archived/list')
+  findArchived() {
+    return this.roomsService.findArchived();
   }
 
   @Post()
@@ -47,5 +47,25 @@ export class RoomsController {
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.roomsService.remove(id);
+  }
+
+  @Patch(':id/restore')
+  restore(@Param('id', ParseIntPipe) id: number) {
+    return this.roomsService.restoreArchived(id);
+  }
+
+  @Get(':id/deletion-impact')
+  getDeletionImpact(@Param('id', ParseIntPipe) id: number) {
+    return this.roomsService.getDeletionImpact(id);
+  }
+
+  @Delete(':id/permanent')
+  permanentlyDelete(@Param('id', ParseIntPipe) id: number) {
+    return this.roomsService.permanentlyDeleteArchived(id);
+  }
+
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.roomsService.findOne(id);
   }
 }

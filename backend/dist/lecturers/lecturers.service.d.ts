@@ -61,4 +61,32 @@ export declare class LecturersService {
     remove(id: number): Promise<{
         message: string;
     }>;
+    findDeactivated(): Promise<{
+        id: string;
+        databaseId: number;
+        name: string;
+        email: string;
+        department: string;
+        departmentId: number;
+        maxWorkload: number;
+        isAvailable: boolean;
+    }[]>;
+    reactivate(id: number): Promise<{
+        message: string;
+    }>;
+    getPurgeImpact(id: number): Promise<{
+        lecturerUserId: number;
+        lecturerName: string;
+        isActive: boolean;
+        entryCount: number;
+        timetables: {
+            timetableId: number;
+            generationType: string;
+            status: string;
+            versionNumber: number;
+        }[];
+    }>;
+    purgeDeactivated(id: number): Promise<{
+        message: string;
+    }>;
 }

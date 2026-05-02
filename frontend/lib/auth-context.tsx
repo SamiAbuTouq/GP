@@ -84,6 +84,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const decodeToken = useCallback((token: string): User | null => {
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7709/ingest/ec09a340-7727-4b91-930d-cfdbd393ea72',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d7b561'},body:JSON.stringify({sessionId:'d7b561',runId:'initial',hypothesisId:'H1',location:'frontend/lib/auth-context.tsx:88',message:'decodeToken input received',data:{tokenParts:token.split('.').length,tokenPayloadLength:(token.split('.')[1]||'').length},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       const payload = JSON.parse(atob(token.split('.')[1]));
       const id =
         typeof payload.sub === "number"
@@ -110,6 +113,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Try to get a new access token using the HttpOnly refresh token cookie
       const response = await ApiClient.refresh();
       const decodedUser = decodeToken(response.access_token);
+      // #region agent log
+      fetch('http://127.0.0.1:7709/ingest/ec09a340-7727-4b91-930d-cfdbd393ea72',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d7b561'},body:JSON.stringify({sessionId:'d7b561',runId:'initial',hypothesisId:'H2',location:'frontend/lib/auth-context.tsx:116',message:'restoreSession decode result',data:{decodedUserPresent:Boolean(decodedUser)},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       
       if (decodedUser) {
         setUser(decodedUser);
@@ -213,6 +219,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!authLoading) {
       const isPublicRoute = isAuthPublicPath(pathname);
+      // #region agent log
+      fetch('http://127.0.0.1:7709/ingest/ec09a340-7727-4b91-930d-cfdbd393ea72',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d7b561'},body:JSON.stringify({sessionId:'d7b561',runId:'initial',hypothesisId:'H3',location:'frontend/lib/auth-context.tsx:219',message:'route-protection decision snapshot',data:{pathname:pathname??'null',authLoading,userPresent:Boolean(user),role:user?.role??null,isPublicRoute},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      // #region agent log
+      fetch('/api/_debug',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({runId:'initial',hypothesisId:'H3',location:'frontend/lib/auth-context.tsx:220',message:'route-protection decision snapshot (relay)',data:{pathname:pathname??'null',authLoading,userPresent:Boolean(user),role:user?.role??null,isPublicRoute},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
 
       if (!user && !isPublicRoute) {
         // Not authenticated and trying to access protected route

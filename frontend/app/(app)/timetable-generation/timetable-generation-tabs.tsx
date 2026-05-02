@@ -5,16 +5,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
 import {
   TimetableGrid,
-  TimeslotCodeLegend,
   ConflictAlert,
-  SoftConstraintPanel,
-  TeachingLoadPanel,
-  RoomUtilizationPanel,
   StudyPlanTabPanel,
   OptimizationInfo,
   HardConstraintsReadOnlyPanel,
+  LastAllowedHourPhysicalLecturesPanel,
   SoftConstraintWeightsPanel,
-  SoftConstraintMetricsPanel,
+  QualityAnalyticsTabPanel,
   GwoParametersPanel,
 } from "@/components/timetable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -28,8 +25,7 @@ function isTabValue(value: string | null): value is TabValue {
   return value !== null && (TAB_VALUES as string[]).includes(value);
 }
 
-const TAB_TRIGGER_CLASS = `relative ${segmentedNavTabItemRadiusClass} px-4 py-2 text-sm font-semibold text-slate-600 shadow-none transition-colors duration-200 data-[state=active]:bg-transparent data-[state=active]:text-primary-foreground data-[state=active]:shadow-none dark:text-slate-400 dark:data-[state=active]:bg-transparent dark:data-[state=active]:text-primary-foreground`;
-
+const TAB_TRIGGER_CLASS = `relative ${segmentedNavTabItemRadiusClass} px-4 py-2 text-sm font-semibold text-muted-foreground shadow-none transition-colors duration-200 data-[state=active]:bg-transparent data-[state=active]:text-primary-foreground data-[state=active]:shadow-none dark:data-[state=active]:bg-transparent dark:data-[state=active]:text-primary-foreground`;
 function ActiveTabPill() {
   return (
     <motion.div
@@ -88,7 +84,7 @@ function TimetableGenerationTabsInner() {
         </TabsTrigger>
         <TabsTrigger value="soft-metrics" className={TAB_TRIGGER_CLASS}>
           {activeTab === "soft-metrics" && <ActiveTabPill />}
-          <span className="relative z-10">Soft Constraint Metrics</span>
+          <span className="relative z-10">Quality &amp; Analytics</span>
         </TabsTrigger>
         <TabsTrigger value="grid" className={TAB_TRIGGER_CLASS}>
           {activeTab === "grid" && <ActiveTabPill />}
@@ -96,52 +92,35 @@ function TimetableGenerationTabsInner() {
         </TabsTrigger>
         <TabsTrigger value="study-plan" className={TAB_TRIGGER_CLASS}>
           {activeTab === "study-plan" && <ActiveTabPill />}
-          <span className="relative z-10">Study Plan</span>
+          <span className="relative z-10">Study Plans</span>
         </TabsTrigger>
       </TabsList>
 
       <TabsContent value="schedule" className="mt-0 space-y-5 outline-none">
-        <ConflictAlert />
         <OptimizationInfo />
-        <div className="grid gap-6 lg:grid-cols-2">
-          <TeachingLoadPanel />
-          <RoomUtilizationPanel />
-        </div>
       </TabsContent>
 
       <TabsContent value="study-plan" className="mt-0 space-y-4 outline-none">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Student cohort health</p>
-          <p className="mt-1 max-w-3xl text-sm text-slate-600">
-            Review each pathway by year and semester to spot hard overlaps, long idle gaps, and single-class days.
-          </p>
-        </div>
+
         <StudyPlanTabPanel />
       </TabsContent>
 
       <TabsContent value="constraints" className="mt-0 space-y-5 outline-none">
         <SoftConstraintWeightsPanel />
+        <LastAllowedHourPhysicalLecturesPanel />
         <HardConstraintsReadOnlyPanel />
       </TabsContent>
 
       <TabsContent value="soft-metrics" className="mt-0 space-y-3 outline-none">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Soft constraint metrics</p>
-        <p className="text-sm text-slate-600">
-          Outcomes and detail for each soft goal on the latest generated timetable (weights are configured under Constraints).
-        </p>
-        <SoftConstraintMetricsPanel embedded />
-        <SoftConstraintPanel />
+        <QualityAnalyticsTabPanel />
       </TabsContent>
 
       <TabsContent value="gwo" className="mt-0 space-y-2 outline-none">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Grey Wolf Optimizer controls</p>
         <GwoParametersPanel />
       </TabsContent>
 
       <TabsContent value="grid" className="mt-0 space-y-3 outline-none">
         <TimetableGrid />
-        <p className="text-right text-xs text-muted-foreground">Format: course - lecturer - class size / room capacity</p>
-        <TimeslotCodeLegend />
       </TabsContent>
     </Tabs>
   );

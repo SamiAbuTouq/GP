@@ -31,6 +31,7 @@ model User {
   user_id          Int      @id @default(autoincrement())
   email            String   @unique @db.VarChar(100)
   password_hash    String   @db.VarChar(255)
+  is_active        Boolean  @default(true)
   must_change_password Boolean @default(false)
   first_name       String   @db.VarChar(50)
   last_name        String   @db.VarChar(50)
@@ -119,8 +120,11 @@ model Course {
   is_lab              Boolean @default(false)
   credit_hours   Int
   delivery_mode  DeliveryMode
-  /// Count of distinct sections in the most recent semester (seed); 0 if not offered that term.
-  sections       Int          @default(1)
+  /// Parallel sections typically run in a first or second semester; 0 = omit from normal-mode GWO.
+  sections_normal Int @default(1)
+  /// Parallel sections in summer; 0 = not offered in summer.
+  sections_summer Int @default(0)
+  is_active       Boolean @default(true)
 
   department   Department @relation(fields: [dept_id], references: [dept_id])
 
@@ -178,12 +182,17 @@ model Timeslot {
   ///      0b10101 = 21 = Sun + Tue + Thu
   days_mask  Int
   slot_type  String   @db.VarChar(30)
+  /// When true, slot is for summer semester scheduling; false = first/second semester.
+  is_summer  Boolean  @default(false)
+  is_active  Boolean  @default(true)
 
   lecturer_preferences     LecturerPreference[]
   lecturer_office_hours    LecturerOfficeHours[]
   section_schedule_entries SectionScheduleEntry[]
 
-  @@unique([start_time, end_time, days_mask])
+  // Slot type is part of uniqueness so "Traditional" vs "Blended" patterns can coexist
+  // even when they share the same calendar pattern (common in summer scheduling).
+  @@unique([start_time, end_time, days_mask, is_summer, slot_type])
   @@map("timeslot")
 }
 
@@ -219,9 +228,64 @@ model Scenario {
   status      String @db.VarChar(30)
   description String @db.Text
 
+  conditions                   ScenarioCondition[]
+  runs                         ScenarioRun[]
   scenario_produces_timetables ScenarioProducesTimetable[]
 
   @@map("scenario")
+}
+
+// ─────────────────────────────────────────────
+// SCENARIO CONDITION
+// ─────────────────────────────────────────────
+
+model ScenarioCondition {
+  condition_id   Int    @id @default(autoincrement())
+  scenario_id    Int
+  /// One of: add_lecturer | delete_lecturer | amend_lecturer |
+  ///         add_room | delete_room | adjust_room_capacity |
+  ///         add_course | change_section_count |
+  ///         add_timeslot | delete_timeslot | change_delivery_mode
+  condition_type String @db.VarChar(50)
+  /// All condition-specific parameters as JSONB — see whatif.dto.ts for shapes
+  parameters     Json   @default("{}")
+  order_index    Int    @default(0)
+
+  scenario Scenario @relation(fields: [scenario_id], references: [scenario_id], onDelete: Cascade)
+
+  @@index([scenario_id])
+  @@map("scenario_condition")
+}
+
+// ─────────────────────────────────────────────
+// SCENARIO RUN
+// ─────────────────────────────────────────────
+
+model ScenarioRun {
+  run_id               Int       @id @default(autoincrement())
+  scenario_id          Int
+  base_timetable_id    Int
+  /// NULL until run completes successfully
+  result_timetable_id  Int?
+  /// pending | running | completed | failed | applied
+  status               String    @db.VarChar(30) @default("pending")
+  started_at           DateTime?
+  completed_at         DateTime?
+  error_message        String?   @db.Text
+  /// Snapshot of base timetable metrics taken at run start
+  baseline_metrics     Json?
+  /// Metrics for the GWO-produced sandbox result timetable
+  result_metrics       Json?
+  gwo_iterations_run   Int?
+  generation_seconds   Float?
+
+  scenario         Scenario   @relation(fields: [scenario_id], references: [scenario_id], onDelete: Cascade)
+  base_timetable   Timetable  @relation("RunBaseTimetable", fields: [base_timetable_id], references: [timetable_id])
+  result_timetable Timetable? @relation("RunResultTimetable", fields: [result_timetable_id], references: [timetable_id])
+
+  @@index([scenario_id])
+  @@index([base_timetable_id])
+  @@map("scenario_run")
 }
 
 // ─────────────────────────────────────────────
@@ -241,7 +305,10 @@ model Timetable {
 
   timetable_metrics            TimetableMetrics?
   scenario_produces_timetables ScenarioProducesTimetable[]
+  scenario_runs_as_base        ScenarioRun[] @relation("RunBaseTimetable")
+  scenario_runs_as_result      ScenarioRun[] @relation("RunResultTimetable")
   section_schedule_entries     SectionScheduleEntry[]
+  timetable_conflicts          TimetableConflict[]
 
   @@index([semester_id])
   @@map("timetable")
@@ -261,6 +328,24 @@ model TimetableMetrics {
   timetable Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)
 
   @@map("timetable_metrics")
+}
+
+model TimetableConflict {
+  conflict_id     Int      @id @default(autoincrement())
+  timetable_id    Int
+  conflict_type   String   @db.VarChar(64)
+  severity        String   @db.VarChar(16)
+  course_code     String   @db.VarChar(30)
+  section_number  String   @db.VarChar(20)
+  lecturer_name   String?  @db.VarChar(150)
+  room_number     String?  @db.VarChar(60)
+  timeslot_label  String?  @db.VarChar(120)
+  detail          String   @db.Text
+
+  timetable Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)
+
+  @@index([timetable_id])
+  @@map("timetable_conflict")
 }
 
 // ─────────────────────────────────────────────
@@ -333,7 +418,8 @@ model LecturerOfficeHours {
 
 model SectionScheduleEntry {
   entry_id            Int     @id @default(autoincrement())
-  user_id             Int
+  user_id             Int?
+  lecturer_name_snapshot String? @db.VarChar(150)
   slot_id             Int
   course_id           Int
   timetable_id        Int
@@ -341,7 +427,7 @@ model SectionScheduleEntry {
   registered_students Int
   section_number      String  @db.VarChar(10)
 
-  lecturer  Lecturer  @relation(fields: [user_id], references: [user_id])
+  lecturer  Lecturer? @relation(fields: [user_id], references: [user_id], onDelete: SetNull)
   timeslot  Timeslot  @relation(fields: [slot_id], references: [slot_id])
   course    Course    @relation(fields: [course_id], references: [course_id])
   timetable Timetable @relation(fields: [timetable_id], references: [timetable_id], onDelete: Cascade)

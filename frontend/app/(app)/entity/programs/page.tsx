@@ -72,6 +72,58 @@ const COURSE_PLACEHOLDERS: Record<number, { name: string; creditHours: number }>
   1: { name: "Elective Program Requirements", creditHours: 3 },
 }
 
+const FIRST_SEMESTER = "First Semester"
+const SECOND_SEMESTER = "Second Semester"
+const SUMMER_SEMESTER = "Summer Semester"
+const STANDARD_SEMESTERS = [FIRST_SEMESTER, SECOND_SEMESTER, SUMMER_SEMESTER] as const
+
+function normalizeSemesterName(rawSemesterName: string): (typeof STANDARD_SEMESTERS)[number] | null {
+  const normalized = rawSemesterName.trim().toLowerCase()
+  if (
+    normalized === "semester 1" ||
+    normalized === "sem 1" ||
+    normalized === "sem1" ||
+    normalized === "first semester" ||
+    normalized === "first"
+  ) {
+    return FIRST_SEMESTER
+  }
+  if (
+    normalized === "semester 2" ||
+    normalized === "sem 2" ||
+    normalized === "sem2" ||
+    normalized === "second semester" ||
+    normalized === "second"
+  ) {
+    return SECOND_SEMESTER
+  }
+  if (normalized === "summer semester" || normalized === "summer" || normalized === "semester 3" || normalized === "sem 3" || normalized === "sem3") {
+    return SUMMER_SEMESTER
+  }
+  return null
+}
+
+function normalizeProgramStructure(programs: ProgramStructure): ProgramStructure {
+  const normalizedPrograms: ProgramStructure = {}
+  for (const [programName, years] of Object.entries(programs)) {
+    normalizedPrograms[programName] = {}
+    for (const [year, semesters] of Object.entries(years)) {
+      const normalizedYear: Record<string, number[]> = {
+        [FIRST_SEMESTER]: [],
+        [SECOND_SEMESTER]: [],
+        [SUMMER_SEMESTER]: [],
+      }
+      for (const [semesterName, courseRefs] of Object.entries(semesters)) {
+        const mappedSemester = normalizeSemesterName(semesterName)
+        if (!mappedSemester) continue
+        normalizedYear[mappedSemester] = [...normalizedYear[mappedSemester], ...(courseRefs ?? [])]
+      }
+      normalizedPrograms[programName][year] = normalizedYear
+    }
+  }
+  return normalizedPrograms
+}
+
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export default function ProgramsPage() {
@@ -117,15 +169,16 @@ export default function ProgramsPage() {
   // Initialize local programs state when data arrives
   useEffect(() => {
     if (programsData && !localPrograms) {
-      setLocalPrograms(programsData)
-      const firstProgram = Object.keys(programsData)[0]
+      const normalizedPrograms = normalizeProgramStructure(programsData)
+      setLocalPrograms(normalizedPrograms)
+      const firstProgram = Object.keys(normalizedPrograms)[0]
       if (firstProgram) {
         setSelectedProgram(firstProgram)
-        const years = Object.keys(programsData[firstProgram]).sort()
+        const years = Object.keys(normalizedPrograms[firstProgram]).sort()
         const firstYear = years[0]
         if (firstYear) {
           setSelectedYear(firstYear)
-          const semesters = Object.keys(programsData[firstProgram][firstYear]).sort()
+          const semesters = Object.keys(normalizedPrograms[firstProgram][firstYear]).sort()
           const firstSemester = semesters[0]
           if (firstSemester) {
             setSelectedSemester(firstSemester)
@@ -250,6 +303,10 @@ export default function ProgramsPage() {
 
   const handleRemoveCourse = async (courseId: number) => {
     if (!localPrograms || !selectedProgram || !selectedYear || !selectedSemester) return
+    const display = resolveSemesterCourseDisplay(courseId)
+    const courseLabel = display.code ? `${display.code} - ${display.name}` : display.name
+    const shouldDelete = window.confirm(`Are you sure you want to remove "${courseLabel}" from this semester?`)
+    if (!shouldDelete) return
 
     const previous = localPrograms
     const updatedPrograms = { ...localPrograms }
@@ -287,20 +344,8 @@ export default function ProgramsPage() {
 
   const openMoveDialog = (courseRef: number) => {
     if (!localPrograms || !selectedProgram || !selectedYear || !selectedSemester) return
-    const programYears = Object.keys(localPrograms[selectedProgram]).sort()
-    const semestersHere = Object.keys(localPrograms[selectedProgram][selectedYear]).sort()
-    let targetYear = selectedYear
-    let targetSem =
-      semestersHere.find((s) => s !== selectedSemester) ??
-      semestersHere[0] ??
-      ""
-    if (!targetSem || targetSem === selectedSemester) {
-      const otherYear = programYears.find((y) => y !== selectedYear) ?? programYears[0] ?? selectedYear
-      targetYear = otherYear
-      targetSem = Object.keys(localPrograms[selectedProgram][otherYear] ?? {}).sort()[0] ?? ""
-    }
-    setMoveToYear(targetYear)
-    setMoveToSemester(targetSem)
+    setMoveToYear(selectedYear)
+    setMoveToSemester(selectedSemester)
     setMoveDialog({ courseRef })
   }
 
@@ -323,8 +368,13 @@ export default function ProgramsPage() {
     }
 
     const moving = resolveCatalogCourse(courseRef)
-    const destRaw = localPrograms[selectedProgram][toYear]?.[toSemester] ?? []
-    if (destRaw.some((existing) => sameCatalogEntry(existing, courseRef))) {
+    const sourceRaw = localPrograms[selectedProgram][selectedYear]?.[selectedSemester] ?? []
+    const destinationRaw = localPrograms[selectedProgram][toYear]?.[toSemester] ?? []
+    const sourceAfterRemoval = sourceRaw.filter((existing) => !sameCatalogEntry(existing, courseRef))
+    const destinationWithoutDuplicate = destinationRaw.filter((existing) => !sameCatalogEntry(existing, courseRef))
+    const destinationCourseRefs =
+      toYear === selectedYear && toSemester === selectedSemester ? sourceAfterRemoval : destinationWithoutDuplicate
+    if (destinationRaw.some((existing) => sameCatalogEntry(existing, courseRef))) {
       toast({
         title: "Already in destination",
         description: "That semester already lists this course.",
@@ -339,10 +389,10 @@ export default function ProgramsPage() {
     const updatedPrograms: ProgramStructure = { ...localPrograms }
     updatedPrograms[selectedProgram] = { ...updatedPrograms[selectedProgram] }
     updatedPrograms[selectedProgram][selectedYear] = { ...updatedPrograms[selectedProgram][selectedYear] }
-    updatedPrograms[selectedProgram][selectedYear][selectedSemester] = currentSemesterCourses.filter((x) => x !== courseRef)
+    updatedPrograms[selectedProgram][selectedYear][selectedSemester] = sourceAfterRemoval
 
     updatedPrograms[selectedProgram][toYear] = { ...updatedPrograms[selectedProgram][toYear] }
-    updatedPrograms[selectedProgram][toYear][toSemester] = [...destRaw, valueToStore]
+    updatedPrograms[selectedProgram][toYear][toSemester] = [...destinationCourseRefs, valueToStore]
 
     setLocalPrograms(updatedPrograms)
     setMoveDialog(null)
@@ -371,7 +421,7 @@ export default function ProgramsPage() {
 
   if (programsError || coursesError) {
     return (
-      <EntityLayout title="Program Management" description="View and edit academic program structures by year and semester.">
+      <EntityLayout title="Study Plans Management" description="View and edit academic program structures by year and semester.">
         <Card className="border-destructive/50 bg-destructive/5">
           <CardContent className="py-8">
             <p className="text-sm text-destructive">Failed to load programs or course data. Please refresh the page.</p>
@@ -383,7 +433,7 @@ export default function ProgramsPage() {
 
   if (!localPrograms || !coursesCatalog) {
     return (
-      <EntityLayout title="Program Management" description="View and edit academic program structures by year and semester.">
+      <EntityLayout title="Study Plans Management" description="View and edit academic program structures by year and semester.">
         <Card>
           <CardContent className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -394,7 +444,7 @@ export default function ProgramsPage() {
   }
 
   return (
-    <EntityLayout title="Program Management" description="View and edit academic program structures by year and semester.">
+    <EntityLayout title="Study Plans Management" description="View and edit academic program structures by year and semester.">
       <Card>
         <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
           <div className="space-y-1">
@@ -569,25 +619,39 @@ export default function ProgramsPage() {
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-[min(100vw-2rem,28rem)] p-0 sm:w-[450px]" align="end">
-                            <Command>
+                            <Command
+                              filter={(value, search) => {
+                                const query = search.trim().toLowerCase()
+                                if (!query) return 1
+                                const [code = "", name = "", department = ""] = value.toLowerCase().split("|")
+                                if (/^\d+$/.test(query)) {
+                                  return code.startsWith(query) ? 1 : 0
+                                }
+                                const combined = `${code} ${name} ${department}`
+                                return combined.includes(query) ? 1 : 0
+                              }}
+                            >
                               <CommandInput placeholder="Search by code or name…" className="h-10" />
-                              <CommandList>
+                              <CommandList className="max-h-[320px] overflow-auto">
                                 <CommandEmpty>
                                   {courses.length > 0 && coursesAvailableToAdd.length === 0
                                     ? "All catalog courses are already in this semester."
                                     : "No courses match your search."}
                                 </CommandEmpty>
-                                <CommandGroup className="max-h-[320px] overflow-auto">
+                                <CommandGroup>
                                   {coursesAvailableToAdd.map((course) => (
                                     <CommandItem
                                       key={course.id}
-                                      value={`${course.code} ${course.name}`}
+                                      value={`${course.code}|${course.name}|${course.department}`}
                                       onSelect={() => handleAddCourse(course.id)}
                                       className="flex cursor-pointer flex-col items-start gap-1 py-3 aria-selected:bg-accent"
                                     >
                                       <div className="flex w-full items-center justify-between gap-2">
                                         <span className="font-mono text-xs font-medium">{course.code}</span>
-                                        <Badge variant="outline" className="max-w-[10rem] shrink-0 truncate text-xs font-normal">
+                                        <Badge
+                                          variant="outline"
+                                          className="max-w-[16rem] shrink-0 whitespace-normal break-words text-xs font-normal leading-tight"
+                                        >
                                           {course.department}
                                         </Badge>
                                       </div>
@@ -617,9 +681,6 @@ export default function ProgramsPage() {
                               <TableRow>
                                 <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
                                   <p className="text-sm">No courses in this semester yet.</p>
-                                  <Button variant="link" className="mt-1 h-auto p-0 text-sm" onClick={() => setOpenCoursePicker(true)}>
-                                    Add a course from the catalog
-                                  </Button>
                                 </TableCell>
                               </TableRow>
                             ) : (
@@ -647,14 +708,14 @@ export default function ProgramsPage() {
                                         <DropdownMenuContent align="end">
                                           <DropdownMenuItem onClick={() => openMoveDialog(id)}>
                                             <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                            Move to another term…
+                                            Move
                                           </DropdownMenuItem>
                                           <DropdownMenuItem
                                             className="text-destructive focus:text-destructive"
                                             onClick={() => handleRemoveCourse(id)}
                                           >
                                             <Trash2 className="mr-2 h-4 w-4" />
-                                            Remove from semester
+                                            Remove
                                           </DropdownMenuItem>
                                         </DropdownMenuContent>
                                       </DropdownMenu>

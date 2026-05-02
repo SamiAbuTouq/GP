@@ -36,6 +36,10 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], CreateTimeslotDto.prototype, "slotType", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateTimeslotDto.prototype, "isSummer", void 0);
 class UpdateTimeslotDto {
 }
 exports.UpdateTimeslotDto = UpdateTimeslotDto;
@@ -60,6 +64,11 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], UpdateTimeslotDto.prototype, "slotType", void 0);
+__decorate([
+    (0, class_validator_1.IsBoolean)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Boolean)
+], UpdateTimeslotDto.prototype, "isSummer", void 0);
 class UpdateLecturerPreferenceItemDto {
 }
 exports.UpdateLecturerPreferenceItemDto = UpdateLecturerPreferenceItemDto;

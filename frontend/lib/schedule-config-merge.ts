@@ -65,6 +65,7 @@ export const SCHEDULE_CONFIG_DEFAULTS: Omit<
     single_session_day: 50,
   },
   study_plan_units: {},
+  last_allowed_hour: null,
 };
 
 export function mergeConfigWithDefaults(parsed: Record<string, unknown>): ScheduleConfig {
@@ -95,5 +96,11 @@ export function mergeConfigWithDefaults(parsed: Record<string, unknown>): Schedu
       ...SCHEDULE_CONFIG_DEFAULTS.study_plan_units,
       ...((parsed.study_plan_units as object) ?? {}),
     },
+    last_allowed_hour:
+      parsed.last_allowed_hour === undefined
+        ? SCHEDULE_CONFIG_DEFAULTS.last_allowed_hour
+        : parsed.last_allowed_hour === null
+          ? null
+          : String(parsed.last_allowed_hour),
   };
 }

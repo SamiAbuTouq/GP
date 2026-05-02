@@ -24,6 +24,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (body.slotType !== undefined || body.type !== undefined) {
       payload.slotType = body.slotType ?? body.type
     }
+    if (body.isSummer !== undefined) {
+      payload.isSummer = Boolean(body.isSummer)
+    }
     return proxyToBackend(`/timeslots/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify(payload),

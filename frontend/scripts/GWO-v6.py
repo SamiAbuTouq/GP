@@ -82,12 +82,12 @@ DEFAULT_TIMESLOTS_DATA = [
 
 # Slot types that are allowed per (delivery_mode, session_type) combination
 SLOT_TYPE_RULES: Dict[Tuple[str, str], List[str]] = {
-    ("inperson", "lecture"): ["lecture_mw", "lecture_stt"],
-    ("online",   "lecture"): ["lecture_mw", "lecture_stt", "blended_mon", "blended_wed", "blended_st"],
+    ("inperson", "lecture"): ["lecture_mw", "lecture_stt", "lecture_generic"],
+    ("online",   "lecture"): ["lecture_mw", "lecture_stt", "lecture_generic", "blended_mon", "blended_wed", "blended_st", "blended_generic"],
     # BUG 1 FIX: blended lectures must use blended-type slots only (constraint 3).
     # lecture_mw / lecture_stt are regular in-person patterns and must NOT be
     # offered to blended courses.
-    ("blended",  "lecture"): ["blended_mon", "blended_wed", "blended_st"],
+    ("blended",  "lecture"): ["blended_mon", "blended_wed", "blended_st", "blended_generic"],
     ("inperson", "lab"):     ["lab"],
     ("online",   "lab"):     ["lab"],
     ("blended",  "lab"):     ["lab"],
@@ -282,6 +282,12 @@ LECTURER_MAX_WORKLOAD: Dict[str, int] = {
     k: int(v) for k, v in CONFIG.get("lecturer_max_workload", {}).items()
 }
 
+# Semester mode written by the TypeScript layer before each run.
+# "normal" = first/second semester timeslots; "summer" = summer timeslots.
+# The timeslots list in config.json is already pre-filtered to the correct mode
+# by db-schedule-config.ts — this variable is used only for logging.
+SEMESTER_MODE: str = CONFIG.get("semester_mode", "normal")
+
 gwo_params             = CONFIG.get("gwo_params", {})
 NUM_WOLVES             = gwo_params.get("num_wolves", 30)
 NUM_ITERATIONS         = gwo_params.get("num_iterations", 200)
@@ -309,6 +315,26 @@ _cfg_sw = dict(CONFIG.get("soft_weights", {}))
 if _cfg_sw.get("single_session_day") is None and "early_thursday_penalty" in _cfg_sw:
     _cfg_sw["single_session_day"] = _cfg_sw["early_thursday_penalty"]
 SOFT_WEIGHTS = {k: int(_cfg_sw.get(k, v)) for k, v in _default_soft_weights.items()}
+
+# =============================================================================
+# LAST ALLOWED HOUR — hard cutoff for in-person and blended lectures
+# Set via config key "last_allowed_hour" as an "HH:MM" string (e.g. "15:00").
+# When set, any in-person or blended section whose timeslot ENDS after this
+# hour is treated as a hard-constraint violation.  Online lectures are exempt.
+# =============================================================================
+def _parse_last_allowed_hour(raw) -> "Optional[float]":
+    """Parse 'HH:MM' → float hours, or return None if not set / invalid."""
+    if not raw:
+        return None
+    try:
+        h, m = str(raw).strip().split(":")
+        return int(h) + int(m) / 60.0
+    except Exception:
+        return None
+
+LAST_ALLOWED_HOUR: "Optional[float]" = _parse_last_allowed_hour(
+    CONFIG.get("last_allowed_hour")
+)
 
 
 # =============================================================================
@@ -381,11 +407,7 @@ def load_program_cohort_groups(path: str) -> Dict[str, List[str]]:
                 if not isinstance(course_ids, list):
                     continue
                 cohort_id = f"{program_name} | {year_name} | {semester_name}"
-                cohorts[cohort_id] = [
-                    str(c).strip()
-                    for c in course_ids
-                    if str(c).strip() not in {"0", "1"}
-                ]
+                cohorts[cohort_id] = [str(c).strip() for c in course_ids]
     return cohorts
 
 
@@ -433,7 +455,12 @@ PERFECT_THRESHOLD = float(gwo_params.get("perfect_threshold", 1e-6))
 # HELPER: lecture-level allowed sets
 # =============================================================================
 def get_allowed_timeslot_indices(lec: Dict) -> List[int]:
-    """Return timeslot indices valid for this lecture's delivery_mode + session_type."""
+    """Return timeslot indices valid for this lecture's delivery_mode + session_type.
+
+    For in-person and blended lectures, timeslots whose END time exceeds
+    LAST_ALLOWED_HOUR are excluded (end = start_hour + duration).
+    Online lectures are not subject to the cutoff.
+    """
     mode  = lec.get("delivery_mode", "inperson")
     stype = lec.get("session_type",  "lecture")
     key   = (mode, stype)
@@ -441,6 +468,16 @@ def get_allowed_timeslot_indices(lec: Dict) -> List[int]:
     indices = []
     for st in allowed_types:
         indices.extend(SLOT_TYPE_INDICES.get(st, []))
+
+    # Apply last-allowed-hour cutoff for physical (non-online) lectures.
+    # A timeslot is excluded if its end time exceeds the cutoff.
+    if LAST_ALLOWED_HOUR is not None and mode in ("inperson", "blended"):
+        indices = [
+            idx for idx in indices
+            if (TIMESLOTS_DATA[idx]["start_hour"] + TIMESLOTS_DATA[idx]["duration"])
+               <= LAST_ALLOWED_HOUR
+        ]
+
     return indices if indices else list(range(len(TIMESLOTS_DATA)))
 
 
@@ -552,7 +589,8 @@ def validate_configuration():
 print(
     f"GWO v6 | {len(LECTURES)} lectures | {len(ROOM_NAMES)} rooms | "
     f"{len(TIMESLOTS_DATA)} slots | {len(LECTURERS)} lecturers | "
-    f"{NUM_WOLVES} wolves × {NUM_ITERATIONS} iters × {NUM_RUNS} runs"
+    f"{NUM_WOLVES} wolves × {NUM_ITERATIONS} iters × {NUM_RUNS} runs | "
+    f"semester: {SEMESTER_MODE}"
 )
 
 config_issues, config_warnings = validate_configuration()
@@ -876,9 +914,6 @@ def repair(wolf: np.ndarray) -> np.ndarray:
     room_assignments:     Dict[int, List[int]] = {}
     # Track per-cohort assigned timeslots for cohort conflict avoidance
     cohort_assignments: Dict[str, List[int]] = {}
-    # WORKLOAD HARD CONSTRAINT: accumulated credit-hour load per lecturer.
-    # The repair MUST NOT produce a solution where any lecturer exceeds their ceiling.
-    lecturer_credit_load: Dict[int, float] = {}
 
     lecture_order = _repair_lecture_order()
 
@@ -888,99 +923,120 @@ def repair(wolf: np.ndarray) -> np.ndarray:
         t   = int(wolf[i*3+1])
         l   = int(wolf[i*3+2])
 
-        allowed_ts   = LECTURE_ALLOWED_TS[i]
-        allowed_r    = LECTURE_ALLOWED_ROOMS[i]
+        allowed_ts = LECTURE_ALLOWED_TS[i]
+        allowed_ts_sorted = sorted(allowed_ts, key=lambda idx: TIMESLOTS_DATA[idx]["start_hour"])
+        allowed_r = LECTURE_ALLOWED_ROOMS[i]
         require_room = LECTURE_NEEDS_ROOM[i]
-        cohort_ids   = LECTURE_TO_COHORTS.get(i, [])
-        credit_hours = float(lec.get("credit_hours", 1))
 
-        # Shuffle timeslots so we explore the space randomly (preferred t first)
-        ts_pref = [t] if t in allowed_ts else []
-        ts_rest = [x for x in allowed_ts if x != t]
-        random.shuffle(ts_rest)
-        ts_order = ts_pref + ts_rest
+        ts_fallback = [x for x in allowed_ts if x != t]
+        random.shuffle(ts_fallback)
 
-        # Build the lecturer search order: preferred first, then all others.
-        # Lecturers that are NOT in allowed_lecturers are excluded entirely.
-        preferred_l = l if l in lec["allowed_lecturers"] else lec["allowed_lecturers"][0]
-        alt_lecturers = [x for x in lec["allowed_lecturers"] if x != preferred_l]
-        random.shuffle(alt_lecturers)
-        lecturer_order = [preferred_l] + alt_lecturers
+        # Fix invalid lecturer
+        if l not in lec["allowed_lecturers"]:
+            l = lec["allowed_lecturers"][0]
 
-        resolved = False
+        # Fix invalid timeslot type
+        if t not in allowed_ts:
+            t = allowed_ts_sorted[0]
 
-        # ── Main search: try every (lecturer × timeslot [× room]) triple ──────
-        # Workload ceiling is a HARD constraint — any lecturer that would be pushed
-        # over their individual ceiling is skipped completely, not just penalised.
-        for cand_l in lecturer_order:
-            # HARD WORKLOAD CONSTRAINT: skip lecturer if ceiling would be exceeded.
-            if lecturer_credit_load.get(cand_l, 0.0) + credit_hours > get_lecturer_max_workload(cand_l):
-                continue
-
-            for t_cand in ts_order:
-                # Skip timeslot conflicts
-                if lecturer_has_conflict(cand_l, t_cand, lecturer_assignments):
-                    continue
-                # Skip timeslots the lecturer is unavailable for
-                if not lecturer_timeslot_available(cand_l, t_cand):
-                    continue
-                # Skip cohort conflicts
-                if cohorts_have_conflict(cohort_ids, t_cand, cohort_assignments):
-                    continue
-
-                if not require_room:
-                    l, t, r = cand_l, t_cand, 0
-                    resolved = True
-                    break
-
-                # Find a valid room
-                cap_ok = [x for x in allowed_r if ROOM_CAPS[x] >= lec["size"]]
-                room_pool = cap_ok if cap_ok else allowed_r
-                room_search = ([r] if r in room_pool else []) + [x for x in room_pool if x != r]
-                for r_cand in room_search:
-                    if not room_has_conflict(r_cand, t_cand, room_assignments):
-                        l, t, r = cand_l, t_cand, r_cand
-                        resolved = True
-                        break
-                if resolved:
-                    break
-            if resolved:
-                break
-
-        # ── Last resort: only if the problem is genuinely infeasible ──────────
-        # This path means NO lecturer has capacity left AND/OR no timeslot is free.
-        # We pick the least-overloaded eligible lecturer to minimise damage,
-        # and emit a warning so the operator knows the input needs adjustment.
-        if not resolved:
-            # Among allowed lecturers, pick the one with the smallest current load.
-            best_l = min(
-                lec["allowed_lecturers"],
-                key=lambda x: lecturer_credit_load.get(x, 0.0)
-            )
-            best_t = random.choice(allowed_ts) if allowed_ts else t
-            best_r = 0
-            if require_room and allowed_r:
-                cap_ok3 = [x for x in allowed_r if ROOM_CAPS[x] >= lec["size"]]
-                best_r = random.choice(cap_ok3 if cap_ok3 else allowed_r)
-            l, t, r = best_l, best_t, best_r
-            print(
-                f"[warn] repair: no workload-safe slot found for {lec['course']} "
-                f"(lecturer {LECTURERS[best_l]} load "
-                f"{lecturer_credit_load.get(best_l, 0.0):.1f}/"
-                f"{get_lecturer_max_workload(best_l):.1f} ch) — "
-                f"input may be infeasible (too many sections for available lecturers)."
-            )
+        # Fix invalid room type (for room-requiring sessions)
+        if require_room and r not in allowed_r:
+            r = allowed_r[0] if allowed_r else r
 
         if not require_room:
             r = 0
 
-        # Register assignment — update all tracking structures
+        # Try to resolve conflicts ─────────────────────────────────────────────
+        resolved = False
+
+        cohort_ids = LECTURE_TO_COHORTS.get(i, [])
+
+        for t_cand in ([t] if t in allowed_ts else []) + ts_fallback:
+            l_conflict = lecturer_has_conflict(l, t_cand, lecturer_assignments)
+            if l_conflict:
+                continue
+
+            # BUG 2 FIX: skip slots where the lecturer is not available.
+            if not lecturer_timeslot_available(l, t_cand):
+                continue
+
+            # Cohort hard constraint: no overlap with same-cohort courses
+            if cohorts_have_conflict(cohort_ids, t_cand, cohort_assignments):
+                continue
+
+            if not require_room:
+                # Online: no room conflict check needed; room gene is sentinel 0
+                t, r = t_cand, 0
+                resolved = True
+                break
+
+            cap_ok = [x for x in allowed_r if ROOM_CAPS[x] >= lec["size"]]
+            room_pool = cap_ok if cap_ok else allowed_r
+            # Try rooms in priority: same type first, then fallback
+            room_search = [x for x in room_pool if x != r] if r in room_pool else list(room_pool)
+            room_search = ([r] if r in room_pool else []) + room_search
+
+            for r_cand in room_search:
+                if not room_has_conflict(r_cand, t_cand, room_assignments):
+                    t, r = t_cand, r_cand
+                    resolved = True
+                    break
+            if resolved:
+                break
+
+        # If still not resolved, try alternate lecturers
+        if not resolved:
+            alt_ts_order = list(allowed_ts)
+            random.shuffle(alt_ts_order)
+            for alt_l in lec["allowed_lecturers"]:
+                if alt_l == l:
+                    continue
+                for t_cand in alt_ts_order:
+                    if lecturer_has_conflict(alt_l, t_cand, lecturer_assignments):
+                        continue
+                    # BUG 2 FIX: check availability for alternate lecturer too.
+                    if not lecturer_timeslot_available(alt_l, t_cand):
+                        continue
+                    if cohorts_have_conflict(cohort_ids, t_cand, cohort_assignments):
+                        continue
+                    if not require_room:
+                        l, t, r = alt_l, t_cand, 0
+                        resolved = True
+                        break
+                    cap_ok2 = [x for x in allowed_r if ROOM_CAPS[x] >= lec["size"]]
+                    r_iter = cap_ok2 if cap_ok2 else allowed_r
+                    for r_cand in r_iter:
+                        if not room_has_conflict(r_cand, t_cand, room_assignments):
+                            l, t, r = alt_l, t_cand, r_cand
+                            resolved = True
+                            break
+                    if resolved:
+                        break
+                if resolved:
+                    break
+
+        if not resolved:
+            # Last resort: valid (t, r, l) for this lecture type — may still conflict
+            # globally; fitness will penalise. Avoid silently keeping a stale triple.
+            if allowed_ts:
+                t = random.choice(allowed_ts)
+            l = random.choice(lec["allowed_lecturers"])
+            if require_room and allowed_r:
+                cap_ok3 = [x for x in allowed_r if ROOM_CAPS[x] >= lec["size"]]
+                r = random.choice(cap_ok3 if cap_ok3 else allowed_r)
+            elif not require_room:
+                r = 0
+            print(f"[warn] repair fallback: {lec['course']}")
+
+        if not require_room:
+            r = 0
+
+        # Register assignment
         lecturer_assignments.setdefault(l, []).append(t)
         if require_room:
             room_assignments.setdefault(r, []).append(t)
         for cohort_id in cohort_ids:
             cohort_assignments.setdefault(cohort_id, []).append(t)
-        lecturer_credit_load[l] = lecturer_credit_load.get(l, 0.0) + credit_hours
 
         wolf[i*3], wolf[i*3+1], wolf[i*3+2] = r, t, l
 
@@ -1052,6 +1108,15 @@ def fitness_hard_soft(wolf: np.ndarray) -> Tuple[float, float]:
         if require_room and ROOM_CAPS[r] < lec['size']:
             hard += 10
 
+        # ── Hard 7: last allowed hour for in-person / blended lectures ────────
+        # Timeslot end = start_hour + duration.  Online lectures are exempt.
+        if LAST_ALLOWED_HOUR is not None:
+            _mode = lec.get("delivery_mode", "inperson")
+            if _mode in ("inperson", "blended"):
+                _ts_end = TIMESLOTS_DATA[t]["start_hour"] + TIMESLOTS_DATA[t]["duration"]
+                if _ts_end > LAST_ALLOWED_HOUR:
+                    hard += 10
+
         # Register assignment (even if conflicting, so we don't keep retrying)
         lecturer_assignments.setdefault(l, []).append(t)
         if require_room:
@@ -1075,14 +1140,12 @@ def fitness_hard_soft(wolf: np.ndarray) -> Tuple[float, float]:
         lecturer_ts.setdefault(l, []).append(t)
         timeslot_usage[t] = timeslot_usage.get(t, 0) + 1
 
-    # ── Hard 7: lecturer workload overload — TRUE HARD CONSTRAINT ───────────
-    # repair() already enforces this; the massive penalty here ensures the GWO
-    # selection pressure strongly rejects any wolf that still violates it
-    # (e.g. from the infeasible last-resort path in repair).
+    # ── Hard 7: lecturer workload overload (BUG 4 FIX: per-lecturer ceiling) ─
+    # Uses credit-hour load vs each lecturer's individual DB ceiling.
     for l, load in lecturer_load.items():
         limit = get_lecturer_max_workload(l)
         if load > limit:
-            hard += (load - limit) * 1000  # crushing penalty — treat as hard
+            hard += (load - limit) * 8
 
     # ── Hard 8: cohort conflicts (program+year+semester) ─────────────────────
     for (_cohort_id, idx_a, idx_b) in COHORT_CONFLICT_PAIRS:

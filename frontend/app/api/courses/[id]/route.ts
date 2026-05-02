@@ -19,9 +19,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (body.academicLevel !== undefined) payload.academicLevel = body.academicLevel
     if (body.deliveryMode !== undefined) payload.deliveryMode = body.deliveryMode
     if (body.department !== undefined) payload.department = body.department
-    if (body.sections !== undefined) {
-      const n = Number(body.sections)
-      payload.sections = Number.isFinite(n) ? Math.min(20, Math.max(1, Math.trunc(n))) : 1
+    if (body.sectionsNormal !== undefined) {
+      const n = Number(body.sectionsNormal)
+      payload.sectionsNormal = Number.isFinite(n)
+        ? Math.min(20, Math.max(0, Math.trunc(n)))
+        : 1
+    }
+    if (body.sectionsSummer !== undefined) {
+      const n = Number(body.sectionsSummer)
+      payload.sectionsSummer = Number.isFinite(n)
+        ? Math.min(20, Math.max(0, Math.trunc(n)))
+        : 0
     }
     if (body.isLab !== undefined) payload.isLab = Boolean(body.isLab)
     return proxyToBackend(`/courses/${encodeURIComponent(id)}`, {

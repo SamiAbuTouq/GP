@@ -60,7 +60,7 @@ let AuthService = AuthService_1 = class AuthService {
     }
     async login(dto) {
         const user = await this.usersService.findByEmail(dto.email);
-        if (!user || !user.password_hash) {
+        if (!user || !user.password_hash || !user.is_active) {
             throw new common_1.UnauthorizedException("Invalid credentials");
         }
         const passwordValid = await bcrypt.compare(dto.password, user.password_hash);
@@ -106,6 +106,10 @@ let AuthService = AuthService_1 = class AuthService {
             data: { revoked_at: new Date() },
         });
         const user = await this.usersService.findById(payload.sub);
+        if (!user.is_active) {
+            await this.revokeAllUserTokens(payload.sub);
+            throw new common_1.UnauthorizedException("User account is deactivated");
+        }
         const tokens = await this.generateTokens(user);
         await this.storeRefreshToken(user.user_id, tokens.refresh_token);
         return tokens;

@@ -66,7 +66,39 @@ const DEFAULT = {
   single_session_day_warnings: [],
 }
 
-export async function GET() {
+type LecturerApiRow = {
+  name?: unknown
+  courses?: unknown
+  maxWorkload?: unknown
+}
+
+type CourseCatalogRow = {
+  code?: unknown
+  creditHours?: unknown
+}
+
+function normalizeCookie(req: NextRequest): string {
+  return req.headers.get("cookie") ?? ""
+}
+
+function readJsonSafely(raw: string): unknown {
+  try {
+    return JSON.parse(raw.replace(/^\uFEFF/, ""))
+  } catch {
+    return null
+  }
+}
+
+function asArray<T = unknown>(v: unknown): T[] {
+  return Array.isArray(v) ? (v as T[]) : []
+}
+
+function toNumber(v: unknown): number | null {
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN
+  return Number.isFinite(n) ? n : null
+}
+
+export async function GET(req: NextRequest) {
   try {
     if (!existsSync(DATA_FILE)) {
       return NextResponse.json(DEFAULT, {
@@ -74,7 +106,78 @@ export async function GET() {
       })
     }
     const raw = await readFile(DATA_FILE, "utf-8")
-    const parsed = JSON.parse(raw)
+    const parsed = (readJsonSafely(raw) ?? {}) as Record<string, unknown>
+
+    // Enrich lecturer_summary with DB-backed max_workload + Lecturer Details load logic.
+    // - Max: from DB lecturer.max_workload (via /api/lecturers)
+    // - Load: sum(course credit hours) per distinct (course_code, lecture_id) in schedule.json
+    try {
+      const baseUrl = new URL(req.url)
+      const cookie = normalizeCookie(req)
+
+      const [lecturersRes, coursesRes] = await Promise.all([
+        fetch(new URL("/api/lecturers", baseUrl), {
+          headers: cookie ? { cookie } : undefined,
+          cache: "no-store",
+        }),
+        fetch(new URL("/api/courses/catalog", baseUrl), {
+          headers: cookie ? { cookie } : undefined,
+          cache: "no-store",
+        }),
+      ])
+
+      const lecturersJson = lecturersRes.ok ? ((await lecturersRes.json()) as unknown) : []
+      const coursesJson = coursesRes.ok ? ((await coursesRes.json()) as unknown) : null
+
+      const lecturers = asArray<LecturerApiRow>(lecturersJson)
+      const courses = asArray<CourseCatalogRow>(
+        coursesJson && typeof coursesJson === "object" && coursesJson != null
+          ? (coursesJson as { courses?: unknown }).courses
+          : [],
+      )
+
+      const creditHoursByCode = new Map<string, number>()
+      for (const c of courses) {
+        const code = typeof c.code === "string" ? c.code.trim() : ""
+        const ch = toNumber(c.creditHours)
+        if (code && ch != null) creditHoursByCode.set(code, ch)
+      }
+
+      const loadByLecturer = new Map<string, number>()
+      const seen = new Set<string>()
+      const schedule = asArray<Record<string, unknown>>((parsed as any).schedule)
+      for (let idx = 0; idx < schedule.length; idx++) {
+        const row = schedule[idx] ?? {}
+        const lecturer = typeof row.lecturer === "string" ? row.lecturer.trim() : ""
+        const courseCode = typeof row.course_code === "string" ? row.course_code.trim() : ""
+        const lectureId = row.lecture_id != null ? String(row.lecture_id) : String(idx)
+        if (!lecturer || !courseCode) continue
+        const key = `${lecturer}||${courseCode}||${lectureId}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        const ch = creditHoursByCode.get(courseCode) ?? 0
+        loadByLecturer.set(lecturer, (loadByLecturer.get(lecturer) ?? 0) + ch)
+      }
+
+      const lecturerSummary = lecturers
+        .map((l) => {
+          const name = typeof l.name === "string" ? l.name.trim() : ""
+          if (!name) return null
+          const maxWorkload = toNumber(l.maxWorkload) ?? 0
+          const teachingLoad = loadByLecturer.get(name) ?? 0
+          return {
+            name,
+            courses: asArray<string>(l.courses).filter((c) => typeof c === "string" && c.trim()).map((c) => c.trim()),
+            teaching_load: teachingLoad,
+            max_load: maxWorkload,
+          }
+        })
+        .filter(Boolean)
+
+      ;(parsed as any).lecturer_summary = lecturerSummary
+    } catch {
+      // If enrichment fails, fall back to schedule.json as-is.
+    }
 
     // BUG FIX 1 & 2: Deep-merge soft_weights at BOTH the top level AND inside
     // metadata so old schedule.json files missing the 2 new keys still work.

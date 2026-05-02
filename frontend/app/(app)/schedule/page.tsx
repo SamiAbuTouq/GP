@@ -1,12 +1,15 @@
 "use client"
 
 import { type ReactNode, useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
@@ -31,12 +34,19 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { HardConflictsAcknowledgmentFields, HardConflictsViewerBanner } from "@/components/hard-conflicts-ui"
 import { ApiClient } from "@/lib/api-client"
 import { useAuth } from "@/lib/auth-context"
+import {
+  fetchTimetableConflictSummary,
+  type TimetableConflictSummary,
+} from "@/lib/timetable-conflicts"
+import { useToast } from "@/hooks/use-toast"
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils"
 import { cn } from "@/lib/utils"
 import { ArrowDown, ArrowUp, ArrowUpDown, Calendar, Check, ChevronsUpDown, Grid3X3, List, Loader2, Printer, Upload, X } from "lucide-react"
@@ -75,12 +85,38 @@ type TimetableDto = {
   status: string
   generationType: string
   versionNumber: number
+  isDraft?: boolean
+  isPublished?: boolean
+  isScenarioResult?: boolean
+  draftOrigin?: "optimizer" | "scenario" | "other" | null
+  canUseAsScenarioBase?: boolean
+  timetableKind?: "draft" | "published"
   metrics: null | {
     roomUtilizationRate: number
     softConstraintsScore: number
     fitnessScore: number
     isValid: boolean
   }
+}
+
+function timetableStatusBadges(tt: TimetableDto) {
+  if (tt.semesterId != null) {
+    const seeded = tt.generationType?.toLowerCase() === "imported"
+    return [{ key: "pub", label: seeded ? "Published · seeded official" : "Published · official", variant: "default" as const }]
+  }
+  if (tt.isScenarioResult || tt.generationType?.toLowerCase() === "what_if") {
+    return [{ key: "sc", label: "Draft · scenario result", variant: "secondary" as const }]
+  }
+  if (tt.generationType?.toLowerCase() === "gwo_ui") {
+    return [{ key: "opt", label: "Draft · optimizer", variant: "outline" as const }]
+  }
+  return [{ key: "dr", label: "Draft", variant: "outline" as const }]
+}
+
+/** Short prefix for timetable dropdown rows. */
+function timetableDropdownPrefix(tt: TimetableDto): string {
+  const [b] = timetableStatusBadges(tt)
+  return b?.label.includes("scenario") ? "Scenario draft" : b?.label.includes("optimizer") ? "Optimizer draft" : b?.label ?? "Draft"
 }
 
 function formatTimetableGeneratedAt(iso: string): string {
@@ -488,7 +524,19 @@ export function ScheduleViewerPage({
   autoSelectLatestTimetable?: boolean
   hideVersionInTitle?: boolean
 } = {}) {
+  const searchParams = useSearchParams()
+  const isSimulationView = searchParams.get("simulation") === "1"
+  const simulationRunId = searchParams.get("runId")
+  const requestedTimetableId = useMemo(() => {
+    const raw = searchParams.get("timetableId") ?? searchParams.get("simulationTimetableId")
+    if (!raw) return null
+    const n = Number(raw)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }, [searchParams])
+  const [simulationResultTimetableId, setSimulationResultTimetableId] = useState<number | null>(null)
   const { user } = useAuth()
+  const { toast } = useToast()
+  const isAdmin = user?.role === "ADMIN"
   const myLecturerId = user?.role === "LECTURER" ? String(user.id) : null
   const [viewType, setViewType] = useState<ViewType>("grid")
   const [listSortField, setListSortField] = useState<ListSortField>("courseCode")
@@ -513,6 +561,48 @@ export function ScheduleViewerPage({
   const [loadingTimetables, setLoadingTimetables] = useState(false)
   const [loadingEntries, setLoadingEntries] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false)
+  const [publishSubmitting, setPublishSubmitting] = useState(false)
+  const [conflictSummary, setConflictSummary] = useState<TimetableConflictSummary | null>(null)
+  const [conflictSummaryLoading, setConflictSummaryLoading] = useState(false)
+  const [applyConflictAckOpen, setApplyConflictAckOpen] = useState(false)
+  const [applyConflictAcknowledged, setApplyConflictAcknowledged] = useState(false)
+  const [publishConflictSummary, setPublishConflictSummary] = useState<TimetableConflictSummary | null>(null)
+  const [publishConflictLoading, setPublishConflictLoading] = useState(false)
+  const [publishConflictAcknowledged, setPublishConflictAcknowledged] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    if (!isSimulationView || !simulationRunId) {
+      setSimulationResultTimetableId(null)
+      return () => {
+        mounted = false
+      }
+    }
+
+    const parsedRunId = Number(simulationRunId)
+    if (!Number.isFinite(parsedRunId) || parsedRunId <= 0) {
+      setSimulationResultTimetableId(null)
+      return () => {
+        mounted = false
+      }
+    }
+
+    ApiClient.request<{ resultTimetableId?: number | null }>(`/what-if/runs/${parsedRunId}`)
+      .then((run) => {
+        if (!mounted) return
+        const resultId = Number(run?.resultTimetableId ?? 0)
+        setSimulationResultTimetableId(Number.isFinite(resultId) && resultId > 0 ? resultId : null)
+      })
+      .catch(() => {
+        if (!mounted) return
+        setSimulationResultTimetableId(null)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [isSimulationView, simulationRunId])
 
   // Load semesters
   useEffect(() => {
@@ -625,18 +715,25 @@ export function ScheduleViewerPage({
     setTimetables([])
     setTimetableId(null)
 
-    if (timetableSource === "published" && resolvedPublishedSemesterId == null) {
+    const simulationNeedsFullCatalog = isSimulationView && requestedTimetableId != null
+
+    if (
+      !simulationNeedsFullCatalog &&
+      timetableSource === "published" &&
+      resolvedPublishedSemesterId == null
+    ) {
       setLoadingTimetables(false)
       return () => {
         mounted = false
       }
     }
-
     let endpoint = "/timetables"
-    if (timetableSource === "drafts") {
-      endpoint = "/timetables?draftsOnly=true"
-    } else if (timetableSource === "published" && resolvedPublishedSemesterId != null) {
-      endpoint = `/timetables?semesterId=${resolvedPublishedSemesterId}`
+    if (!simulationNeedsFullCatalog) {
+      if (timetableSource === "drafts") {
+        endpoint = "/timetables?draftsOnly=true"
+      } else if (timetableSource === "published" && resolvedPublishedSemesterId != null) {
+        endpoint = `/timetables?semesterId=${resolvedPublishedSemesterId}`
+      }
     }
 
     ApiClient.request<TimetableDto[]>(endpoint)
@@ -644,7 +741,23 @@ export function ScheduleViewerPage({
         if (!mounted) return
         setTimetables(data)
         const first = data[0] ?? null
-        setTimetableId(first?.timetableId ?? null)
+        const preferredRequestedId =
+          isSimulationView && simulationResultTimetableId != null
+            ? simulationResultTimetableId
+            : requestedTimetableId
+        const requested =
+          preferredRequestedId == null ? null : data.find((t) => t.timetableId === preferredRequestedId) ?? null
+        if (simulationNeedsFullCatalog && preferredRequestedId != null && !requested) {
+          setError(`Simulation timetable #${preferredRequestedId} could not be found.`)
+        }
+        if (isSimulationView && preferredRequestedId != null) {
+          setTimetableId(requested?.timetableId ?? preferredRequestedId)
+          if (!requested) {
+            return
+          }
+          return
+        }
+        setTimetableId(requested?.timetableId ?? first?.timetableId ?? null)
       })
       .catch((e) => {
         if (!mounted) return
@@ -658,7 +771,7 @@ export function ScheduleViewerPage({
     return () => {
       mounted = false
     }
-  }, [timetableSource, resolvedPublishedSemesterId, autoSelectLatestTimetable])
+  }, [timetableSource, resolvedPublishedSemesterId, autoSelectLatestTimetable, requestedTimetableId, isSimulationView, simulationResultTimetableId])
 
   // Auto-select latest timetable (newest first from backend ordering).
   useEffect(() => {
@@ -679,14 +792,27 @@ export function ScheduleViewerPage({
         if (!mounted) return
         setTimetables(data)
         const latest = data[0] ?? null
-        if (latest?.semesterId != null) {
+        const preferredRequestedId =
+          isSimulationView && simulationResultTimetableId != null
+            ? simulationResultTimetableId
+            : requestedTimetableId
+        const requested = preferredRequestedId == null
+          ? null
+          : data.find((t) => t.timetableId === preferredRequestedId) ?? null
+        if (isSimulationView && preferredRequestedId != null && !requested) {
+          setTimetableId(preferredRequestedId)
+          setError(`Simulation timetable ${preferredRequestedId} is not in the current timetable list.`)
+          return
+        }
+        const selectedTimetable = requested ?? latest
+        if (selectedTimetable?.semesterId != null) {
           setTimetableSource("published")
-          setPublishedYear(latest.academicYear)
-          setPublishedSemesterType(latest.semesterType)
+          setPublishedYear(selectedTimetable.academicYear)
+          setPublishedSemesterType(selectedTimetable.semesterType)
         } else {
           setTimetableSource("drafts")
         }
-        setTimetableId(latest?.timetableId ?? null)
+        setTimetableId(selectedTimetable?.timetableId ?? null)
       })
       .catch((e) => {
         if (!mounted) return
@@ -700,7 +826,7 @@ export function ScheduleViewerPage({
     return () => {
       mounted = false
     }
-  }, [autoSelectLatestTimetable])
+  }, [autoSelectLatestTimetable, requestedTimetableId, isSimulationView, simulationResultTimetableId])
 
   useEffect(() => {
     setCourseFilter("all")
@@ -797,11 +923,17 @@ export function ScheduleViewerPage({
     })
   }, [entries, courseFilter, lecturerFilter, roomFilter, myScheduleOnly, myLecturerId])
   const visibleBaseEntries = useMemo(
-    () =>
-      strictlyFilteredEntries.filter(
-        (entry) => !(entry.registeredStudents === 0 && entry.sectionCapacity === 0),
-      ),
-    [strictlyFilteredEntries],
+    () => {
+      const selectedTimetable = timetables.find((t) => t.timetableId === timetableId) ?? null
+      return strictlyFilteredEntries.filter((entry) => {
+        // Scenario sandboxes can legitimately store zeroed enrollment/capacity
+        // while still containing valid session assignments.
+        if (isSimulationView) return true
+        if (selectedTimetable?.generationType === "what_if") return true
+        return !(entry.registeredStudents === 0 && entry.sectionCapacity === 0)
+      })
+    },
+    [strictlyFilteredEntries, isSimulationView, timetables, timetableId],
   )
   const expandedDisplayedEntries = useMemo(() => expandEntries(visibleBaseEntries), [visibleBaseEntries])
   const listDisplayedEntries = useMemo(() => compactEntries(visibleBaseEntries), [visibleBaseEntries])
@@ -912,6 +1044,72 @@ export function ScheduleViewerPage({
     () => timetables.find((t) => t.timetableId === timetableId) ?? null,
     [timetables, timetableId],
   )
+
+  const isScenarioResultScheduleContext =
+    !!timetableId &&
+    (isSimulationView ||
+      timetable?.isScenarioResult === true ||
+      timetable?.generationType?.toLowerCase() === "what_if")
+
+  useEffect(() => {
+    let cancelled = false
+    if (!isScenarioResultScheduleContext || timetableId == null) {
+      setConflictSummary(null)
+      setConflictSummaryLoading(false)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    setConflictSummaryLoading(true)
+    fetchTimetableConflictSummary(timetableId)
+      .then((data) => {
+        if (!cancelled) setConflictSummary(data)
+      })
+      .catch(() => {
+        if (!cancelled) setConflictSummary(null)
+      })
+      .finally(() => {
+        if (!cancelled) setConflictSummaryLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isScenarioResultScheduleContext, timetableId])
+
+  useEffect(() => {
+    if (!publishDialogOpen || timetableId == null) return
+    let cancelled = false
+    setPublishConflictAcknowledged(false)
+    setPublishConflictLoading(true)
+    setPublishConflictSummary(null)
+
+    fetchTimetableConflictSummary(timetableId)
+      .then((data) => {
+        if (!cancelled) setPublishConflictSummary(data)
+      })
+      .catch(() => {
+        if (!cancelled) setPublishConflictSummary(null)
+      })
+      .finally(() => {
+        if (!cancelled) setPublishConflictLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [publishDialogOpen, timetableId])
+
+  const isSelectedTimetableDraft = timetable?.timetableKind === "draft"
+  const isSelectedTimetableScenarioDraft = timetable?.draftOrigin === "scenario"
+  const canPublishSelectedDraft =
+    Boolean(timetable) &&
+    isSelectedTimetableDraft &&
+    !isSelectedTimetableScenarioDraft &&
+    isAdmin &&
+    !loadingTimetables &&
+    !loadingEntries
 
   const scheduleTitle = useMemo(() => {
     if (!timetable) return "Schedule Viewer"
@@ -1226,6 +1424,45 @@ export function ScheduleViewerPage({
     setListSortDirection("asc")
   }
 
+  async function publishCurrentDraft() {
+    if (!timetableId || !timetable) return
+    if (timetable.timetableKind !== "draft" || timetable.draftOrigin === "scenario") return
+    const needConflictAck = publishConflictSummary?.requiresConflictAcknowledgment === true
+    if (needConflictAck && !publishConflictAcknowledged) {
+      toast({
+        title: "Acknowledgment required",
+        description: "Confirm that you understand this timetable has hard conflicts before publishing.",
+        variant: "destructive",
+      })
+      return
+    }
+    setPublishSubmitting(true)
+    try {
+      const updated = await ApiClient.request<TimetableDto>(`/timetables/${timetableId}/publish`, {
+        method: "POST",
+        body: JSON.stringify({
+          academicYear: publishedYear,
+          semesterType: publishedSemesterType,
+          ...(needConflictAck ? { acknowledgedHardConflicts: true } : {}),
+        }),
+      })
+      setTimetables((prev) => prev.map((row) => (row.timetableId === updated.timetableId ? updated : row)))
+      setTimetableSource("published")
+      setPublishedYear(updated.academicYear)
+      setPublishedSemesterType(updated.semesterType)
+      setPublishDialogOpen(false)
+      toast({ title: "Timetable published", description: "The selected draft is now an official published timetable." })
+    } catch (e: unknown) {
+      toast({
+        title: "Publish failed",
+        description: e instanceof Error ? e.message : "Could not publish timetable.",
+        variant: "destructive",
+      })
+    } finally {
+      setPublishSubmitting(false)
+    }
+  }
+
   const isReady = !loadingTimetables && !!timetableId
   const isViewerLoading = loadingSemesters || loadingTimetables || loadingEntries
 
@@ -1235,6 +1472,12 @@ export function ScheduleViewerPage({
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-auto p-4 lg:p-6">
+          {isSimulationView ? (
+            <div className="sticky top-0 z-20 mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-100">
+              <span className="font-semibold">What-if scenario result:</span>{" "}
+              You are viewing a sandbox timetable result. This is not a published or active timetable.
+            </div>
+          ) : null}
           <div className="mx-auto w-full max-w-[1680px]">
           <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-1">
@@ -1246,6 +1489,81 @@ export function ScheduleViewerPage({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {canPublishSelectedDraft ? (
+                <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="default">Publish</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Publish Draft Timetable</DialogTitle>
+                      <DialogDescription>
+                        Publishing makes this draft official and assigns an academic year and semester. Scenario sandbox
+                        results cannot be published (run scenarios from an optimizer draft or published timetable only).
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-3 py-1">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-medium text-muted-foreground">Academic year</Label>
+                        <Select value={publishedYear} onValueChange={setPublishedYear}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select year" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {academicYears.map((y) => (
+                              <SelectItem key={y} value={y}>
+                                {y}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-medium text-muted-foreground">Semester</Label>
+                        <Select
+                          value={String(publishedSemesterType)}
+                          onValueChange={(v) => setPublishedSemesterType(Number(v))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select semester" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PUBLISHED_SEMESTER_TYPES.map((opt) => (
+                              <SelectItem key={opt.value} value={String(opt.value)}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <HardConflictsAcknowledgmentFields
+                      summary={publishConflictSummary}
+                      loading={publishConflictLoading}
+                      acknowledged={publishConflictAcknowledged}
+                      onAcknowledgedChange={setPublishConflictAcknowledged}
+                      contextLabel="Publishing will make this draft the official timetable for the selected semester."
+                    />
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setPublishDialogOpen(false)} disabled={publishSubmitting}>
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => void publishCurrentDraft()}
+                        disabled={
+                          publishSubmitting ||
+                          !publishedYear ||
+                          publishConflictLoading ||
+                          (publishConflictSummary?.requiresConflictAcknowledgment === true &&
+                            !publishConflictAcknowledged)
+                        }
+                      >
+                        {publishSubmitting ? "Publishing..." : "Confirm publish"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              ) : null}
               {enableMySchedule && myLecturerId ? (
                 <Button
                   variant={myScheduleOnly ? "default" : "outline"}
@@ -1280,7 +1598,67 @@ export function ScheduleViewerPage({
             </Card>
           )}
 
+          {isScenarioResultScheduleContext ? (
+            <div className="mb-4">
+              <HardConflictsViewerBanner summary={conflictSummary} loading={conflictSummaryLoading} />
+            </div>
+          ) : null}
+
           <div className="space-y-4">
+            {isSimulationView ? (
+              <Card className="border-orange-300 bg-orange-50 dark:bg-orange-950/20">
+                <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-sm font-semibold text-orange-900 dark:text-orange-100">
+                      Scenario simulation (draft timetable)
+                    </p>
+                    <p className="text-xs leading-relaxed text-orange-950/85 dark:text-orange-100/90">
+                      This result is saved as a draft—not an official published timetable—and cannot be used as the base
+                      for another scenario run. Compare before/after or apply to merge the sandbox onto the baseline
+                      timetable.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {simulationRunId ? (
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={`/dashboard/what-if/compare?runIds=${simulationRunId}&mode=before_after`}>
+                          Compare before vs after
+                        </Link>
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      disabled={conflictSummaryLoading}
+                      onClick={() => {
+                        if (!simulationRunId || conflictSummaryLoading) return
+                        if (!conflictSummary?.requiresConflictAcknowledgment) {
+                          void (async () => {
+                            try {
+                              await ApiClient.request(`/what-if/runs/${simulationRunId}/apply`, {
+                                method: "POST",
+                                body: JSON.stringify({}),
+                              })
+                              window.location.reload()
+                            } catch (e: unknown) {
+                              toast({
+                                title: "Apply failed",
+                                description: e instanceof Error ? e.message : "Unknown error",
+                                variant: "destructive",
+                              })
+                            }
+                          })()
+                          return
+                        }
+                        setApplyConflictAcknowledged(false)
+                        setApplyConflictAckOpen(true)
+                      }}
+                    >
+                      Apply to Production
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
             {!hideScheduleSelection ? (
             <CompactCollapsibleCard title="Schedule Selection">
                   <CardDescription className="text-xs">
@@ -1333,7 +1711,8 @@ export function ScheduleViewerPage({
                                   </SelectLabel>
                                   {items.map((tt) => (
                                     <SelectItem key={tt.timetableId} value={String(tt.timetableId)}>
-                                      v{tt.versionNumber} · {formatTimetableGeneratedAt(tt.generatedAt)}
+                                      [{timetableDropdownPrefix(tt)}] v{tt.versionNumber} ·{" "}
+                                      {formatTimetableGeneratedAt(tt.generatedAt)}
                                     </SelectItem>
                                   ))}
                                 </SelectGroup>
@@ -1346,8 +1725,8 @@ export function ScheduleViewerPage({
                                   <SelectLabel>Published timetables</SelectLabel>
                                   {timetableVersionSelectModel.published.map((tt) => (
                                     <SelectItem key={tt.timetableId} value={String(tt.timetableId)}>
-                                      v{tt.versionNumber} · {tt.academicYear} {tt.semester} ·{" "}
-                                      {formatTimetableGeneratedAt(tt.generatedAt)}
+                                      {timetableStatusBadges(tt)[0]?.label ?? "Published"} · v{tt.versionNumber} ·{" "}
+                                      {tt.academicYear} {tt.semester} · {formatTimetableGeneratedAt(tt.generatedAt)}
                                     </SelectItem>
                                   ))}
                                 </SelectGroup>
@@ -1540,15 +1919,24 @@ export function ScheduleViewerPage({
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <CardTitle className="text-base">{scheduleTitle}</CardTitle>
-                      <CardDescription>
+                      <CardDescription className="space-y-2">
                         {timetableId ? (
-                          <span>
+                          <span className="block">
                             {timetable ? `${formatTimetableGeneratedAt(timetable.generatedAt)} • ` : ""}
                             {uniqueSectionCount} sections
                           </span>
                         ) : (
-                          "No schedule selected."
+                          <span>No schedule selected.</span>
                         )}
+                        {timetable ? (
+                          <span className="flex flex-wrap gap-1">
+                            {timetableStatusBadges(timetable).map((b) => (
+                              <Badge key={b.key} variant={b.variant} className="text-[11px] font-normal">
+                                {b.label}
+                              </Badge>
+                            ))}
+                          </span>
+                        ) : null}
                       </CardDescription>
                     </div>
                     <div className="flex items-center gap-1 rounded-lg border p-1">
@@ -1760,6 +2148,67 @@ export function ScheduleViewerPage({
             </div>
           </div>
           </div>
+
+          <Dialog
+            open={applyConflictAckOpen}
+            onOpenChange={(open) => {
+              setApplyConflictAckOpen(open)
+              if (!open) setApplyConflictAcknowledged(false)
+            }}
+          >
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Apply timetable with hard conflicts?</DialogTitle>
+                <DialogDescription>
+                  This merges the scenario result into the base timetable and replaces its sessions. Only continue if you
+                  accept the risks.
+                </DialogDescription>
+              </DialogHeader>
+              <HardConflictsAcknowledgmentFields
+                summary={conflictSummary}
+                loading={conflictSummaryLoading}
+                acknowledged={applyConflictAcknowledged}
+                onAcknowledgedChange={setApplyConflictAcknowledged}
+                contextLabel="Applying replaces the base timetable’s schedule with this result."
+              />
+              <DialogFooter>
+                <Button variant="outline" type="button" onClick={() => setApplyConflictAckOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  type="button"
+                  disabled={
+                    conflictSummaryLoading ||
+                    !conflictSummary?.requiresConflictAcknowledgment ||
+                    !applyConflictAcknowledged ||
+                    !simulationRunId
+                  }
+                  onClick={() => {
+                    void (async () => {
+                      if (!simulationRunId) return
+                      try {
+                        await ApiClient.request(`/what-if/runs/${simulationRunId}/apply`, {
+                          method: "POST",
+                          body: JSON.stringify({ acknowledgedHardConflicts: true }),
+                        })
+                        setApplyConflictAckOpen(false)
+                        window.location.reload()
+                      } catch (e: unknown) {
+                        toast({
+                          title: "Apply failed",
+                          description: e instanceof Error ? e.message : "Unknown error",
+                          variant: "destructive",
+                        })
+                      }
+                    })()
+                  }}
+                >
+                  Confirm apply
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </div>

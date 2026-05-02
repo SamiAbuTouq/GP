@@ -5,8 +5,17 @@ import { existsSync, writeFileSync } from "fs";
 import { getGwoControlFilePath } from "@/lib/gwo-control-path";
 import {
   endGwoRun,
+  getGwoRunStatus,
+  setGwoRunFinalizing,
+  setGwoRunPhase,
+  setGwoRunProgress,
   tryBeginGwoRun,
 } from "@/lib/gwo-server-run-lock";
+import {
+  getOptimizerGlobalLockOwner,
+  releaseOptimizerGlobalLock,
+  tryAcquireOptimizerGlobalLock,
+} from "@/lib/optimizer-global-lock";
 import { writeGwoConfigFileMergedWithDatabase } from "@/lib/write-gwo-config";
 
 /** Next.js route max duration (seconds). Match the Python spawn timeout below. */
@@ -217,8 +226,16 @@ function safeCloseStream(
   }
 }
 
-export async function POST(_request: Request) {
+export async function POST(request: Request) {
   console.log("[v0] POST /api/run called (SSE stream)");
+
+  let semesterMode: "normal" | "summer" = "normal";
+  try {
+    const body = (await request.json()) as { semesterMode?: string };
+    if (body?.semesterMode === "summer") semesterMode = "summer";
+  } catch {
+    /* empty or non-JSON body — default normal */
+  }
 
   const scriptsDir = path.join(process.cwd(), "scripts");
   const scriptCandidates = ["GWO-v6.py", "GWO-v5.py"];
@@ -240,7 +257,22 @@ export async function POST(_request: Request) {
   }
 
   const runAbort = new AbortController();
+  const globalLock = tryAcquireOptimizerGlobalLock("timetable");
+  if (!globalLock.ok) {
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          globalLock.holder === "whatif"
+            ? "A What-If scenario run is already in progress. Wait for it to finish first."
+            : "An optimizer run is already in progress on the server. Wait for it to finish or cancel it first.",
+        output: "",
+      },
+      { status: 409 },
+    );
+  }
   if (!tryBeginGwoRun(runAbort)) {
+    releaseOptimizerGlobalLock("timetable");
     return NextResponse.json(
       {
         success: false,
@@ -253,7 +285,7 @@ export async function POST(_request: Request) {
   }
 
   try {
-    await writeGwoConfigFileMergedWithDatabase();
+    await writeGwoConfigFileMergedWithDatabase({ semesterMode });
   } catch (e) {
     console.error("[api/run] Failed to refresh config from database:", e);
   }
@@ -263,6 +295,7 @@ export async function POST(_request: Request) {
   } catch (e) {
     console.error("[api/run] Failed to write control file:", e);
     endGwoRun();
+    releaseOptimizerGlobalLock("timetable");
     return NextResponse.json(
       {
         success: false,
@@ -292,6 +325,10 @@ export async function POST(_request: Request) {
       };
 
       try {
+        setGwoRunPhase(
+          "Connected to optimizer",
+          "Waiting for the first iteration — Python startup can take a few seconds",
+        );
         for (const att of attempts) {
           if (runSignal.aborted) {
             send("complete", {
@@ -308,7 +345,17 @@ export async function POST(_request: Request) {
             att,
             scriptPath,
             scriptsDir,
-            (payload) => send("progress", payload),
+            (payload) => {
+              const progress = {
+                current: Number(payload.current ?? 0),
+                total: Number(payload.total ?? 0),
+                ...(payload.run != null ? { run: Number(payload.run) } : {}),
+                ...(payload.numRuns != null ? { numRuns: Number(payload.numRuns) } : {}),
+                ...(payload.best != null ? { best: Number(payload.best) } : {}),
+              };
+              setGwoRunProgress(progress);
+              send("progress", payload);
+            },
             { abortSignal: runSignal, controlFilePath },
           );
 
@@ -340,6 +387,7 @@ export async function POST(_request: Request) {
           }
 
           if (exitCode === 0) {
+            setGwoRunFinalizing();
             send("complete", {
               success: true,
               output: stdout,
@@ -379,6 +427,7 @@ export async function POST(_request: Request) {
         safeCloseStream(controller);
       } finally {
         endGwoRun();
+        releaseOptimizerGlobalLock("timetable");
       }
     },
     cancel() {
@@ -396,7 +445,9 @@ export async function POST(_request: Request) {
 }
 
 export async function GET() {
-  return NextResponse.json({
-    message: "Use POST to run the GWO algorithm",
+  const status = getGwoRunStatus();
+  const globalLockOwner = getOptimizerGlobalLockOwner();
+  return NextResponse.json({ ...status, globalLockOwner }, {
+    headers: { "Cache-Control": "no-store" },
   });
 }

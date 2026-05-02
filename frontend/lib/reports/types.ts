@@ -5,8 +5,9 @@ export type ReportTypeId =
   | "lecturer-workload"
   | "course-distribution"
   | "conflict-analysis"
-  | "student-schedule"
   | "optimization-summary"
+  | "lecturer-preference-compliance"
+  | "room-type-matching"
 
 export type ReportDefinition = {
   id: ReportTypeId

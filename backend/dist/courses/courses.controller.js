@@ -25,8 +25,8 @@ let CoursesController = class CoursesController {
     findAll() {
         return this.coursesService.findAll();
     }
-    findOne(id) {
-        return this.coursesService.findOne(id);
+    findArchived() {
+        return this.coursesService.findArchived();
     }
     create(dto) {
         return this.coursesService.create(dto);
@@ -37,6 +37,18 @@ let CoursesController = class CoursesController {
     remove(id) {
         return this.coursesService.remove(id);
     }
+    restore(id) {
+        return this.coursesService.restoreArchived(id);
+    }
+    getDeletionImpact(id) {
+        return this.coursesService.getDeletionImpact(id);
+    }
+    permanentlyDelete(id) {
+        return this.coursesService.permanentlyDeleteArchived(id);
+    }
+    findOne(id) {
+        return this.coursesService.findOne(id);
+    }
 };
 exports.CoursesController = CoursesController;
 __decorate([
@@ -46,12 +58,11 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], CoursesController.prototype, "findAll", null);
 __decorate([
-    (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)('archived/list'),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
-], CoursesController.prototype, "findOne", null);
+], CoursesController.prototype, "findArchived", null);
 __decorate([
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),
@@ -74,6 +85,34 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], CoursesController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Patch)(':id/restore'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], CoursesController.prototype, "restore", null);
+__decorate([
+    (0, common_1.Get)(':id/deletion-impact'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], CoursesController.prototype, "getDeletionImpact", null);
+__decorate([
+    (0, common_1.Delete)(':id/permanent'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], CoursesController.prototype, "permanentlyDelete", null);
+__decorate([
+    (0, common_1.Get)(':id'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], CoursesController.prototype, "findOne", null);
 exports.CoursesController = CoursesController = __decorate([
     (0, common_1.Controller)('courses'),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),

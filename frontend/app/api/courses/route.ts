@@ -64,6 +64,7 @@ export async function GET(request: Request) {
       },
       select: {
         user_id: true,
+        lecturer_name_snapshot: true,
         room_id: true,
         registered_students: true,
         section_number: true,
@@ -98,6 +99,10 @@ export async function GET(request: Request) {
     const courses = entries.flatMap((entry) => {
       const semester = entry.timetable.semester
       if (!semester) return []
+      const lecturerName =
+        entry.lecturer?.user
+          ? `${entry.lecturer.user.first_name} ${entry.lecturer.user.last_name}`.trim()
+          : (entry.lecturer_name_snapshot ?? "")
       return [
         {
           Year: semester.academic_year,
@@ -107,8 +112,8 @@ export async function GET(request: Request) {
           academic_level: entry.course.academic_level,
           credit_hours: entry.course.credit_hours,
           Section: entry.section_number,
-          Lecturer_Name: `${entry.lecturer.user.first_name} ${entry.lecturer.user.last_name}`,
-          Lecturer_ID: String(entry.user_id),
+          Lecturer_Name: lecturerName,
+          Lecturer_ID: entry.user_id == null ? "" : String(entry.user_id),
           Department: entry.course.department.dept_name,
           Day: decodeDaysMask(entry.timeslot.days_mask),
           Time: `${formatTime(entry.timeslot.start_time)} - ${formatTime(entry.timeslot.end_time)}`,

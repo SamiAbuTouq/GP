@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminFromRefreshCookie } from "@/lib/server-auth";
-import { prismaTimeslotRowToConfig, mergeFileConfigWithDatabase } from "@/lib/db-schedule-config";
+import {
+  prismaTimeslotRowToConfig,
+  mergeFileConfigWithDatabase,
+  type SemesterMode,
+} from "@/lib/db-schedule-config";
 import { mergeConfigWithDefaults } from "@/lib/schedule-config-merge";
 import { readFile } from "fs/promises";
 import path from "path";
@@ -13,12 +17,102 @@ import type { TimeslotCatalogueEntry } from "@/lib/timetable-model";
 const DATA_DIR = path.join(process.cwd(), "data");
 const CONFIG_FILE = path.join(DATA_DIR, "config.json");
 
+type PersistValidationResult = {
+  lecturer_conflicts?: unknown[];
+  room_conflicts?: unknown[];
+  capacity_violations?: unknown[];
+  overload_violations?: unknown[];
+  invalid_timeslot_types?: unknown[];
+  invalid_room_types?: unknown[];
+  unit_conflict_violations?: unknown[];
+  preference_warnings?: unknown[];
+};
+
+type ConflictCreateInput = {
+  conflict_type: string;
+  severity: "hard" | "soft";
+  course_code: string;
+  section_number: string;
+  lecturer_name: string | null;
+  room_number: string | null;
+  timeslot_label: string | null;
+  detail: string;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value != null && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function readStr(rec: Record<string, unknown> | null, keys: string[]): string {
+  if (!rec) return "";
+  for (const key of keys) {
+    const raw = rec[key];
+    if (typeof raw === "string") {
+      const trimmed = raw.trim();
+      if (trimmed) return trimmed;
+    }
+  }
+  return "";
+}
+
+function readNullableStr(rec: Record<string, unknown> | null, keys: string[]): string | null {
+  const v = readStr(rec, keys);
+  return v || null;
+}
+
+function toDetail(value: unknown, fallback: string): string {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (value != null && typeof value === "object") return JSON.stringify(value);
+  return fallback;
+}
+
+function collectConflicts(validationResult: PersistValidationResult | null | undefined): ConflictCreateInput[] {
+  if (!validationResult) return [];
+
+  const addMany = (
+    rows: unknown[] | undefined,
+    conflictType: string,
+    severity: "hard" | "soft",
+    fallbackDetail: string,
+  ): ConflictCreateInput[] => {
+    if (!Array.isArray(rows)) return [];
+    return rows.map((row) => {
+      const rec = asRecord(row);
+      return {
+        conflict_type: conflictType,
+        severity,
+        course_code: readStr(rec, ["course_code", "course", "lecture", "course_a", "course_b"]),
+        section_number: readStr(rec, ["section_number", "section"]),
+        lecturer_name: readNullableStr(rec, ["lecturer_name", "lecturer"]),
+        room_number: readNullableStr(rec, ["room_number", "room"]),
+        timeslot_label: readNullableStr(rec, ["timeslot_label", "timeslot", "timeslot_a"]),
+        detail: toDetail(
+          rec?.detail ?? rec?.reason ?? rec?.message ?? rec?.violation ?? row,
+          fallbackDetail,
+        ),
+      };
+    });
+  };
+
+  return [
+    ...addMany(validationResult.lecturer_conflicts, "lecturer_double_booking", "hard", "Lecturer double-booking"),
+    ...addMany(validationResult.room_conflicts, "room_double_booking", "hard", "Room double-booking"),
+    ...addMany(validationResult.capacity_violations, "capacity_exceeded", "hard", "Capacity exceeded"),
+    ...addMany(validationResult.overload_violations, "lecturer_overload", "hard", "Lecturer overload"),
+    ...addMany(validationResult.invalid_timeslot_types, "wrong_timeslot_type", "hard", "Wrong timeslot type"),
+    ...addMany(validationResult.invalid_room_types, "wrong_room_type", "hard", "Wrong room type"),
+    ...addMany(validationResult.unit_conflict_violations, "cohort_overlap", "hard", "Cohort overlap"),
+    ...addMany(validationResult.preference_warnings, "preference_violation", "soft", "Preference violation"),
+  ];
+}
+
 async function loadMergedConfig(): Promise<ScheduleConfig> {
   if (existsSync(CONFIG_FILE)) {
     const raw = JSON.parse(await readFile(CONFIG_FILE, "utf-8")) as Record<string, unknown>;
-    return mergeFileConfigWithDatabase(mergeConfigWithDefaults(raw));
+    const semesterMode: SemesterMode = raw.semester_mode === "summer" ? "summer" : "normal";
+    return mergeFileConfigWithDatabase(mergeConfigWithDefaults(raw), semesterMode);
   }
-  return mergeFileConfigWithDatabase(mergeConfigWithDefaults({} as Record<string, unknown>));
+  return mergeFileConfigWithDatabase(mergeConfigWithDefaults({} as Record<string, unknown>), "normal");
 }
 
 function approxEq(a: number, b: number, eps = 0.12): boolean {
@@ -77,6 +171,7 @@ export async function POST(req: NextRequest) {
       continueFromTimetableId?: number | null;
       schedule?: ScheduleEntry[];
       timeslots_catalogue?: TimeslotCatalogueEntry[];
+      validationResult?: PersistValidationResult;
     };
 
     const parsedSemesterId = Number(body.semesterId);
@@ -217,6 +312,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const conflictRows = collectConflicts(body.validationResult);
+
     const timetable = await prisma.$transaction(async (tx) => {
       const t = await tx.timetable.create({
         data: {
@@ -233,6 +330,12 @@ export async function POST(req: NextRequest) {
             timetable_id: t.timetable_id,
             ...row,
           },
+        });
+      }
+
+      if (conflictRows.length > 0) {
+        await tx.timetableConflict.createMany({
+          data: conflictRows.map((c) => ({ ...c, timetable_id: t.timetable_id })),
         });
       }
 

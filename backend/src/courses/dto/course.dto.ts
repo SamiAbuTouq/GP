@@ -30,9 +30,15 @@ export class CreateCourseDto {
 
   @IsOptional()
   @IsInt()
-  @Min(1)
+  @Min(0)
   @Max(20)
-  sections?: number;
+  sectionsNormal?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  sectionsSummer?: number;
 
   @IsOptional()
   @IsBoolean()
@@ -66,9 +72,15 @@ export class UpdateCourseDto {
 
   @IsOptional()
   @IsInt()
-  @Min(1)
+  @Min(0)
   @Max(20)
-  sections?: number;
+  sectionsNormal?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(20)
+  sectionsSummer?: number;
 
   @IsOptional()
   @IsBoolean()

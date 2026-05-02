@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -23,9 +24,9 @@ export class CoursesController {
     return this.coursesService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.coursesService.findOne(id);
+  @Get('archived/list')
+  findArchived() {
+    return this.coursesService.findArchived();
   }
 
   @Post()
@@ -41,5 +42,25 @@ export class CoursesController {
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.coursesService.remove(id);
+  }
+
+  @Patch(':id/restore')
+  restore(@Param('id', ParseIntPipe) id: number) {
+    return this.coursesService.restoreArchived(id);
+  }
+
+  @Get(':id/deletion-impact')
+  getDeletionImpact(@Param('id', ParseIntPipe) id: number) {
+    return this.coursesService.getDeletionImpact(id);
+  }
+
+  @Delete(':id/permanent')
+  permanentlyDelete(@Param('id', ParseIntPipe) id: number) {
+    return this.coursesService.permanentlyDeleteArchived(id);
+  }
+
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.coursesService.findOne(id);
   }
 }

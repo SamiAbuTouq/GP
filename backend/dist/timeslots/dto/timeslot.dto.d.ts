@@ -3,12 +3,14 @@ export declare class CreateTimeslotDto {
     start: string;
     end: string;
     slotType: string;
+    isSummer: boolean;
 }
 export declare class UpdateTimeslotDto {
     days?: string[];
     start?: string;
     end?: string;
     slotType?: string;
+    isSummer?: boolean;
 }
 export declare class UpdateLecturerPreferenceItemDto {
     slotId: number;

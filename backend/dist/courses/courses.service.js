@@ -19,6 +19,7 @@ let CoursesService = class CoursesService {
     }
     async findAll() {
         const courses = await this.prisma.course.findMany({
+            where: { is_active: true },
             include: {
                 department: true,
             },
@@ -33,7 +34,8 @@ let CoursesService = class CoursesService {
             deliveryMode: course.delivery_mode,
             department: course.department.dept_name,
             departmentId: course.dept_id,
-            sections: course.sections,
+            sectionsNormal: course.sections_normal,
+            sectionsSummer: course.sections_summer,
             isLab: course.is_lab,
         }));
     }
@@ -56,7 +58,8 @@ let CoursesService = class CoursesService {
             deliveryMode: course.delivery_mode,
             department: course.department.dept_name,
             departmentId: course.dept_id,
-            sections: course.sections,
+            sectionsNormal: course.sections_normal,
+            sectionsSummer: course.sections_summer,
             isLab: course.is_lab,
         };
     }
@@ -78,7 +81,8 @@ let CoursesService = class CoursesService {
                 academic_level: level,
                 delivery_mode: dto.deliveryMode,
                 dept_id: department.dept_id,
-                sections: dto.sections ?? 1,
+                sections_normal: dto.sectionsNormal ?? 1,
+                sections_summer: dto.sectionsSummer ?? 0,
                 is_lab: dto.isLab ?? false,
             },
             include: {
@@ -94,7 +98,8 @@ let CoursesService = class CoursesService {
             deliveryMode: course.delivery_mode,
             department: course.department.dept_name,
             departmentId: course.dept_id,
-            sections: course.sections,
+            sectionsNormal: course.sections_normal,
+            sectionsSummer: course.sections_summer,
             isLab: course.is_lab,
         };
     }
@@ -126,7 +131,8 @@ let CoursesService = class CoursesService {
                 academic_level: syncedLevel,
                 ...(dto.deliveryMode !== undefined ? { delivery_mode: dto.deliveryMode } : {}),
                 dept_id: deptId,
-                ...(dto.sections !== undefined ? { sections: dto.sections } : {}),
+                ...(dto.sectionsNormal !== undefined ? { sections_normal: dto.sectionsNormal } : {}),
+                ...(dto.sectionsSummer !== undefined ? { sections_summer: dto.sectionsSummer } : {}),
                 ...(dto.isLab !== undefined ? { is_lab: dto.isLab } : {}),
             },
             include: {
@@ -142,7 +148,8 @@ let CoursesService = class CoursesService {
             deliveryMode: course.delivery_mode,
             department: course.department.dept_name,
             departmentId: course.dept_id,
-            sections: course.sections,
+            sectionsNormal: course.sections_normal,
+            sectionsSummer: course.sections_summer,
             isLab: course.is_lab,
         };
     }
@@ -153,10 +160,95 @@ let CoursesService = class CoursesService {
         if (!existing) {
             throw new common_1.NotFoundException(`Course with ID ${id} not found`);
         }
-        await this.prisma.course.delete({
+        await this.prisma.course.update({
             where: { course_id: id },
+            data: { is_active: false },
         });
-        return { message: 'Course deleted successfully' };
+        return { message: 'Course archived successfully', archived: true };
+    }
+    async findArchived() {
+        const courses = await this.prisma.course.findMany({
+            where: { is_active: false },
+            include: { department: true },
+            orderBy: { course_code: 'asc' },
+        });
+        return courses.map((course) => ({
+            id: course.course_id,
+            code: course.course_code,
+            name: course.course_name,
+            creditHours: course.credit_hours,
+            academicLevel: (0, academic_level_util_1.academicLevelFromCourseCode)(course.course_code),
+            deliveryMode: course.delivery_mode,
+            department: course.department.dept_name,
+            departmentId: course.dept_id,
+            sectionsNormal: course.sections_normal,
+            sectionsSummer: course.sections_summer,
+            isLab: course.is_lab,
+        }));
+    }
+    async restoreArchived(id) {
+        const course = await this.prisma.course.findUnique({
+            where: { course_id: id },
+            select: { course_id: true },
+        });
+        if (!course) {
+            throw new common_1.NotFoundException(`Course with ID ${id} not found`);
+        }
+        await this.prisma.course.update({
+            where: { course_id: id },
+            data: { is_active: true },
+        });
+        return { message: 'Course restored successfully' };
+    }
+    async getDeletionImpact(id) {
+        const course = await this.prisma.course.findUnique({
+            where: { course_id: id },
+            select: { course_id: true, course_code: true, course_name: true },
+        });
+        if (!course) {
+            throw new common_1.NotFoundException(`Course with ID ${id} not found`);
+        }
+        const entries = await this.prisma.sectionScheduleEntry.findMany({
+            where: { course_id: id },
+            select: {
+                timetable_id: true,
+                timetable: {
+                    select: { generation_type: true, status: true, version_number: true },
+                },
+            },
+            distinct: ['timetable_id'],
+            orderBy: { timetable_id: 'asc' },
+        });
+        return {
+            courseId: course.course_id,
+            courseCode: course.course_code,
+            courseName: course.course_name,
+            entryCount: await this.prisma.sectionScheduleEntry.count({ where: { course_id: id } }),
+            timetables: entries.map((entry) => ({
+                timetableId: entry.timetable_id,
+                generationType: entry.timetable.generation_type,
+                status: entry.timetable.status,
+                versionNumber: entry.timetable.version_number,
+            })),
+        };
+    }
+    async permanentlyDeleteArchived(id) {
+        const course = await this.prisma.course.findUnique({
+            where: { course_id: id },
+            select: { course_id: true, is_active: true },
+        });
+        if (!course) {
+            throw new common_1.NotFoundException(`Course with ID ${id} not found`);
+        }
+        if (course.is_active) {
+            throw new common_1.ConflictException('Only archived courses can be permanently deleted.');
+        }
+        await this.prisma.$transaction(async (tx) => {
+            await tx.sectionScheduleEntry.deleteMany({ where: { course_id: id } });
+            await tx.lecturerCanTeachCourse.deleteMany({ where: { course_id: id } });
+            await tx.course.delete({ where: { course_id: id } });
+        });
+        return { message: 'Course permanently deleted successfully' };
     }
 };
 exports.CoursesService = CoursesService;

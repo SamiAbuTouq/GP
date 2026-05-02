@@ -67,6 +67,8 @@ export type ScheduleConfig = {
   lecturers: string[]
   lecturer_preferences: Record<string, { preferred: string[]; unpreferred: string[] }>
   lectures: LectureConfig[]
+  /** Set when refreshing config from the DB before a GWO run (`normal` | `summer`). */
+  semester_mode?: "normal" | "summer"
   gwo_params: GWOParams
   soft_weights: SoftWeights
   /** Optional: maps unit IDs to their course code bundles (e.g. "CompEng_Y1S1" -> ["CS101","MATH101"]) */
@@ -83,6 +85,11 @@ export type ScheduleConfig = {
    * Falls back to gwo_params.max_classes_per_lecturer when absent.
    */
   lecturer_max_workload?: Record<string, number>
+  /**
+   * Latest clock time (24h HH:MM) when in-person / blended sections may start or occupy.
+   * `null` = rule disabled. Online-only placements ignore this at scheduling time.
+   */
+  last_allowed_hour?: string | null
 }
 
 // ─── Schedule Types ───────────────────────────────────────────────────────────

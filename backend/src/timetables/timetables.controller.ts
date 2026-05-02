@@ -1,6 +1,7 @@
-import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { Roles } from '../common/decorators/roles.decorator';
+import { PublishDraftDto } from './dto/publish-draft.dto';
 import { TimetablesService } from './timetables.service';
 
 @Controller('timetables')
@@ -12,7 +13,12 @@ export class TimetablesController {
   list(
     @Query('semesterId') semesterIdRaw?: string,
     @Query('draftsOnly') draftsOnlyRaw?: string,
+    @Query('scenarioRunBasesOnly') scenarioRunBasesOnlyRaw?: string,
   ) {
+    const scenarioRunBasesOnly =
+      scenarioRunBasesOnlyRaw === 'true' ||
+      scenarioRunBasesOnlyRaw === '1' ||
+      scenarioRunBasesOnlyRaw?.toLowerCase() === 'yes';
     const draftsOnly =
       draftsOnlyRaw === 'true' ||
       draftsOnlyRaw === '1' ||
@@ -31,7 +37,7 @@ export class TimetablesController {
       parsedSemester > 0
         ? parsedSemester
         : undefined;
-    return this.timetablesService.list(semesterId, draftsOnly);
+    return this.timetablesService.list(semesterId, draftsOnly, scenarioRunBasesOnly);
   }
 
   @Get(':id/entries')
@@ -50,6 +56,37 @@ export class TimetablesController {
       courseId: Number.isFinite(courseId) ? courseId : undefined,
       lecturerUserId: Number.isFinite(lecturerUserId) ? lecturerUserId : undefined,
       roomId: Number.isFinite(roomId) ? roomId : undefined,
+    });
+  }
+
+  @Get(':id/conflicts')
+  listConflicts(@Param('id', ParseIntPipe) id: number) {
+    return this.timetablesService.getTimetableConflictSummary(id);
+  }
+
+  @Get(':id/schedule-payload')
+  schedulePayload(@Param('id', ParseIntPipe) id: number) {
+    return this.timetablesService.buildSchedulePayload(id);
+  }
+
+  @Put(':id/schedule-payload')
+  replaceSchedulePayload(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { schedule?: unknown[] },
+  ) {
+    return this.timetablesService.replaceScheduleFromPayload(id, body?.schedule);
+  }
+
+  @Post(':id/publish')
+  @Roles(Role.ADMIN)
+  publishDraft(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: PublishDraftDto,
+  ) {
+    return this.timetablesService.publishDraftTimetable(id, {
+      academicYear: body?.academicYear,
+      semesterType: body?.semesterType,
+      acknowledgedHardConflicts: body?.acknowledgedHardConflicts,
     });
   }
 }

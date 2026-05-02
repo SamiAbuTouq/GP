@@ -3,6 +3,8 @@
 import { Loader2, Pause } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSWRConfig } from "swr";
+import { ApiClient } from "@/lib/api-client";
+import { getScenarios } from "@/lib/what-if";
 import {
   createContext,
   useCallback,
@@ -23,6 +25,22 @@ export type GwoOptimizerProgressPayload = {
   run?: number;
   numRuns?: number;
   best?: number;
+};
+
+type GwoServerRunStatusPayload = {
+  running: boolean;
+  paused: boolean;
+  startedAt: number | null;
+  phase: string;
+  detail: string;
+  progress: GwoOptimizerProgressPayload | null;
+};
+
+type ActiveScenarioSnapshot = {
+  id: number;
+  name: string;
+  latestRunId: number | null;
+  latestRunStartedAt: string | null;
 };
 
 type GwoRunBarState = {
@@ -126,9 +144,13 @@ async function jsonFetcher(url: string) {
   return r.json();
 }
 
+export type GwoSemesterMode = "normal" | "summer";
+export type GwoRunSource = "timetable" | "scenario";
+
 type GwoRunContextValue = {
   isRunning: boolean;
   isPaused: boolean;
+  runSource: GwoRunSource | null;
   runStartedAt: number | null;
   bar: GwoRunBarState;
   /**
@@ -139,7 +161,8 @@ type GwoRunContextValue = {
   /** Snapshot when pausing so the countdown does not drain while work is stopped */
   etaPausedRemainingSec: number | null;
   /** Creates a new AbortController for the current run; returned signal must be passed to fetch. */
-  beginRun: () => AbortController;
+  beginRun: (source?: GwoRunSource, runId?: number | null) => AbortController;
+  bindRunId: (runId: number | null) => void;
   updateProgress: (p: GwoOptimizerProgressPayload) => void;
   /** Update high-level status (e.g. while waiting on the network or stream). */
   setRunPhase: (phase: string, detail?: string) => void;
@@ -153,7 +176,7 @@ type GwoRunContextValue = {
    * Safe to call from any page: the provider stays mounted for the whole app shell.
    * @returns `null` on success or user cancel; an error message string on failure.
    */
-  runOptimizer: () => Promise<string | null>;
+  runOptimizer: (options?: { semesterMode?: GwoSemesterMode }) => Promise<string | null>;
   /** Wall time since the run began minus optimizer pauses (UI “Elapsed” clock). */
   getRunElapsedActiveSec: () => number;
   /**
@@ -170,6 +193,8 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
   const [optimizerScheduleEpoch, setOptimizerScheduleEpoch] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [runSource, setRunSource] = useState<GwoRunSource | null>(null);
+  const [activeRunId, setActiveRunId] = useState<number | null>(null);
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   /** Wall time when first iteration sample is taken — origin for active-ms axis */
@@ -213,11 +238,19 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     setEtaDeadlineMs(ms);
   }, []);
 
-  const beginRun = useCallback((): AbortController => {
+  const beginRun = useCallback((source: GwoRunSource = "timetable", runId: number | null = null): AbortController => {
+    // Ensure no stale stream can continue updating progress after a new run starts.
+    try {
+      abortRef.current?.abort();
+    } catch {
+      /* ignore */
+    }
     const ac = new AbortController();
     abortRef.current = ac;
     setIsPaused(false);
     setIsRunning(true);
+    setRunSource(source);
+    setActiveRunId(runId);
     setRunStartedAt(Date.now());
     progressEpochWallRef.current = null;
     progressSamplesRef.current = [];
@@ -234,12 +267,62 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     return ac;
   }, [setDeadline]);
 
+  const bindRunId = useCallback((runId: number | null) => {
+    setActiveRunId(runId);
+  }, []);
+
   const setRunPhase = useCallback((phase: string, detail?: string) => {
     setBar((b) => ({
       ...b,
       visible: true,
       phase,
       ...(detail !== undefined ? { detail } : {}),
+    }));
+  }, []);
+
+  const applyServerStatus = useCallback(
+    (status: GwoServerRunStatusPayload) => {
+      if (!status.running) {
+        return;
+      }
+      setIsRunning(true);
+      setIsPaused(Boolean(status.paused));
+      setRunSource("timetable");
+      setActiveRunId(null);
+      setRunStartedAt(status.startedAt ?? Date.now());
+      setBar((b) => {
+        const progress = status.progress;
+        const safeTotal = progress?.total && progress.total > 0 ? progress.total : 1;
+        const pct = progress
+          ? Math.min(95, Math.round((95 * Number(progress.current)) / safeTotal))
+          : b.percent > 0
+            ? b.percent
+            : 1;
+        return {
+          visible: true,
+          percent: pct,
+          phase: status.phase || b.phase || "Grey Wolf optimization running",
+          detail: status.detail || b.detail || "Optimizer is running on the server",
+        };
+      });
+    },
+    [],
+  );
+
+  const applyScenarioStatus = useCallback((active: ActiveScenarioSnapshot) => {
+    setIsRunning(true);
+    setIsPaused(false);
+    setRunSource("scenario");
+    // Some scenario list payloads may temporarily omit latestRunId while the run is active.
+    // Preserve the previous ID so pause/resume controls keep targeting the live scenario run.
+    setActiveRunId((prev) => active.latestRunId ?? prev);
+    const startedAtMs = active.latestRunStartedAt ? Date.parse(active.latestRunStartedAt) : NaN;
+    setRunStartedAt(Number.isFinite(startedAtMs) ? startedAtMs : Date.now());
+    setBar((b) => ({
+      visible: true,
+      percent: b.percent > 0 ? b.percent : 1,
+      phase: b.phase || "Scenario simulation in progress",
+      detail: b.detail || `Scenario "${active.name}" is currently running`,
     }));
   }, []);
 
@@ -346,6 +429,8 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     abortRef.current = null;
     setIsRunning(false);
     setIsPaused(false);
+    setRunSource(null);
+    setActiveRunId(null);
     setRunStartedAt(null);
     progressEpochWallRef.current = null;
     progressSamplesRef.current = [];
@@ -365,20 +450,34 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
 
   const cancelRun = useCallback(() => {
     void (async () => {
-      try {
-        await fetch("/api/run/cancel", { method: "POST", cache: "no-store" });
-      } catch {
-        /* ignore */
+      if (runSource === "scenario" && activeRunId != null) {
+        try {
+          await ApiClient.request(`/what-if/runs/${activeRunId}/cancel`, { method: "POST" });
+        } catch {
+          /* ignore */
+        }
+      } else {
+        try {
+          await fetch("/api/run/cancel", { method: "POST", cache: "no-store" });
+        } catch {
+          /* ignore */
+        }
       }
       abortRef.current?.abort();
     })();
-  }, []);
+  }, [runSource, activeRunId]);
 
-  const runOptimizer = useCallback(async (): Promise<string | null> => {
+  const runOptimizer = useCallback(async (options?: {
+    semesterMode?: GwoSemesterMode;
+  }): Promise<string | null> => {
     const runAbort = beginRun();
+    const semesterMode: GwoSemesterMode =
+      options?.semesterMode === "summer" ? "summer" : "normal";
     try {
       const response = await fetch("/api/run", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ semesterMode }),
         signal: runAbort.signal,
       });
 
@@ -469,6 +568,11 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
               "/api/schedule",
             )) as SchedulePayload;
             await mutate("/api/schedule", schedule, { revalidate: false });
+            await mutate(
+              (key) => typeof key === "string" && key.startsWith("/api/config"),
+              undefined,
+              { revalidate: true },
+            );
             setOptimizerScheduleEpoch((n) => n + 1);
             return null;
           }
@@ -488,13 +592,93 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     }
   }, [beginRun, endRun, mutate, setFinalizing, setRunPhase, updateProgress]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncFromServer = async () => {
+      // When this tab owns the scenario stream, keep its live phase/progress.
+      if (runSource === "scenario" && abortRef.current) return;
+      try {
+        const response = await fetch("/api/run", { cache: "no-store" });
+        if (!response.ok) return;
+        const status = (await response.json()) as GwoServerRunStatusPayload;
+        if (cancelled) return;
+        if (status.running) {
+          applyServerStatus(status);
+          return;
+        }
+
+        const scenarios = await getScenarios();
+        if (cancelled) return;
+        const activeScenario = scenarios.find((s) => {
+          const runStatus = s.latestRun?.status;
+          return Boolean(s.isRunning) || runStatus === "running" || runStatus === "pending";
+        });
+        if (activeScenario) {
+          applyScenarioStatus({
+            id: activeScenario.id,
+            name: activeScenario.name,
+            latestRunId: activeScenario.latestRun?.id ?? null,
+            latestRunStartedAt: activeScenario.latestRun?.startedAt ?? null,
+          });
+        } else if (!abortRef.current) {
+          setIsRunning(false);
+          setIsPaused(false);
+          setRunSource(null);
+          setActiveRunId(null);
+          setRunStartedAt(null);
+          setBar((b) => (b.visible ? { visible: false, percent: 0, phase: "", detail: "" } : b));
+        }
+      } catch {
+        /* ignore polling errors */
+      }
+    };
+
+    void syncFromServer();
+    const id = window.setInterval(() => {
+      void syncFromServer();
+    }, 1500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [applyScenarioStatus, applyServerStatus, runSource]);
+
+  const resolveScenarioRunId = useCallback(async (): Promise<number | null> => {
+    if (activeRunId != null) return activeRunId;
+    try {
+      const scenarios = await getScenarios();
+      const active = scenarios.find((s) => {
+        const status = s.latestRun?.status;
+        return Boolean(s.isRunning) || status === "running" || status === "pending";
+      });
+      const id =
+        typeof active?.latestRun?.id === "number" && active.latestRun.id > 0
+          ? active.latestRun.id
+          : null;
+      if (id != null) setActiveRunId(id);
+      return id;
+    } catch {
+      return null;
+    }
+  }, [activeRunId]);
+
   const pauseRun = useCallback(async () => {
     try {
-      await fetch("/api/run/control", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "pause" }),
-      });
+      if (runSource === "scenario") {
+        const runId = await resolveScenarioRunId();
+        if (runId == null) return;
+        await ApiClient.request(`/what-if/runs/${runId}/control`, {
+          method: "POST",
+          body: JSON.stringify({ action: "pause" }),
+        });
+      } else {
+        await fetch("/api/run/control", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "pause" }),
+        });
+      }
       setIsPaused(true);
       pauseStartedAtRef.current = Date.now();
       const d = etaDeadlineMsRef.current;
@@ -512,15 +696,24 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [runSource, resolveScenarioRunId, setDeadline]);
 
   const resumeRun = useCallback(async () => {
     try {
-      await fetch("/api/run/control", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "resume" }),
-      });
+      if (runSource === "scenario") {
+        const runId = await resolveScenarioRunId();
+        if (runId == null) return;
+        await ApiClient.request(`/what-if/runs/${runId}/control`, {
+          method: "POST",
+          body: JSON.stringify({ action: "resume" }),
+        });
+      } else {
+        await fetch("/api/run/control", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "resume" }),
+        });
+      }
       setIsPaused(false);
       setEtaPausedRemainingSec(null);
       if (pauseStartedAtRef.current != null) {
@@ -534,17 +727,19 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [runSource, resolveScenarioRunId]);
 
   const value = useMemo(
     () => ({
       isRunning,
       isPaused,
+      runSource,
       runStartedAt,
       bar,
       etaDeadlineMs,
       etaPausedRemainingSec,
       beginRun,
+      bindRunId,
       updateProgress,
       setRunPhase,
       setFinalizing,
@@ -559,11 +754,13 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     [
       isRunning,
       isPaused,
+      runSource,
       runStartedAt,
       bar,
       etaDeadlineMs,
       etaPausedRemainingSec,
       beginRun,
+      bindRunId,
       updateProgress,
       setRunPhase,
       setFinalizing,
@@ -590,10 +787,15 @@ export function useGwoRun(): GwoRunContextValue {
   return ctx;
 }
 
-export function GwoTopProgressBar() {
+export function GwoTopProgressBar({
+  sources = ["timetable", "scenario"],
+}: {
+  sources?: GwoRunSource[];
+}) {
   const {
     isRunning,
     isPaused,
+    runSource,
     runStartedAt,
     bar,
     cancelRun,
@@ -616,6 +818,7 @@ export function GwoTopProgressBar() {
   }, [runStartedAt, getRunElapsedActiveSec, isPaused]);
 
   if (!bar.visible) return null;
+  if (runSource && !sources.includes(runSource)) return null;
 
   const displayPct = Math.min(100, Math.max(0, bar.percent));
 

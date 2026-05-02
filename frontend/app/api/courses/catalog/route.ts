@@ -91,6 +91,7 @@ export async function GET() {
     }
 
     const allCourses = await prisma.course.findMany({
+      where: { is_active: true },
       include: { department: true },
       orderBy: { course_code: 'asc' },
     })
@@ -103,7 +104,9 @@ export async function GET() {
       academicLevel: academicLevelFromCourseCode(c.course_code),
       deliveryMode: c.delivery_mode,
       department: c.department.dept_name,
-      sections: sectionSetsByCourseId.get(c.course_id)?.size ?? 0,
+      sectionsNormal: c.sections_normal,
+      sectionsSummer: c.sections_summer,
+      sectionsInLatestSchedule: sectionSetsByCourseId.get(c.course_id)?.size ?? 0,
       isLab: c.is_lab,
     }))
 
