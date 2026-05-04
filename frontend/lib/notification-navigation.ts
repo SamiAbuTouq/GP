@@ -37,6 +37,9 @@ export function getNotificationHref(
   if (t === "Lecturer Deactivated — Schedule Impact") {
     return "/entity/lecturers";
   }
+  if (t === "New Lecturer Access Request") {
+    return "/entity/access-requests";
+  }
   if (t === "Your Schedule is Ready" || t === "Schedule Updated") {
     return "/lecturer-schedule";
   }

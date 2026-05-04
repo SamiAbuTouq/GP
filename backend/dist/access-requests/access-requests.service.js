@@ -17,6 +17,7 @@ const lecturers_service_1 = require("../lecturers/lecturers.service");
 const notifications_service_1 = require("../notifications/notifications.service");
 const mail_service_1 = require("../mail/mail.service");
 const EXPIRY_DAYS = 14;
+const GENERIC_ELIGIBILITY_MESSAGE = 'If this email is eligible for access, you will be contacted with further instructions.';
 let AccessRequestsService = class AccessRequestsService {
     constructor(prisma, lecturersService, notifications, mailService) {
         this.prisma = prisma;
@@ -85,11 +86,8 @@ let AccessRequestsService = class AccessRequestsService {
                 select: { request_id: true },
             }),
         ]);
-        if (existingUser) {
-            throw new common_1.ConflictException('This email is already registered in the system.');
-        }
-        if (pendingRequest) {
-            throw new common_1.ConflictException('A pending access request already exists for this email.');
+        if (existingUser || pendingRequest) {
+            throw new common_1.ConflictException(GENERIC_ELIGIBILITY_MESSAGE);
         }
         const now = new Date();
         const expiresAt = new Date(now.getTime() + EXPIRY_DAYS * 24 * 60 * 60 * 1000);
@@ -103,8 +101,30 @@ let AccessRequestsService = class AccessRequestsService {
                 expires_at: expiresAt,
             },
         });
+        const courseRows = courses.length
+            ? await this.prisma.course.findMany({
+                where: { course_code: { in: courses } },
+                select: { course_code: true, course_name: true },
+            })
+            : [];
+        const courseNameByCode = new Map(courseRows.map((row) => [row.course_code, row.course_name]));
+        const coursesWithNames = courses.map((code) => {
+            const name = courseNameByCode.get(code);
+            return name ? `${code} - ${name}` : code;
+        });
         void this.notifications
             .notifyAdmins('New Lecturer Access Request', `${fullName} (${email}) submitted a lecturer access request.`)
+            .catch(() => { });
+        void this.mailService
+            .sendLecturerAccessRequestSubmittedEmail({
+            to: email,
+            fullName,
+            department,
+            maxWorkload: dto.maxWorkload,
+            courses: coursesWithNames,
+            submittedAtIso: created.submitted_at.toISOString(),
+            expiresAtIso: created.expires_at.toISOString(),
+        })
             .catch(() => { });
         return this.mapRow(created);
     }

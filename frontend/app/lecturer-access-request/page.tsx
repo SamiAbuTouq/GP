@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { departments, type Department } from "@/lib/data";
 
 type CourseOption = { code: string; name: string };
+const ELIGIBILITY_MESSAGE =
+  "If this email is eligible for access, you will be contacted with further instructions.";
 
 const INPUT_BASE_CLASSES =
   "h-12 rounded-[10px] border px-4 text-white placeholder:text-white/45 backdrop-blur-[4px] transition-all duration-300 ease-out focus:outline-none focus:bg-white/[0.14] focus:border-[#48CAE4] focus:shadow-[0_0_0_3px_rgba(72,202,228,0.18)] bg-white/[0.08] border-white/[0.18]";
@@ -76,11 +78,11 @@ export default function LecturerAccessRequestPage() {
     if (!res.ok) return false;
     const data = await res.json();
     if (data.existsAsUser) {
-      setInlineError("This email is already registered as a user.");
+      setInlineError(ELIGIBILITY_MESSAGE);
       return true;
     }
     if (data.hasPendingRequest) {
-      setInlineError("A pending access request already exists for this email.");
+      setInlineError(ELIGIBILITY_MESSAGE);
       return true;
     }
     return false;
@@ -121,7 +123,7 @@ export default function LecturerAccessRequestPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setInlineError(data.error || "Failed to submit access request.");
+        setInlineError(data.error || ELIGIBILITY_MESSAGE);
         return;
       }
       setSubmitted(true);
@@ -153,7 +155,7 @@ export default function LecturerAccessRequestPage() {
   };
 
   return (
-    <div className="forgot-theme min-h-screen lg:grid lg:grid-cols-[42%_58%]">
+    <div className="forgot-theme min-h-screen overflow-hidden lg:h-screen lg:grid lg:grid-cols-[42%_58%]">
       <div className="relative hidden lg:flex overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)]">
         <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col items-center justify-start px-12 pt-20 pb-16 text-center">
           <Image src="/images/logo.png" alt="PSUT Logo" width={180} height={180} className="object-contain" priority />
@@ -165,10 +167,23 @@ export default function LecturerAccessRequestPage() {
             </span>
           </h1>
         </div>
+        <div className="absolute inset-x-0 bottom-20 z-10 flex justify-center px-12 text-center">
+          <p className="max-w-sm text-base leading-relaxed text-[var(--text-secondary)]">
+            Intelligent scheduling powered by advanced optimization algorithms for efficient resource management.
+          </p>
+        </div>
+        <div
+          className="absolute inset-x-0 bottom-0 h-19 bg-bottom bg-repeat-x opacity-90"
+          style={{
+            backgroundImage: "url('/images/background/(1).jpeg')",
+            backgroundSize: "auto 100%",
+            filter: "var(--mosaic-filter)",
+          }}
+        />
       </div>
-      <div className="relative overflow-hidden p-6 lg:p-12 [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)]">
-        <div className="relative mx-auto flex min-h-screen w-full max-w-md items-center py-10 lg:min-h-0">
-          <div className="w-full py-4 lg:py-8">
+      <div className="relative overflow-hidden p-6 lg:h-screen lg:p-10 [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)]">
+        <div className="relative mx-auto flex min-h-screen w-full max-w-md items-start py-6 lg:h-full lg:min-h-0 lg:items-start lg:pt-10">
+          <div className="w-full py-2 lg:py-0">
             {submitted ? (
               <div className="text-center space-y-6">
                 <div className="flex justify-center">
@@ -187,11 +202,10 @@ export default function LecturerAccessRequestPage() {
               </div>
             ) : (
               <>
-                <div className="mb-8">
+                <div className="mb-5">
                   <h2 className="mb-2 text-[2rem] font-bold tracking-[-0.02em] text-white">Request access</h2>
-                  <p className="text-[0.95rem] text-white/60">Submit your details for administrator approval</p>
                 </div>
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-white/60">
                     <span>Step {step} of 2</span>
                     <span>{step === 1 ? "Personal Information" : "Teaching Profile"}</span>
@@ -246,7 +260,7 @@ export default function LecturerAccessRequestPage() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-white/85">Max workload (hrs)</Label>
+                        <Label className="text-white/85">Max workload (hrs) for bachelor&apos;s degree</Label>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
@@ -284,7 +298,7 @@ export default function LecturerAccessRequestPage() {
                           value={courseQuery}
                           onChange={(e) => setCourseQuery(e.target.value)}
                         />
-                        <div className="custom-scrollbar max-h-32 overflow-y-auto rounded-md border border-white/20 bg-white/5 p-3 text-white">
+                        <div className="custom-scrollbar max-h-28 overflow-y-auto rounded-md border border-white/20 bg-white/5 p-3 text-white">
                           {coursesLoading ? (
                             <p className="text-sm text-white/60">Loading courses...</p>
                           ) : null}

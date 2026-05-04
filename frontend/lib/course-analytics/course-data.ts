@@ -324,7 +324,8 @@ export function calculateStats(courses: Course[], opts?: CalculateStatsOptions):
   const uniqueLecturers = new Set(
     courses
       .filter(c => c.Lecturer_Name && c.Lecturer_Name.trim().toUpperCase() !== 'TBA')
-      .map(c => c.Lecturer_ID),
+      .map(c => c.Lecturer_ID)
+      .filter(id => id !== ''), // Fix: exclude empty-string IDs from TBA/unassigned sections
   ).size
   const uniqueDepartments = new Set(courses.map(c => c.Department)).size
   // Issue 1: always use seat-enrollment sum so avgClassSize is never contaminated by HC totals.
@@ -406,11 +407,13 @@ export function calculateStats(courses: Course[], opts?: CalculateStatsOptions):
       }, 0) / uniqueSemesterCount,
   )
   
-  // Find peak hour
+  // Find peak hour — normalise via parseInt so "08" and "8" map to the same key
   const hourCounts = new Map<string, number>()
   courses.forEach(c => {
-    const hour = c.Start_Time?.split(':')[0]
-    if (hour) {
+    const raw = c.Start_Time?.split(':')[0]
+    if (raw == null) return
+    const hour = String(parseInt(raw, 10)) // "08" → "8", avoids split-vote between formats
+    if (!isNaN(parseInt(hour))) {
       hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1)
     }
   })

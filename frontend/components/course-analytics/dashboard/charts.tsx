@@ -120,7 +120,7 @@ export function DepartmentChart({ data }: DepartmentChartProps) {
     <Card className="col-span-full">
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Students by Department</CardTitle>
-        <CardDescription>Total enrolled students across academic departments</CardDescription>
+        <CardDescription>Seat enrollments summed across all selected terms (not unique student headcount)</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={Math.max(300, chartData.length * 36)}>
@@ -201,7 +201,7 @@ export function SemesterChart({ data }: SemesterChartProps) {
     <Card className="col-span-full lg:col-span-1">
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Enrollment Trends</CardTitle>
-        <CardDescription>Student enrollment and sections by semester</CardDescription>
+        <CardDescription>Seat enrollments (sum of section registrations) and section counts per semester</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={280}>
@@ -229,7 +229,7 @@ export function SemesterChart({ data }: SemesterChartProps) {
               axisLine={false}
               tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value.toString()}
               tick={AXIS_TICK}
-              label={{ value: 'Students', angle: -90, position: 'insideLeft', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
+              label={{ value: 'Seat Enrollments', angle: -90, position: 'insideLeft', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
             />
             <YAxis 
               yAxisId="right"
@@ -274,9 +274,9 @@ export function SemesterChart({ data }: SemesterChartProps) {
             />
           </ComposedChart>
         </ResponsiveContainer>
-        {/* Issue 9: clarify students axis always uses seat-enrollment, even when the KPI above shows HC */}
+        {/* Clarify that this axis always uses seat-enrollment, even when the KPI above shows registrar headcount */}
         <p className="mt-2 text-[10px] text-muted-foreground text-center">
-          Student counts shown as seat-enrollment (sum of section registrations per semester).
+          Seat enrollments = sum of registered students across all sections per semester (not unique headcount).
         </p>
       </CardContent>
     </Card>
@@ -541,7 +541,7 @@ export function CapacityChart({ data }: CapacityChartProps) {
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Capacity Utilization</CardTitle>
-        <CardDescription>Section fill rate distribution</CardDescription>
+        <CardDescription>Section fill rate distribution — in-person & blended sections only (online excluded)</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={280}>
@@ -594,7 +594,7 @@ export function TopCoursesChart({ data }: TopCoursesChartProps) {
     <Card className="col-span-full">
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Top Courses by Enrollment</CardTitle>
-        <CardDescription>Most popular courses by total student enrollment</CardDescription>
+        <CardDescription>Cumulative seat enrollments across all selected terms — apply year/semester filter for single-term ranking</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={Math.max(360, data.length * 32)}>
@@ -675,7 +675,7 @@ export function DepartmentComparisonChart({ data }: DepartmentComparisonChartPro
     <Card className="col-span-full lg:col-span-1">
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Department Comparison</CardTitle>
-        <CardDescription>Students, sections & courses by top departments</CardDescription>
+        <CardDescription>Seat enrollments, sections & courses by top departments — cumulative across selected terms</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
@@ -758,7 +758,7 @@ export function SectionScatterChart({ data }: SectionScatterChartProps) {
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Class Size vs Utilization</CardTitle>
-        <CardDescription>Department efficiency analysis</CardDescription>
+        <CardDescription>X: avg students per section (all modes) · Y: room utilization % (in-person only) · bubble size = section count</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
@@ -854,7 +854,7 @@ export function UtilizationHeatmap({ data }: UtilizationHeatmapProps) {
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Schedule Heatmap</CardTitle>
-        <CardDescription>Class session density by day and hour</CardDescription>
+        <CardDescription>Student-seat-days by day and hour (enrolled students × meeting day occurrences)</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -1021,7 +1021,7 @@ export function SemesterYoYChart({ data }: SemesterYoYChartProps) {
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Semester Comparison by Year</CardTitle>
-        <CardDescription>Year-over-year enrollment trends for each semester type</CardDescription>
+        <CardDescription>Enrollment per semester type by year — uses registrar headcount where available, otherwise seat-enrollment sums</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={320}>
@@ -1131,7 +1131,7 @@ export function RoomWasteTable({ data, className }: { data: RoomWasteData[], cla
     <Card className={`flex flex-col h-full border-border/40 overflow-hidden ${className || ''}`}>
       <CardHeader className="pb-4 shrink-0">
         <CardTitle className="text-lg font-semibold text-destructive">Room Efficiency Analysis</CardTitle>
-        <CardDescription>Top rooms by average unused seats per term</CardDescription>
+        <CardDescription>Average unused seats per term by physical room — online, training & project rooms excluded</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden px-0 pb-0 min-h-0">
         <div className="h-full overflow-y-auto">
@@ -1180,7 +1180,7 @@ export function CourseGrowthChart({ data }: { data: CourseGrowthData[] }) {
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Course Enrollment Growth</CardTitle>
-        <CardDescription>Top courses by enrollment change vs previous academic year</CardDescription>
+        <CardDescription>Largest enrollment changes vs previous year — courses with &lt;30 students prior year excluded; only semester types present in both years compared</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={320}>
@@ -1389,7 +1389,7 @@ export function RoomTypeChart({ data }: RoomTypeChartProps) {
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Room Type Utilization</CardTitle>
-        <CardDescription>Average utilization percentage by room type</CardDescription>
+        <CardDescription>Capacity-weighted utilization rate by room type (total enrolled ÷ total capacity)</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={220}>

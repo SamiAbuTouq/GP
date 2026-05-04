@@ -82,13 +82,13 @@ const mainNavItems: NavItem[] = [
 const entityNavItems: NavItem[] = [
   { title: "Courses", href: "/entity/courses", icon: BookOpenTextIcon, animated: true },
   { title: "Lecturers", href: "/entity/lecturers", icon: UserRoundIcon, animated: true },
-  { title: "Access Requests", href: "/entity/access-requests", icon: FileTextIcon, animated: true },
   { title: "Rooms", href: "/entity/rooms", icon: DoorOpen },
   { title: "Time Slots", href: "/entity/timeslots", icon: ClockIcon, animated: true },
   { title: "Study Plans", href: "/entity/study-plans", icon: GraduationCapIcon, animated: true },
 ];
 
 const otherNavItems: NavItem[] = [
+  { title: "Access Requests", href: "/entity/access-requests", icon: FileTextIcon, animated: true },
   { title: "Reports", href: "/reports", icon: FileTextIcon, animated: true },
 ];
 
@@ -148,7 +148,7 @@ function NavButton({
     <Link
       href={href}
       onClick={onClick}
-      className={collapsed ? "flex justify-center" : "block w-full"}
+      className={collapsed ? "flex justify-center" : "block w-full min-w-0"}
     >
       <Button
         variant="ghost"
@@ -160,7 +160,7 @@ function NavButton({
           collapsed
             ? "h-9 w-9 justify-center px-0 py-0"
             : cn(
-                "w-full justify-start gap-3 py-2.5",
+                "w-full min-w-0 justify-start gap-3 overflow-hidden py-2.5",
                 isSubItem ? "pl-8" : "px-2",
               ),
           isActive
@@ -199,10 +199,10 @@ function NavButton({
         </span>
         <span
           className={cn(
-            "overflow-hidden whitespace-nowrap text-left text-sm font-medium transition-[max-width,opacity,transform] duration-200 ease-in-out",
+            "min-w-0 overflow-hidden text-left text-sm font-medium transition-[max-width,opacity,transform] duration-200 ease-in-out",
             collapsed
-              ? "max-w-0 opacity-0 -translate-x-1"
-              : "max-w-[160px] opacity-100 translate-x-0",
+              ? "max-w-0 shrink-0 whitespace-nowrap opacity-0 -translate-x-1"
+              : "flex-1 truncate opacity-100 translate-x-0",
           )}
         >
           {title}
@@ -238,10 +238,10 @@ function SidebarNavigation({
   const entityRef = useRef<AnimatedIconHandle | null>(null);
 
   return (
-    <ScrollArea className="flex-1 py-4">
+    <ScrollArea className="min-w-0 flex-1 py-4">
       <div
         className={cn(
-          "flex flex-col space-y-1 transition-all duration-200 ease-in-out",
+          "flex min-w-0 flex-col space-y-1 transition-all duration-200 ease-in-out",
           collapsed ? "w-full items-center px-0" : "px-3",
         )}
       >
@@ -287,21 +287,21 @@ function SidebarNavigation({
                   onMouseEnter={() => entityRef.current?.startAnimation()}
                   onMouseLeave={() => entityRef.current?.stopAnimation()}
                   className={cn(
-                    "w-full justify-between rounded-lg px-2 py-2.5 text-sm font-medium transition-colors",
+                    "w-full min-w-0 justify-between gap-2 overflow-hidden rounded-lg px-2 py-2.5 text-sm font-medium transition-colors",
                     "border-0 outline-none ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:outline-none",
                     pathname.startsWith("/entity")
                       ? "bg-sidebar-accent text-sidebar-accent-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground bg-transparent",
                   )}
                 >
-                  <span className="flex items-center gap-3">
+                  <span className="flex min-w-0 flex-1 items-center gap-3">
                     <UsersRoundIcon ref={entityRef} size={20} className="h-5 w-5 shrink-0" />
-                    Entity Management
+                    <span className="min-w-0 truncate text-left">Entity Management</span>
                   </span>
                   <ChevronDownIcon
                     size={16}
                     className={cn(
-                      "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
                       entityOpen && "rotate-180",
                     )}
                   />
@@ -416,7 +416,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 
   return (
-    <div className="flex h-full flex-col bg-[linear-gradient(to_bottom,transparent_48px,hsl(var(--sidebar))_48px)]">
+    <div className="flex h-full min-w-0 flex-col overflow-hidden bg-[linear-gradient(to_bottom,transparent_48px,hsl(var(--sidebar))_48px)]">
       {/* Logo Section */}
       <div
         className={cn(
@@ -552,9 +552,9 @@ export function Sidebar() {
       <div className="pointer-events-none fixed inset-x-0 top-0 z-0 hidden h-12 border-b border-sidebar-border bg-[url('/images/background/D66.png')] bg-top bg-repeat-x bg-[length:auto_48px] dark:bg-[image:linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.5)),url('/images/background/D66.png')] lg:block" />
       <aside
         className={cn(
-          "relative z-10 hidden lg:block shrink-0 overflow-hidden",
+          "relative z-10 hidden min-w-0 shrink-0 overflow-hidden lg:block",
           transitionsEnabled && "transition-all duration-300 ease-in-out",
-          collapsed ? "w-12" : "w-56",
+          collapsed ? "w-12 min-w-12 max-w-12" : "w-56 min-w-56 max-w-56",
         )}
       >
         <div className="pointer-events-none absolute bottom-0 right-0 top-12 w-px bg-sidebar-border" />
@@ -649,21 +649,21 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-between rounded-lg px-2 py-2.5 text-sm font-medium transition-colors",
+                    "w-full min-w-0 justify-between gap-2 overflow-hidden rounded-lg px-2 py-2.5 text-sm font-medium transition-colors",
                     "border-0 outline-none ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:outline-none",
                     pathname.startsWith("/entity")
                       ? "bg-sidebar-accent text-sidebar-accent-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground bg-transparent",
                   )}
                 >
-                  <span className="flex items-center gap-3">
+                  <span className="flex min-w-0 flex-1 items-center gap-3">
                     <UsersRoundIcon size={20} className="h-5 w-5 shrink-0" />
-                    Entity Management
+                    <span className="min-w-0 truncate text-left">Entity Management</span>
                   </span>
                   <ChevronDownIcon
                     size={16}
                     className={cn(
-                      "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
                       entityOpen && "rotate-180",
                     )}
                   />
