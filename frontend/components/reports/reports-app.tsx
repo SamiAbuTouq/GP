@@ -19,8 +19,6 @@ import { GraduationCapIcon } from "@/components/ui/graduation-cap"
 import { ActivityIcon } from "@/components/ui/activity"
 import { SparklesIcon } from "@/components/ui/sparkles-icon"
 import { FileTextIcon } from "@/components/ui/file-text-icon"
-import { format } from "date-fns"
-
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -73,6 +71,7 @@ import type { ExportFormat, GeneratedReportRecord, ReportTypeId } from "@/lib/re
 import { fetchReportDataset } from "@/lib/reports/fetch-dataset"
 import { generateReportBlob, triggerDownload } from "@/lib/reports/generate-report"
 import { deleteRecentReport, loadRecentReports, saveRecentReport } from "@/lib/reports/recent-storage"
+import { useDateTimeFormat } from "@/components/datetime-preferences-context"
 import * as XLSX from "xlsx"
 
 const REPORT_ICONS: Record<ReportTypeId, any> = {
@@ -189,6 +188,7 @@ function ReportTypeButton({
 }
 
 export function ReportsApp() {
+  const { prefs, formatDateTimeCompact } = useDateTimeFormat()
   const { toast } = useToast()
   const [mainTab, setMainTab] = useState("generate")
   const sparkleRef = useRef<any>(null)
@@ -383,6 +383,7 @@ export function ReportsApp() {
         reportTypeId: selectedReportId,
         format: exportFormat as ExportFormat,
         dataset,
+        dateTimePrefs: prefs,
       })
       const filename = `${baseFilename}.${extension}`
       if (opts.download) {
@@ -950,7 +951,7 @@ export function ReportsApp() {
                                 {formatBytes(r.sizeBytes)}
                               </TableCell>
                               <TableCell className="text-muted-foreground text-sm tabular-nums">
-                                {format(r.generatedAt, "MMM d, yyyy · HH:mm")}
+                                {formatDateTimeCompact(r.generatedAt)}
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-0.5">

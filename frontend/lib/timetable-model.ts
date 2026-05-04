@@ -1,3 +1,6 @@
+import type { UserTimeFormat } from "@/lib/datetime-format"
+import { formatHourFloatAsClock, formatTimeslotClockRange } from "@/lib/datetime-format"
+
 /** Timeslot catalogue entry (from config / schedule payload). */
 export type TimeslotCatalogueEntry = {
   id: string
@@ -27,10 +30,8 @@ export function slotFamilyFromSlotType(slotType?: string): SlotFamily {
   return uiSlotKindFromEngineSlotType(slotType)
 }
 
-export function hourFloatToLabel(h: number): string {
-  const hh = Math.floor(h)
-  const mm = Math.round((h - hh) * 60) % 60
-  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`
+export function hourFloatToLabel(h: number, timeFormat: UserTimeFormat = "24"): string {
+  return formatHourFloatAsClock(h, timeFormat)
 }
 
 export function parseStartTimeToHour(s?: string): number | undefined {
@@ -52,26 +53,26 @@ export function normalizeTimeslotCatalogueEntry(t: TimeslotCatalogueEntry): Requ
 }
 
 /** Human-readable day/time range (ignores short_code). */
-export function timeslotScheduleLabel(t: TimeslotCatalogueEntry): string {
+export function timeslotScheduleLabel(t: TimeslotCatalogueEntry, timeFormat: UserTimeFormat = "24"): string {
   const n = normalizeTimeslotCatalogueEntry(t)
   const dayPart = (n.days || []).map((d) => d.slice(0, 3)).join("/") || "—"
-  return `${dayPart} ${hourFloatToLabel(n.start_hour)}–${hourFloatToLabel(n.start_hour + n.duration)}`
+  return `${dayPart} ${formatTimeslotClockRange(n.start_hour, n.duration, timeFormat)}`
 }
 
 /** Long label for tooltips and legends: optional custom label, else schedule range. */
-export function timeslotLongLabel(t: TimeslotCatalogueEntry): string {
+export function timeslotLongLabel(t: TimeslotCatalogueEntry, timeFormat: UserTimeFormat = "24"): string {
   if (t.label?.trim()) return t.label.trim()
-  return timeslotScheduleLabel(t)
+  return timeslotScheduleLabel(t, timeFormat)
 }
 
 /** Compact label for grid headers: short_code, else same as long. */
-export function timeslotCompactLabel(t: TimeslotCatalogueEntry): string {
+export function timeslotCompactLabel(t: TimeslotCatalogueEntry, timeFormat: UserTimeFormat = "24"): string {
   if (t.short_code?.trim()) return t.short_code.trim()
-  return timeslotLongLabel(t)
+  return timeslotLongLabel(t, timeFormat)
 }
 
-export function derivedTimeslotLabel(t: TimeslotCatalogueEntry): string {
-  return timeslotCompactLabel(t)
+export function derivedTimeslotLabel(t: TimeslotCatalogueEntry, timeFormat: UserTimeFormat = "24"): string {
+  return timeslotCompactLabel(t, timeFormat)
 }
 
 /** Merge engine catalogue rows with short_code (and optional label) from config by id. */
@@ -132,19 +133,24 @@ export function catalogueById(
 export function timeslotLabelForId(
   id: string,
   catalogue?: TimeslotCatalogueEntry[],
+  timeFormat: UserTimeFormat = "24",
 ): string {
   const row = catalogue?.find((t) => t.id === id)
   if (!row) return id
-  return derivedTimeslotLabel(row)
+  return derivedTimeslotLabel(row, timeFormat)
 }
 
 /** Replace raw timeslot ids in a string (e.g. gap warnings) with catalogue labels. */
-export function injectTimeslotIdsWithLabels(text: string, catalogue?: TimeslotCatalogueEntry[]): string {
+export function injectTimeslotIdsWithLabels(
+  text: string,
+  catalogue?: TimeslotCatalogueEntry[],
+  timeFormat: UserTimeFormat = "24",
+): string {
   if (!catalogue?.length) return text
   let out = text
   const sorted = [...catalogue].sort((a, b) => b.id.length - a.id.length)
   for (const t of sorted) {
-    const lab = timeslotLongLabel(t)
+    const lab = timeslotLongLabel(t, timeFormat)
     if (t.id) out = out.split(t.id).join(lab)
   }
   return out

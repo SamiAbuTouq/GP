@@ -17,7 +17,7 @@ interface AuthContextType {
   /** True until the initial session restore (refresh token) finishes */
   authLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, redirectTo?: string | null) => Promise<void>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<boolean>;
 }
@@ -143,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /**
    * Login function that handles the full login flow
    */
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, redirectTo?: string | null) => {
     const response = await ApiClient.login(email, password);
     const decodedUser = decodeToken(response.access_token);
     
@@ -154,6 +154,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthLoading(false);
     if (response.requires_password_change) {
       router.push("/first-login-password");
+      return;
+    }
+    if (redirectTo) {
+      router.push(redirectTo);
       return;
     }
     if (decodedUser?.role === LECTURER_ROLE) {

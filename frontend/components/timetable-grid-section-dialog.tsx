@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { useDateTimeFormat } from "@/components/datetime-preferences-context";
 
 function roomCap(config: ScheduleConfig, name: string): number {
   const rv = config.rooms?.[name];
@@ -63,6 +64,7 @@ export function TimetableGridSectionDialog({
   onApply,
   onDelete,
 }: Props) {
+  const { prefs } = useDateTimeFormat();
   const lec = entry ? findLectureConfig(config, entry) : undefined;
   const [ts, setTs] = useState("");
   const [room, setRoom] = useState("");
@@ -131,10 +133,10 @@ export function TimetableGridSectionDialog({
     return allowedTs.filter((id) => {
       if (!q) return true;
       const row = catMap.get(id);
-      const lab = `${id} ${row ? timeslotLongLabel(row) : ""}`.toLowerCase();
+      const lab = `${id} ${row ? timeslotLongLabel(row, prefs.timeFormat) : ""}`.toLowerCase();
       return lab.includes(q);
     });
-  }, [allowedTs, qTs, catMap]);
+  }, [allowedTs, qTs, catMap, prefs.timeFormat]);
 
   const filteredRooms = useMemo(() => {
     const q = qRoom.trim().toLowerCase();
@@ -216,7 +218,10 @@ export function TimetableGridSectionDialog({
               <div className="text-xs font-medium text-muted-foreground">Timeslot</div>
               <div className="font-medium text-foreground">
                 {entry.timeslot_label ??
-                  timeslotLongLabel(catMap.get(entry.timeslot) ?? { id: entry.timeslot, days: [] })}
+                  timeslotLongLabel(
+                    catMap.get(entry.timeslot) ?? { id: entry.timeslot, days: [] },
+                    prefs.timeFormat,
+                  )}
               </div>
               {!isInternalSlotId(entry.timeslot) ? (
                 <div className="mt-0.5 font-mono text-xs text-muted-foreground">{entry.timeslot}</div>
@@ -276,7 +281,7 @@ export function TimetableGridSectionDialog({
                               ts === id ? "bg-primary/15 font-medium" : ""
                             }`}
                           >
-                            <span>{row ? timeslotLongLabel(row) : "Unlabeled timeslot"}</span>
+                            <span>{row ? timeslotLongLabel(row, prefs.timeFormat) : "Unlabeled timeslot"}</span>
                             {!isInternalSlotId(id) ? (
                               <span className="font-mono text-[10px] text-muted-foreground">{id}</span>
                             ) : null}
@@ -385,6 +390,7 @@ export function TimetableGridSectionDialog({
                   entryNeedsRoom(entry) ? room : null,
                   ts,
                   cap,
+                  prefs.timeFormat,
                 );
                 onApply(next);
                 onOpenChange(false);

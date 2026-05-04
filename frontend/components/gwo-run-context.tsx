@@ -71,6 +71,63 @@ const ETA_MIN_DT_MS = 400;
 const ETA_MIN_ITER_DELTA = 1;
 const ETA_MAX_MS = 48 * 60 * 60 * 1000;
 
+/** Full-grid runs: reserve a few points for “finalizing” → 100%. */
+const TIMETABLE_ITERATION_PROGRESS_CAP = 97;
+
+/**
+ * What-if `run_scenario.py` keeps work before validating in ~5–37%, GWO in ~38–92%
+ * (see pct remapping around GWO subprocess output), then validating / save / done.
+ * Map iteration counts into the GWO band so the bar matches phase pcts from SSE.
+ */
+const SCENARIO_GWO_PROGRESS_LO = 38;
+const SCENARIO_GWO_PROGRESS_HI = 92;
+
+/**
+ * Scenario runs may restart iteration counters between GWO batches (run 1/N).
+ * Aggregate into one 0→1 progression so monotonic smoothing does not stall mid-job.
+ */
+function scenarioGwoIterationBarPercent(
+  current: number,
+  total: number,
+  run?: number,
+  numRuns?: number,
+): number {
+  const cur = Number(current);
+  const tot = Number(total);
+  if (!Number.isFinite(cur) || !Number.isFinite(tot) || cur < 0) return 0;
+  const safeTotal = tot > 0 ? tot : 1;
+  const inRunRatio = Math.min(1, Math.max(0, cur / safeTotal));
+
+  let runsCount = numRuns != null ? Number(numRuns) : 1;
+  if (!Number.isFinite(runsCount) || runsCount < 1) runsCount = 1;
+  runsCount = Math.min(32, Math.floor(runsCount));
+
+  let runIdx = run != null ? Number(run) : 1;
+  if (!Number.isFinite(runIdx) || runIdx < 1) runIdx = 1;
+  runIdx = Math.min(runsCount, Math.floor(runIdx));
+
+  const globalRatio = (runIdx - 1 + inRunRatio) / runsCount;
+  const span = SCENARIO_GWO_PROGRESS_HI - SCENARIO_GWO_PROGRESS_LO;
+  return Math.round(SCENARIO_GWO_PROGRESS_LO + Math.min(1, Math.max(0, globalRatio)) * span);
+}
+
+function iterationBarPercent(
+  current: number,
+  total: number,
+  mode: "timetable" | "scenario",
+  run?: number,
+  numRuns?: number,
+): number {
+  if (mode === "scenario") {
+    return scenarioGwoIterationBarPercent(current, total, run, numRuns);
+  }
+  const cur = Number(current);
+  const tot = Number(total);
+  if (!Number.isFinite(cur) || !Number.isFinite(tot) || cur < 0) return 0;
+  const safeTotal = tot > 0 ? tot : 1;
+  return Math.min(TIMETABLE_ITERATION_PROGRESS_CAP, Math.round((100 * cur) / safeTotal));
+}
+
 function trimSamples(samples: ProgressSample[]): ProgressSample[] {
   if (samples.length <= 2) return samples;
   const newest = samples[samples.length - 1].activeMs;
@@ -164,6 +221,8 @@ type GwoRunContextValue = {
   beginRun: (source?: GwoRunSource, runId?: number | null) => AbortController;
   bindRunId: (runId: number | null) => void;
   updateProgress: (p: GwoOptimizerProgressPayload) => void;
+  /** Server-driven bar fill (0–100); never decreases vs. the current bar. */
+  setPercent: (pct: number) => void;
   /** Update high-level status (e.g. while waiting on the network or stream). */
   setRunPhase: (phase: string, detail?: string) => void;
   setFinalizing: () => void;
@@ -280,6 +339,17 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const setPercent = useCallback((pct: number) => {
+    const n = Number(pct);
+    if (!Number.isFinite(n)) return;
+    const clamped = Math.min(100, Math.max(0, Math.round(n)));
+    setBar((b) => ({
+      ...b,
+      visible: true,
+      percent: Math.max(b.percent, clamped),
+    }));
+  }, []);
+
   const applyServerStatus = useCallback(
     (status: GwoServerRunStatusPayload) => {
       if (!status.running) {
@@ -293,14 +363,16 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
       setBar((b) => {
         const progress = status.progress;
         const safeTotal = progress?.total && progress.total > 0 ? progress.total : 1;
-        const pct = progress
-          ? Math.min(95, Math.round((95 * Number(progress.current)) / safeTotal))
-          : b.percent > 0
-            ? b.percent
-            : 1;
+        let nextPct = b.percent;
+        if (progress) {
+          const iterPct = iterationBarPercent(Number(progress.current), safeTotal, "timetable");
+          nextPct = Math.max(b.percent, iterPct);
+        } else if (nextPct <= 0) {
+          nextPct = 1;
+        }
         return {
           visible: true,
-          percent: pct,
+          percent: nextPct,
           phase: status.phase || b.phase || "Grey Wolf optimization running",
           detail: status.detail || b.detail || "Optimizer is running on the server",
         };
@@ -330,10 +402,10 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     const current = Number(p.current);
     const total = Number(p.total);
     const safeTotal = total > 0 ? total : 1;
-    const pct = Math.min(95, Math.round((95 * current) / safeTotal));
-
     const numRuns = p.numRuns != null ? Number(p.numRuns) : undefined;
     const run = p.run != null ? Number(p.run) : undefined;
+    const iterMode = runSource === "scenario" ? "scenario" : "timetable";
+    const pct = iterationBarPercent(current, safeTotal, iterMode, run, numRuns);
     const best = p.best != null ? Number(p.best) : undefined;
 
     const detailParts: string[] = [];
@@ -407,12 +479,12 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
       return {
         ...b,
         visible: true,
-        percent: pct,
+        percent: Math.max(b.percent, pct),
         phase,
         detail: paused ? b.detail : detail,
       };
     });
-  }, [getActiveMs, setDeadline]);
+  }, [getActiveMs, runSource, setDeadline]);
 
   const setFinalizing = useCallback(() => {
     setDeadline(null);
@@ -741,6 +813,7 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
       beginRun,
       bindRunId,
       updateProgress,
+      setPercent,
       setRunPhase,
       setFinalizing,
       endRun,
@@ -762,6 +835,7 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
       beginRun,
       bindRunId,
       updateProgress,
+      setPercent,
       setRunPhase,
       setFinalizing,
       endRun,

@@ -1,6 +1,8 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ADMIN_NOTIFICATION_PREF_KEYS } from '../notifications/notification-prefs';
 import {
   CreateTimeslotDto,
   UpdateTimeslotDto,
@@ -13,7 +15,10 @@ const DAY_VALUES = { Sunday: 1, Monday: 2, Tuesday: 4, Wednesday: 8, Thursday: 1
 
 @Injectable()
 export class TimeslotsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   private async ensureLecturerProfileExists(
     tx: Prisma.TransactionClient,
@@ -248,6 +253,19 @@ export class TimeslotsService {
       ([slotId, isPreferred]) => ({ slotId, isPreferred }),
     );
 
+    const priorCount = await this.prisma.lecturerPreference.count({
+      where: { user_id: userId },
+    });
+
+    const lecturer = await this.prisma.user.findUnique({
+      where: { user_id: userId },
+      select: { first_name: true, last_name: true },
+    });
+    const fullName =
+      lecturer != null
+        ? `${lecturer.first_name ?? ''} ${lecturer.last_name ?? ''}`.trim()
+        : `Lecturer #${userId}`;
+
     await this.prisma.$transaction(async (tx) => {
       await this.ensureLecturerProfileExists(tx, userId);
 
@@ -266,6 +284,18 @@ export class TimeslotsService {
         });
       }
     });
+
+    const isFirst = priorCount === 0;
+    const suffix = `\n[[lecturer_user_id:${userId}]]`;
+    void this.notifications
+      .notifyAdmins(
+        isFirst ? 'Preferences Submitted' : 'Preferences Updated',
+        (isFirst
+          ? `${fullName} submitted their time preferences for the first time.`
+          : `${fullName} updated their time preferences. Re-running timetable generation may be needed to reflect the changes.`) + suffix,
+        { preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_PREFERENCES },
+      )
+      .catch(() => {});
 
     return { success: true };
   }

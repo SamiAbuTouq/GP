@@ -1,7 +1,7 @@
 'use client'
 
-// Inspired by react-hot-toast library
 import * as React from 'react'
+import { toast as sonnerToast } from 'sonner'
 
 import type { ToastActionElement, ToastProps } from '@/components/ui/toast'
 
@@ -67,7 +67,6 @@ const addToRemoveQueue = (toastId: string) => {
       toastId: toastId,
     })
   }, TOAST_REMOVE_DELAY)
-
   toastTimeouts.set(toastId, timeout)
 }
 
@@ -90,8 +89,6 @@ export const reducer = (state: State, action: Action): State => {
     case 'DISMISS_TOAST': {
       const { toastId } = action
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
       if (toastId) {
         addToRemoveQueue(toastId)
       } else {
@@ -139,13 +136,25 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, 'id'>
 
-function toast({ ...props }: Toast) {
-  const id = genId()
+function nodeToText(n: React.ReactNode): string | undefined {
+  if (n == null || typeof n === 'boolean') return undefined
+  if (typeof n === 'string' || typeof n === 'number') return String(n)
+  return undefined
+}
 
-  const update = (props: ToasterToast) =>
+/**
+ * Shows a Sonner toast (success / error / warning) with project duration rules.
+ * Legacy Radix toast state is still updated for callers that read `useToast().toasts`.
+ */
+function toast({ title, description, variant, ...props }: Toast) {
+  const id = genId()
+  const titleText = nodeToText(title) ?? 'Notice'
+  const descText = nodeToText(description)
+
+  const update = (p: ToasterToast) =>
     dispatch({
       type: 'UPDATE_TOAST',
-      toast: { ...props, id },
+      toast: { ...p, id },
     })
   const dismiss = () => dispatch({ type: 'DISMISS_TOAST', toastId: id })
 
@@ -153,6 +162,8 @@ function toast({ ...props }: Toast) {
     type: 'ADD_TOAST',
     toast: {
       ...props,
+      title,
+      description,
       id,
       open: true,
       onOpenChange: (open) => {
@@ -161,9 +172,24 @@ function toast({ ...props }: Toast) {
     },
   })
 
+  if (variant === 'destructive') {
+    sonnerToast.error(titleText, {
+      description: descText,
+      duration: Number.POSITIVE_INFINITY,
+    })
+  } else {
+    sonnerToast.success(titleText, {
+      description: descText,
+      duration: 3000,
+    })
+  }
+
   return {
-    id: id,
-    dismiss,
+    id,
+    dismiss: () => {
+      sonnerToast.dismiss()
+      dismiss()
+    },
     update,
   }
 }

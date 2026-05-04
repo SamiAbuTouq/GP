@@ -4,9 +4,10 @@ import { cookies } from "next/headers"
 import { Inter, JetBrains_Mono } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { DateTimePreferencesProvider } from "@/components/datetime-preferences-context"
 import { AuthProvider } from "@/lib/auth-context"
 import { SidebarProvider } from "@/lib/sidebar-context"
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
@@ -40,10 +41,12 @@ export default async function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <TooltipProvider>
             <AuthProvider>
-              <SidebarProvider initialCollapsed={initialSidebarCollapsed}>
-                {children}
-                <Toaster />
-              </SidebarProvider>
+              <DateTimePreferencesProvider>
+                <SidebarProvider initialCollapsed={initialSidebarCollapsed}>
+                  {children}
+                  <Toaster />
+                </SidebarProvider>
+              </DateTimePreferencesProvider>
             </AuthProvider>
           </TooltipProvider>
         </ThemeProvider>

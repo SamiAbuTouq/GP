@@ -140,6 +140,7 @@ export declare class WhatIfController {
         runId: number;
         scenarioId: number;
         baseTimetableId: number;
+        baseTimetableName: string;
         resultTimetableId: number | null;
         status: string;
         startedAt: Date | null;
@@ -160,6 +161,7 @@ export declare class WhatIfController {
             runId: number;
             scenarioId: number;
             scenarioName: string;
+            conditionCount: number;
             baseTimetableId: number;
             resultTimetableId: number | null;
             status: string;
@@ -176,15 +178,18 @@ export declare class WhatIfController {
                 fitnessScore: number;
                 lecturerBalanceScore: number | null;
             } | null;
+            baselineConflictBreakdown: import("./whatif.service").ConflictBreakdown;
+            resultConflictBreakdown: import("./whatif.service").ConflictBreakdown | null;
+            conflictBreakdownDelta: {
+                roomConflicts: number;
+                lecturerConflicts: number;
+                timeslotClashes: number;
+            } | null;
+            gwoIterationsRun: number | null;
+            generationSeconds: number | null;
+            disruptionLevel: string;
             recommendation: string;
-            sectionChanges: {
-                added: number;
-                removed: number;
-                changed: number;
-                unchanged: number;
-                baselineCount: number;
-                resultCount: number;
-            };
+            sectionChanges: import("./whatif.service").SectionChangeSummary;
         }[];
     }>;
     applyScenarioRun(runId: number, body: ApplyScenarioRunDto): Promise<{

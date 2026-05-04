@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdminFromRefreshCookie } from "@/lib/server-auth";
+import { requireAdminFromRefreshOrBearer, resolveAuthUser } from "@/lib/server-auth";
+import { notifyAdminsTimetablePersisted } from "@/lib/server-notifications";
 import {
   prismaTimeslotRowToConfig,
   mergeFileConfigWithDatabase,
@@ -161,7 +162,7 @@ async function resolveTimeslotToSlotId(
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAdminFromRefreshCookie();
+  const auth = await requireAdminFromRefreshOrBearer(req);
   if (!auth.ok) return auth.response;
 
   try {
@@ -172,6 +173,8 @@ export async function POST(req: NextRequest) {
       schedule?: ScheduleEntry[];
       timeslots_catalogue?: TimeslotCatalogueEntry[];
       validationResult?: PersistValidationResult;
+      /** Optional optimizer summary for admin notifications */
+      metadata?: { best_fitness?: number | null };
     };
 
     const parsedSemesterId = Number(body.semesterId);
@@ -363,6 +366,25 @@ export async function POST(req: NextRequest) {
     } else {
       timetableName = "Unassigned draft";
     }
+
+    const hardConflictCount = conflictRows.filter((c) => c.severity === "hard").length;
+    const authUser = await resolveAuthUser(req);
+    const rawSub = authUser?.sub;
+    const publisherId =
+      typeof rawSub === "number" && Number.isFinite(rawSub)
+        ? rawSub
+        : typeof rawSub === "string" && Number.isFinite(Number(rawSub))
+          ? Number(rawSub)
+          : undefined;
+
+    void notifyAdminsTimetablePersisted({
+      exceptUserId: publisherId,
+      timetableName,
+      timetableId: timetable.timetable_id,
+      versionNumber: nextVersion,
+      hardConflictCount,
+      bestFitness: body.metadata?.best_fitness ?? null,
+    }).catch(() => {});
 
     return NextResponse.json({
       ok: true,

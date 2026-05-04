@@ -50,11 +50,14 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const bcrypt = __importStar(require("bcrypt"));
 const crypto_1 = require("crypto");
 const mail_service_1 = require("../mail/mail.service");
+const notifications_service_1 = require("../notifications/notifications.service");
+const notification_prefs_1 = require("../notifications/notification-prefs");
 const STANDARD_MAX_WORKLOAD_HOURS = 15;
 let LecturersService = LecturersService_1 = class LecturersService {
-    constructor(prisma, mailService) {
+    constructor(prisma, mailService, notifications) {
         this.prisma = prisma;
         this.mailService = mailService;
+        this.notifications = notifications;
         this.logger = new common_1.Logger(LecturersService_1.name);
     }
     generateTemporaryPassword(length = 16) {
@@ -284,11 +287,15 @@ let LecturersService = LecturersService_1 = class LecturersService {
     async update(id, dto) {
         const existing = await this.prisma.lecturer.findUnique({
             where: { user_id: id },
-            include: { user: true },
+            include: { user: true, department: true },
         });
         if (!existing) {
             throw new common_1.NotFoundException(`Lecturer with ID ${id} not found`);
         }
+        const oldDeptName = existing.department.dept_name;
+        const oldFirst = existing.user.first_name;
+        const oldLast = existing.user.last_name;
+        const oldMax = existing.max_workload;
         let deptId = existing.dept_id;
         if (dto.department) {
             let department = await this.prisma.department.findFirst({
@@ -321,6 +328,36 @@ let LecturersService = LecturersService_1 = class LecturersService {
                 ...(dto.maxWorkload !== undefined ? { max_workload: dto.maxWorkload } : {}),
             },
         });
+        const newDept = await this.prisma.department.findUnique({
+            where: { dept_id: deptId },
+            select: { dept_name: true },
+        });
+        const updatedUser = await this.prisma.user.findUnique({
+            where: { user_id: id },
+            select: { first_name: true, last_name: true },
+        });
+        const updatedLecturer = await this.prisma.lecturer.findUnique({
+            where: { user_id: id },
+            select: { max_workload: true },
+        });
+        const changes = [];
+        if (dto.name && updatedUser) {
+            const nn = `${updatedUser.first_name} ${updatedUser.last_name}`.trim();
+            const on = `${oldFirst} ${oldLast}`.trim();
+            if (nn !== on)
+                changes.push(`name (${on} → ${nn})`);
+        }
+        if (dto.department && newDept && newDept.dept_name !== oldDeptName) {
+            changes.push(`department (${oldDeptName} → ${newDept.dept_name})`);
+        }
+        if (dto.maxWorkload !== undefined && updatedLecturer && dto.maxWorkload !== oldMax) {
+            changes.push(`max workload (${oldMax ?? '—'} → ${dto.maxWorkload})`);
+        }
+        if (changes.length > 0) {
+            void this.notifications
+                .createForUser(id, 'Your Profile Was Updated', `An administrator updated your profile: ${changes.join('; ')}.`, { preferenceKey: notification_prefs_1.LECTURER_NOTIFICATION_PREF_KEYS.PROFILE_UPDATED_BY_ADMIN })
+                .catch(() => { });
+        }
         if (dto.courses !== undefined) {
             await this.prisma.lecturerCanTeachCourse.deleteMany({
                 where: { user_id: id },
@@ -342,7 +379,7 @@ let LecturersService = LecturersService_1 = class LecturersService {
     async remove(id) {
         const existing = await this.prisma.lecturer.findUnique({
             where: { user_id: id },
-            include: { user: { select: { is_active: true } } },
+            include: { user: { select: { is_active: true, first_name: true, last_name: true } } },
         });
         if (!existing) {
             throw new common_1.NotFoundException(`Lecturer with ID ${id} not found`);
@@ -350,10 +387,19 @@ let LecturersService = LecturersService_1 = class LecturersService {
         if (!existing.user.is_active) {
             return { message: 'Lecturer already deactivated' };
         }
+        const fullName = `${existing.user.first_name} ${existing.user.last_name}`.trim();
+        const sectionCount = await this.prisma.sectionScheduleEntry.count({
+            where: { user_id: id },
+        });
         await this.prisma.user.update({
             where: { user_id: id },
             data: { is_active: false },
         });
+        if (sectionCount > 0) {
+            void this.notifications
+                .notifyAdmins('Lecturer Deactivated — Schedule Impact', `${fullName || `Lecturer #${id}`} was deactivated and had ${sectionCount} schedule section row(s) assigned across timetables.`)
+                .catch(() => { });
+        }
         return { message: 'Lecturer deactivated successfully' };
     }
     async findDeactivated() {
@@ -457,6 +503,7 @@ exports.LecturersService = LecturersService;
 exports.LecturersService = LecturersService = LecturersService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        mail_service_1.MailService])
+        mail_service_1.MailService,
+        notifications_service_1.NotificationsService])
 ], LecturersService);
 //# sourceMappingURL=lecturers.service.js.map

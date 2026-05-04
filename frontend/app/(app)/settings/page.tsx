@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect, Suspense } from "react";
+import {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  Suspense,
+  type ComponentType,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Sidebar } from "@/components/sidebar";
@@ -15,6 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -51,12 +60,26 @@ import {
   Loader2,
   Eye,
   EyeOff,
+  AlertCircle,
   CheckCircle2,
   XCircle,
+  Sparkles,
+  AlertTriangle,
+  ClipboardList,
+  Megaphone,
+  CalendarCheck,
+  CalendarClock,
+  ShieldAlert,
+  UserCog,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ApiClient, type UserProfile } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import {
+  ADMIN_NOTIFICATION_PREF_KEYS,
+  LECTURER_NOTIFICATION_PREF_KEYS,
+  defaultNotificationPrefsMerged,
+} from "@/lib/notification-prefs";
 
 function AvatarCropDialog({
   open,
@@ -308,6 +331,67 @@ const settingsTabs = [
   { id: "security", label: "Security", icon: Shield },
 ];
 
+type NotificationPrefRowDef = {
+  key: string;
+  title: string;
+  description: string;
+  Icon: ComponentType<{ className?: string }>;
+};
+
+const ADMIN_NOTIFICATION_PREF_ROWS: NotificationPrefRowDef[] = [
+  {
+    key: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_COMPLETED,
+    title: "Optimization completed",
+    description: "Get notified when a timetable generation run finishes.",
+    Icon: Sparkles,
+  },
+  {
+    key: ADMIN_NOTIFICATION_PREF_KEYS.HARD_CONFLICTS,
+    title: "Hard conflicts detected",
+    description: "Get notified when conflicts are found in a generated timetable.",
+    Icon: AlertTriangle,
+  },
+  {
+    key: ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_PREFERENCES,
+    title: "Lecturer preferences submitted",
+    description: "Get notified when a lecturer submits or updates their time preferences.",
+    Icon: ClipboardList,
+  },
+  {
+    key: ADMIN_NOTIFICATION_PREF_KEYS.TIMETABLE_PUBLISHED_BY_OTHER,
+    title: "Timetable published by another admin",
+    description: "Get notified when a colleague publishes a timetable.",
+    Icon: Megaphone,
+  },
+];
+
+const LECTURER_NOTIFICATION_PREF_ROWS: NotificationPrefRowDef[] = [
+  {
+    key: LECTURER_NOTIFICATION_PREF_KEYS.SCHEDULE_PUBLISHED,
+    title: "Schedule published",
+    description: "Get notified when a new timetable that includes you is published.",
+    Icon: CalendarCheck,
+  },
+  {
+    key: LECTURER_NOTIFICATION_PREF_KEYS.SCHEDULE_REVISED,
+    title: "Schedule revised",
+    description: "Get notified when a published timetable you are part of gets updated.",
+    Icon: CalendarClock,
+  },
+  {
+    key: LECTURER_NOTIFICATION_PREF_KEYS.PREFERENCE_NOT_HONORED,
+    title: "Preference not honored",
+    description: "Get notified when a timeslot you marked unavailable was assigned to you anyway.",
+    Icon: ShieldAlert,
+  },
+  {
+    key: LECTURER_NOTIFICATION_PREF_KEYS.PROFILE_UPDATED_BY_ADMIN,
+    title: "Profile updated by admin",
+    description: "Get notified when an admin makes changes to your account.",
+    Icon: UserCog,
+  },
+];
+
 function SettingRow({
   title,
   description,
@@ -402,7 +486,14 @@ function SettingsContent() {
   const [preferencesSaveState, setPreferencesSaveState] = useState<
     "idle" | "saving" | "saved"
   >("idle");
+  const [notificationPrefsSaveState, setNotificationPrefsSaveState] = useState<
+    "idle" | "saving" | "saved"
+  >("idle");
   const preferencesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notificationPrefsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notificationPrefsBaselineRef = useRef<string>(
+    JSON.stringify(defaultNotificationPrefsMerged(null)),
+  );
 
   // Profile state (fetched from API)
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -417,11 +508,9 @@ function SettingsContent() {
     timeFormat: "24",
   });
 
-  const [notifications, setNotifications] = useState({
-    emailAlerts: true,
-    conflictNotifications: true,
-    generationComplete: true,
-  });
+  const [notificationPrefs, setNotificationPrefs] = useState<Record<string, boolean>>(() =>
+    defaultNotificationPrefsMerged(null),
+  );
 
   // Security / Password state
   const [passwordData, setPasswordData] = useState({
@@ -435,6 +524,10 @@ function SettingsContent() {
     confirm: false,
   });
   const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [passwordFeedback, setPasswordFeedback] = useState<{
+    type: "error" | "success";
+    message: string;
+  } | null>(null);
 
   // Password validation
   const passwordValidation = {
@@ -448,6 +541,11 @@ function SettingsContent() {
   const isPasswordValid = Object.values(passwordValidation).every(Boolean);
 
   const hasFetchedProfile = useRef(false);
+
+  const notificationPrefRows = useMemo(() => {
+    if (profile?.role === "ADMIN") return ADMIN_NOTIFICATION_PREF_ROWS;
+    return LECTURER_NOTIFICATION_PREF_ROWS;
+  }, [profile?.role]);
 
   // Mount logic and auth-dependent fetch
   useEffect(() => {
@@ -474,6 +572,9 @@ function SettingsContent() {
         dateFormat: data.date_format || "DD/MM/YYYY",
         timeFormat: data.time_format || "24",
       });
+      const np = defaultNotificationPrefsMerged(data.notification_preferences ?? null);
+      setNotificationPrefs(np);
+      notificationPrefsBaselineRef.current = JSON.stringify(np);
       // Sync theme from DB if available
       if (data.theme_preference && mounted) {
         setTheme(data.theme_preference);
@@ -486,6 +587,7 @@ function SettingsContent() {
         ).split(".");
         const idFromAuth =
           typeof user.id === 'number' ? user.id : parseInt(String(user.id), 10)
+        const fallbackNp = defaultNotificationPrefsMerged(null);
         const fallbackProfile: UserProfile = {
           user_id: Number.isFinite(idFromAuth) && idFromAuth > 0 ? idFromAuth : 0,
           email: user.email,
@@ -498,8 +600,11 @@ function SettingsContent() {
           theme_preference: theme || "system",
           date_format: "DD/MM/YYYY",
           time_format: "24",
+          notification_preferences: fallbackNp,
         };
         setProfile(fallbackProfile);
+        setNotificationPrefs(fallbackNp);
+        notificationPrefsBaselineRef.current = JSON.stringify(fallbackNp);
         setEditableProfile({
           first_name: fallbackProfile.first_name,
           last_name: fallbackProfile.last_name,
@@ -584,6 +689,11 @@ function SettingsContent() {
       console.log(
         "[v0] Preferences saved locally - backend may not be running",
       );
+      ApiClient.notifyProfileUpdate({
+        theme_preference: theme || "system",
+        date_format: preferences.dateFormat,
+        time_format: preferences.timeFormat,
+      });
       setPreferencesSaveState("saved");
     } finally {
       setIsSavingPreferences(false);
@@ -612,12 +722,50 @@ function SettingsContent() {
     };
   }, [theme, preferences.dateFormat, preferences.timeFormat, mounted, isLoading]);
 
-  const handleSave = () => {
-    toast({
-      title: "Settings saved",
-      description: "Your preferences have been updated successfully.",
-    });
-  };
+  const handleSaveNotificationPrefs = useCallback(async () => {
+    try {
+      setNotificationPrefsSaveState("saving");
+      const { notification_preferences } =
+        await ApiClient.updateNotificationPreferences(notificationPrefs);
+      setNotificationPrefs(notification_preferences);
+      notificationPrefsBaselineRef.current = JSON.stringify(notification_preferences);
+      setProfile((prev) =>
+        prev ? { ...prev, notification_preferences } : null,
+      );
+      setNotificationPrefsSaveState("saved");
+    } catch {
+      console.log(
+        "[v0] Notification preferences saved locally - backend may not be running",
+      );
+      notificationPrefsBaselineRef.current = JSON.stringify(notificationPrefs);
+      setNotificationPrefsSaveState("saved");
+      ApiClient.notifyProfileUpdate({
+        notification_preferences: notificationPrefs,
+      });
+      setProfile((prev) =>
+        prev ? { ...prev, notification_preferences: notificationPrefs } : null,
+      );
+    }
+  }, [notificationPrefs]);
+
+  useEffect(() => {
+    if (!mounted || isLoading) return;
+    const serialized = JSON.stringify(notificationPrefs);
+    if (serialized === notificationPrefsBaselineRef.current) return;
+
+    setNotificationPrefsSaveState("idle");
+    if (notificationPrefsDebounceRef.current) {
+      clearTimeout(notificationPrefsDebounceRef.current);
+    }
+    notificationPrefsDebounceRef.current = setTimeout(() => {
+      void handleSaveNotificationPrefs();
+    }, 500);
+    return () => {
+      if (notificationPrefsDebounceRef.current) {
+        clearTimeout(notificationPrefsDebounceRef.current);
+      }
+    };
+  }, [notificationPrefs, mounted, isLoading, handleSaveNotificationPrefs]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -965,51 +1113,101 @@ function SettingsContent() {
               {activeTab === "notifications" && (
                 <Card className="border shadow-sm">
                   <CardHeader>
-                    <CardTitle>Notification Preferences</CardTitle>
-                    <CardDescription>
-                      Choose what notifications you want to receive.
-                    </CardDescription>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <CardTitle>In-app notification preferences</CardTitle>
+                        <CardDescription className="mt-1.5 max-w-2xl">
+                          Choose which events appear in your notification center (bell). Turning a
+                          category off stops{" "}
+                          <span className="font-medium text-foreground">new</span> notifications of
+                          that type — existing messages stay in your list.
+                        </CardDescription>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5 pt-0.5 text-xs text-muted-foreground">
+                        {notificationPrefsSaveState === "saving" ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <span>Saving...</span>
+                          </>
+                        ) : notificationPrefsSaveState === "saved" ? (
+                          <>
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                            <span className="text-emerald-700 dark:text-emerald-400">Saved</span>
+                          </>
+                        ) : (
+                          <span>Autosave enabled</span>
+                        )}
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="space-y-4">
-                      {[
-                        {
-                          key: "emailAlerts" as const,
-                          label: "Email Alerts",
-                          desc: "Receive important alerts via email",
-                        },
-                        {
-                          key: "conflictNotifications" as const,
-                          label: "Conflict Notifications",
-                          desc: "Get notified when conflicts are detected",
-                        },
-                        {
-                          key: "generationComplete" as const,
-                          label: "Generation Complete",
-                          desc: "Notify when timetable generation finishes",
-                        },
-                      ].map((item) => (
-                        <SettingRow
-                          key={item.key}
-                          title={item.label}
-                          description={item.desc}
-                        >
-                          <Switch
-                            checked={notifications[item.key]}
-                            onCheckedChange={(v) =>
-                              setNotifications({
-                                ...notifications,
-                                [item.key]: v,
-                              })
-                            }
-                          />
-                        </SettingRow>
-                      ))}
-                    </div>
-                    <Button onClick={handleSave}>
-                      <Save className="mr-2 h-4 w-4" />
-                      Save Preferences
-                    </Button>
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-10">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : profile ? (
+                      <>
+                        <div className="rounded-xl border border-dashed bg-muted/25 px-4 py-3 text-sm text-muted-foreground">
+                          These toggles only apply to{" "}
+                          <span className="font-medium text-foreground">in-app</span>{" "}
+                          notifications. They do not send email or push alerts.
+                        </div>
+
+                        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+                          <div className="border-b bg-muted/40 px-4 py-3">
+                            <p className="text-sm font-medium text-foreground">
+                              {profile.role === "ADMIN"
+                                ? "Administrator alerts"
+                                : "Your schedule & profile"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {profile.role === "ADMIN"
+                                ? "System events for timetable runs, conflicts, and publishing."
+                                : "Updates about your published schedule and account."}
+                            </p>
+                          </div>
+                          <div className="divide-y divide-border/80">
+                            {notificationPrefRows.map((row) => {
+                              const Icon = row.Icon;
+                              const checked = notificationPrefs[row.key] !== false;
+                              return (
+                                <div
+                                  key={row.key}
+                                  className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+                                >
+                                  <div className="flex min-w-0 gap-3">
+                                    <span className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
+                                      <Icon className="h-[18px] w-[18px]" />
+                                    </span>
+                                    <div className="min-w-0 space-y-1">
+                                      <p className="text-sm font-medium leading-snug">{row.title}</p>
+                                      <p className="text-sm text-muted-foreground leading-snug">
+                                        {row.description}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex shrink-0 justify-end sm:min-w-[52px]">
+                                    <Switch
+                                      checked={checked}
+                                      onCheckedChange={(v) =>
+                                        setNotificationPrefs((prev) => ({
+                                          ...prev,
+                                          [row.key]: v,
+                                        }))
+                                      }
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="py-10 text-center text-muted-foreground">
+                        Unable to load notification preferences.
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}
@@ -1030,9 +1228,10 @@ function SettingsContent() {
                         id="current-password"
                         label="Current Password"
                         value={passwordData.currentPassword}
-                        onChange={(value) =>
-                          setPasswordData((prev) => ({ ...prev, currentPassword: value }))
-                        }
+                          onChange={(value) => {
+                            setPasswordFeedback(null);
+                            setPasswordData((prev) => ({ ...prev, currentPassword: value }));
+                          }}
                         placeholder="Enter your current password"
                         shown={showPasswords.current}
                         onToggleShown={() =>
@@ -1044,9 +1243,10 @@ function SettingsContent() {
                           id="new-password"
                           label="New Password"
                           value={passwordData.newPassword}
-                          onChange={(value) =>
-                            setPasswordData((prev) => ({ ...prev, newPassword: value }))
-                          }
+                          onChange={(value) => {
+                            setPasswordFeedback(null);
+                            setPasswordData((prev) => ({ ...prev, newPassword: value }));
+                          }}
                           placeholder="Enter new password"
                           shown={showPasswords.new}
                           onToggleShown={() =>
@@ -1057,9 +1257,10 @@ function SettingsContent() {
                           id="confirm-password"
                           label="Confirm Password"
                           value={passwordData.confirmPassword}
-                          onChange={(value) =>
-                            setPasswordData((prev) => ({ ...prev, confirmPassword: value }))
-                          }
+                          onChange={(value) => {
+                            setPasswordFeedback(null);
+                            setPasswordData((prev) => ({ ...prev, confirmPassword: value }));
+                          }}
                           placeholder="Confirm new password"
                           shown={showPasswords.confirm}
                           onToggleShown={() =>
@@ -1095,50 +1296,48 @@ function SettingsContent() {
                         </div>
                       )}
                     </div>
+                    {passwordFeedback && (
+                      <Alert
+                        variant={passwordFeedback.type === "error" ? "destructive" : "default"}
+                      >
+                        {passwordFeedback.type === "error" ? (
+                          <AlertCircle className="h-4 w-4" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        )}
+                        <AlertTitle>
+                          {passwordFeedback.type === "error" ? "Password not updated" : "Success"}
+                        </AlertTitle>
+                        <AlertDescription>{passwordFeedback.message}</AlertDescription>
+                      </Alert>
+                    )}
                     
                     <Button
                       className="w-full sm:w-auto"
                       onClick={async () => {
+                        setPasswordFeedback(null);
                         if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-                          toast({
-                            title: "Missing fields",
-                            description: "Please fill in all password fields.",
-                            variant: "destructive",
+                          setPasswordFeedback({
+                            type: "error",
+                            message: "Please fill in all password fields.",
                           });
                           return;
                         }
                         
                         if (!isPasswordValid) {
-                          toast({
-                            title: "Invalid password",
-                            description: "Please ensure your password meets all requirements.",
-                            variant: "destructive",
+                          setPasswordFeedback({
+                            type: "error",
+                            message: "Please ensure your password meets all requirements.",
                           });
                           return;
                         }
                         
                         try {
                           setIsSavingPassword(true);
-                          const resolvedUserId =
-                            profile?.user_id && profile.user_id > 0
-                              ? profile.user_id
-                              : typeof user?.id === "number"
-                                ? user.id
-                                : parseInt(String(user?.id ?? ""), 10)
-                          if (!Number.isFinite(resolvedUserId) || resolvedUserId < 1) {
-                            toast({
-                              title: "Cannot update password",
-                              description:
-                                "Your account id is missing. Reload the page or sign in again.",
-                              variant: "destructive",
-                            })
-                            return
-                          }
                           const response = await fetch("/api/auth/change-password", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                              userId: resolvedUserId,
                               currentPassword: passwordData.currentPassword,
                               newPassword: passwordData.newPassword,
                             }),
@@ -1147,12 +1346,33 @@ function SettingsContent() {
                           const data = await response.json();
                           
                           if (!response.ok) {
-                            throw new Error(data.error || "Failed to change password");
+                            if (response.status === 401) {
+                              setPasswordFeedback({
+                                type: "error",
+                                message: "The current password you entered is incorrect.",
+                              });
+                              return;
+                            }
+
+                            if (response.status === 404) {
+                              setPasswordFeedback({
+                                type: "error",
+                                message:
+                                  "We could not find your account for this session. Please sign out and sign in again.",
+                              });
+                              return;
+                            }
+
+                            setPasswordFeedback({
+                              type: "error",
+                              message: data.error || "Failed to change password. Please try again.",
+                            });
+                            return;
                           }
                           
-                          toast({
-                            title: "Password updated",
-                            description: "Your password has been changed successfully.",
+                          setPasswordFeedback({
+                            type: "success",
+                            message: "Your password has been changed successfully.",
                           });
 
                           // Refresh access token so auth state reflects cleared
@@ -1165,10 +1385,12 @@ function SettingsContent() {
                             confirmPassword: "",
                           });
                         } catch (error) {
-                          toast({
-                            title: "Error",
-                            description: error instanceof Error ? error.message : "Failed to change password. Please try again.",
-                            variant: "destructive",
+                          setPasswordFeedback({
+                            type: "error",
+                            message:
+                              error instanceof Error
+                                ? error.message
+                                : "Failed to change password. Please try again.",
                           });
                         } finally {
                           setIsSavingPassword(false);

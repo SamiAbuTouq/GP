@@ -1,3 +1,4 @@
+import { type User } from '@prisma/client';
 import { PublishDraftDto } from './dto/publish-draft.dto';
 import { TimetablesService } from './timetables.service';
 export declare class TimetablesController {
@@ -227,7 +228,7 @@ export declare class TimetablesController {
         timetableId: number;
         entryCount: number;
     }>;
-    publishDraft(id: number, body: PublishDraftDto): Promise<{
+    publishDraft(user: User, id: number, body: PublishDraftDto): Promise<{
         timetableId: any;
         semesterId: any;
         academicYear: any;

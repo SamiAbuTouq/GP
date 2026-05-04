@@ -1,8 +1,10 @@
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateTimeslotDto, UpdateTimeslotDto, UpdateLecturerPreferenceItemDto } from './dto/timeslot.dto';
 export declare class TimeslotsService {
     private prisma;
-    constructor(prisma: PrismaService);
+    private readonly notifications;
+    constructor(prisma: PrismaService, notifications: NotificationsService);
     private ensureLecturerProfileExists;
     private daysMaskToArray;
     private daysArrayToMask;

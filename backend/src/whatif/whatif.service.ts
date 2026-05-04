@@ -37,6 +37,8 @@ import {
   UpdateScenarioDto,
 } from './dto/whatif.dto';
 import { TimetablesService } from '../timetables/timetables.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ADMIN_NOTIFICATION_PREF_KEYS } from '../notifications/notification-prefs';
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -49,6 +51,34 @@ export interface MetricsSnapshot {
   fitnessScore: number;
   lecturerBalanceScore: number | null;
   isValid: boolean;
+}
+
+/** Pairwise hard-conflict style counts derived from the live schedule graph (mirrors what-if metrics.py buckets). */
+export interface ConflictBreakdown {
+  roomConflicts: number;
+  lecturerConflicts: number;
+  timeslotClashes: number;
+}
+
+export interface SectionChangePerCourse {
+  courseId: number;
+  courseCode: string;
+  sectionsAffected: number;
+  sectionsWithRoomChange: number;
+  sectionsWithLecturerChange: number;
+  sectionsWithSlotChange: number;
+}
+
+export interface SectionChangeSummary {
+  added: number;
+  removed: number;
+  changed: number;
+  unchanged: number;
+  baselineCount: number;
+  resultCount: number;
+  /** Share of distinct course-section keys in the baseline∪result set that were added, removed, or reassigned. */
+  percentSectionsAffected: number;
+  perCourse: SectionChangePerCourse[];
 }
 
 interface BaselineLecturer {
@@ -82,6 +112,11 @@ interface GwoProgressLine {
   detail?: string;
 }
 
+function isOptimizerScenarioRunBaseGenerationType(gen: string | null | undefined): boolean {
+  const g = String(gen ?? '').trim().toLowerCase();
+  return g === 'gwo_ui' || g === 'gwo';
+}
+
 @Injectable()
 export class WhatIfService {
   private readonly logger = new Logger(WhatIfService.name);
@@ -91,6 +126,12 @@ export class WhatIfService {
    * Key = run_id (DB).  Cleared when process exits.
    */
   private readonly activeProcesses = new Map<number, ChildProcess>();
+  /**
+   * Run IDs for which POST /runs/:id/cancel was invoked before the child exited.
+   * Prevents the `close` handler (often code=null after kill) from clobbering the DB with
+   * "Process exited with code null." instead of the user-cancelled message.
+   */
+  private readonly userCancelledRunIds = new Set<number>();
   private holdsGlobalOptimizerLock = false;
   private pendingProcessStarts = 0;
   private queuedScenarioRuns: Array<{
@@ -109,6 +150,7 @@ export class WhatIfService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly timetablesService: TimetablesService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -345,12 +387,12 @@ export class WhatIfService {
         .filter(
           (t) =>
             t.semester_id == null &&
-            t.generation_type !== 'gwo_ui',
+            !isOptimizerScenarioRunBaseGenerationType(t.generation_type),
         )
         .map((t) => t.timetable_id);
       if (invalidDraftBases.length > 0) {
         throw new BadRequestException(
-          `Only optimizer drafts or published timetables can be used as scenario bases. Invalid IDs: ${invalidDraftBases.join(', ')}`,
+          `Only published timetables or timetables saved from timetable generation (optimizer drafts) can be used as scenario bases. Invalid IDs: ${invalidDraftBases.join(', ')}`,
         );
       }
 
@@ -448,6 +490,53 @@ export class WhatIfService {
   }
 
   /**
+   * POST /what-if/scenarios/:id/run returns before the Python child is registered:
+   * `_spawnRunnerProcess` runs asynchronously while config is built. Clients open
+   * SSE immediately, so we must wait for `activeProcesses` instead of treating
+   * `pending` + missing process as "interrupted".
+   */
+  private async waitForActiveScenarioProcess(
+    runId: number,
+    sendEvent: (data: object) => void,
+    options: { maxWaitMs: number; pollMs: number },
+  ): Promise<ChildProcess | undefined> {
+    const { maxWaitMs, pollMs } = options;
+    const deadline = Date.now() + maxWaitMs;
+    let lastKeepalive = 0;
+    while (Date.now() < deadline) {
+      const proc = this.activeProcesses.get(runId);
+      if (proc) return proc;
+
+      const row = await this.prisma.scenarioRun.findUnique({
+        where: { run_id: runId },
+        select: { status: true },
+      });
+      if (!row) return undefined;
+      if (
+        row.status === 'completed' ||
+        row.status === 'applied' ||
+        row.status === 'failed'
+      ) {
+        return undefined;
+      }
+
+      const now = Date.now();
+      if (now - lastKeepalive >= 5000) {
+        lastKeepalive = now;
+        sendEvent({
+          type: 'progress',
+          phase: 'starting',
+          pct: 1,
+          message: 'Preparing scenario runner…',
+        });
+      }
+
+      await new Promise((r) => setTimeout(r, pollMs));
+    }
+    return undefined;
+  }
+
+  /**
    * SSE endpoint handler.
    * Attaches to the active child process stdout (if still running) or returns
    * the final DB state immediately (if already completed/failed).
@@ -464,7 +553,23 @@ export class WhatIfService {
       res.write(`data: ${JSON.stringify(data)}\n\n`);
     };
 
-    const proc = this.activeProcesses.get(runId);
+    let proc = this.activeProcesses.get(runId);
+
+    if (!proc) {
+      const runPeek = await this.prisma.scenarioRun.findUnique({
+        where: { run_id: runId },
+        select: { status: true },
+      });
+      if (
+        runPeek &&
+        (runPeek.status === 'pending' || runPeek.status === 'running')
+      ) {
+        proc = await this.waitForActiveScenarioProcess(runId, sendEvent, {
+          maxWaitMs: 120_000,
+          pollMs: 50,
+        });
+      }
+    }
 
     if (proc) {
       // Process is still running — pipe stdout events
@@ -606,6 +711,14 @@ export class WhatIfService {
       runId: r.run_id,
       scenarioId: r.scenario_id,
       baseTimetableId: r.base_timetable_id,
+      baseTimetableName: (() => {
+        const sem = r.base_timetable.semester;
+        if (sem) {
+          const parts = [sem.academic_year, sem.semester_type].filter(Boolean);
+          if (parts.length) return parts.join(' · ');
+        }
+        return `Timetable ${r.base_timetable_id}`;
+      })(),
       resultTimetableId: r.result_timetable_id,
       status: r.status,
       startedAt: r.started_at,
@@ -639,7 +752,13 @@ export class WhatIfService {
         status: { in: ['completed', 'applied'] },
       },
       include: {
-        scenario: { select: { scenario_id: true, name: true } },
+        scenario: {
+          select: {
+            scenario_id: true,
+            name: true,
+            _count: { select: { conditions: true } },
+          },
+        },
         base_timetable: {
           select: {
             timetable_id: true,
@@ -696,6 +815,10 @@ export class WhatIfService {
         slot_id: true,
         room_id: true,
         user_id: true,
+        timeslot: {
+          select: { days_mask: true, start_time: true, end_time: true },
+        },
+        course: { select: { course_code: true } },
       },
     });
     const entriesByTimetable = new Map<number, typeof entries>();
@@ -717,6 +840,28 @@ export class WhatIfService {
         baseEntries,
         resultEntries,
       );
+
+      const baselineConflictBreakdown =
+        this._computeConflictBreakdownFromSchedule(baseEntries);
+      const resultConflictBreakdown =
+        resultEntries.length > 0
+          ? this._computeConflictBreakdownFromSchedule(resultEntries)
+          : null;
+
+      const conflictBreakdownDelta =
+        baselineConflictBreakdown && resultConflictBreakdown
+          ? {
+              roomConflicts:
+                resultConflictBreakdown.roomConflicts -
+                baselineConflictBreakdown.roomConflicts,
+              lecturerConflicts:
+                resultConflictBreakdown.lecturerConflicts -
+                baselineConflictBreakdown.lecturerConflicts,
+              timeslotClashes:
+                resultConflictBreakdown.timeslotClashes -
+                baselineConflictBreakdown.timeslotClashes,
+            }
+          : null;
 
       const deltas =
         baseline && result
@@ -740,10 +885,18 @@ export class WhatIfService {
             }
           : null;
 
+      const disruption =
+        sectionChanges.percentSectionsAffected <= 12
+          ? 'Low'
+          : sectionChanges.percentSectionsAffected <= 28
+            ? 'Moderate'
+            : 'High';
+
       return {
         runId: run.run_id,
         scenarioId: run.scenario_id,
         scenarioName: run.scenario.name,
+        conditionCount: run.scenario._count?.conditions ?? 0,
         baseTimetableId: run.base_timetable_id,
         resultTimetableId: run.result_timetable_id,
         status: run.status,
@@ -751,8 +904,19 @@ export class WhatIfService {
         baseline,
         result,
         deltas,
+        baselineConflictBreakdown,
+        resultConflictBreakdown,
+        conflictBreakdownDelta,
+        gwoIterationsRun: run.gwo_iterations_run ?? null,
+        generationSeconds: run.generation_seconds ?? null,
+        disruptionLevel: disruption,
         recommendation: deltas
-          ? this._generateRecommendation(run.scenario.name, deltas)
+          ? this._generateRecommendation(run.scenario.name, deltas, {
+              disruptionPercent: sectionChanges.percentSectionsAffected,
+              disruptionLevel: disruption,
+              gwoIterations: run.gwo_iterations_run ?? null,
+              conflictBreakdownDelta,
+            })
           : 'Run the scenario first to see a recommendation.',
         sectionChanges,
       };
@@ -882,6 +1046,8 @@ export class WhatIfService {
       });
     });
 
+    void this.timetablesService.notifyPreferenceViolationsForTimetable(baseTimetableId).catch(() => {});
+
     return {
       ok: true,
       appliedToTimetableId: baseTimetableId,
@@ -923,6 +1089,7 @@ export class WhatIfService {
   }
 
   async cancelRun(runId: number) {
+    this.userCancelledRunIds.add(runId);
     const proc = this.activeProcesses.get(runId);
     if (proc) {
       try {
@@ -945,6 +1112,11 @@ export class WhatIfService {
           error_message: 'Run cancelled by user.',
         },
       });
+    }
+
+    // No child process means `close` will never run to clear the flag.
+    if (!proc) {
+      this.userCancelledRunIds.delete(runId);
     }
 
     this.releaseGlobalOptimizerLockIfIdle();
@@ -1043,8 +1215,10 @@ export class WhatIfService {
       this.logger.warn(`[run ${runId} stderr] ${text.trim()}`);
     });
 
-    proc.on('close', async (code) => {
+    proc.on('close', async (code, signal) => {
       this.activeProcesses.delete(runId);
+      const wasUserCancel = this.userCancelledRunIds.has(runId);
+      this.userCancelledRunIds.delete(runId);
 
       // Flush any remaining buffered line
       if (lineBuffer.trim()) {
@@ -1054,7 +1228,12 @@ export class WhatIfService {
       // Cleanup temp config file
       try { fs.unlinkSync(configPath); } catch { /* ignore */ }
 
-      if (code !== 0) {
+      const exitedNonZero = typeof code === 'number' && code !== 0;
+      const exitedWithNullCode = code === null || code === undefined;
+      const shouldRecordFailure =
+        exitedNonZero || exitedWithNullCode || wasUserCancel;
+
+      if (shouldRecordFailure) {
         // Mark as failed if the DB record is still 'running'
         const run = await this.prisma.scenarioRun.findUnique({
           where: { run_id: runId },
@@ -1062,20 +1241,38 @@ export class WhatIfService {
         });
         if (run?.status === 'running') {
           const stderrDetail = stderrBuffer.trim();
+          let error_message: string;
+          if (wasUserCancel) {
+            error_message = 'Run cancelled by user.';
+          } else if (exitedWithNullCode) {
+            const sig = typeof signal === 'string' && signal.trim() ? signal.trim() : null;
+            error_message = stderrDetail
+              ? `Process stopped${sig ? ` (${sig})` : ''}. ${stderrDetail.slice(0, 1800)}`
+              : `Process stopped${sig ? ` (${sig})` : ''} before producing a result.`;
+          } else {
+            error_message = stderrDetail
+              ? `Process exited with code ${code}. ${stderrDetail.slice(0, 1800)}`
+              : `Process exited with code ${code}.`;
+          }
           await this.prisma.scenarioRun.update({
             where: { run_id: runId },
             data: {
               status: 'failed',
               completed_at: new Date(),
-              error_message: stderrDetail
-                ? `Process exited with code ${code}. ${stderrDetail.slice(0, 1800)}`
-                : `Process exited with code ${code}.`,
+              error_message,
             },
           });
+          if (!wasUserCancel) {
+            void this.notifications
+              .notifyAdmins('Optimization Failed', `Scenario run #${runId} failed: ${error_message.slice(0, 800)}`)
+              .catch(() => {});
+          }
         }
       }
 
-      this.logger.log(`Scenario runner for run ${runId} exited with code ${code}.`);
+      this.logger.log(
+        `Scenario runner for run ${runId} exited with code ${code}${signal ? ` signal=${signal}` : ''}.`,
+      );
       await this._startNextQueuedRunIfIdle();
       this.releaseGlobalOptimizerLockIfIdle();
     });
@@ -1090,6 +1287,9 @@ export class WhatIfService {
           error_message: err.message,
         },
       });
+      void this.notifications
+        .notifyAdmins('Optimization Failed', `Scenario run #${runId} could not start: ${err.message.slice(0, 800)}`)
+        .catch(() => {});
       this.logger.error(`Scenario runner spawn error for run ${runId}: ${err.message}`);
       await this._startNextQueuedRunIfIdle();
       this.releaseGlobalOptimizerLockIfIdle();
@@ -1124,6 +1324,7 @@ export class WhatIfService {
           generation_seconds: parsed.generation_seconds ?? null,
         },
       });
+      void this.notifyAdminsScenarioRunSucceeded(runId, parsed).catch(() => {});
     } else if (parsed.type === 'error') {
       const detail = (parsed.detail ?? '').trim();
       const message = (parsed.message ?? '').trim();
@@ -1141,12 +1342,109 @@ export class WhatIfService {
           error_message: resolvedError,
         },
       });
+      void this.notifications
+        .notifyAdmins('Optimization Failed', `Scenario run #${runId} failed: ${resolvedError.slice(0, 800)}`)
+        .catch(() => {});
     }
+  }
+
+  private async notifyAdminsScenarioRunSucceeded(runId: number, parsed: GwoProgressLine) {
+    const run = await this.prisma.scenarioRun.findUnique({
+      where: { run_id: runId },
+      include: {
+        scenario: { select: { name: true } },
+        base_timetable: {
+          include: { semester: true },
+        },
+      },
+    });
+    if (!run) return;
+
+    const sem = run.base_timetable.semester;
+    const semesterLabel = sem
+      ? `${sem.academic_year} (${this.decodeSemesterTypeLabel(sem.semester_type)})`
+      : `Draft timetable #${run.base_timetable_id}`;
+
+    const rm = parsed.result_metrics as MetricsSnapshot | undefined;
+    const fitness =
+      rm && typeof rm.fitnessScore === 'number' && Number.isFinite(rm.fitnessScore)
+        ? rm.fitnessScore.toFixed(4)
+        : rm && rm.fitnessScore != null
+          ? String(rm.fitnessScore)
+          : 'n/a';
+    const hardFromMetrics =
+      rm && typeof rm.conflicts === 'number' && Number.isFinite(rm.conflicts) ? rm.conflicts : null;
+
+    let hardConflictCount = hardFromMetrics ?? 0;
+    const tid = parsed.result_timetable_id ?? run.result_timetable_id ?? null;
+    if (tid != null) {
+      try {
+        const summary = await this.timetablesService.getTimetableConflictSummary(tid);
+        hardConflictCount = summary.hardConflictCount;
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const scenarioName = run.scenario?.name?.trim() || `Scenario #${run.scenario_id}`;
+    await this.notifications.notifyAdmins(
+      'Timetable Generated',
+      `${semesterLabel}: scenario "${scenarioName}" finished (run #${runId}). Fitness score ${fitness}. Hard conflicts reported: ${hardConflictCount}.`,
+      { preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_COMPLETED },
+    );
+
+    if (hardConflictCount > 0 && tid != null) {
+      await this.notifications.notifyAdmins(
+        'Hard Conflicts Detected',
+        `${hardConflictCount} hard conflict(s) found in generated timetable #${tid} (${scenarioName}, run #${runId}).`,
+        { preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.HARD_CONFLICTS },
+      );
+    }
+  }
+
+  private decodeSemesterTypeLabel(type: number): string {
+    const map: Record<number, string> = {
+      1: 'First Semester',
+      2: 'Second Semester',
+      3: 'Summer Semester',
+    };
+    return map[type] ?? `Semester ${type}`;
   }
 
   // ══════════════════════════════════════════════════════════════════════════
   // PRIVATE — build runner config JSON
   // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Courses and parallel section counts must match the base timetable only.
+   * Python `run_scenario._build_legacy_gwo_config` builds one GWO lecture per
+   * section index S1..Sn per course; distinct `section_number` values (or one
+   * synthetic key per row when empty) define n.
+   */
+  private _timetableCourseSectionStats(
+    entries: Array<{
+      course_id: number;
+      section_number: string | null;
+      entry_id: number;
+    }>,
+  ): { courseIds: number[]; sectionCountByCourseId: Map<number, number> } {
+    const distinctKeysByCourse = new Map<number, Set<string>>();
+    for (const e of entries) {
+      let set = distinctKeysByCourse.get(e.course_id);
+      if (!set) {
+        set = new Set();
+        distinctKeysByCourse.set(e.course_id, set);
+      }
+      const label = String(e.section_number ?? '').trim();
+      set.add(label || `__entry_${e.entry_id}`);
+    }
+    const sectionCountByCourseId = new Map<number, number>();
+    for (const [courseId, set] of distinctKeysByCourse) {
+      sectionCountByCourseId.set(courseId, set.size);
+    }
+    const courseIds = [...distinctKeysByCourse.keys()].sort((a, b) => a - b);
+    return { courseIds, sectionCountByCourseId };
+  }
 
   private async _buildRunnerConfig(
     runId: number,
@@ -1178,7 +1476,17 @@ export class WhatIfService {
 
     const isSummer = timetable.semester?.semester_type === 3;
 
-    // Load the full pools (conditions can add/remove from these)
+    const { courseIds, sectionCountByCourseId } = this._timetableCourseSectionStats(
+      timetable.section_schedule_entries.map((e) => ({
+        course_id: e.course_id,
+        section_number: e.section_number,
+        entry_id: e.entry_id,
+      })),
+    );
+
+    // Load the full pools (conditions can add/remove from these).
+    // Courses: only those that appear on the base timetable, with section counts
+    // derived from that timetable (not the global catalog).
     const [lecturers, rooms, courses, timeslots] = await Promise.all([
       this.prisma.lecturer.findMany({
         where: { is_available: true },
@@ -1190,14 +1498,12 @@ export class WhatIfService {
       this.prisma.room.findMany({
         where: { is_available: true },
       }),
-      this.prisma.course.findMany({
-        where: {
-          is_active: true,
-          ...(isSummer
-            ? { sections_summer: { gt: 0 } }
-            : { sections_normal: { gt: 0 } }),
-        },
-      }),
+      courseIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.course.findMany({
+            where: { course_id: { in: courseIds } },
+            orderBy: { course_id: 'asc' },
+          }),
       this.prisma.timeslot.findMany({
         where: {
           is_active: true,
@@ -1205,6 +1511,14 @@ export class WhatIfService {
         },
       }),
     ]);
+
+    const loadedCourseIds = new Set(courses.map((c) => c.course_id));
+    const missingCourseIds = courseIds.filter((id) => !loadedCourseIds.has(id));
+    if (missingCourseIds.length > 0) {
+      this.logger.warn(
+        `What-if run config: base timetable references course_id(s) not found in DB: ${missingCourseIds.join(', ')}`,
+      );
+    }
 
     // Baseline metrics snapshot
     const lecturerBalanceScore = this._computeLecturerBalanceScore(
@@ -1283,18 +1597,21 @@ export class WhatIfService {
           capacity: r.capacity,
           is_available: r.is_available,
         })),
-        courses: courses.map((c) => ({
-          course_id: c.course_id,
-          course_code: c.course_code,
-          course_name: c.course_name,
-          dept_id: c.dept_id,
-          academic_level: c.academic_level,
-          is_lab: c.is_lab,
-          credit_hours: c.credit_hours,
-          delivery_mode: c.delivery_mode,
-          sections_normal: c.sections_normal,
-          sections_summer: c.sections_summer,
-        })),
+        courses: courses.map((c) => {
+          const n = sectionCountByCourseId.get(c.course_id) ?? 0;
+          return {
+            course_id: c.course_id,
+            course_code: c.course_code,
+            course_name: c.course_name,
+            dept_id: c.dept_id,
+            academic_level: c.academic_level,
+            is_lab: c.is_lab,
+            credit_hours: c.credit_hours,
+            delivery_mode: c.delivery_mode,
+            sections_normal: isSummer ? 0 : n,
+            sections_summer: isSummer ? n : 0,
+          };
+        }),
         timeslots: timeslots.map((t) => ({
           slot_id: t.slot_id,
           start_time: t.start_time.toISOString().slice(11, 16),
@@ -1403,6 +1720,12 @@ export class WhatIfService {
       fitnessScore: number;
       lecturerBalanceScore: number | null;
     },
+    ctx?: {
+      disruptionPercent: number;
+      disruptionLevel: string;
+      gwoIterations: number | null;
+      conflictBreakdownDelta: ConflictBreakdown | null;
+    },
   ): string {
     let positives = 0;
     let negatives = 0;
@@ -1426,17 +1749,195 @@ export class WhatIfService {
 
     const total = positives + negatives;
 
-    if (total === 0)
-      return `"${scenarioName}" produces no measurable change in key metrics.`;
+    const parts: string[] = [];
 
-    const ratio = positives / total;
-    if (ratio >= 0.8)
-      return `✅ Apply recommended — "${scenarioName}" improves ${positives}/${total} key metrics with no significant downsides.`;
-    if (ratio >= 0.6)
-      return `⚠️ Apply with caution — "${scenarioName}" improves most metrics but has ${negatives} area(s) of concern.`;
-    if (negatives > positives)
-      return `❌ Apply not recommended — "${scenarioName}" worsens more metrics than it improves.`;
-    return `⚠️ Mixed results — "${scenarioName}" has equal positive and negative effects.`;
+    if (total === 0) {
+      parts.push(`"${scenarioName}" produces no measurable change in headline metrics.`);
+    } else {
+      const ratio = positives / total;
+      const verdict =
+        ratio >= 0.8 && negatives === 0
+          ? 'Apply recommended'
+          : ratio >= 0.6
+            ? 'Apply with caution'
+            : negatives > positives
+              ? 'Apply not recommended'
+              : 'Mixed outcome';
+      parts.push(
+        `${verdict}: "${scenarioName}" shifts ${positives} headline metric(s) favorably vs ${negatives} unfavorably (among comparable deltas).`,
+      );
+
+      const metricNotes: string[] = [];
+      if (deltas.conflicts !== 0)
+        metricNotes.push(
+          `Recorded conflicts ${deltas.conflicts > 0 ? 'rose' : 'fell'} by ${Math.abs(deltas.conflicts)}.`,
+        );
+      if (Math.abs(deltas.fitnessScore) >= 0.0001)
+        metricNotes.push(
+          `Fitness ${deltas.fitnessScore > 0 ? 'improved' : 'worsened'} by ${Math.abs(deltas.fitnessScore)}.`,
+        );
+      if (Math.abs(deltas.roomUtilizationRate) >= 0.05)
+        metricNotes.push(
+          `Room utilization ${deltas.roomUtilizationRate > 0 ? 'up' : 'down'} ${Math.abs(deltas.roomUtilizationRate)} points.`,
+        );
+      if (Math.abs(deltas.softConstraintsScore) >= 0.05)
+        metricNotes.push(
+          `Soft-constraint score ${deltas.softConstraintsScore > 0 ? 'up' : 'down'} ${Math.abs(deltas.softConstraintsScore)}.`,
+        );
+      if (typeof deltas.lecturerBalanceScore === 'number' && Math.abs(deltas.lecturerBalanceScore) >= 0.05)
+        metricNotes.push(
+          `Lecturer balance ${deltas.lecturerBalanceScore > 0 ? 'improved' : 'worsened'} by ${Math.abs(deltas.lecturerBalanceScore)}.`,
+        );
+      if (metricNotes.length) parts.push(metricNotes.join(' '));
+
+      if (ctx?.conflictBreakdownDelta) {
+        const cd = ctx.conflictBreakdownDelta;
+        const breakdownPieces = [
+          cd.roomConflicts !== 0 ? `room Δ ${cd.roomConflicts > 0 ? '+' : ''}${cd.roomConflicts}` : null,
+          cd.lecturerConflicts !== 0
+            ? `lecturer Δ ${cd.lecturerConflicts > 0 ? '+' : ''}${cd.lecturerConflicts}`
+            : null,
+          cd.timeslotClashes !== 0
+            ? `timeslot/cohort Δ ${cd.timeslotClashes > 0 ? '+' : ''}${cd.timeslotClashes}`
+            : null,
+        ].filter(Boolean);
+        if (breakdownPieces.length)
+          parts.push(`Schedule-derived clash pairs: ${breakdownPieces.join(', ')}.`);
+      }
+    }
+
+    if (ctx)
+      parts.push(
+        `Structural churn is ${ctx.disruptionLevel.toLowerCase()} (~${ctx.disruptionPercent.toFixed(1)}% of section slots touched).`,
+      );
+
+    if (ctx?.gwoIterations != null && ctx.gwoIterations <= 20)
+      parts.push(
+        `Optimizer ran only ${ctx.gwoIterations} iteration(s); the timetable may still be far from optimal.`,
+      );
+
+    return parts.join(' ');
+  }
+
+  private readonly _dayLabelByBit: Record<number, string> = {
+    0: 'Sunday',
+    1: 'Monday',
+    2: 'Tuesday',
+    3: 'Wednesday',
+    4: 'Thursday',
+    5: 'Friday',
+    6: 'Saturday',
+  };
+
+  private _decodeDaysMask(daysMask: number): string[] {
+    const days: string[] = [];
+    for (let bit = 0; bit <= 6; bit += 1) {
+      if (((daysMask >> bit) & 1) === 1) {
+        const label = this._dayLabelByBit[bit];
+        if (label) days.push(label);
+      }
+    }
+    return days;
+  }
+
+  private _timeToMinutes(d: Date): number {
+    const hhmm = d.toISOString().slice(11, 16);
+    const [h, m] = hhmm.split(':').map((x) => Number(x));
+    return h * 60 + m;
+  }
+
+  private _expandAtomicSlots(
+    entries: Array<{
+      course_id: number;
+      section_number: string;
+      room_id: number;
+      user_id: number | null;
+      timeslot: { days_mask: number; start_time: Date; end_time: Date } | null;
+    }>,
+  ): Array<{
+    roomId: number;
+    userId: number | null;
+    sectionKey: string;
+    day: string;
+    startMin: number;
+    endMin: number;
+  }> {
+    const atoms: Array<{
+      roomId: number;
+      userId: number | null;
+      sectionKey: string;
+      day: string;
+      startMin: number;
+      endMin: number;
+    }> = [];
+    for (const e of entries) {
+      if (!e.timeslot) continue;
+      const startMin = this._timeToMinutes(e.timeslot.start_time);
+      let endMin = this._timeToMinutes(e.timeslot.end_time);
+      if (endMin <= startMin) endMin += 24 * 60;
+      const days = this._decodeDaysMask(e.timeslot.days_mask);
+      const sectionKey = `${e.course_id}|${String(e.section_number)}`;
+      for (const day of days) {
+        atoms.push({
+          roomId: e.room_id,
+          userId: e.user_id,
+          sectionKey,
+          day,
+          startMin,
+          endMin,
+        });
+      }
+    }
+    return atoms;
+  }
+
+  private _pairOverlaps(
+    a: { day: string; startMin: number; endMin: number },
+    b: { day: string; startMin: number; endMin: number },
+  ): boolean {
+    return a.day === b.day && a.startMin < b.endMin && b.startMin < a.endMin;
+  }
+
+  /** Count unordered overlapping pairs within each group (matches metrics.py logic). */
+  private _countGroupedOverlaps<T extends { day: string; startMin: number; endMin: number }>(
+    atoms: T[],
+    groupKey: (row: T) => string | number | null,
+  ): number {
+    const groups = new Map<string | number, T[]>();
+    for (const atom of atoms) {
+      const key = groupKey(atom);
+      if (key === null) continue;
+      const bucket = groups.get(key) ?? [];
+      bucket.push(atom);
+      groups.set(key, bucket);
+    }
+    let total = 0;
+    for (const group of groups.values()) {
+      for (let i = 0; i < group.length; i += 1) {
+        for (let j = i + 1; j < group.length; j += 1) {
+          if (this._pairOverlaps(group[i]!, group[j]!)) total += 1;
+        }
+      }
+    }
+    return total;
+  }
+
+  private _computeConflictBreakdownFromSchedule(
+    entries: Array<{
+      course_id: number;
+      section_number: string;
+      room_id: number;
+      user_id: number | null;
+      timeslot: { days_mask: number; start_time: Date; end_time: Date } | null;
+    }>,
+  ): ConflictBreakdown {
+    const atoms = this._expandAtomicSlots(entries);
+    const roomConflicts = this._countGroupedOverlaps(atoms, (a) => a.roomId);
+    const lecturerConflicts = this._countGroupedOverlaps(atoms, (a) =>
+      a.userId != null ? a.userId : null,
+    );
+    const timeslotClashes = this._countGroupedOverlaps(atoms, (a) => a.sectionKey);
+    return { roomConflicts, lecturerConflicts, timeslotClashes };
   }
 
   private _computeSectionChangeSummary(
@@ -1446,6 +1947,7 @@ export class WhatIfService {
       slot_id: number;
       room_id: number;
       user_id: number | null;
+      course: { course_code: string } | null;
     }>,
     resultEntries: Array<{
       course_id: number;
@@ -1453,41 +1955,147 @@ export class WhatIfService {
       slot_id: number;
       room_id: number;
       user_id: number | null;
+      course: { course_code: string } | null;
     }>,
-  ) {
-    const keyOf = (e: { course_id: number; section_number: string }) =>
+  ): SectionChangeSummary {
+    const sectionKey = (e: { course_id: number; section_number: string }) =>
       `${e.course_id}|${String(e.section_number)}`;
-    const assignmentOf = (e: {
-      slot_id: number;
-      room_id: number;
-      user_id: number | null;
-    }) => `${e.slot_id}|${e.room_id}|${e.user_id ?? 'none'}`;
 
-    const baseline = new Map<string, string>();
-    const result = new Map<string, string>();
-    for (const e of baselineEntries) baseline.set(keyOf(e), assignmentOf(e));
-    for (const e of resultEntries) result.set(keyOf(e), assignmentOf(e));
+    const groupBySection = (
+      list: typeof baselineEntries,
+    ): Map<string, typeof baselineEntries> => {
+      const m = new Map<string, typeof baselineEntries>();
+      for (const e of list) {
+        const k = sectionKey(e);
+        const bucket = m.get(k) ?? [];
+        bucket.push(e);
+        m.set(k, bucket);
+      }
+      return m;
+    };
+
+    const slotsSig = (rows: typeof baselineEntries) =>
+      [...rows]
+        .map((e) => String(e.slot_id))
+        .sort()
+        .join(',');
+    const roomsSig = (rows: typeof baselineEntries) =>
+      [...rows]
+        .map((e) => String(e.room_id))
+        .sort()
+        .join(',');
+    const lecturersSig = (rows: typeof baselineEntries) =>
+      [...rows]
+        .map((e) => String(e.user_id ?? 'none'))
+        .sort()
+        .join(',');
+
+    const baseline = groupBySection(baselineEntries);
+    const result = groupBySection(resultEntries);
+
+    const assignmentSig = (rows: typeof baselineEntries) =>
+      [...rows]
+        .map((e) => `${e.slot_id}|${e.room_id}|${e.user_id ?? 'none'}`)
+        .sort()
+        .join('||');
 
     let added = 0;
     let removed = 0;
     let changed = 0;
-    for (const [key, assignment] of result.entries()) {
-      if (!baseline.has(key)) {
+    let unchanged = 0;
+
+    const courseAgg = new Map<
+      number,
+      {
+        courseCode: string;
+        sectionsAffected: number;
+        sectionsWithRoomChange: number;
+        sectionsWithLecturerChange: number;
+        sectionsWithSlotChange: number;
+      }
+    >();
+
+    const allKeys = new Set<string>([...baseline.keys(), ...result.keys()]);
+    let affectedUnion = 0;
+
+    const bumpCourse = (
+      cid: number,
+      code: string,
+      dims?: { room?: boolean; lec?: boolean; slot?: boolean },
+    ) => {
+      const agg =
+        courseAgg.get(cid) ??
+        {
+          courseCode: code,
+          sectionsAffected: 0,
+          sectionsWithRoomChange: 0,
+          sectionsWithLecturerChange: 0,
+          sectionsWithSlotChange: 0,
+        };
+      agg.courseCode = code;
+      agg.sectionsAffected += 1;
+      if (dims?.room) agg.sectionsWithRoomChange += 1;
+      if (dims?.lec) agg.sectionsWithLecturerChange += 1;
+      if (dims?.slot) agg.sectionsWithSlotChange += 1;
+      courseAgg.set(cid, agg);
+    };
+
+    for (const key of allKeys) {
+      const br = baseline.get(key);
+      const rr = result.get(key);
+      const courseId = Number(key.split('|')[0] ?? 0);
+      const courseCode =
+        br?.[0]?.course?.course_code ?? rr?.[0]?.course?.course_code ?? String(courseId);
+
+      if (!br && rr) {
         added += 1;
+        affectedUnion += 1;
+        bumpCourse(courseId, courseCode);
         continue;
       }
-      if (baseline.get(key) !== assignment) changed += 1;
+      if (br && !rr) {
+        removed += 1;
+        affectedUnion += 1;
+        bumpCourse(courseId, courseCode);
+        continue;
+      }
+      if (br && rr) {
+        if (assignmentSig(br) === assignmentSig(rr)) unchanged += 1;
+        else {
+          changed += 1;
+          affectedUnion += 1;
+          bumpCourse(courseId, courseCode, {
+            room: roomsSig(br) !== roomsSig(rr),
+            lec: lecturersSig(br) !== lecturersSig(rr),
+            slot: slotsSig(br) !== slotsSig(rr),
+          });
+        }
+      }
     }
-    for (const key of baseline.keys()) {
-      if (!result.has(key)) removed += 1;
-    }
+
+    const percentSectionsAffected =
+      allKeys.size > 0 ? Math.round((affectedUnion / allKeys.size) * 1000) / 10 : 0;
+
+    const perCourse: SectionChangePerCourse[] = [...courseAgg.entries()]
+      .map(([courseId, v]) => ({
+        courseId,
+        courseCode: v.courseCode,
+        sectionsAffected: v.sectionsAffected,
+        sectionsWithRoomChange: v.sectionsWithRoomChange,
+        sectionsWithLecturerChange: v.sectionsWithLecturerChange,
+        sectionsWithSlotChange: v.sectionsWithSlotChange,
+      }))
+      .sort((a, b) => b.sectionsAffected - a.sectionsAffected);
+
     return {
       added,
       removed,
       changed,
-      unchanged: Math.max(0, result.size - added - changed),
+      unchanged,
       baselineCount: baseline.size,
       resultCount: result.size,
+      percentSectionsAffected,
+      perCourse,
     };
   }
 }

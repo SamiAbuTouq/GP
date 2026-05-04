@@ -103,10 +103,16 @@ export async function loadCourseData(opts?: {
   const qs = params.toString()
   const url = `/api/courses${qs ? `?${qs}` : ''}`
 
-  const response = await fetch(url)
+  const response = await fetch(url, {
+    credentials: 'include',
+    cache: 'no-store',
+  })
 
   if (!response.ok) {
     const body = await response.text()
+    if (response.status === 401) {
+      throw new Error('Authentication required. Please sign in again and retry.')
+    }
     throw new Error(
       `Failed to fetch courses from API (${response.status}): ${body}`,
     )
@@ -119,10 +125,16 @@ export async function loadCourseData(opts?: {
 }
 
 export async function loadSemesterTotals(): Promise<SemesterTotal[]> {
-  const response = await fetch('/api/semesters')
+  const response = await fetch('/api/semesters', {
+    credentials: 'include',
+    cache: 'no-store',
+  })
 
   if (!response.ok) {
     const body = await response.text()
+    if (response.status === 401) {
+      throw new Error('Authentication required. Please sign in again and retry.')
+    }
     throw new Error(
       `Failed to fetch semesters from API (${response.status}): ${body}`,
     )

@@ -4,7 +4,7 @@ import type React from "react";
 import { Suspense, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   Eye,
   EyeOff,
@@ -17,7 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
 
 interface ErrorState {
   message: string;
@@ -28,8 +29,8 @@ const INPUT_BASE_CLASSES =
   "form-input h-12 w-full rounded-[10px] border-[1.5px] border-white/20 bg-white/10 px-4 pr-12 text-[0.95rem] text-white placeholder:text-white/40 backdrop-blur-[4px] transition-all duration-[250ms] ease-out focus:bg-white/15 focus:border-[#48CAE4] focus:shadow-[0_0_0_3px_rgba(72,202,228,0.18)] focus:outline-none";
 
 function LoginPageContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -86,11 +87,8 @@ function LoginPageContent() {
     setIsLoading(true);
 
     try {
-      const loginResponse = await ApiClient.login(email.trim(), password);
-      const redirectTo = loginResponse.requires_password_change
-        ? "/first-login-password"
-        : (searchParams.get("redirect") || "/dashboard");
-      router.push(redirectTo);
+      const redirectTo = searchParams.get("redirect");
+      await login(email.trim(), password, redirectTo);
     } catch (err) {
       if (err instanceof ApiError) {
         switch (err.errorType) {

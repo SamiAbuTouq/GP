@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { useDateTimeFormat } from "@/components/datetime-preferences-context";
 
 type TargetCell = { rowKey: string; timeslotId: string } | null;
 
@@ -66,6 +67,7 @@ export function TimetableGridAddSectionDialog({
   extraSectionsOverride,
   onAdd,
 }: Props) {
+  const { prefs } = useDateTimeFormat();
   const [query, setQuery] = useState("");
   const [selectedLectureId, setSelectedLectureId] = useState<string>("");
   const [selectedLecturer, setSelectedLecturer] = useState("");
@@ -186,7 +188,7 @@ export function TimetableGridAddSectionDialog({
               {isOnlineRow ? "Online row" : `Room ${targetRow}`}
             </span>{" "}
             at <span className="font-mono">{targetTs}</span>
-            {tsRow ? ` (${timeslotLongLabel(tsRow)})` : ""}.
+            {tsRow ? ` (${timeslotLongLabel(tsRow, prefs.timeFormat)})` : ""}.
           </DialogDescription>
         </DialogHeader>
 
@@ -335,7 +337,7 @@ export function TimetableGridAddSectionDialog({
                 room_capacity: cap,
                 class_size: selectedLecture.size ?? 0,
                 timeslot: targetTs,
-                timeslot_label: tsRow ? timeslotLongLabel(tsRow) : targetTs,
+                timeslot_label: tsRow ? timeslotLongLabel(tsRow, prefs.timeFormat) : targetTs,
                 day: tsRow?.days?.[0] ?? "",
                 lecturer: selectedLecturer,
                 delivery_mode: selectedLecture.delivery_mode,
@@ -354,6 +356,7 @@ export function TimetableGridAddSectionDialog({
                 roomName,
                 targetTs,
                 cap,
+                prefs.timeFormat,
               );
               onAdd(placed);
               onOpenChange(false);

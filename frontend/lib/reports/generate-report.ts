@@ -2,13 +2,11 @@ import * as XLSX from "xlsx"
 import type { ExportFormat, ReportTypeId } from "./types"
 import type { ReportDataset } from "./dataset"
 import { getReportDefinition } from "./definitions"
-
-function formatGeneratedAt(d: Date): string {
-  return d.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  })
-}
+import {
+  DEFAULT_DATETIME_PREFS,
+  formatDateTime,
+  type DateTimeFormatPreferences,
+} from "@/lib/datetime-format"
 
 function slugFilePart(label: string) {
   return label
@@ -52,12 +50,12 @@ async function buildCsvZip(files: { filename: string; content: string }[]): Prom
   return new Blob([zipped], { type: "application/zip" })
 }
 
-function timetableFootnote(ds: ReportDataset): string {
+function timetableFootnote(ds: ReportDataset, prefs: DateTimeFormatPreferences): string {
   const t = ds.timetable
   if (!t) {
     return "No timetable version is stored for this semester; room and workload tables reflect zero scheduled activity."
   }
-  return `Source timetable #${t.timetableId} (${t.status}, v${t.versionNumber}, ${t.generationType}), generated ${formatGeneratedAt(new Date(t.generatedAt))}.`
+  return `Source timetable #${t.timetableId} (${t.status}, v${t.versionNumber}, ${t.generationType}), generated ${formatDateTime(new Date(t.generatedAt), prefs)}.`
 }
 
 async function buildPdf(
@@ -68,6 +66,7 @@ async function buildPdf(
   tableBody: (string | number)[][],
   extraNotes?: string[],
   appendSections?: PdfTableSection[],
+  fmtGen: (d: Date) => string = (d) => formatDateTime(d, DEFAULT_DATETIME_PREFS),
 ): Promise<Blob> {
   const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
     import("jspdf"),
@@ -89,7 +88,7 @@ async function buildPdf(
   doc.setTextColor(80)
   doc.text(`Academic period: ${timetableLabel}`, margin, y)
   y += 5
-  doc.text(`Generated: ${formatGeneratedAt(new Date())}`, margin, y)
+  doc.text(`Generated: ${fmtGen(new Date())}`, margin, y)
   y += 8
 
   doc.setTextColor(0)
@@ -179,15 +178,16 @@ async function buildPdf(
   return doc.output("blob")
 }
 
-function buildRoomExcel(ds: ReportDataset) {
+function buildRoomExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
   const { roomRows: rows, insights: ins, timetable: t } = ds
   const wb = XLSX.utils.book_new()
+  const fmtGen = (d: Date) => formatDateTime(d, prefs)
 
   const summaryData: (string | number)[][] = [
     ["Room Utilization Report"],
     ["Academic period", ds.semesterLabel],
-    ["Generated", formatGeneratedAt(new Date())],
-    [timetableFootnote(ds)],
+    ["Generated", fmtGen(new Date())],
+    [timetableFootnote(ds, prefs)],
     [],
     ["Metric", "Value"],
     ["Rooms in catalog", ins.totalRoomsInCatalog],
@@ -226,9 +226,10 @@ function buildRoomExcel(ds: ReportDataset) {
   return wb
 }
 
-function buildLecturerExcel(ds: ReportDataset) {
+function buildLecturerExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
   const { lecturerRows: rows, insights: ins } = ds
   const wb = XLSX.utils.book_new()
+  const fmtGen = (d: Date) => formatDateTime(d, prefs)
   const avgLoad =
     rows.length > 0
       ? Math.round((rows.reduce((s, r) => s + r.loadIndex, 0) / rows.length) * 1000) /
@@ -240,8 +241,8 @@ function buildLecturerExcel(ds: ReportDataset) {
   const summaryData: (string | number)[][] = [
     ["Lecturer Workload Report"],
     ["Academic period", ds.semesterLabel],
-    ["Generated", formatGeneratedAt(new Date())],
-    [timetableFootnote(ds)],
+    ["Generated", fmtGen(new Date())],
+    [timetableFootnote(ds, prefs)],
     [],
     ["Metric", "Value"],
     ["Lecturers with assignments", ins.lecturerCountScheduled],
@@ -284,15 +285,16 @@ function buildLecturerExcel(ds: ReportDataset) {
   return wb
 }
 
-function buildCourseExcel(ds: ReportDataset) {
+function buildCourseExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
   const { courseDistributionRows: rows, insights: ins } = ds
   const wb = XLSX.utils.book_new()
+  const fmtGen = (d: Date) => formatDateTime(d, prefs)
 
   const summaryData: (string | number)[][] = [
     ["Course Distribution Report"],
     ["Academic period", ds.semesterLabel],
-    ["Generated", formatGeneratedAt(new Date())],
-    [timetableFootnote(ds)],
+    ["Generated", fmtGen(new Date())],
+    [timetableFootnote(ds, prefs)],
     [],
     ["Metric", "Value"],
     ["Departments listed", rows.length],
@@ -354,18 +356,21 @@ export async function generateReportBlob(params: {
   reportTypeId: ReportTypeId
   format: ExportFormat
   dataset: ReportDataset
+  dateTimePrefs?: DateTimeFormatPreferences
 }): Promise<{
   blob: Blob
   mimeType: string
   extension: string
   baseFilename: string
 }> {
-  const { reportTypeId, format, dataset: ds } = params
+  const { reportTypeId, format, dataset: ds, dateTimePrefs: dateTimePrefsArg } = params
+  const dateTimePrefs = dateTimePrefsArg ?? DEFAULT_DATETIME_PREFS
+  const fmtGen = (d: Date) => formatDateTime(d, dateTimePrefs)
   const timetableLabel = ds.semesterLabel
   const base = getReportBaseFilename(reportTypeId, timetableLabel)
 
   const footnotes = [
-    timetableFootnote(ds),
+    timetableFootnote(ds, dateTimePrefs),
     "Undergraduate vs. graduate course counts use academic_level: levels below 500 count as undergraduate; 500+ as graduate.",
     "Weekly hours multiply slot length by the number of days in each timeslot’s days mask (recurring meetings per week).",
   ]
@@ -381,7 +386,7 @@ export async function generateReportBlob(params: {
           ["Metric", "Value"],
           ["Report", "Room Utilization"],
           ["Academic period", timetableLabel],
-          ["Generated", formatGeneratedAt(new Date())],
+          ["Generated", fmtGen(new Date())],
           ["Rooms in catalog", ins.totalRoomsInCatalog],
           ["Rooms with scheduled sessions", ins.roomsWithSchedule],
           ["Total section instances", ins.totalScheduleEntries],
@@ -433,7 +438,7 @@ export async function generateReportBlob(params: {
     }
 
     if (format === "excel") {
-      const wb = buildRoomExcel(ds)
+      const wb = buildRoomExcel(ds, dateTimePrefs)
       const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" })
       const blob = new Blob([buf], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -500,6 +505,7 @@ export async function generateReportBlob(params: {
             },
           ]
         : undefined,
+      fmtGen,
     )
     return { blob, mimeType: "application/pdf", extension: "pdf", baseFilename: base }
   }
@@ -523,7 +529,7 @@ export async function generateReportBlob(params: {
           ["Metric", "Value"],
           ["Report", "Lecturer Workload"],
           ["Academic period", timetableLabel],
-          ["Generated", formatGeneratedAt(new Date())],
+          ["Generated", fmtGen(new Date())],
           ["Lecturers with assignments", ins.lecturerCountScheduled],
           ["Lecturers with no assignments", noAssignments],
           ["Average load index", avgLoad],
@@ -569,7 +575,7 @@ export async function generateReportBlob(params: {
     }
 
     if (format === "excel") {
-      const wb = buildLecturerExcel(ds)
+      const wb = buildLecturerExcel(ds, dateTimePrefs)
       const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" })
       const blob = new Blob([buf], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -619,6 +625,8 @@ export async function generateReportBlob(params: {
         r.loadPctOfMax ?? "",
       ]),
       footnotes,
+      undefined,
+      fmtGen,
     )
 
     return { blob, mimeType: "application/pdf", extension: "pdf", baseFilename: base }
@@ -637,7 +645,7 @@ export async function generateReportBlob(params: {
           ["Metric", "Value"],
           ["Report", "Course Distribution"],
           ["Academic period", timetableLabel],
-          ["Generated", formatGeneratedAt(new Date())],
+          ["Generated", fmtGen(new Date())],
           ["Departments", rows.length],
           ["Distinct courses scheduled", ins.distinctCoursesScheduled],
           ["Total section instances", ins.totalScheduleEntries],
@@ -702,7 +710,7 @@ export async function generateReportBlob(params: {
     }
 
     if (format === "excel") {
-      const wb = buildCourseExcel(ds)
+      const wb = buildCourseExcel(ds, dateTimePrefs)
       const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" })
       const blob = new Blob([buf], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -774,6 +782,8 @@ export async function generateReportBlob(params: {
         ]
       })(),
       footnotes,
+      undefined,
+      fmtGen,
     )
     return { blob, mimeType: "application/pdf", extension: "pdf", baseFilename: base }
   }
@@ -792,7 +802,7 @@ export async function generateReportBlob(params: {
         ["Metric", "Value"],
         ["Report", "Optimization Summary"],
         ["Academic period", timetableLabel],
-        ["Generated", formatGeneratedAt(new Date())],
+        ["Generated", fmtGen(new Date())],
         ["Total runs this semester", runs.length],
         ["Active version", active ? `v${active.versionNumber}` : "N/A"],
         ["Best fitness score", best ? `${best.fitnessScore} (v${best.versionNumber})` : "N/A"],
@@ -806,7 +816,7 @@ export async function generateReportBlob(params: {
             Version: `v${r.versionNumber}`,
             Type: r.generationTypeLabel,
             Status: r.status,
-            Generated: formatGeneratedAt(new Date(r.generatedAt)),
+            Generated: fmtGen(new Date(r.generatedAt)),
             "Fitness score": r.fitnessScore ?? "",
             "Soft constraints score": r.softConstraintsScore ?? "",
             "Room utilization %": r.roomUtilizationRate ?? "",
@@ -836,7 +846,7 @@ export async function generateReportBlob(params: {
         `v${r.versionNumber}`,
         r.generationTypeLabel,
         r.status,
-        formatGeneratedAt(new Date(r.generatedAt)),
+        fmtGen(new Date(r.generatedAt)),
         r.fitnessScore ?? "—",
         r.softConstraintsScore ?? "—",
         r.roomUtilizationRate ?? "—",
@@ -848,6 +858,8 @@ export async function generateReportBlob(params: {
         "Soft constraints score: weighted sum of soft penalty violations including preference mismatches, gaps, and workload imbalance.",
         "Room utilization rate: percentage of available room-slot capacity occupied by a scheduled section.",
       ],
+      undefined,
+      fmtGen,
     )
     return { blob, mimeType: "application/pdf", extension: "pdf", baseFilename: base }
   }
@@ -892,7 +904,7 @@ export async function generateReportBlob(params: {
         ["Metric", "Value"],
         ["Report", "Conflict Analysis"],
         ["Academic period", timetableLabel],
-        ["Generated", formatGeneratedAt(new Date())],
+        ["Generated", fmtGen(new Date())],
         ["Timetable version", ds.timetable ? `v${ds.timetable.versionNumber}` : "N/A"],
         ["Total hard violations", hardCount],
         ["Total soft violations", softCount],
@@ -916,6 +928,9 @@ export async function generateReportBlob(params: {
       summaryLines,
       [["Severity", "Type", "Course", "Section", "Lecturer", "Room", "Timeslot", "Detail"]],
       conflicts.map((c) => [c.severity === "hard" ? "Hard" : "Soft", typeLabel(c.type), c.courseCode, c.sectionNumber, c.lecturerName ?? "", c.roomNumber ?? "", c.timeslotLabel ?? "", c.detail]),
+      undefined,
+      undefined,
+      fmtGen,
     )
     return { blob, mimeType: "application/pdf", extension: "pdf", baseFilename: base }
   }
@@ -928,7 +943,7 @@ export async function generateReportBlob(params: {
         ["Metric", "Value"],
         ["Report", "Lecturer Preference Compliance"],
         ["Academic period", timetableLabel],
-        ["Generated", formatGeneratedAt(new Date())],
+        ["Generated", fmtGen(new Date())],
         ["Lecturers with preferences defined", s.lecturersWithPreferences],
         ["Lecturers with no preferences", s.lecturersWithoutPreferences],
         ["Total avoided-slot violations", s.totalAvoidedViolations],
@@ -944,16 +959,35 @@ export async function generateReportBlob(params: {
     }
     if (format === "excel") {
       const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Metric", "Value"], ["Report", "Lecturer Preference Compliance"], ["Academic period", timetableLabel], ["Generated", formatGeneratedAt(new Date())], ["Lecturers with preferences defined", s.lecturersWithPreferences], ["Lecturers with no preferences", s.lecturersWithoutPreferences], ["Total avoided-slot violations", s.totalAvoidedViolations], ["Total preferred-slot hits", s.totalPreferredHits], ["Lecturers requiring attention (>=1 avoided violation)", s.lecturersRequiringAttention]]), "Summary")
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Metric", "Value"], ["Report", "Lecturer Preference Compliance"], ["Academic period", timetableLabel], ["Generated", fmtGen(new Date())], ["Lecturers with preferences defined", s.lecturersWithPreferences], ["Lecturers with no preferences", s.lecturersWithoutPreferences], ["Total avoided-slot violations", s.totalAvoidedViolations], ["Total preferred-slot hits", s.totalPreferredHits], ["Lecturers requiring attention (>=1 avoided violation)", s.lecturersRequiringAttention]]), "Summary")
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.map((r) => ({ Lecturer: r.lecturerName, Department: r.department, "Sessions assigned": r.sessionsAssigned, "On preferred": r.onPreferred, "On avoided": r.onAvoided, Neutral: r.neutral, "Compliance score": r.hasPreferences ? `${r.complianceScore ?? 0}%` : "N/A" }))), "Compliance detail")
       const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" })
       return { blob: new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", extension: "xlsx", baseFilename: base }
     }
-    const blob = await buildPdf("Lecturer Preference Compliance Report", timetableLabel, [
-      `${s.lecturersWithPreferences} scheduled lecturers have preferences defined; ${s.lecturersWithoutPreferences} have none.`,
-      `Institution-wide avoided-slot violations: ${s.totalAvoidedViolations}. Preferred-slot hits: ${s.totalPreferredHits}.`,
-      `${s.lecturersRequiringAttention} lecturers have at least one avoided-slot violation and require attention.`,
-    ], [["Lecturer", "Department", "Sessions assigned", "On preferred", "On avoided", "Neutral", "Compliance score"]], rows.map((r) => [r.lecturerName, r.department, r.sessionsAssigned, r.onPreferred, r.onAvoided, r.neutral, r.hasPreferences ? `${r.complianceScore ?? 0}%` : "No preferences defined"]), ["Compliance score = percentage of assigned sessions not falling on an avoided timeslot. 100% means no avoided-slot violations. Preferred-slot hits are tracked separately and do not affect the score."])
+    const blob = await buildPdf(
+      "Lecturer Preference Compliance Report",
+      timetableLabel,
+      [
+        `${s.lecturersWithPreferences} scheduled lecturers have preferences defined; ${s.lecturersWithoutPreferences} have none.`,
+        `Institution-wide avoided-slot violations: ${s.totalAvoidedViolations}. Preferred-slot hits: ${s.totalPreferredHits}.`,
+        `${s.lecturersRequiringAttention} lecturers have at least one avoided-slot violation and require attention.`,
+      ],
+      [["Lecturer", "Department", "Sessions assigned", "On preferred", "On avoided", "Neutral", "Compliance score"]],
+      rows.map((r) => [
+        r.lecturerName,
+        r.department,
+        r.sessionsAssigned,
+        r.onPreferred,
+        r.onAvoided,
+        r.neutral,
+        r.hasPreferences ? `${r.complianceScore ?? 0}%` : "No preferences defined",
+      ]),
+      [
+        "Compliance score = percentage of assigned sessions not falling on an avoided timeslot. 100% means no avoided-slot violations. Preferred-slot hits are tracked separately and do not affect the score.",
+      ],
+      undefined,
+      fmtGen,
+    )
     return { blob, mimeType: "application/pdf", extension: "pdf", baseFilename: base }
   }
 
@@ -969,7 +1003,7 @@ export async function generateReportBlob(params: {
     }
     if (format === "excel") {
       const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Metric", "Value"], ["Report", "Room Type Matching"], ["Academic period", timetableLabel], ["Generated", formatGeneratedAt(new Date())], ["Total sections", s.totalSections], ["Correctly matched", s.okCount], ["Hard mismatches", s.hardMismatchCount], ["Soft mismatches", s.softMismatchCount]]), "Summary")
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Metric", "Value"], ["Report", "Room Type Matching"], ["Academic period", timetableLabel], ["Generated", fmtGen(new Date())], ["Total sections", s.totalSections], ["Correctly matched", s.okCount], ["Hard mismatches", s.hardMismatchCount], ["Soft mismatches", s.softMismatchCount]]), "Summary")
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.map((r) => ({ Course: r.courseCode, Section: r.sectionNumber, Delivery: r.deliveryLabel, Lab: r.isLab ? "Yes" : "No", Room: r.roomNumber, "Room type": r.roomTypeLabel, Capacity: r.capacity, Enrolled: r.enrolled, "Match status": r.matchStatus, Issue: r.issue }))), "All sections")
       const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" })
       return { blob: new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", extension: "xlsx", baseFilename: base }
@@ -978,7 +1012,29 @@ export async function generateReportBlob(params: {
       `Total sections: ${s.totalSections}. Correctly matched: ${s.okCount}. Hard mismatches: ${s.hardMismatchCount}. Soft mismatches: ${s.softMismatchCount}.`,
       ...(mismatches.length === 0 ? ["All sections are assigned to appropriate room types."] : []),
     ]
-    const blob = await buildPdf("Room Type Matching Report", timetableLabel, summaryLines, [["Course", "Section", "Delivery", "Lab", "Room", "Room type", "Capacity", "Enrolled", "Severity", "Issue"]], mismatches.map((r) => [r.courseCode, r.sectionNumber, r.deliveryLabel, r.isLab ? "Yes" : "No", r.roomNumber, r.roomTypeLabel, r.capacity, r.enrolled, r.severity === "hard" ? "Hard" : "Soft", r.issue]), ["Hard mismatch: a lab course is not in a lab or computer-lab room, or a non-lab course occupies a lab room. Soft mismatch: an online course is allocated a physical room, or an in-person section's enrollment approaches or exceeds room capacity."])
+    const blob = await buildPdf(
+      "Room Type Matching Report",
+      timetableLabel,
+      summaryLines,
+      [["Course", "Section", "Delivery", "Lab", "Room", "Room type", "Capacity", "Enrolled", "Severity", "Issue"]],
+      mismatches.map((r) => [
+        r.courseCode,
+        r.sectionNumber,
+        r.deliveryLabel,
+        r.isLab ? "Yes" : "No",
+        r.roomNumber,
+        r.roomTypeLabel,
+        r.capacity,
+        r.enrolled,
+        r.severity === "hard" ? "Hard" : "Soft",
+        r.issue,
+      ]),
+      [
+        "Hard mismatch: a lab course is not in a lab or computer-lab room, or a non-lab course occupies a lab room. Soft mismatch: an online course is allocated a physical room, or an in-person section's enrollment approaches or exceeds room capacity.",
+      ],
+      undefined,
+      fmtGen,
+    )
     return { blob, mimeType: "application/pdf", extension: "pdf", baseFilename: base }
   }
 

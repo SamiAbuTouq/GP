@@ -6,7 +6,7 @@ import { TimetableGridDraftProvider } from "@/components/timetable-grid-draft-co
 import { ProtectedRoute } from "@/components/protected-route";
 
 const LECTURER_ONLY_PATHS = ["/lecturer-time-preferences", "/lecturer-schedule"];
-const SHARED_PATHS = ["/settings"];
+const SHARED_PATHS = ["/settings", "/notifications"];
 
 function matchesAny(pathname: string, paths: string[]): boolean {
   return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));

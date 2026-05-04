@@ -1,4 +1,5 @@
 import type { LectureConfig, RoomConfigValue, ScheduleConfig, ScheduleEntry } from "@/lib/schedule-data";
+import type { UserTimeFormat } from "@/lib/datetime-format";
 import type { TimeslotCatalogueEntry } from "@/lib/timetable-model";
 import {
   catalogueById,
@@ -363,6 +364,7 @@ export function buildScheduleEntryFromLectureConfig(
   config: ScheduleConfig,
   lec: LectureConfig,
   catalogue: TimeslotCatalogueEntry[],
+  timeFormat: UserTimeFormat = "24",
 ): ScheduleEntry | null {
   const lecturerNames = allowedLecturerNamesForLecture(config, lec);
   if (lecturerNames.length === 0) return null;
@@ -393,7 +395,7 @@ export function buildScheduleEntryFromLectureConfig(
   const row = catMap.get(tsId);
 
   if (normDelivery(lec.delivery_mode) === "online") {
-    return mergeEntryWithPlacement(stub, catalogue, null, tsId, 0);
+    return mergeEntryWithPlacement(stub, catalogue, null, tsId, 0, timeFormat);
   }
 
   const eng = engineSlotTypeForCatalogueRow(row);
@@ -403,7 +405,7 @@ export function buildScheduleEntryFromLectureConfig(
   const rv = config.rooms?.[rname];
   const cap = rv == null ? 0 : roomCfgCap(rv);
 
-  return mergeEntryWithPlacement(stub, catalogue, rname, tsId, cap);
+  return mergeEntryWithPlacement(stub, catalogue, rname, tsId, cap, timeFormat);
 }
 
 export function mergeEntryWithPlacement(
@@ -412,12 +414,13 @@ export function mergeEntryWithPlacement(
   roomName: string | null,
   timeslotId: string,
   roomCapacity: number,
+  timeFormat: UserTimeFormat = "24",
 ): ScheduleEntry {
   const catMap = catalogueById(catalogue);
   const row = catMap.get(timeslotId);
   const slotType = row?.slot_type ?? entry.slot_type;
   const norm = row ? normalizeTimeslotCatalogueEntry(row) : null;
-  const tsLabel = row ? timeslotLongLabel(row) : entry.timeslot_label;
+  const tsLabel = row ? timeslotLongLabel(row, timeFormat) : entry.timeslot_label;
   return {
     ...entry,
     timeslot: timeslotId,

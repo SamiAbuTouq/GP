@@ -4,9 +4,10 @@ import { TimetablesModule } from '../timetables/timetables.module';
 import { WhatIfController } from './whatif.controller';
 import { WhatIfService } from './whatif.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule, TimetablesModule],
+  imports: [PrismaModule, TimetablesModule, NotificationsModule],
   controllers: [WhatIfController],
   providers: [WhatIfService],
 })

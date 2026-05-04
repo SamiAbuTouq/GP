@@ -12,12 +12,13 @@ const timetables_module_1 = require("../timetables/timetables.module");
 const whatif_controller_1 = require("./whatif.controller");
 const whatif_service_1 = require("./whatif.service");
 const prisma_module_1 = require("../prisma/prisma.module");
+const notifications_module_1 = require("../notifications/notifications.module");
 let WhatIfModule = class WhatIfModule {
 };
 exports.WhatIfModule = WhatIfModule;
 exports.WhatIfModule = WhatIfModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule, timetables_module_1.TimetablesModule],
+        imports: [prisma_module_1.PrismaModule, timetables_module_1.TimetablesModule, notifications_module_1.NotificationsModule],
         controllers: [whatif_controller_1.WhatIfController],
         providers: [whatif_service_1.WhatIfService],
     })

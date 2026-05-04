@@ -2,6 +2,7 @@
  * Shared export utilities for CSV, JSON, Excel (.xlsx), and PDF downloads.
  */
 import * as XLSX from "xlsx"
+import { DEFAULT_DATETIME_PREFS, formatDateTime } from "@/lib/datetime-format"
 
 export function downloadBlob(content: string, filename: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType })
@@ -62,13 +63,20 @@ export function exportToExcel<T extends Record<string, unknown>>(
   XLSX.writeFile(wb, `${filename}.xlsx`)
 }
 
+export type ExportToPdfOptions = {
+  generatedAtFormatted?: string
+}
+
 export function exportToPDF<T extends Record<string, unknown>>(
   data: T[],
   columns: { key: keyof T; label: string }[],
   title: string,
   subtitle?: string,
   autoPrint = true,
+  options?: ExportToPdfOptions,
 ) {
+  const generatedAtFormatted =
+    options?.generatedAtFormatted ?? formatDateTime(new Date(), DEFAULT_DATETIME_PREFS)
   const thStyle = `padding:11px 12px;font-size:12px;font-weight:700;color:#1e3a8a;text-align:left;border-bottom:2px solid #2563eb;background:#eff6ff;white-space:nowrap;`
   const tdStyle = `padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#111827;vertical-align:top;`
 
@@ -141,7 +149,7 @@ export function exportToPDF<T extends Record<string, unknown>>(
           <h1 class="title">${title}</h1>
           <p class="subtitle">${subtitle || `${data.length} records`}</p>
         </div>
-        <div class="meta">Generated ${new Date().toLocaleString()}</div>
+        <div class="meta">Generated ${generatedAtFormatted}</div>
       </div>
       <table>
         <thead><tr>${headerRow}</tr></thead>

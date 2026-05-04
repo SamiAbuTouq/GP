@@ -382,16 +382,95 @@ export class ApiClient {
   }
 
   static async updatePreferences(data: UpdatePreferencesData): Promise<UserPreferences> {
-    return this.request<UserPreferences>('/users/me/preferences', {
+    const updated = await this.request<UserPreferences>('/users/me/preferences', {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
+    const existing = readCachedProfile();
+    if (existing) {
+      writeCachedProfile({
+        ...existing,
+        theme_preference: updated.theme_preference,
+        date_format: updated.date_format,
+        time_format: updated.time_format,
+      });
+    }
+    this.notifyProfileUpdate({
+      theme_preference: updated.theme_preference,
+      date_format: updated.date_format,
+      time_format: updated.time_format,
+    });
+    return updated;
+  }
+
+  static async updateNotificationPreferences(
+    prefs: Record<string, boolean>,
+  ): Promise<{ notification_preferences: Record<string, boolean> }> {
+    const updated = await this.request<{ notification_preferences: Record<string, boolean> }>(
+      '/users/me/notification-preferences',
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ prefs }),
+      },
+    );
+    const existing = readCachedProfile();
+    if (existing) {
+      writeCachedProfile({
+        ...existing,
+        notification_preferences: updated.notification_preferences,
+      });
+    }
+    this.notifyProfileUpdate({
+      notification_preferences: updated.notification_preferences,
+    });
+    return updated;
   }
 
   static async updateMyPassword(newPassword: string): Promise<{ success: boolean }> {
     return this.request<{ success: boolean }>('/users/me/password', {
       method: 'PATCH',
       body: JSON.stringify({ new_password: newPassword }),
+    });
+  }
+
+  static async getNotifications(params?: {
+    filter?: 'all' | 'unread' | 'read';
+    page?: number;
+    pageSize?: number;
+  }): Promise<NotificationsListResponse> {
+    const q = new URLSearchParams();
+    if (params?.filter && params.filter !== 'all') q.set('filter', params.filter);
+    if (params?.page != null) q.set('page', String(params.page));
+    if (params?.pageSize != null) q.set('pageSize', String(params.pageSize));
+    const qs = q.toString();
+    return this.request<NotificationsListResponse>(`/notifications${qs ? `?${qs}` : ''}`);
+  }
+
+  static async getNotificationsUnreadCount(): Promise<{ count: number }> {
+    return this.request<{ count: number }>('/notifications/unread-count');
+  }
+
+  static async markNotificationRead(notificationId: number): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/notifications/${notificationId}/read`, {
+      method: 'PATCH',
+    });
+  }
+
+  static async markNotificationUnread(notificationId: number): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/notifications/${notificationId}/unread`, {
+      method: 'PATCH',
+    });
+  }
+
+  static async markAllNotificationsRead(): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>('/notifications/read-all', {
+      method: 'PATCH',
+    });
+  }
+
+  static async deleteNotification(notificationId: number): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(`/notifications/${notificationId}`, {
+      method: 'DELETE',
     });
   }
 }
@@ -408,6 +487,8 @@ export interface UserProfile {
   date_format: string;
   time_format: string;
   avatar_url?: string | null;
+  /** Merged defaults + saved toggles for in-app notification categories */
+  notification_preferences?: Record<string, boolean>;
 }
 
 export interface UpdateProfileData {
@@ -426,4 +507,20 @@ export interface UserPreferences {
   theme_preference: string;
   date_format: string;
   time_format: string;
+}
+
+export interface AppNotificationRow {
+  notificationId: number;
+  messageTitle: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface NotificationsListResponse {
+  items: AppNotificationRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }

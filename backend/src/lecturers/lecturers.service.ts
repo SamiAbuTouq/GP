@@ -10,6 +10,8 @@ import { CreateLecturerDto, UpdateLecturerDto } from './dto/lecturer.dto';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { MailService } from '../mail/mail.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { LECTURER_NOTIFICATION_PREF_KEYS } from '../notifications/notification-prefs';
 
 /** Policy max workload (hours) shown and stored for all lecturers. */
 const STANDARD_MAX_WORKLOAD_HOURS = 15;
@@ -21,6 +23,7 @@ export class LecturersService {
   constructor(
     private prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private generateTemporaryPassword(length = 16): string {
@@ -311,12 +314,17 @@ export class LecturersService {
   async update(id: number, dto: UpdateLecturerDto) {
     const existing = await this.prisma.lecturer.findUnique({
       where: { user_id: id },
-      include: { user: true },
+      include: { user: true, department: true },
     });
 
     if (!existing) {
       throw new NotFoundException(`Lecturer with ID ${id} not found`);
     }
+
+    const oldDeptName = existing.department.dept_name;
+    const oldFirst = existing.user.first_name;
+    const oldLast = existing.user.last_name;
+    const oldMax = existing.max_workload;
 
     // Update department if provided
     let deptId = existing.dept_id;
@@ -357,6 +365,42 @@ export class LecturersService {
       },
     });
 
+    const newDept = await this.prisma.department.findUnique({
+      where: { dept_id: deptId },
+      select: { dept_name: true },
+    });
+    const updatedUser = await this.prisma.user.findUnique({
+      where: { user_id: id },
+      select: { first_name: true, last_name: true },
+    });
+    const updatedLecturer = await this.prisma.lecturer.findUnique({
+      where: { user_id: id },
+      select: { max_workload: true },
+    });
+
+    const changes: string[] = [];
+    if (dto.name && updatedUser) {
+      const nn = `${updatedUser.first_name} ${updatedUser.last_name}`.trim();
+      const on = `${oldFirst} ${oldLast}`.trim();
+      if (nn !== on) changes.push(`name (${on} → ${nn})`);
+    }
+    if (dto.department && newDept && newDept.dept_name !== oldDeptName) {
+      changes.push(`department (${oldDeptName} → ${newDept.dept_name})`);
+    }
+    if (dto.maxWorkload !== undefined && updatedLecturer && dto.maxWorkload !== oldMax) {
+      changes.push(`max workload (${oldMax ?? '—'} → ${dto.maxWorkload})`);
+    }
+    if (changes.length > 0) {
+      void this.notifications
+        .createForUser(
+          id,
+          'Your Profile Was Updated',
+          `An administrator updated your profile: ${changes.join('; ')}.`,
+          { preferenceKey: LECTURER_NOTIFICATION_PREF_KEYS.PROFILE_UPDATED_BY_ADMIN },
+        )
+        .catch(() => {});
+    }
+
     // Update courses if provided
     if (dto.courses !== undefined) {
       // Remove existing course assignments
@@ -385,7 +429,7 @@ export class LecturersService {
   async remove(id: number) {
     const existing = await this.prisma.lecturer.findUnique({
       where: { user_id: id },
-      include: { user: { select: { is_active: true } } },
+      include: { user: { select: { is_active: true, first_name: true, last_name: true } } },
     });
 
     if (!existing) {
@@ -396,10 +440,24 @@ export class LecturersService {
       return { message: 'Lecturer already deactivated' };
     }
 
+    const fullName = `${existing.user.first_name} ${existing.user.last_name}`.trim();
+    const sectionCount = await this.prisma.sectionScheduleEntry.count({
+      where: { user_id: id },
+    });
+
     await this.prisma.user.update({
       where: { user_id: id },
       data: { is_active: false },
     });
+
+    if (sectionCount > 0) {
+      void this.notifications
+        .notifyAdmins(
+          'Lecturer Deactivated — Schedule Impact',
+          `${fullName || `Lecturer #${id}`} was deactivated and had ${sectionCount} schedule section row(s) assigned across timetables.`,
+        )
+        .catch(() => {});
+    }
 
     return { message: 'Lecturer deactivated successfully' };
   }

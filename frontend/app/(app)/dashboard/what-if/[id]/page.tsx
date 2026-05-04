@@ -16,24 +16,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { HardConflictsAcknowledgmentFields } from "@/components/hard-conflicts-ui";
-import { ApiClient } from "@/lib/api-client";
+import { ApiClient, ApiError } from "@/lib/api-client";
 import { streamScenarioRunSse } from "@/lib/scenario-sse";
 import {
   fetchTimetableConflictSummary,
   type TimetableConflictSummary,
 } from "@/lib/timetable-conflicts";
 import {
+  buildWhatIfCompareHref,
   conditionLabel,
   conditionParameterSummary,
   getScenario,
   getScenarios,
   getTimetables,
-  recommendationFromMetrics,
   type Scenario,
   type TimetableOption,
   type WhatIfLookupOption,
 } from "@/lib/what-if";
 import { cn } from "@/lib/utils";
+import { useDateTimeFormat } from "@/components/datetime-preferences-context";
 import { AlertTriangle, Check, Play, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -54,7 +55,36 @@ function isUserCancelledRun(errorMessage: string | null | undefined): boolean {
   const normalized = String(errorMessage ?? "")
     .trim()
     .toLowerCase();
-  return normalized === "run cancelled by user.";
+  if (normalized === "run cancelled by user." || normalized === "run cancelled by user") return true;
+  if (normalized.includes("cancelled by user")) return true;
+  return false;
+}
+
+function formatRunDurationSeconds(sec: number | null | undefined): string {
+  if (sec == null || !Number.isFinite(Number(sec)) || Number(sec) < 0) return "—";
+  const s = Math.round(Number(sec));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (m < 60) return r ? `${m}m ${r}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return `${h}h ${mm}m`;
+}
+
+function effectiveRunDurationSeconds(run: {
+  durationSeconds: number | null;
+  startedAt: string;
+  completedAt: string | null;
+}): number | null {
+  if (run.durationSeconds != null && Number.isFinite(Number(run.durationSeconds)) && Number(run.durationSeconds) >= 0) {
+    return Number(run.durationSeconds);
+  }
+  if (!run.completedAt) return null;
+  const a = Date.parse(run.startedAt);
+  const b = Date.parse(run.completedAt);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return null;
+  return Math.round((b - a) / 1000);
 }
 
 function firstArray(value: unknown): unknown[] {
@@ -68,10 +98,12 @@ function firstArray(value: unknown): unknown[] {
 }
 
 export default function WhatIfScenarioDetailPage() {
+  const { formatDateTime } = useDateTimeFormat();
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { toast } = useToast();
   const id = Number(params.id);
+  const idValid = Number.isFinite(id) && id > 0;
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [timetables, setTimetables] = useState<TimetableOption[]>([]);
   const [launcherOpen, setLauncherOpen] = useState(false);
@@ -91,7 +123,19 @@ export default function WhatIfScenarioDetailPage() {
   const [roomOptions, setRoomOptions] = useState<WhatIfLookupOption[]>([]);
   const [courseOptions, setCourseOptions] = useState<WhatIfLookupOption[]>([]);
   const [timeslotOptions, setTimeslotOptions] = useState<WhatIfLookupOption[]>([]);
-  const { beginRun, bindRunId, updateProgress, setRunPhase, endRun, setFinalizing } = useGwoRun();
+  const {
+    beginRun,
+    bindRunId,
+    updateProgress,
+    setPercent,
+    setRunPhase,
+    endRun,
+    setFinalizing,
+    isRunning: gwoIsRunning,
+    isPaused: gwoIsPaused,
+    runSource: gwoRunSource,
+  } =
+    useGwoRun();
   const recoveringRunIdRef = useRef<number | null>(null);
   const pageMountedRef = useRef(true);
   const streamAbortRef = useRef<AbortController | null>(null);
@@ -119,7 +163,9 @@ export default function WhatIfScenarioDetailPage() {
     Boolean(scenario?.isRunning) ||
     runStatus === "running" ||
     runStatus === "pending" ||
+    (gwoRunSource === "scenario" && gwoIsRunning) ||
     simStarting;
+  const scenarioPaused = gwoRunSource === "scenario" && localScenarioActive && gwoIsPaused;
   const blockedByOtherScenarioRun = blockedByWhatIf && !localScenarioActive;
   const scenarioRunBusy = localScenarioActive;
   const shouldShowScenarioProgressBar = localScenarioActive;
@@ -139,6 +185,10 @@ export default function WhatIfScenarioDetailPage() {
   }, [blockedByOtherScenarioRun, scenariosSnapshot, id]);
 
   const load = useCallback(async () => {
+    if (!idValid) {
+      setScenarioLoading(false);
+      return;
+    }
     setLoadError(null);
     try {
       const [scenarioData, timetablesData] = await Promise.all([
@@ -153,7 +203,17 @@ export default function WhatIfScenarioDetailPage() {
     } finally {
       setScenarioLoading(false);
     }
-  }, [id]);
+  }, [id, idValid]);
+
+  useEffect(() => {
+    if (idValid) return;
+    toast({
+      title: "Invalid scenario",
+      description: "Check the link or pick a scenario from the list.",
+      variant: "destructive",
+    });
+    router.replace("/dashboard/what-if");
+  }, [idValid, router, toast]);
 
   useEffect(() => {
     pageMountedRef.current = true;
@@ -330,19 +390,39 @@ export default function WhatIfScenarioDetailPage() {
 
     const ac = beginRun("scenario", latest.id);
     streamAbortRef.current = ac;
-    updateProgress({ current: 1, total: 100 });
     setRunPhase(
       "Connected to optimizer",
       "Recovered active run after reload. Waiting for progress updates…",
     );
     void (async () => {
       try {
-        const outcome = await streamScenarioRunSse(latest.id, ac.signal, { updateProgress, setRunPhase });
+        const outcome = await streamScenarioRunSse(latest.id, ac.signal, {
+          updateProgress,
+          setPercent,
+          setRunPhase,
+        });
         if (outcome.ok) {
           setFinalizing();
           if (pageMountedRef.current) {
             await load();
           }
+        } else if (outcome.cancelled) {
+          if (pageMountedRef.current) {
+            await load();
+            toast({
+              title: "Simulation cancelled",
+              description: "Run cancelled by user.",
+            });
+          }
+        } else if (outcome.streamInterrupted) {
+          if (pageMountedRef.current) await load();
+        } else if (outcome.errorMessage) {
+          toast({
+            title: "Run failed",
+            description: outcome.errorMessage,
+            variant: "destructive",
+          });
+          if (pageMountedRef.current) await load();
         }
       } catch (error: unknown) {
         if (!(error instanceof Error && error.name === "AbortError")) {
@@ -356,9 +436,7 @@ export default function WhatIfScenarioDetailPage() {
         if (streamAbortRef.current === ac) {
           streamAbortRef.current = null;
         }
-        if (!ac.signal.aborted) {
-          endRun();
-        }
+        endRun();
       }
     })();
   }, [
@@ -366,6 +444,7 @@ export default function WhatIfScenarioDetailPage() {
     simStarting,
     beginRun,
     updateProgress,
+    setPercent,
     setRunPhase,
     setFinalizing,
     load,
@@ -387,7 +466,6 @@ export default function WhatIfScenarioDetailPage() {
     const ac = beginRun("scenario");
     streamAbortRef.current = ac;
     const signal = ac.signal;
-    updateProgress({ current: 1, total: 100 });
     setRunPhase("Starting what-if run", "Posting scenario to the server…");
     try {
       const timetableId = runSelection[0];
@@ -396,7 +474,7 @@ export default function WhatIfScenarioDetailPage() {
       );
       if (!selectedTimetable) {
         throw new Error(
-          "Selected timetable is not eligible. Choose a published timetable or an optimizer draft.",
+          "Selected timetable is not eligible. Choose a published timetable or one saved from timetable generation (optimizer draft).",
         );
       }
       const started = await ApiClient.request<{ runs: Array<{ runId: number; timetableId: number }> }>(
@@ -411,8 +489,28 @@ export default function WhatIfScenarioDetailPage() {
       }
 
       const run = runs[0];
-      const outcome = await streamScenarioRunSse(run.runId, signal, { updateProgress, setRunPhase });
+      const outcome = await streamScenarioRunSse(run.runId, signal, {
+        updateProgress,
+        setPercent,
+        setRunPhase,
+      });
       if (!outcome.ok) {
+        if (outcome.cancelled) {
+          toast({
+            title: "Simulation cancelled",
+            description: "Run cancelled by user.",
+          });
+          if (pageMountedRef.current) {
+            await load();
+          }
+          return;
+        }
+        if (outcome.streamInterrupted) {
+          if (pageMountedRef.current) {
+            await load();
+          }
+          return;
+        }
         toast({
           title: "Run failed",
           description: outcome.errorMessage ?? "Unknown error",
@@ -426,23 +524,17 @@ export default function WhatIfScenarioDetailPage() {
         typeof outcome.resultTimetableId === "number" && outcome.resultTimetableId > 0
           ? outcome.resultTimetableId
           : null;
-      if (sseResultTimetableId && pageMountedRef.current) {
-        toast({
-          title: "Scenario result saved",
-          description: `Stored as draft timetable #${sseResultTimetableId}. Opening the schedule viewer…`,
-        });
-        const params = new URLSearchParams({
-          simulation: "1",
-          timetableId: String(sseResultTimetableId),
-          runId: String(run.runId),
-        });
-        router.push(`/schedule?${params.toString()}`);
-        return;
-      }
-
       if (pageMountedRef.current) {
         await load();
       }
+      if (sseResultTimetableId && pageMountedRef.current) {
+        toast({
+          title: "Scenario result saved",
+          description: `Stored as draft timetable #${sseResultTimetableId}. Use View schedule below when you want to inspect it.`,
+        });
+        return;
+      }
+
       if (pageMountedRef.current) {
         const refreshedScenario = await getScenario(id);
         const latestRun = refreshedScenario.latestRun;
@@ -453,16 +545,8 @@ export default function WhatIfScenarioDetailPage() {
         ) {
           toast({
             title: "Scenario result saved",
-            description: `Stored as draft timetable #${latestRun.resultTimetableId}. Opening the schedule viewer…`,
+            description: `Stored as draft timetable #${latestRun.resultTimetableId}. Use View schedule below when you want to inspect it.`,
           });
-          const params = new URLSearchParams({
-            simulation: "1",
-            timetableId: String(latestRun.resultTimetableId),
-            runId: String(latestRun.id),
-          });
-          if (pageMountedRef.current) {
-            router.push(`/schedule?${params.toString()}`);
-          }
           return;
         }
       }
@@ -485,37 +569,12 @@ export default function WhatIfScenarioDetailPage() {
       if (streamAbortRef.current === ac) {
         streamAbortRef.current = null;
       }
-      if (!ac.signal.aborted) {
-        endRun();
-      }
+      endRun();
       if (pageMountedRef.current) {
         setSimStarting(false);
       }
     }
   }
-
-  const metricsRows = useMemo(() => {
-    const baseline = scenario?.latestRun?.metricsBaseline;
-    const result = scenario?.latestRun?.metricsResult;
-    if (!baseline || !result) return [];
-    return [
-      ["Conflicts", baseline.conflicts, result.conflicts, true],
-      ["Room Utilization Rate", baseline.roomUtilizationRate, result.roomUtilizationRate, false],
-      ["Soft Constraints Score", baseline.softConstraintsScore, result.softConstraintsScore, false],
-      ["Fitness Score", baseline.fitnessScore, result.fitnessScore, false],
-      ["Lecturer Balance Score", baseline.lecturerBalanceScore, result.lecturerBalanceScore, false],
-    ] as Array<[string, number | null, number | null, boolean]>;
-  }, [scenario?.latestRun]);
-
-  const applyHint = useMemo(
-    () =>
-      recommendationFromMetrics(
-        scenario?.latestRun?.metricsBaseline ?? null,
-        scenario?.latestRun?.metricsResult ?? null,
-        scenario?.name ?? "Scenario",
-      ),
-    [scenario?.latestRun?.metricsBaseline, scenario?.latestRun?.metricsResult, scenario?.name],
-  );
 
   const selectableBaseTimetables = useMemo(() => timetables.filter((t) => Boolean(t.canUseAsScenarioBase)), [timetables]);
 
@@ -537,21 +596,25 @@ export default function WhatIfScenarioDetailPage() {
   }, [scenario?.latestRun?.baseTimetableId, timetables]);
   const applyTargetsPublishedTimetable = isPublishedTimetableStatus(latestRunBaseTimetableStatus);
 
-  const outcome = useMemo(() => {
-    if (!metricsRows.length) return null;
-    let good = 0;
-    let bad = 0;
-    for (const [, b, r, lower] of metricsRows) {
-      if (typeof b !== "number" || typeof r !== "number") continue;
-      if (r === b) continue;
-      const isGood = lower ? r < b : r > b;
-      if (isGood) good += 1;
-      else bad += 1;
+  const latestRunCompleteWithResult = useMemo(() => {
+    const lr = scenario?.latestRun;
+    if (!lr?.resultTimetableId) return null;
+    if (lr.status !== "completed" && lr.status !== "applied") return null;
+    return lr;
+  }, [scenario?.latestRun]);
+
+  const latestRunBaseLabel = useMemo(() => {
+    if (!latestRunCompleteWithResult) return "";
+    const fromRun = latestRunCompleteWithResult.baseTimetableName?.trim();
+    if (fromRun) return fromRun;
+    const t = timetables.find(
+      (x) => Number(x.timetableId) === Number(latestRunCompleteWithResult.baseTimetableId),
+    );
+    if (t) {
+      return `${t.academicYear} · ${t.semester} · v${t.versionNumber}`;
     }
-    if (good > bad) return { text: "Net outcome: Improved", cls: "text-green-600" };
-    if (bad > good) return { text: "Net outcome: Regressed", cls: "text-red-600" };
-    return { text: "Net outcome: Mixed", cls: "text-amber-600" };
-  }, [metricsRows]);
+    return `Timetable #${latestRunCompleteWithResult.baseTimetableId}`;
+  }, [latestRunCompleteWithResult, timetables]);
 
   return (
     <div className="flex h-screen">
@@ -570,6 +633,12 @@ export default function WhatIfScenarioDetailPage() {
               </Breadcrumb>
               {shouldShowScenarioProgressBar ? <GwoTopProgressBar sources={["scenario"]} /> : null}
             </div>
+            {!idValid ? (
+              <Alert>
+                <AlertTitle>Redirecting…</AlertTitle>
+                <AlertDescription>Invalid scenario ID.</AlertDescription>
+              </Alert>
+            ) : null}
             {loadError ? (
               <Alert variant="destructive">
                 <AlertTitle>Could not load scenario</AlertTitle>
@@ -645,30 +714,52 @@ export default function WhatIfScenarioDetailPage() {
                 <Card className="border-border/80 shadow-sm">
                   <CardContent className="space-y-4 p-6 pt-6">
                     <div className="flex flex-col items-center text-center">
-                      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 dark:bg-green-950/50">
-                        <Play className="h-6 w-6 translate-x-0.5 fill-green-600 text-green-600 dark:fill-green-400 dark:text-green-400" />
+                      <div
+                        className={cn(
+                          "mb-4 flex h-14 w-14 items-center justify-center rounded-full",
+                          latestRunCompleteWithResult && !scenarioRunBusy
+                            ? "bg-emerald-100 dark:bg-emerald-950/50"
+                            : "bg-green-100 dark:bg-green-950/50",
+                        )}
+                      >
+                        {latestRunCompleteWithResult && !scenarioRunBusy ? (
+                          <Check
+                            className="h-7 w-7 stroke-[2.5] text-emerald-700 dark:text-emerald-300"
+                            aria-hidden
+                          />
+                        ) : (
+                          <Play className="h-6 w-6 translate-x-0.5 fill-green-600 text-green-600 dark:fill-green-400 dark:text-green-400" />
+                        )}
                       </div>
                       <p className="text-lg font-semibold text-foreground">
                         {blockedByOtherScenarioRun
                           ? "Another simulation is running"
-                          : scenarioRunBusy
-                          ? "Simulation in progress"
-                          : runWasCancelledByUser
-                            ? "Simulation cancelled"
-                            : scenario?.latestRun?.status === "failed"
-                            ? "Simulation failed"
-                            : "Ready to simulate"}
+                          : scenarioPaused
+                            ? "Simulation paused"
+                            : scenarioRunBusy
+                              ? "Simulation in progress"
+                              : runWasCancelledByUser
+                                ? "Simulation cancelled"
+                                : scenario?.latestRun?.status === "failed"
+                                  ? "Simulation failed"
+                                  : latestRunCompleteWithResult
+                                    ? "Latest run finished"
+                                    : "Ready to simulate"}
                       </p>
-                      <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+                      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                         {blockedByOtherScenarioRun
                           ? "Only one What-If simulation can run at a time. Wait for the active run to finish."
-                          : scenarioRunBusy
-                          ? "Live progress is shown in the bar above."
-                          : runWasCancelledByUser
-                            ? "This run was cancelled by you. You can start another simulation at any time."
-                            : scenario?.latestRun?.status === "failed"
-                            ? "Review the error below, adjust conditions or pick another timetable, then try again."
-                            : "Select a timetable to run this scenario against."}
+                          : scenarioPaused
+                            ? "The run is paused. Use Resume in the progress bar above to continue."
+                            : scenarioRunBusy
+                              ? "Live progress is shown in the bar above."
+                              : runWasCancelledByUser
+                                ? "This run was cancelled by you. You can start another simulation at any time."
+                                : scenario?.latestRun?.status === "failed"
+                                  ? "Review the error below, adjust conditions or pick another timetable, then try again."
+                                  : latestRunCompleteWithResult
+                                    ? `Your most recent completed run used baseline “${latestRunBaseLabel}”. Compare, apply, or open the draft below — you can still run this scenario on other timetables.`
+                                    : "Select a timetable to run this scenario against."}
                       </p>
                     </div>
                     {blockedByTimetable ? (
@@ -715,143 +806,112 @@ export default function WhatIfScenarioDetailPage() {
                         {blockedByOtherScenarioRun ? "Waiting for active simulation…" : scenarioRunBusy ? "Running…" : "Run Simulation"}
                       </Button>
                     )}
-                    {runStatus === "failed" ? (
-                      <div
-                        className={cn(
-                          "rounded-lg border p-4",
-                          runWasCancelledByUser
-                            ? "border-amber-200/80 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/30"
-                            : "border-red-200/80 bg-red-50/70 dark:border-red-900/60 dark:bg-red-950/30",
-                        )}
-                      >
+                    {runStatus === "failed" && !runWasCancelledByUser ? (
+                      <div className="rounded-lg border border-red-200/80 bg-red-50/70 p-4 dark:border-red-900/60 dark:bg-red-950/30">
                         <div className="flex items-start gap-3">
-                          <span
-                            className={cn(
-                              "mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full",
-                              runWasCancelledByUser
-                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/70 dark:text-amber-100"
-                                : "bg-red-100 text-red-700 dark:bg-red-900/70 dark:text-red-100",
-                            )}
-                          >
+                          <span className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-red-700 dark:bg-red-900/70 dark:text-red-100">
                             <AlertTriangle className="h-4 w-4" />
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-start justify-between gap-3">
-                              <p
-                                className={cn(
-                                  "font-semibold",
-                                  runWasCancelledByUser
-                                    ? "text-amber-800 dark:text-amber-100"
-                                    : "text-red-800 dark:text-red-100",
-                                )}
-                              >
-                                {runWasCancelledByUser ? "Simulation cancelled" : "Simulation failed"}
-                              </p>
+                              <p className="font-semibold text-red-800 dark:text-red-100">Simulation failed</p>
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className={cn(
-                                  "bg-white",
-                                  runWasCancelledByUser
-                                    ? "border-amber-300 text-amber-700 hover:bg-amber-100 hover:text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-900/50"
-                                    : "border-red-300 text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100 dark:hover:bg-red-900/50",
-                                )}
+                                className="border-red-300 bg-white text-red-700 hover:bg-red-100 hover:text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100 dark:hover:bg-red-900/50"
                                 onClick={() => setLauncherOpen(true)}
                               >
                                 Retry
                               </Button>
                             </div>
                             {latestRunErrorMessage !== "Process exited with code null." ? (
-                              <p
-                                className={cn(
-                                  "mt-1 text-sm leading-relaxed",
-                                  runWasCancelledByUser
-                                    ? "text-amber-700/95 dark:text-amber-200/90"
-                                    : "text-red-700/95 dark:text-red-200/90",
-                                )}
-                              >
-                                {runWasCancelledByUser
-                                  ? "Run cancelled by user."
-                                  : latestRunErrorMessage ??
-                                    "The run failed. Try again with another timetable or updated conditions."}
+                              <p className="mt-1 text-sm leading-relaxed text-red-700/95 dark:text-red-200/90">
+                                {latestRunErrorMessage ??
+                                  "The run failed. Try again with another timetable or updated conditions."}
                               </p>
                             ) : null}
                           </div>
                         </div>
                       </div>
                     ) : null}
-                    {scenario?.latestRun?.status === "completed" || scenario?.latestRun?.status === "applied" ? (
+                    {latestRunCompleteWithResult ? (
                       <>
                         <div className="border-t border-border/80 pt-4" />
-                        <div className="rounded-lg border border-emerald-200/70 bg-emerald-50/60 p-3 dark:border-emerald-900/70 dark:bg-emerald-950/30">
-                          <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
-                            Result saved as a draft timetable
-                          </p>
-                          <p className="mt-1 text-xs text-emerald-900/80 dark:text-emerald-200/90">
-                            The optimizer output is stored in the database as draft timetable #
-                            {scenario.latestRun.resultTimetableId ?? "—"}
-                            {' '}
-                            (not published yet). Open the schedule viewer to use grid, list, and calendar like any other
-                            timetable.
-                          </p>
-                          <div className="mt-2">
-                            <Button asChild>
-                              <Link
-                                href={
-                                  scenario.latestRun.resultTimetableId
-                                    ? `/schedule?simulation=1&timetableId=${scenario.latestRun.resultTimetableId}&runId=${scenario.latestRun.id}`
-                                    : `/schedule?runId=${scenario.latestRun.id}`
-                                }
-                              >
-                                View Schedule
-                              </Link>
-                            </Button>
-                          </div>
+                        <div className="rounded-lg border border-border/80 bg-muted/25 px-4 py-3 text-left text-sm shadow-sm">
+                          <p className="font-medium text-foreground">Last run</p>
+                          <dl className="mt-2 space-y-1.5 text-muted-foreground">
+                            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                              <dt className="shrink-0 text-xs font-medium uppercase tracking-wide">Finished</dt>
+                              <dd className="text-foreground sm:text-right">
+                                {latestRunCompleteWithResult.completedAt
+                                  ? formatDateTime(latestRunCompleteWithResult.completedAt)
+                                  : "—"}
+                              </dd>
+                            </div>
+                            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                              <dt className="shrink-0 text-xs font-medium uppercase tracking-wide">Duration</dt>
+                              <dd className="tabular-nums text-foreground sm:text-right">
+                                {formatRunDurationSeconds(
+                                  effectiveRunDurationSeconds(latestRunCompleteWithResult),
+                                )}
+                              </dd>
+                            </div>
+                            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                              <dt className="shrink-0 text-xs font-medium uppercase tracking-wide">Baseline timetable</dt>
+                              <dd className="min-w-0 text-foreground sm:max-w-[65%] sm:text-right">
+                                <span className="break-words">{latestRunBaseLabel}</span>
+                                <span className="mt-0.5 block font-mono text-[11px] text-muted-foreground">
+                                  #{latestRunCompleteWithResult.baseTimetableId}
+                                </span>
+                              </dd>
+                            </div>
+                          </dl>
                         </div>
-                        {outcome ? <p className={`text-sm font-medium ${outcome.cls}`}>{outcome.text}</p> : null}
-                        <div className="overflow-x-auto rounded-lg border bg-card">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b bg-muted/40">
-                                <th className="p-2.5 text-left font-medium">Metric</th>
-                                <th className="p-2.5 text-center font-medium">Baseline</th>
-                                <th className="p-2.5 text-center font-medium">Result</th>
-                                <th className="p-2.5 text-center font-medium">Delta</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {metricsRows.map(([label, b, r, lowerIsBetter]) => {
-                                const bn = typeof b === "number" ? b : null;
-                                const rn = typeof r === "number" ? r : null;
-                                const delta = bn != null && rn != null ? rn - bn : null;
-                                const good =
-                                  delta != null &&
-                                  (lowerIsBetter ? delta < 0 : delta > 0);
-                                return (
-                                  <tr key={label} className="border-b last:border-0">
-                                    <td className="p-2.5">{label}</td>
-                                    <td className="p-2.5 text-center tabular-nums">{bn ?? "—"}</td>
-                                    <td className="p-2.5 text-center tabular-nums">{rn ?? "—"}</td>
-                                    <td className={`p-2.5 text-center tabular-nums ${delta === 0 ? "text-muted-foreground" : good ? "text-emerald-600" : "text-rose-600"}`}>
-                                      {delta == null ? "—" : delta === 0 ? "—" : `${delta > 0 ? "+" : ""}${Math.abs(delta) < 0.01 ? delta.toFixed(4) : delta.toFixed(2)}`}
-                                    </td>
-                                  </tr>
-                                );
+                        <div className="grid w-full gap-2 [grid-template-columns:minmax(0,1fr)_minmax(0,1.55fr)_minmax(0,1fr)]">
+                          <Button
+                            asChild
+                            variant="default"
+                            type="button"
+                            className="w-full min-w-0 justify-center px-2 text-center text-sm sm:px-3"
+                          >
+                            <Link
+                              href={buildWhatIfCompareHref({
+                                mode: "before_after",
+                                runIds: [latestRunCompleteWithResult.id],
+                                scenarioId: id,
+                                timetableId: latestRunCompleteWithResult.baseTimetableId ?? null,
                               })}
-                            </tbody>
-                          </table>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{applyHint ?? "No recommendation available."}</p>
-                        <div className="flex flex-wrap gap-2">
-                          <Button asChild variant="outline" type="button">
-                            <Link href={`/dashboard/what-if/compare?runIds=${scenario.latestRun.id}&mode=before_after&scenarioId=${id}`}>Compare metrics</Link>
+                            >
+                              Compare results
+                            </Link>
                           </Button>
-                          <Button type="button" onClick={() => setApplyOpen(true)}>Apply to timetable</Button>
+                          <Button
+                            type="button"
+                            variant="default"
+                            className="w-full min-w-0 justify-center px-2 text-center text-sm sm:px-3"
+                            onClick={() => setApplyOpen(true)}
+                          >
+                            Apply to timetable
+                          </Button>
+                          <Button
+                            asChild
+                            variant="default"
+                            type="button"
+                            className="w-full min-w-0 justify-center px-2 text-center text-sm sm:px-3"
+                          >
+                            <Link
+                              href={`/schedule?simulation=1&timetableId=${latestRunCompleteWithResult.resultTimetableId}&runId=${latestRunCompleteWithResult.id}`}
+                            >
+                              View schedule
+                            </Link>
+                          </Button>
                         </div>
                       </>
                     ) : null}
-                    {runStatus === "running" ? (
-                      <p className="text-xs text-muted-foreground">Simulation is running. Live progress is shown above.</p>
+                    {scenarioPaused ? (
+                      <p className="text-xs text-muted-foreground">
+                        Simulation is paused. Use Resume in the progress bar above.
+                      </p>
                     ) : null}
                   </CardContent>
                 </Card>
@@ -887,7 +947,7 @@ export default function WhatIfScenarioDetailPage() {
               <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg border border-border/80 bg-muted/10 p-2">
                 {selectableBaseTimetables.length === 0 ? (
                   <p className="px-2 py-8 text-center text-sm text-muted-foreground">
-                    No eligible base timetables found. Use a published timetable or an optimizer draft.
+                    No eligible base timetables found. Use a published timetable or save a draft from timetable generation first.
                   </p>
                 ) : filteredTimetables.length === 0 ? (
                   <p className="px-2 py-8 text-center text-sm text-muted-foreground">No timetables match your search.</p>
@@ -930,7 +990,7 @@ export default function WhatIfScenarioDetailPage() {
                           ? String(t.generationType ?? "").toLowerCase() === "imported"
                             ? "Published · seeded"
                             : "Published · official"
-                          : String(t.generationType ?? "").toLowerCase() === "gwo_ui"
+                          : ["gwo_ui", "gwo"].includes(String(t.generationType ?? "").toLowerCase())
                             ? "Draft · optimizer"
                             : "Draft"}
                       </Badge>
@@ -1013,7 +1073,12 @@ export default function WhatIfScenarioDetailPage() {
               } catch (error: unknown) {
                 toast({
                   title: "Apply failed",
-                  description: error instanceof Error ? error.message : "Unknown error",
+                  description:
+                    error instanceof ApiError
+                      ? error.message
+                      : error instanceof Error
+                        ? error.message
+                        : "Unknown error",
                   variant: "destructive",
                 });
               } finally {

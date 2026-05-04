@@ -201,6 +201,20 @@ def _build_legacy_gwo_config(
                 continue
         teachable_by_user[uid] = teachable
 
+    # True only when no lecturer has any teachable course id in the sandbox.
+    # Used to decide whether "no qualified lecturer" may fall back to all lecturers.
+    sandbox_teachability_empty = True
+    for l in lecturers:
+        for cid in l.get("teachable_course_ids", []) or []:
+            try:
+                int(cid)
+                sandbox_teachability_empty = False
+                break
+            except Exception:
+                continue
+        if not sandbox_teachability_empty:
+            break
+
     seeded_sizes: Dict[tuple, int] = {}
     for e in existing_entries:
         try:
@@ -230,12 +244,20 @@ def _build_legacy_gwo_config(
         for uid, idx in lecturer_index_by_user_id.items():
             if course_id in teachable_by_user.get(uid, set()):
                 allowed_lecturer_indices.append(idx)
-        if not allowed_lecturer_indices:
+        if not allowed_lecturer_indices and sandbox_teachability_empty:
             allowed_lecturer_indices = list(range(len(lecturer_names)))
 
         for s in range(1, sections_count + 1):
             section_number = f"S{s}"
             size = seeded_sizes.get((course_id, section_number), 30)
+            try:
+                academic_level = int(c.get("academic_level") or 0)
+            except Exception:
+                academic_level = 0
+            try:
+                dept_id = int(c.get("dept_id") or 0)
+            except Exception:
+                dept_id = 0
             lectures_data.append({
                 "id": lecture_id,
                 "course": course_code,
@@ -246,6 +268,8 @@ def _build_legacy_gwo_config(
                 "section_number": section_number,
                 "delivery_mode": _delivery_mode_name(c.get("delivery_mode")),
                 "session_type": "lab" if bool(c.get("is_lab")) else "lecture",
+                "academic_level": academic_level,
+                "dept_id": dept_id,
             })
             lecture_id += 1
 
@@ -834,6 +858,7 @@ def _apply_delete_timeslot(sandbox: Dict, params: Dict) -> None:
     for entry in sandbox.get("existing_entries", []):
         if entry.get("slot_id") == sid:
             entry["slot_id"] = None
+            entry["room_id"] = None
 
 
 # ---------------------------------------------------------------------------
@@ -973,6 +998,8 @@ def save_result_timetable(
     base_timetable_id: int,
     semester_id: Optional[int],
     gwo_result: Dict,
+    *,
+    scenario_id: Optional[int] = None,
 ) -> int:
     """
     Create a new timetable row and populate it with schedule entries produced
@@ -1176,13 +1203,19 @@ def save_result_timetable(
                 )
 
             # ── 6. Link to scenario via scenario_produces_timetable ──
+            sid = scenario_id if scenario_id is not None else gwo_result.get("scenario_id")
+            if sid is None:
+                raise ValueError(
+                    "scenario_id is required to persist scenario_produces_timetable link "
+                    "(fallback GWO payloads often omit it — pass scenario_id= explicitly)."
+                )
             cur.execute(
                 """
                 INSERT INTO scenario_produces_timetable (timetable_id, scenario_id)
                 VALUES (%s, %s)
                 ON CONFLICT DO NOTHING
                 """,
-                (result_timetable_id, gwo_result.get("scenario_id")),
+                (result_timetable_id, sid),
             )
 
         conn.commit()
@@ -1365,6 +1398,7 @@ def main() -> int:
             # Scenario outputs are always drafts until an explicit publish action.
             semester_id=None,
             gwo_result=result_for_persistence,
+            scenario_id=scenario_id,
         )
     except Exception as exc:
         # Last-chance recovery: if the selected payload couldn't be persisted,
@@ -1382,6 +1416,7 @@ def main() -> int:
                     base_timetable_id=base_tt_id,
                     semester_id=None,
                     gwo_result=candidate,
+                    scenario_id=scenario_id,
                 )
                 gwo_result = candidate
                 recovered_ok = True

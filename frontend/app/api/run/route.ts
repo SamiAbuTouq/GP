@@ -17,6 +17,7 @@ import {
   tryAcquireOptimizerGlobalLock,
 } from "@/lib/optimizer-global-lock";
 import { writeGwoConfigFileMergedWithDatabase } from "@/lib/write-gwo-config";
+import { notifyAdminsOptimizerFailed } from "@/lib/server-notifications";
 
 /** Next.js route max duration (seconds). Match the Python spawn timeout below. */
 export const maxDuration = 10_800; // 3 hours
@@ -397,12 +398,14 @@ export async function POST(request: Request) {
             return;
           }
 
+          const errLine =
+            combinedErr ||
+            stdout.trim() ||
+            `Algorithm execution failed with exit code ${exitCode}`;
+          void notifyAdminsOptimizerFailed(`Timetable generation (GWO UI): ${errLine}`).catch(() => {});
           send("complete", {
             success: false,
-            error:
-              combinedErr ||
-              stdout.trim() ||
-              `Algorithm execution failed with exit code ${exitCode}`,
+            error: errLine,
             output: stdout,
             exitCode,
           });
@@ -415,14 +418,17 @@ export async function POST(request: Request) {
           process.platform === "win32"
             ? " On Windows, install Python from python.org (check “Add to PATH”), or set GWO_PYTHON to your python.exe. If `python` opens the Microsoft Store, disable App execution aliases for python.exe under Settings → Apps → Advanced app settings."
             : "";
+        const pyMissing = `Python not found. Tried: ${tried}.${winHint}`;
+        void notifyAdminsOptimizerFailed(`Timetable generation (GWO UI): ${pyMissing}`).catch(() => {});
         send("complete", {
           success: false,
-          error: `Python not found. Tried: ${tried}.${winHint}`,
+          error: pyMissing,
           output: "",
         });
         safeCloseStream(controller);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
+        void notifyAdminsOptimizerFailed(`Timetable generation (GWO UI): ${message}`).catch(() => {});
         send("complete", { success: false, error: message, output: "" });
         safeCloseStream(controller);
       } finally {

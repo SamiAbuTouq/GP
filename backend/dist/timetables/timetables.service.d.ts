@@ -1,7 +1,9 @@
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 export declare class TimetablesService {
     private prisma;
-    constructor(prisma: PrismaService);
+    private readonly notifications;
+    constructor(prisma: PrismaService, notifications: NotificationsService);
     private mapTimetableSummary;
     list(semesterId?: number, draftsOnly?: boolean, scenarioRunBasesOnly?: boolean): Promise<{
         timetableId: any;
@@ -50,6 +52,10 @@ export declare class TimetablesService {
         academicYear?: string;
         semesterType?: number;
         acknowledgedHardConflicts?: boolean;
+    }, publisher?: {
+        userId: number;
+        firstName: string;
+        lastName: string;
     }): Promise<{
         timetableId: any;
         semesterId: any;
@@ -74,6 +80,7 @@ export declare class TimetablesService {
             isValid: any;
         } | null;
     }>;
+    notifyPreferenceViolationsForTimetable(timetableId: number): Promise<void>;
     listEntries(params: {
         timetableId: number;
         courseId?: number;

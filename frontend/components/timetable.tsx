@@ -26,6 +26,10 @@ import {
   validateScheduleHardConstraints,
 } from "@/lib/schedule-hard-constraints";
 import { mergeEntryWithPlacement } from "@/lib/schedule-edit-rules";
+import type { UserTimeFormat } from "@/lib/datetime-format";
+import { useDateTimeFormat } from "@/components/datetime-preferences-context";
+import { ApiClient } from "@/lib/api-client";
+import { dispatchNotificationsRefresh } from "@/lib/notification-bus";
 import { getScenarios } from "@/lib/what-if";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -100,7 +104,6 @@ import {
   timeslotScheduleLabel,
   uiSlotKindFromEngineSlotType,
   formatDeliveryMode,
-  injectTimeslotIdsWithLabels,
   type TimeslotCatalogueEntry,
 } from "@/lib/timetable-model";
 async function jsonFetcher(url: string) {
@@ -149,10 +152,11 @@ function timeslotHeaderLabel(
   catalogue: TimeslotCatalogueEntry[],
   entries: ScheduleEntry[],
   mode: "compact" | "long" = "long",
+  timeFormat: UserTimeFormat = "24",
 ): string {
   const row = catalogue.find((t) => t.id === tsId);
   if (row) {
-    return mode === "compact" ? timeslotCompactLabel(row) : timeslotLongLabel(row);
+    return mode === "compact" ? timeslotCompactLabel(row, timeFormat) : timeslotLongLabel(row, timeFormat);
   }
   const hit = entries.find((e) => e.timeslot === tsId);
   return hit?.timeslot_label ?? tsId;
@@ -816,6 +820,7 @@ export function SoftConstraintPanel() {
 
 export function SoftConstraintWarningsPanel({ asSection = false }: { asSection?: boolean } = {}) {
   const { data, isLoading } = useSchedule();
+  const { prefs } = useDateTimeFormat();
   const [query, setQuery] = useState("");
   const preferenceWarnings = data?.preference_warnings ?? [];
   const catalogue = data?.timeslots_catalogue ?? [];
@@ -826,7 +831,7 @@ export function SoftConstraintWarningsPanel({ asSection = false }: { asSection?:
   const totalWarnings = preferenceWarnings.length;
   if (totalWarnings === 0) return null;
 
-  const slotLabel = (id: string) => timeslotHeaderLabel(id, catalogue, []);
+  const slotLabel = (id: string) => timeslotHeaderLabel(id, catalogue, [], "long", prefs.timeFormat);
 
   const q = query.trim().toLowerCase();
   const filteredPreferenceWarnings = preferenceWarnings
@@ -1303,6 +1308,7 @@ export function TeachingLoadPanel() {
 
 export function RoomUtilizationPanel() {
   const { data, isLoading } = useSchedule();
+  const { prefs } = useDateTimeFormat();
   const { config, isLoading: configLoading } = useConfig();
   const [query, setQuery] = useState("");
   const [openUtil, setOpenUtil] = useState(false);
@@ -1401,7 +1407,10 @@ export function RoomUtilizationPanel() {
   
   const distQ = distQuery.trim().toLowerCase();
   const distRows = distributionInfo
-    .filter((d) => !distQ || timeslotHeaderLabel(d.timeslot, catalogue, []).toLowerCase().includes(distQ))
+    .filter((d) =>
+      !distQ ||
+      timeslotHeaderLabel(d.timeslot, catalogue, [], "long", prefs.timeFormat).toLowerCase().includes(distQ),
+    )
     .sort((a, b) => b.classes - a.classes);
 
   const maxClasses = Math.max(...distributionInfo.map((d) => d.classes), 0);
@@ -1489,7 +1498,9 @@ export function RoomUtilizationPanel() {
                 const pct = maxClasses > 0 ? (d.classes / maxClasses) * 100 : 0;
                 return (
                   <div key={d.timeslot} className="grid grid-cols-[1fr_2.75rem_8rem] items-center gap-3">
-                    <span className="truncate text-muted-foreground">{timeslotHeaderLabel(d.timeslot, catalogue, [])}</span>
+                    <span className="truncate text-muted-foreground">
+                      {timeslotHeaderLabel(d.timeslot, catalogue, [], "long", prefs.timeFormat)}
+                    </span>
                     <span className="text-right tabular-nums font-semibold text-foreground/80">{d.classes}</span>
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
                       <div className="h-full rounded-full bg-indigo-400 transition-[width] duration-500" style={{ width: `${pct}%` }} />
@@ -1642,6 +1653,7 @@ function studyPlanPseudoCourseLabel(code: string): string | null {
 /** Full-width cohort health view for Timetable Generation (majors, years, semester cards, badges). */
 export function StudyPlanTabPanel() {
   const { data, isLoading } = useSchedule();
+  const { prefs } = useDateTimeFormat();
   const [selectedMajor, setSelectedMajor] = useState<string | null>(null);
   const [majorPickerOpen, setMajorPickerOpen] = useState(false);
   const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({});
@@ -1689,8 +1701,8 @@ export function StudyPlanTabPanel() {
   }, [unitConflicts]);
 
   const slotLabel = useCallback(
-    (id: string) => timeslotHeaderLabel(id, catalogue, entries, "compact"),
-    [catalogue, entries],
+    (id: string) => timeslotHeaderLabel(id, catalogue, entries, "compact", prefs.timeFormat),
+    [catalogue, entries, prefs.timeFormat],
   );
 
   const activeMajor = useMemo(() => {
@@ -2078,6 +2090,7 @@ export function LecturerLegend() {
 /** Maps column codes T1, T2, … (timetable left-to-right) to calendar times and engine ids. */
 export function TimeslotCodeLegend() {
   const { data } = useSchedule();
+  const { prefs } = useDateTimeFormat();
   const { config, isLoading } = useConfig();
   const [open, setOpen] = useState(false);
 
@@ -2172,7 +2185,7 @@ export function TimeslotCodeLegend() {
                       <td className="py-2 pr-3 font-bold text-foreground tabular-nums">
                         T{idx + 1}
                       </td>
-                      <td className="py-2 pr-3 text-foreground/90">{timeslotScheduleLabel(ts)}</td>
+                      <td className="py-2 pr-3 text-foreground/90">{timeslotScheduleLabel(ts, prefs.timeFormat)}</td>
                       <td className="py-2 font-mono text-xs text-muted-foreground">{tsId}</td>
                     </tr>
                   );
@@ -2276,9 +2289,12 @@ export function TimetableDatabasePersistBar({
     }
     setSavingDb(true);
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const access = ApiClient.getAccessToken();
+      if (access) headers.Authorization = `Bearer ${access}`;
       const r = await fetch("/api/timetables/persist", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         credentials: "include",
         body: JSON.stringify({
           semesterId: null,
@@ -2287,6 +2303,10 @@ export function TimetableDatabasePersistBar({
             : {}),
           schedule: entries,
           timeslots_catalogue: data?.timeslots_catalogue ?? [],
+          metadata: {
+            best_fitness:
+              typeof data?.metadata?.best_fitness === "number" ? data.metadata.best_fitness : null,
+          },
           validationResult: {
             lecturer_conflicts: (data as any)?.lecturer_conflicts ?? [],
             room_conflicts: (data as any)?.room_conflicts ?? [],
@@ -2326,6 +2346,7 @@ export function TimetableDatabasePersistBar({
         title: "Stored in database",
         description: `${tname} · v${ver} (id ${tid}).`,
       });
+      dispatchNotificationsRefresh();
     } catch (e) {
       const msg = String(e);
       onPersistError({ title: "Database save failed", lines: [msg] });
@@ -2388,6 +2409,7 @@ export function TimetableGrid() {
   const gridScrollRef = useRef<HTMLDivElement | null>(null);
   const dragScrollRafRef = useRef<number | null>(null);
   const searchParams = useSearchParams();
+  const { prefs } = useDateTimeFormat();
   const { data, isLoading, refresh } = useSchedule();
   const { config } = useConfig();
   const { toast } = useToast();
@@ -2644,7 +2666,7 @@ export function TimetableGrid() {
     }
     const roomName = onlineRow ? null : rowKey;
     const cap = roomName ? roomCapFromConfig(config, roomName) : 0;
-    const next = mergeEntryWithPlacement(entry, catalogue, roomName, tsId, cap);
+    const next = mergeEntryWithPlacement(entry, catalogue, roomName, tsId, cap, prefs.timeFormat);
     const nextDraft = draft.map((e, i) => (i === idx ? next : e));
     if (commitDraftIfValid(nextDraft)) {
       const where = onlineRow ? "Online row" : `Room ${rowKey}`;
@@ -2995,7 +3017,7 @@ export function TimetableGrid() {
                     : family === "blended"
                       ? "bg-violet-100 dark:bg-violet-900/40 text-violet-900 dark:text-violet-100 border-violet-200 dark:border-violet-700/60"
                       : "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100 border-blue-200 dark:border-blue-700/60";
-                const slotHdrTip = timeslotHeaderLabel(ts, catalogue, displayEntries, "long");
+                const slotHdrTip = timeslotHeaderLabel(ts, catalogue, displayEntries, "long", prefs.timeFormat);
                 return (
                   <th
                     key={ts}
@@ -3198,6 +3220,7 @@ export function TimetableGrid() {
 
 export function CourseList() {
   const { data, isLoading } = useSchedule();
+  const { prefs } = useDateTimeFormat();
   const [open, setOpen] = useState(false);
   const entries = data?.schedule ?? [];
   const catalogue = data?.timeslots_catalogue ?? [];
@@ -3229,11 +3252,7 @@ export function CourseList() {
           {sorted.map((entry) => {
             const color = getLecturerColor(entry.lecturer);
             const isConflict = conflictIds.has(String(entry.lecture_id));
-            const slotLabel = timeslotHeaderLabel(
-              entry.timeslot,
-              catalogue,
-              entries,
-            );
+            const slotLabel = timeslotHeaderLabel(entry.timeslot, catalogue, entries, "long", prefs.timeFormat);
             const family = uiSlotKindFromEngineSlotType(entry.slot_type);
             const isLabRow =
               (entry.session_type || "").toLowerCase() === "lab" ||
@@ -3302,6 +3321,7 @@ export function CourseList() {
 
 export function OptimizationInfo() {
   const { data, isLoading: scheduleLoading } = useSchedule();
+  const { formatDateTime } = useDateTimeFormat();
   const { config, isLoading: configLoading } = useConfig();
   const router = useRouter();
   const pathname = usePathname();
@@ -3322,12 +3342,7 @@ export function OptimizationInfo() {
   const inputCounts = getSchedulingInputCounts(config);
   const breakdown = scheduleDeliveryBreakdown(meta, entries);
 
-  const generatedAt = meta?.generated_at
-    ? new Date(meta.generated_at).toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-    : "—";
+  const generatedAt = meta?.generated_at ? formatDateTime(meta.generated_at) : "—";
 
   // Catalog slot occupancy: assigned classes vs every compatible room×timeslot
   // unit in the catalogue (denominator is large, so this stays low unless the
@@ -4336,6 +4351,7 @@ function RoomConfigEditorRow({
 
 export function ConfigurationPanel() {
   const { config, isLoading, refresh } = useConfig();
+  const { prefs: formatPrefs } = useDateTimeFormat();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -4810,7 +4826,7 @@ export function ConfigurationPanel() {
                           <td className="px-2 py-1.5">
                             <input
                               value={ts.label ?? ""}
-                              placeholder={timeslotScheduleLabel(ts)}
+                              placeholder={timeslotScheduleLabel(ts, formatPrefs.timeFormat)}
                               onChange={(e) =>
                                 updateTimeslotRow(ts.id, {
                                   label:
@@ -5020,7 +5036,7 @@ export function ConfigurationPanel() {
                                   prefs.unpreferred.includes(ts.id) &&
                                   !isSelected;
                                 if (isSelected) return null;
-                                const short = timeslotScheduleLabel(ts);
+                                const short = timeslotScheduleLabel(ts, formatPrefs.timeFormat);
                                 const hint = ts.short_code
                                   ? `${ts.short_code} · ${ts.id}`
                                   : ts.id;
@@ -5102,7 +5118,7 @@ export function ConfigurationPanel() {
                               <option value="">Add unpreferred slot…</option>
                               {timeslotsList.map((ts) => {
                                 if (prefs.unpreferred.includes(ts.id)) return null;
-                                const short = timeslotScheduleLabel(ts);
+                                const short = timeslotScheduleLabel(ts, formatPrefs.timeFormat);
                                 const hint = ts.short_code
                                   ? `${ts.short_code} · ${ts.id}`
                                   : ts.id;

@@ -23,6 +23,7 @@ import {
 import { FileSpreadsheet, FileText, FileDown, FileJson } from "lucide-react"
 import { ExportIcon } from "@/components/custom-icons"
 import { exportToCSV, exportToJSON, exportToExcel, exportToPDF } from "@/lib/export-utils"
+import { useDateTimeFormat } from "@/components/datetime-preferences-context"
 
 type ExportFormat = "csv" | "json" | "xlsx" | "pdf"
 
@@ -49,6 +50,7 @@ export function ExportDropdownWithDialog<T extends Record<string, unknown>>({
   isFiltered = false,
   filterDescription,
 }: ExportDialogProps<T>) {
+  const { formatDateTime } = useDateTimeFormat()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [format, setFormat] = useState<ExportFormat>("csv")
   const [scope, setScope] = useState<"all" | "filtered">("filtered")
@@ -82,11 +84,13 @@ export function ExportDropdownWithDialog<T extends Record<string, unknown>>({
         exportToExcel(data, columns, filename)
         break
       case "pdf":
-        exportToPDF(data, columns, pdfTitle)
+        exportToPDF(data, columns, pdfTitle, undefined, true, {
+          generatedAtFormatted: formatDateTime(new Date()),
+        })
         break
     }
     setDialogOpen(false)
-  }, [format, scope, allData, filteredData, columns, filenamePrefix, pdfTitle])
+  }, [format, scope, allData, filteredData, columns, filenamePrefix, pdfTitle, formatDateTime])
 
   return (
     <>

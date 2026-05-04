@@ -19,6 +19,7 @@ const users_service_1 = require("./users.service");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const update_user_dto_1 = require("./dto/update-user.dto");
+const update_notification_prefs_dto_1 = require("./dto/update-notification-prefs.dto");
 const update_password_dto_1 = require("./dto/update-password.dto");
 const roles_decorator_1 = require("../common/decorators/roles.decorator");
 let UsersController = class UsersController {
@@ -33,6 +34,9 @@ let UsersController = class UsersController {
     }
     async updatePreferences(user, updatePreferencesDto) {
         return this.usersService.updatePreferences(user.user_id, updatePreferencesDto);
+    }
+    async updateNotificationPreferences(user, dto) {
+        return this.usersService.updateNotificationPreferences(user.user_id, user.role_name, dto);
     }
     async updatePassword(user, dto) {
         return this.usersService.updatePasswordForUser(user.user_id, dto.new_password);
@@ -62,6 +66,14 @@ __decorate([
     __metadata("design:paramtypes", [Object, update_user_dto_1.UpdatePreferencesDto]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "updatePreferences", null);
+__decorate([
+    (0, common_1.Patch)("me/notification-preferences"),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, update_notification_prefs_dto_1.UpdateNotificationPrefsDto]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "updateNotificationPreferences", null);
 __decorate([
     (0, common_1.Patch)("me/password"),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),

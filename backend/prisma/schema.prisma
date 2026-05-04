@@ -40,6 +40,8 @@ model User {
   theme_preference String?  @db.VarChar(20)
   date_format      String?  @db.VarChar(20)
   time_format      String?  @db.VarChar(20)
+  /// Per-user toggles for which in-app notifications may be created; `{ "key": false }` suppresses that type.
+  notification_prefs Json?
 
   // Relations
   refresh_tokens   RefreshToken[]

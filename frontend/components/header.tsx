@@ -13,12 +13,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/lib/auth-context"
 import { ApiClient, ApiError, UserProfile } from "@/lib/api-client"
-import { Bell } from "@/components/animate-ui/icons/bell"
-import { AnimateIcon } from "@/components/animate-ui/icons/icon"
+import { NotificationBell } from "@/components/notification-bell"
 
 export function Header() {
   const router = useRouter()
@@ -67,40 +65,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Notifications */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative h-9 w-9 rounded-full text-slate-700 hover:bg-slate-900/10 hover:text-slate-900 dark:text-white/90 dark:hover:bg-white/15 dark:hover:text-white"
-            >
-              <AnimateIcon animateOnHover>
-                <Bell className="h-4 w-4" />
-              </AnimateIcon>
-              <Badge className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-slate-900 text-[10px] text-white dark:border-card dark:bg-neutral-200 dark:text-black">
-                3
-              </Badge>
-              <span className="sr-only">View notifications</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex flex-col items-start gap-1 cursor-pointer">
-              <span className="font-medium">Timetable Generated</span>
-              <span className="text-xs text-muted-foreground">Fall 2024 timetable ready for review</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 cursor-pointer">
-              <span className="font-medium">Conflict Detected</span>
-              <span className="text-xs text-muted-foreground">Room R202 double-booked on Monday</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 cursor-pointer">
-              <span className="font-medium">New Course Added</span>
-              <span className="text-xs text-muted-foreground">AI Ethics (CS450) added to catalog</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <NotificationBell />
 
         {/* Profile Avatar */}
         <DropdownMenu>

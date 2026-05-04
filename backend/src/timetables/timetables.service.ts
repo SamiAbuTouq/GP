@@ -1,6 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DeliveryMode } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import {
+  ADMIN_NOTIFICATION_PREF_KEYS,
+  LECTURER_NOTIFICATION_PREF_KEYS,
+} from '../notifications/notification-prefs';
 
 function decodeSemesterType(type: number): string {
   const map: Record<number, string> = {
@@ -37,6 +42,12 @@ function decodeDaysMask(daysMask: number): string[] {
   return days;
 }
 
+/** Rows stored from timetable generation / GWO persist (often `semester_id` null until published). */
+function isOptimizerScenarioRunBaseGenerationType(gen: string | null | undefined): boolean {
+  const g = String(gen ?? '').trim().toLowerCase();
+  return g === 'gwo_ui' || g === 'gwo';
+}
+
 const DEFAULT_SOFT_WEIGHTS = {
   preferred_timeslot: 80,
   unpreferred_timeslot: 70,
@@ -50,7 +61,10 @@ const DEFAULT_SOFT_WEIGHTS = {
 
 @Injectable()
 export class TimetablesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   private mapTimetableSummary(t: any) {
     const isDraft = t.semester_id == null;
@@ -60,11 +74,12 @@ export class TimetablesService {
         : 0;
     const isScenarioResult = t.generation_type === 'what_if' || resultRunCount > 0;
     const canUseAsScenarioBase =
-      !isScenarioResult && (t.semester_id != null || t.generation_type === 'gwo_ui');
+      !isScenarioResult &&
+      (t.semester_id != null || isOptimizerScenarioRunBaseGenerationType(t.generation_type));
     const draftOrigin: 'optimizer' | 'scenario' | 'other' | null = isDraft
       ? isScenarioResult
         ? 'scenario'
-        : t.generation_type === 'gwo_ui'
+        : isOptimizerScenarioRunBaseGenerationType(t.generation_type)
           ? 'optimizer'
           : 'other'
       : null;
@@ -101,7 +116,8 @@ export class TimetablesService {
    * @param semesterId When set to a positive DB id, only timetables for that semester.
    * @param draftsOnly When true, only timetables with no semester (e.g. GWO UI store draft).
    * When both omitted, returns all timetables.
-   * scenarioRunBasesOnly: eligible bases for scenario runs — published schedules or GWO UI drafts only; excludes timetables that are scenario sandbox results (see ScenarioRun.result_timetable_id).
+   * scenarioRunBasesOnly: eligible bases for scenario runs — semester-linked schedules (published/official)
+   * or optimizer-generated drafts from timetable generation (`gwo_ui` / `gwo`, any common casing); excludes scenario-result timetables.
    */
   async list(semesterId?: number, draftsOnly?: boolean, scenarioRunBasesOnly?: boolean) {
     const hasSemesterFilter =
@@ -115,7 +131,10 @@ export class TimetablesService {
         { NOT: { scenario_runs_as_result: { some: {} } } },
         { generation_type: { notIn: ['what_if', 'what_if_applied'] } },
         {
-          OR: [{ semester_id: { not: null } }, { generation_type: 'gwo_ui' }],
+          OR: [
+            { semester_id: { not: null } },
+            { generation_type: { in: ['gwo_ui', 'gwo', 'GWO_UI', 'GWO', 'Gwo_Ui'] } },
+          ],
         },
       ],
     };
@@ -175,8 +194,29 @@ export class TimetablesService {
     const requiresConflictAcknowledgment =
       metricsIsValid === false || conflicts.length > 0;
 
-    const hardConflictCount =
-      conflicts.length > 0 ? conflicts.length : metricsIsValid === false ? 1 : 0;
+    /**
+     * GWO / what-if often persist a single synthetic row (conflict_type hard_conflicts) whose
+     * `detail` carries the real total ("… reported …: 51"). Using row count alone showed "1"
+     * in the UI while the message said 51 — use the embedded total when present.
+     */
+    const hardConflictCount = (() => {
+      if (conflicts.length > 0) {
+        let sum = 0;
+        for (const c of conflicts) {
+          const t = String(c.conflict_type ?? '').toLowerCase();
+          if (t === 'hard_conflicts' || t === 'hard conflicts') {
+            const m = /:\s*(\d+)\s*$/m.exec(String(c.detail ?? ''));
+            if (m) {
+              sum += Number(m[1]);
+              continue;
+            }
+          }
+          sum += 1;
+        }
+        return sum;
+      }
+      return metricsIsValid === false ? 1 : 0;
+    })();
 
     return {
       timetableId: timetable.timetable_id,
@@ -217,6 +257,7 @@ export class TimetablesService {
   async publishDraftTimetable(
     timetableId: number,
     params: { academicYear?: string; semesterType?: number; acknowledgedHardConflicts?: boolean },
+    publisher?: { userId: number; firstName: string; lastName: string },
   ) {
     const academicYear = String(params.academicYear ?? '').trim();
     const semesterType = Number(params.semesterType);
@@ -266,6 +307,11 @@ export class TimetablesService {
       );
     }
 
+    const existingSameSemester = await this.prisma.timetable.count({
+      where: { semester_id: semester.semester_id },
+    });
+    const isRevision = existingSameSemester > 0;
+
     const updated = await this.prisma.timetable.update({
       where: { timetable_id: timetableId },
       data: {
@@ -279,7 +325,98 @@ export class TimetablesService {
       },
     });
 
+    const semesterLabel = `${academicYear} (${decodeSemesterType(semesterType)})`;
+    const publisherName = publisher
+      ? `${publisher.firstName} ${publisher.lastName}`.trim() || 'An administrator'
+      : 'An administrator';
+
+    void this.notifications
+      .notifyAdmins(
+        'Timetable Published',
+        `${publisherName} published the timetable for ${semesterLabel}.`,
+        {
+          exceptUserId: publisher?.userId,
+          preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.TIMETABLE_PUBLISHED_BY_OTHER,
+        },
+      )
+      .catch(() => {});
+
+    const lecturerRows = await this.prisma.sectionScheduleEntry.findMany({
+      where: { timetable_id: timetableId },
+      select: { user_id: true },
+      distinct: ['user_id'],
+    });
+    const lecturerIds = lecturerRows
+      .map((r) => r.user_id)
+      .filter((id): id is number => id != null && Number.isFinite(id));
+
+    const lectTitle = isRevision ? 'Schedule Updated' : 'Your Schedule is Ready';
+    const lectMessage = isRevision
+      ? `The timetable for ${semesterLabel} has been revised. Please review your updated schedule.`
+      : `The timetable for ${semesterLabel} has been published. You can now view your assigned courses and timeslots.`;
+
+    for (const uid of lecturerIds) {
+      void this.notifications
+        .createForUser(uid, lectTitle, lectMessage, {
+          preferenceKey: isRevision
+            ? LECTURER_NOTIFICATION_PREF_KEYS.SCHEDULE_REVISED
+            : LECTURER_NOTIFICATION_PREF_KEYS.SCHEDULE_PUBLISHED,
+        })
+        .catch(() => {});
+    }
+
+    void this.notifyPreferenceViolationsForTimetable(timetableId).catch(() => {});
+
     return this.mapTimetableSummary(updated);
+  }
+
+  /**
+   * Notifies lecturers when an assigned slot matches a timeslot they marked unavailable (not preferred).
+   */
+  async notifyPreferenceViolationsForTimetable(timetableId: number) {
+    const entries = await this.prisma.sectionScheduleEntry.findMany({
+      where: { timetable_id: timetableId },
+      select: {
+        user_id: true,
+        slot_id: true,
+        timeslot: {
+          select: {
+            days_mask: true,
+            start_time: true,
+            end_time: true,
+          },
+        },
+      },
+    });
+
+    const unpreferred = await this.prisma.lecturerPreference.findMany({
+      where: { is_preferred: false },
+      select: { user_id: true, slot_id: true },
+    });
+    const badSet = new Set(unpreferred.map((p) => `${p.user_id}:${p.slot_id}`));
+
+    const seen = new Set<string>();
+    for (const e of entries) {
+      if (e.user_id == null) continue;
+      if (!badSet.has(`${e.user_id}:${e.slot_id}`)) continue;
+      const key = `${e.user_id}:${e.slot_id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const slot = e.timeslot;
+      const label = slot
+        ? `${decodeDaysMask(slot.days_mask)
+            .map((d) => d.slice(0, 3))
+            .join('/')} ${formatTimeHHmm(slot.start_time)}–${formatTimeHHmm(slot.end_time)}`
+        : `slot ${e.slot_id}`;
+      void this.notifications
+        .createForUser(
+          e.user_id,
+          'Preference Not Honored',
+          `You were assigned ${label}, which you marked as unavailable. If this is unexpected, contact the timetabling office.`,
+          { preferenceKey: LECTURER_NOTIFICATION_PREF_KEYS.PREFERENCE_NOT_HONORED },
+        )
+        .catch(() => {});
+    }
   }
 
   async listEntries(params: {

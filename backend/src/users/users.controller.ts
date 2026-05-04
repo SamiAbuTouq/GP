@@ -4,6 +4,7 @@ import { UsersService } from "./users.service";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { UpdateProfileDto, UpdatePreferencesDto } from "./dto/update-user.dto";
+import { UpdateNotificationPrefsDto } from "./dto/update-notification-prefs.dto";
 import type { User } from "@prisma/client";
 import { UpdatePasswordDto } from "./dto/update-password.dto";
 import { Roles } from "../common/decorators/roles.decorator";
@@ -35,6 +36,18 @@ export class UsersController {
     return this.usersService.updatePreferences(
       user.user_id,
       updatePreferencesDto,
+    );
+  }
+
+  @Patch("me/notification-preferences")
+  async updateNotificationPreferences(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateNotificationPrefsDto,
+  ) {
+    return this.usersService.updateNotificationPreferences(
+      user.user_id,
+      user.role_name,
+      dto,
     );
   }
 

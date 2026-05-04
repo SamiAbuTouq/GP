@@ -65,7 +65,10 @@ export async function POST(request: Request) {
     })
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Account session is invalid. Please sign in again.' },
+        { status: 404 },
+      )
     }
 
     // Verify current password against the session owner's hash

@@ -1,7 +1,12 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import type { User } from '@prisma/client';
+import { Role, type User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProfileDto, UpdatePreferencesDto } from './dto/update-user.dto';
+import { UpdateNotificationPrefsDto } from './dto/update-notification-prefs.dto';
+import {
+  ALLOWED_NOTIFICATION_PREF_KEYS_BY_ROLE,
+  mergeNotificationPrefs,
+} from '../notifications/notification-prefs';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
 import * as bcrypt from 'bcrypt';
@@ -76,6 +81,45 @@ export class UsersService {
       theme_preference: user.theme_preference || 'system',
       date_format: user.date_format || 'DD/MM/YYYY',
       time_format: user.time_format || '24',
+      notification_preferences: mergeNotificationPrefs(user.notification_prefs),
+    };
+  }
+
+  async updateNotificationPreferences(userId: number, role: Role, dto: UpdateNotificationPrefsDto) {
+    const allowed = ALLOWED_NOTIFICATION_PREF_KEYS_BY_ROLE[role];
+    if (!allowed) {
+      throw new BadRequestException('Invalid role for notification preferences.');
+    }
+    const incoming = dto.prefs ?? {};
+    const sanitized: Record<string, boolean> = {};
+    for (const [k, v] of Object.entries(incoming)) {
+      if (!allowed.has(k)) continue;
+      if (typeof v === 'boolean') sanitized[k] = v;
+    }
+
+    const existing = await this.prisma.user.findUnique({
+      where: { user_id: userId },
+      select: { notification_prefs: true },
+    });
+    const prev =
+      existing?.notification_prefs != null &&
+      typeof existing.notification_prefs === 'object' &&
+      !Array.isArray(existing.notification_prefs)
+        ? (existing.notification_prefs as Record<string, boolean>)
+        : {};
+    const mergedJson = { ...prev, ...sanitized };
+
+    await this.prisma.user.update({
+      where: { user_id: userId },
+      data: { notification_prefs: mergedJson },
+    });
+
+    const fresh = await this.prisma.user.findUnique({
+      where: { user_id: userId },
+      select: { notification_prefs: true },
+    });
+    return {
+      notification_preferences: mergeNotificationPrefs(fresh?.notification_prefs ?? null),
     };
   }
 

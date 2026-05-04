@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Role, type User } from '@prisma/client';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PublishDraftDto } from './dto/publish-draft.dto';
 import { TimetablesService } from './timetables.service';
 
@@ -80,14 +81,19 @@ export class TimetablesController {
   @Post(':id/publish')
   @Roles(Role.ADMIN)
   publishDraft(
+    @CurrentUser() user: User,
     @Param('id', ParseIntPipe) id: number,
     @Body() body: PublishDraftDto,
   ) {
-    return this.timetablesService.publishDraftTimetable(id, {
-      academicYear: body?.academicYear,
-      semesterType: body?.semesterType,
-      acknowledgedHardConflicts: body?.acknowledgedHardConflicts,
-    });
+    return this.timetablesService.publishDraftTimetable(
+      id,
+      {
+        academicYear: body?.academicYear,
+        semesterType: body?.semesterType,
+        acknowledgedHardConflicts: body?.acknowledgedHardConflicts,
+      },
+      { userId: user.user_id, firstName: user.first_name, lastName: user.last_name },
+    );
   }
 }
 

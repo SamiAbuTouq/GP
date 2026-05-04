@@ -3,10 +3,112 @@ import type { GwoOptimizerProgressPayload } from "@/components/gwo-run-context";
 
 export type ScenarioSseHandlers = {
   updateProgress: (p: GwoOptimizerProgressPayload) => void;
+  setPercent: (pct: number) => void;
   setRunPhase: (phase: string, detail?: string) => void;
 };
 
 export type ScenarioSseOutcome = "continue" | "completed" | "failed";
+type ScenarioRunTerminalState = "cancelled" | "failed" | "completed" | null;
+
+function isCancelledMessage(message: unknown): boolean {
+  if (typeof message !== "string") return false;
+  const t = message.trim().toLowerCase();
+  if (t === "run cancelled by user." || t === "run cancelled by user") return true;
+  if (t.includes("cancelled by user")) return true;
+  return false;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchRunTerminalStateWithRetry(
+  runId: number,
+  opts?: { attempts?: number; delayMs?: number; signal?: AbortSignal },
+): Promise<Awaited<ReturnType<typeof fetchRunTerminalState>>> {
+  const attempts = Math.max(1, opts?.attempts ?? 10);
+  const delayMs = Math.max(0, opts?.delayMs ?? 120);
+  const signal = opts?.signal;
+  for (let i = 0; i < attempts; i++) {
+    if (signal?.aborted) break;
+    const t = await fetchRunTerminalState(runId);
+    if (t.state !== null) return t;
+    if (i < attempts - 1 && delayMs > 0) await sleep(delayMs);
+  }
+  return { state: null };
+}
+
+async function fetchRunTerminalState(
+  runId: number,
+): Promise<{
+  state: ScenarioRunTerminalState;
+  resultTimetableId?: number | null;
+  errorMessage?: string;
+}> {
+  try {
+    const row = await ApiClient.request<Record<string, unknown>>(`/what-if/runs/${runId}`);
+    const status = String(row.status ?? "").trim().toLowerCase();
+    const message = row.errorMessage ?? row.error_message;
+    const rawResultId = row.resultTimetableId ?? row.result_timetable_id;
+    const resultTimetableId =
+      typeof rawResultId === "number" && Number.isFinite(rawResultId) && rawResultId > 0
+        ? rawResultId
+        : null;
+    if (status === "completed" || status === "applied") {
+      return { state: "completed", resultTimetableId };
+    }
+    if (status === "failed" && isCancelledMessage(message)) {
+      return { state: "cancelled" };
+    }
+    if (status === "failed") {
+      const err =
+        typeof message === "string" && message.trim()
+          ? message.trim()
+          : "Scenario run failed.";
+      return { state: "failed", errorMessage: err };
+    }
+    return { state: null };
+  } catch {
+    return { state: null };
+  }
+}
+
+async function resolveOutcomeAfterAbort(
+  runId: number,
+): Promise<{ ok: boolean; cancelled?: boolean; streamInterrupted?: boolean; errorMessage?: string; resultTimetableId?: number | null }> {
+  const terminal = await fetchRunTerminalStateWithRetry(runId, { attempts: 8, delayMs: 120 });
+  if (terminal.state === "cancelled") return { ok: false, cancelled: true };
+  if (terminal.state === "failed" && isCancelledMessage(terminal.errorMessage)) {
+    return { ok: false, cancelled: true };
+  }
+  if (terminal.state === "completed") {
+    return { ok: true, resultTimetableId: terminal.resultTimetableId ?? null };
+  }
+  if (terminal.state === "failed") {
+    return { ok: false, errorMessage: terminal.errorMessage ?? "Scenario run failed." };
+  }
+  return { ok: false, streamInterrupted: true };
+}
+
+function scenarioPhaseTitle(phase: string): string {
+  const p = phase.trim().toLowerCase();
+  switch (p) {
+    case "cloning":
+      return "Preparing sandbox";
+    case "conditions":
+      return "Applying conditions";
+    case "gwo":
+      return "Grey Wolf optimization";
+    case "validating":
+      return "Validating solution";
+    case "computing_metrics":
+      return "Saving results";
+    default:
+      return phase
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (ch) => ch.toUpperCase());
+  }
+}
 
 function shouldHideScenarioDetailMessage(message: unknown): boolean {
   if (typeof message !== "string") return true;
@@ -82,10 +184,16 @@ export function applyScenarioSsePayload(
       }
     }
 
-    // Match timetable-generation UX: only iteration telemetry should drive live phase/detail.
+    const rawPct = parsed.pct;
+    if (typeof rawPct === "number" && Number.isFinite(rawPct)) {
+      handlers.setPercent(rawPct);
+    }
+
+    // Non-iteration updates: show run_scenario.py phase + message (not a generic “connected” label).
     if (!hasIterationProgress && !shouldHideScenarioDetailMessage(parsed.message)) {
-      // Keep signal from useful non-iteration messages without replacing with noisy raw logs.
-      handlers.setRunPhase("Connected to optimizer", (parsed.message as string).trim());
+      const phaseKey = typeof parsed.phase === "string" ? parsed.phase.trim() : "";
+      const title = phaseKey ? scenarioPhaseTitle(phaseKey) : "Waiting on server";
+      handlers.setRunPhase(title, (parsed.message as string).trim());
     }
     return "continue";
   }
@@ -114,61 +222,110 @@ export async function streamScenarioRunSse(
   runId: number,
   signal: AbortSignal,
   handlers: ScenarioSseHandlers,
-): Promise<{ ok: boolean; errorMessage?: string; resultTimetableId?: number | null }> {
+): Promise<{
+  ok: boolean;
+  cancelled?: boolean;
+  streamInterrupted?: boolean;
+  errorMessage?: string;
+  resultTimetableId?: number | null;
+}> {
   const token = ApiClient.getAccessToken();
   const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1").replace(/\/+$/, "");
-  const response = await fetch(`${baseUrl}/what-if/runs/${runId}/stream`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    signal,
-  });
-  if (!response.ok || !response.body) {
-    return { ok: false, errorMessage: "Failed to connect to run stream." };
-  }
-  handlers.setRunPhase(
-    "Connected to optimizer",
-    "Waiting for the first iteration — Python startup can take a few seconds",
-  );
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  try {
+    const response = await fetch(`${baseUrl}/what-if/runs/${runId}/stream`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      credentials: "include",
+      signal,
+    });
+    if (!response.ok || !response.body) {
+      return { ok: false, errorMessage: "Failed to connect to run stream." };
+    }
+    handlers.setRunPhase(
+      "Connected to optimizer",
+      "Waiting for the first iteration — Python startup can take a few seconds",
+    );
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let sawResult = false;
+    reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let sawResult = false;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const { lines, rest } = parseSseDataBlocks(buffer);
-    buffer = rest;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const { lines, rest } = parseSseDataBlocks(buffer);
+      buffer = rest;
 
-    for (const line of lines) {
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = JSON.parse(line) as Record<string, unknown>;
-      } catch {
-        continue;
-      }
+      for (const line of lines) {
+        let parsed: Record<string, unknown>;
+        try {
+          parsed = JSON.parse(line) as Record<string, unknown>;
+        } catch {
+          continue;
+        }
 
-      const outcome = applyScenarioSsePayload(parsed, handlers);
-      if (outcome === "failed") {
-        const msg =
-          (typeof parsed.message === "string" && parsed.message) ||
-          (typeof parsed.detail === "string" && parsed.detail) ||
-          "Scenario run failed.";
-        return { ok: false, errorMessage: msg };
-      }
-      if (outcome === "completed") {
-        sawResult = true;
-        const rawResultId = parsed.result_timetable_id ?? parsed.resultTimetableId;
-        const resultTimetableId =
-          typeof rawResultId === "number" && Number.isFinite(rawResultId) && rawResultId > 0
-            ? rawResultId
-            : null;
-        return { ok: true, resultTimetableId };
+        const outcome = applyScenarioSsePayload(parsed, handlers);
+        if (outcome === "failed") {
+          const msg =
+            (typeof parsed.message === "string" && parsed.message) ||
+            (typeof parsed.detail === "string" && parsed.detail) ||
+            "Scenario run failed.";
+          if (isCancelledMessage(msg)) {
+            return { ok: false, cancelled: true };
+          }
+          return { ok: false, errorMessage: msg };
+        }
+        if (outcome === "completed") {
+          sawResult = true;
+          const rawResultId = parsed.result_timetable_id ?? parsed.resultTimetableId;
+          const resultTimetableId =
+            typeof rawResultId === "number" && Number.isFinite(rawResultId) && rawResultId > 0
+              ? rawResultId
+              : null;
+          return { ok: true, resultTimetableId };
+        }
       }
     }
-  }
 
-  if (sawResult) return { ok: true };
-  return { ok: false, errorMessage: "Stream ended before the run finished." };
+    if (sawResult) return { ok: true };
+    if (signal.aborted) {
+      return resolveOutcomeAfterAbort(runId);
+    }
+    const terminal = await fetchRunTerminalStateWithRetry(runId, {
+      attempts: 10,
+      delayMs: 150,
+      signal,
+    });
+    if (signal.aborted) {
+      return resolveOutcomeAfterAbort(runId);
+    }
+    if (terminal.state === "completed") {
+      return { ok: true, resultTimetableId: terminal.resultTimetableId ?? null };
+    }
+    if (terminal.state === "cancelled") {
+      return { ok: false, cancelled: true };
+    }
+    if (terminal.state === "failed") {
+      if (isCancelledMessage(terminal.errorMessage)) {
+        return { ok: false, cancelled: true };
+      }
+      return { ok: false, errorMessage: terminal.errorMessage ?? "Scenario run failed." };
+    }
+    if (signal.aborted) {
+      return resolveOutcomeAfterAbort(runId);
+    }
+    return { ok: false, errorMessage: "Stream ended before the run finished." };
+  } catch (e: unknown) {
+    if (e instanceof Error && e.name === "AbortError") {
+      try {
+        reader?.releaseLock();
+      } catch {
+        /* ignore */
+      }
+      return resolveOutcomeAfterAbort(runId);
+    }
+    throw e;
+  }
 }

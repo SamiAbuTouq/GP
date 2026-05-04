@@ -12,12 +12,13 @@ const lecturers_controller_1 = require("./lecturers.controller");
 const lecturers_service_1 = require("./lecturers.service");
 const prisma_module_1 = require("../prisma/prisma.module");
 const mail_module_1 = require("../mail/mail.module");
+const notifications_module_1 = require("../notifications/notifications.module");
 let LecturersModule = class LecturersModule {
 };
 exports.LecturersModule = LecturersModule;
 exports.LecturersModule = LecturersModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule, mail_module_1.MailModule],
+        imports: [prisma_module_1.PrismaModule, mail_module_1.MailModule, notifications_module_1.NotificationsModule],
         controllers: [lecturers_controller_1.LecturersController],
         providers: [lecturers_service_1.LecturersService],
         exports: [lecturers_service_1.LecturersService],

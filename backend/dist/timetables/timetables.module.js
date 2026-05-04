@@ -11,12 +11,13 @@ const common_1 = require("@nestjs/common");
 const prisma_module_1 = require("../prisma/prisma.module");
 const timetables_controller_1 = require("./timetables.controller");
 const timetables_service_1 = require("./timetables.service");
+const notifications_module_1 = require("../notifications/notifications.module");
 let TimetablesModule = class TimetablesModule {
 };
 exports.TimetablesModule = TimetablesModule;
 exports.TimetablesModule = TimetablesModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule],
+        imports: [prisma_module_1.PrismaModule, notifications_module_1.NotificationsModule],
         controllers: [timetables_controller_1.TimetablesController],
         providers: [timetables_service_1.TimetablesService],
         exports: [timetables_service_1.TimetablesService],

@@ -18,11 +18,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { ApiClient } from "@/lib/api-client";
+import { ApiClient, ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { academicLevelFromCourseCode } from "@/lib/academic-level";
 import useSWR from "swr";
 import {
+  buildWhatIfCompareHref,
   conditionParameterSummary,
   getScenarios,
   type Condition,
@@ -54,7 +55,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { departments, slotTypes } from "@/lib/data";
+import { slotTypes } from "@/lib/data";
 
 const WHAT_IF_DRAFT_KEY = "whatif_builder_draft_v1";
 const TIMESLOT_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"] as const;
@@ -63,7 +64,7 @@ const DELIVERY_MODES = ["FACE_TO_FACE", "ONLINE", "BLENDED"] as const;
 const INITIAL_DRAFT_PARAMS: Record<string, unknown> = {
   firstName: "",
   lastName: "",
-  deptId: "1",
+  deptId: "",
   maxWorkload: 15,
   teachableCourseIds: [] as string[],
   lecturerUserId: "",
@@ -312,6 +313,7 @@ export default function WhatIfScenariosPage() {
   const [roomOptions, setRoomOptions] = useState<WhatIfLookupOption[]>([]);
   const [courseOptions, setCourseOptions] = useState<WhatIfLookupOption[]>([]);
   const [timeslotOptions, setTimeslotOptions] = useState<WhatIfLookupOption[]>([]);
+  const [departmentOptions, setDepartmentOptions] = useState<WhatIfLookupOption[]>([]);
   const [loadingLookups, setLoadingLookups] = useState(false);
   const [draftParams, setDraftParams] = useState<Record<string, unknown>>(() => ({ ...INITIAL_DRAFT_PARAMS }));
   type BuilderStep = "scenario" | "chooseCondition" | "conditionForm";
@@ -390,23 +392,44 @@ export default function WhatIfScenariosPage() {
   useEffect(() => {
     if (!drawerOpen) return;
     setLoadingLookups(true);
-    const safeJson = async (url: string, fallback: unknown) => {
+    const safeReq = async <T,>(path: string, fallback: T): Promise<T> => {
       try {
-        const r = await fetch(url);
-        if (!r.ok) return fallback;
-        return await r.json();
+        return await ApiClient.request<T>(path);
       } catch {
         return fallback;
       }
     };
 
+    const fetchCoursesCatalog = async (): Promise<{ courses?: unknown[] }> => {
+      try {
+        const r = await fetch("/api/courses/catalog", { credentials: "include", cache: "no-store" });
+        if (!r.ok) return { courses: [] };
+        return await r.json();
+      } catch {
+        return { courses: [] };
+      }
+    };
+
     Promise.all([
-      safeJson("/api/lecturers", []),
-      safeJson("/api/rooms", []),
-      safeJson("/api/courses/catalog", { courses: [] }),
-      safeJson("/api/timeslots", []),
+      safeReq<unknown[]>("/lecturers", []),
+      safeReq<unknown[]>("/rooms", []),
+      fetchCoursesCatalog(),
+      safeReq<unknown[]>("/timeslots", []),
+      safeReq<Array<{ id?: number; name?: string }>>("/departments", []),
     ])
-      .then(([lecturers, rooms, coursesRes, timeslots]) => {
+      .then(([lecturers, rooms, coursesRes, timeslots, departments]) => {
+        const nextDepartments: WhatIfLookupOption[] = firstArray(departments)
+          .map((d: Record<string, unknown>) => {
+            const value = numericString(d.id ?? d.dept_id ?? d.deptId);
+            if (!value) return null;
+            return {
+              value,
+              label: String(d.name ?? d.dept_name ?? d.deptName ?? `Department ${value}`),
+            };
+          })
+          .filter((x): x is WhatIfLookupOption => x !== null);
+        setDepartmentOptions(nextDepartments);
+
         const nextLecturers: WhatIfLookupOption[] = firstArray(lecturers)
           .map((l: any) => {
             const value = numericString(
@@ -443,7 +466,7 @@ export default function WhatIfScenariosPage() {
             };
           })
           .filter((x): x is WhatIfLookupOption => x !== null);
-        const courses = firstArray(coursesRes);
+        const courses = firstArray(coursesRes.courses ?? []);
         const nextCourses: WhatIfLookupOption[] = courses
           .map((c: any) => {
             const value = numericString(c.id ?? c.course_id ?? c.courseId);
@@ -485,17 +508,17 @@ export default function WhatIfScenariosPage() {
   }, [drawerOpen]);
 
   function openCreate() {
-    const clean = { name: "", description: "", conditions: [] as Condition[] };
     setEditingId(null);
+    setBuilderStep("scenario");
+    setEditingConditionIndex(null);
+    const clean = { name: "", description: "", conditions: [] as Condition[] };
     setName(clean.name);
     setDescription(clean.description);
     setConditions(clean.conditions);
     setInitialFormState(clean);
     setDraftParams({ ...INITIAL_DRAFT_PARAMS });
-    setDraftRecovered(false);
     window.localStorage.removeItem(WHAT_IF_DRAFT_KEY);
-    setBuilderStep("scenario");
-    setEditingConditionIndex(null);
+    setDraftRecovered(false);
     setDrawerOpen(true);
   }
 
@@ -522,7 +545,7 @@ export default function WhatIfScenariosPage() {
     if (loading || editQueryConsumed.current) return;
     editQueryConsumed.current = true;
     const editId = Number(raw);
-    if (!Number.isFinite(editId)) {
+    if (!Number.isFinite(editId) || editId < 1) {
       router.replace("/dashboard/what-if");
       editQueryConsumed.current = false;
       return;
@@ -579,7 +602,7 @@ export default function WhatIfScenariosPage() {
           ...base,
           firstName: str(p.firstName),
           lastName: str(p.lastName),
-          deptId: str(p.deptId) || "1",
+          deptId: str(p.deptId),
           maxWorkload: num(p.maxWorkload, 15),
           teachableCourseIds: idsStr(p.teachableCourseIds),
         });
@@ -615,7 +638,7 @@ export default function WhatIfScenariosPage() {
           ...base,
           courseCode: str(p.courseCode),
           courseName: str(p.courseName),
-          deptId: str(p.deptId) || "1",
+          deptId: str(p.deptId),
           academicLevel: num(p.academicLevel, academicLevelFromCourseCode(str(p.courseCode))),
           isLab: Boolean(p.isLab),
           creditHours: num(p.creditHours, 3),
@@ -738,10 +761,17 @@ export default function WhatIfScenariosPage() {
           toast({ title: "Add course", description: "Enter course code and name.", variant: "destructive" });
           return null;
         }
+        {
+          const courseDeptId = getParamNumber("deptId", 0);
+          if (courseDeptId < 1) {
+            toast({ title: "Add course", description: "Select a department.", variant: "destructive" });
+            return null;
+          }
+        }
         parameters = {
           courseCode: getParamString("courseCode").trim(),
           courseName: getParamString("courseName").trim(),
-          deptId: getParamNumber("deptId", 0) || 1,
+          deptId: getParamNumber("deptId", 0),
           academicLevel: academicLevelFromCourseCode(getParamString("courseCode")),
           isLab: Boolean(p.isLab),
           creditHours: getParamNumber("creditHours", 3),
@@ -826,27 +856,50 @@ export default function WhatIfScenariosPage() {
     });
   }
 
-  async function save(runAfterSave: boolean, opts?: { closeModal?: boolean; quiet?: boolean }) {
+  async function save(
+    runAfterSave: boolean,
+    opts?: { closeModal?: boolean; quiet?: boolean },
+  ): Promise<Scenario | null> {
     if (!name.trim()) {
       toast({ title: "Name required", description: "Enter a scenario name.", variant: "destructive" });
-      return;
+      return null;
     }
     const closeModal = opts?.closeModal !== false;
     const body = { name: name.trim(), description: description.trim(), conditions };
     const endpoint = editingId ? `/what-if/scenarios/${editingId}` : "/what-if/scenarios";
     const method = editingId ? "PATCH" : "POST";
-    const saved = await ApiClient.request<Scenario>(endpoint, { method, body: JSON.stringify(body) });
-    if (!opts?.quiet) {
-    toast({ title: editingId ? "Scenario updated" : "Scenario created" });
+    try {
+      const saved = await ApiClient.request<Scenario>(endpoint, { method, body: JSON.stringify(body) });
+      if (!opts?.quiet) {
+        toast({ title: editingId ? "Scenario updated" : "Scenario created" });
+      }
+      if (closeModal) {
+        setDrawerOpen(false);
+        if (!editingId) window.localStorage.removeItem(WHAT_IF_DRAFT_KEY);
+      } else if (!editingId && saved?.id) {
+        setEditingId(saved.id);
+      }
+      await load();
+      if (runAfterSave && saved?.id) {
+        window.location.href = `/dashboard/what-if/${saved.id}`;
+      }
+      return saved;
+    } catch (error: unknown) {
+      const description =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Unknown error";
+      if (!opts?.quiet) {
+        toast({
+          title: editingId ? "Could not update scenario" : "Could not create scenario",
+          description,
+          variant: "destructive",
+        });
+      }
+      return null;
     }
-    if (closeModal) {
-    setDrawerOpen(false);
-    if (!editingId) window.localStorage.removeItem(WHAT_IF_DRAFT_KEY);
-    } else if (!editingId && saved?.id) {
-      setEditingId(saved.id);
-    }
-    await load();
-    if (runAfterSave) window.location.href = `/dashboard/what-if/${saved.id}`;
   }
 
   async function saveDraft() {
@@ -855,8 +908,16 @@ export default function WhatIfScenariosPage() {
       toast({ title: "Draft saved locally", description: "Add a name to sync this scenario to the server." });
       return;
     }
-    await save(false, { closeModal: true, quiet: true });
-    toast({ title: "Draft saved", description: "Your scenario is stored on the server." });
+    const saved = await save(false, { closeModal: true, quiet: true });
+    if (saved) {
+      toast({ title: "Draft saved", description: "Your scenario is stored on the server." });
+    } else {
+      toast({
+        title: "Could not save to server",
+        description: "Your work is still in local draft. Fix any issues and try again.",
+        variant: "destructive",
+      });
+    }
   }
 
   const conflicts = useMemo(() => {
@@ -971,12 +1032,13 @@ export default function WhatIfScenariosPage() {
                 <p className="text-sm text-muted-foreground">Simulate timetable changes in an isolated sandbox before applying them.</p>
               </div>
               <div className="flex gap-2">
-                {scenarios.filter((s) => s.latestRun?.status === "completed" || s.latestRun?.status === "applied").length >= 2 ? (
-                  <Button variant="outline" onClick={() => router.push("/dashboard/what-if/compare")}>Compare Runs</Button>
-                ) : null}
+                <Button variant="outline" asChild>
+                  <Link href={buildWhatIfCompareHref({})}>Compare results</Link>
+                </Button>
                 <Button onClick={openCreate}>New Scenario</Button>
               </div>
             </div>
+
             <div className="flex flex-wrap items-center gap-2 rounded-lg border p-2">
               <Input
                 value={search}
@@ -1005,11 +1067,14 @@ export default function WhatIfScenariosPage() {
             ) : (
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {visibleScenarios.map((s) => (
-                  <Card key={s.id} className="gap-0 overflow-hidden border-border/70 py-3">
+                  <Card
+                    key={s.id}
+                    className="gap-0 overflow-hidden border-border/70 py-3 transition-all duration-300 ease-out hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-none"
+                  >
                     <div
                       role="button"
                       tabIndex={0}
-                      className="cursor-pointer rounded-sm outline-none transition-colors hover:bg-muted/20 focus-visible:bg-muted/20"
+                      className="cursor-pointer rounded-sm outline-none transition-colors duration-300 hover:bg-muted/25 focus-visible:bg-muted/25"
                       onClick={() => router.push(`/dashboard/what-if/${s.id}`)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
@@ -1064,9 +1129,22 @@ export default function WhatIfScenariosPage() {
                           variant="ghost"
                           className="h-7 px-2.5 text-xs"
                           onClick={async () => {
-                            await ApiClient.request(`/what-if/scenarios/${s.id}/clone`, { method: "POST" });
-                            toast({ title: "Scenario cloned" });
-                            await load();
+                            try {
+                              await ApiClient.request(`/what-if/scenarios/${s.id}/clone`, { method: "POST" });
+                              toast({ title: "Scenario cloned" });
+                              await load();
+                            } catch (error: unknown) {
+                              toast({
+                                title: "Could not clone scenario",
+                                description:
+                                  error instanceof ApiError
+                                    ? error.message
+                                    : error instanceof Error
+                                      ? error.message
+                                      : "Unknown error",
+                                variant: "destructive",
+                              });
+                            }
                           }}
                         >
                           <Copy className="mr-1 h-3.5 w-3.5" />
@@ -1362,19 +1440,25 @@ export default function WhatIfScenariosPage() {
                       </div>
                       <div>
                         <Label className="font-semibold">Department</Label>
-                    <Select value={getParamString("deptId") || "1"} onValueChange={(v) => setParam("deptId", v)}>
+                        <Select
+                          value={getParamString("deptId") || "__none__"}
+                          onValueChange={(v) => setParam("deptId", v === "__none__" ? "" : v)}
+                        >
                           <SelectTrigger className="mt-1.5">
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.map((d, i) => (
-                          <SelectItem key={d} value={String(i + 1)}>
-                            {d}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__" disabled>
+                              {departmentOptions.length ? "Select department" : "Loading departments…"}
+                            </SelectItem>
+                            {departmentOptions.map((d) => (
+                              <SelectItem key={d.value} value={d.value}>
+                                {d.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div>
                         <Label className="font-semibold">Max Workload</Label>
                         <Input className="mt-1.5" type="number" min={1} max={30} value={getParamNumber("maxWorkload", 15)} onChange={(e) => setParam("maxWorkload", Number(e.target.value))} />
@@ -1487,19 +1571,25 @@ export default function WhatIfScenariosPage() {
                     </div>
                     <div>
                       <Label className="font-semibold">Department</Label>
-                    <Select value={getParamString("deptId") || "1"} onValueChange={(v) => setParam("deptId", v)}>
+                      <Select
+                        value={getParamString("deptId") || "__none__"}
+                        onValueChange={(v) => setParam("deptId", v === "__none__" ? "" : v)}
+                      >
                         <SelectTrigger className="mt-1.5">
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.map((d, i) => (
-                          <SelectItem key={d} value={String(i + 1)}>
-                            {d}
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__" disabled>
+                            {departmentOptions.length ? "Select department" : "Loading departments…"}
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                          {departmentOptions.map((d) => (
+                            <SelectItem key={d.value} value={d.value}>
+                              {d.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div>
                       <Label className="font-semibold">Academic Level (Auto)</Label>
                       <Input

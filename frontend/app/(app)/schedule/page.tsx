@@ -1,7 +1,6 @@
 "use client"
 
 import { type ReactNode, useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
@@ -41,7 +40,9 @@ import {
 } from "@/components/ui/dialog"
 import { HardConflictsAcknowledgmentFields, HardConflictsViewerBanner } from "@/components/hard-conflicts-ui"
 import { ApiClient } from "@/lib/api-client"
+import { dispatchNotificationsRefresh } from "@/lib/notification-bus"
 import { useAuth } from "@/lib/auth-context"
+import { useDateTimeFormat } from "@/components/datetime-preferences-context"
 import {
   fetchTimetableConflictSummary,
   type TimetableConflictSummary,
@@ -117,12 +118,6 @@ function timetableStatusBadges(tt: TimetableDto) {
 function timetableDropdownPrefix(tt: TimetableDto): string {
   const [b] = timetableStatusBadges(tt)
   return b?.label.includes("scenario") ? "Scenario draft" : b?.label.includes("optimizer") ? "Optimizer draft" : b?.label ?? "Draft"
-}
-
-function formatTimetableGeneratedAt(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso.length > 16 ? iso.slice(0, 16) : iso
-  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
 }
 
 /**
@@ -339,6 +334,7 @@ function SessionCard({
   compact?: boolean
   searchQuery?: string
 }) {
+  const { formatSessionTimeRange } = useDateTimeFormat()
   const c = getColorForKey(colorKey ?? entry.courseCode)
   return (
     <Dialog>
@@ -361,7 +357,11 @@ function SessionCard({
                 {highlightMatch(`${entry.courseCode}-${entry.sectionNumber}`, searchQuery)}
               </div>
             </div>
-            {showTime ? <span className="shrink-0 text-[10px] opacity-70">{highlightMatch(entry.timeRange, searchQuery)}</span> : null}
+            {showTime ? (
+              <span className="shrink-0 text-[10px] opacity-70">
+                {highlightMatch(formatSessionTimeRange(entry.timeRange), searchQuery)}
+              </span>
+            ) : null}
           </div>
           <div className="mt-1 truncate text-[11px] opacity-90">{highlightMatch(entry.lecturerName, searchQuery)}</div>
           <div className="mt-1 flex items-center justify-between text-[11px] opacity-80">
@@ -378,7 +378,7 @@ function SessionCard({
             {getDisplayCourseName(entry.courseName, entry.isLab)} ({entry.courseCode}) — Section {entry.sectionNumber}
           </DialogTitle>
           <DialogDescription>
-            {entry.day}, {entry.startTime}-{entry.endTime}
+            {entry.day}, {formatSessionTimeRange(`${entry.startTime}-${entry.endTime}`)}
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -535,6 +535,7 @@ export function ScheduleViewerPage({
   }, [searchParams])
   const [simulationResultTimetableId, setSimulationResultTimetableId] = useState<number | null>(null)
   const { user } = useAuth()
+  const { formatDateTime, formatWallClockFromHhMm, formatSessionTimeRange } = useDateTimeFormat()
   const { toast } = useToast()
   const isAdmin = user?.role === "ADMIN"
   const myLecturerId = user?.role === "LECTURER" ? String(user.id) : null
@@ -565,8 +566,6 @@ export function ScheduleViewerPage({
   const [publishSubmitting, setPublishSubmitting] = useState(false)
   const [conflictSummary, setConflictSummary] = useState<TimetableConflictSummary | null>(null)
   const [conflictSummaryLoading, setConflictSummaryLoading] = useState(false)
-  const [applyConflictAckOpen, setApplyConflictAckOpen] = useState(false)
-  const [applyConflictAcknowledged, setApplyConflictAcknowledged] = useState(false)
   const [publishConflictSummary, setPublishConflictSummary] = useState<TimetableConflictSummary | null>(null)
   const [publishConflictLoading, setPublishConflictLoading] = useState(false)
   const [publishConflictAcknowledged, setPublishConflictAcknowledged] = useState(false)
@@ -1117,10 +1116,10 @@ export function ScheduleViewerPage({
     if (timetable.semesterId == null) {
       const line = timetableVersionSelectModel.draftRunById.get(timetable.timetableId)
       const linePart = line != null ? `Draft line ${line} · ` : ""
-      return `${linePart}v${timetable.versionNumber} · ${formatTimetableGeneratedAt(timetable.generatedAt)}`
+      return `${linePart}v${timetable.versionNumber} · ${formatDateTime(timetable.generatedAt)}`
     }
     return `${timetable.academicYear} • ${timetable.semester} • v${timetable.versionNumber}`
-  }, [timetable, hideVersionInTitle, timetableVersionSelectModel.draftRunById])
+  }, [timetable, hideVersionInTitle, timetableVersionSelectModel.draftRunById, formatDateTime])
 
   const useSectionColors = courseFilter !== "all" || lecturerFilter !== "all" || roomFilter !== "all"
   const getEntryColorKey = (entry: ExpandedEntry) => (useSectionColors ? `section-${entry.entryId}` : entry.courseCode)
@@ -1134,13 +1133,13 @@ export function ScheduleViewerPage({
       lecturer: e.lecturerName,
       room: e.roomNumber,
       day: e.day,
-      start: e.startTime,
-      end: e.endTime,
+      start: formatWallClockFromHhMm(e.startTime),
+      end: formatWallClockFromHhMm(e.endTime),
       type: e.isLab ? "Lab" : "Lecture",
       students: e.registeredStudents,
       capacity: e.sectionCapacity,
     }))
-  }, [searchFilteredExpanded, searchFilteredList, viewType])
+  }, [searchFilteredExpanded, searchFilteredList, viewType, formatWallClockFromHhMm])
   const uniqueSectionCount = useMemo(() => {
     const sectionIds = new Set(searchFilteredList.map((e) => e.entryId))
     return sectionIds.size
@@ -1207,6 +1206,7 @@ export function ScheduleViewerPage({
         scheduleTitle,
         `${exportRows.length} sessions`,
         false,
+        { generatedAtFormatted: formatDateTime(new Date()) },
       )
       return
     }
@@ -1231,7 +1231,7 @@ export function ScheduleViewerPage({
                   return `<div style="background:${c.bg};border-left:4px solid ${c.border};color:${c.text};padding:10px 12px;border-radius:8px;font-size:11px;margin-bottom:8px;break-inside:avoid;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
                       <span style="font-weight:700;font-size:13px;">${e.courseCode}-${e.sectionNumber}${e.isLab ? " (Lab)" : ""}</span>
-                      <span style="font-size:10px;opacity:0.75;">${e.timeRange}</span>
+                      <span style="font-size:10px;opacity:0.75;">${formatSessionTimeRange(e.timeRange)}</span>
                     </div>
                     <div style="margin-bottom:2px;font-size:11px;opacity:0.85;">${getDisplayCourseName(e.courseName, e.isLab)}</div>
                     <div style="margin-bottom:2px;">${e.lecturerName}</div>
@@ -1331,7 +1331,7 @@ export function ScheduleViewerPage({
           )
           .join("")
         return `<tr>
-          <td style="padding:12px 12px;border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;font-size:12px;color:#1e3a8a;font-weight:700;vertical-align:middle;white-space:nowrap;background:#eff6ff;">${t}</td>
+          <td style="padding:12px 12px;border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;font-size:12px;color:#1e3a8a;font-weight:700;vertical-align:middle;white-space:nowrap;background:#eff6ff;">${formatSessionTimeRange(t)}</td>
           ${dayCells}
         </tr>`
       })
@@ -1452,6 +1452,7 @@ export function ScheduleViewerPage({
       setPublishedSemesterType(updated.semesterType)
       setPublishDialogOpen(false)
       toast({ title: "Timetable published", description: "The selected draft is now an official published timetable." })
+      dispatchNotificationsRefresh()
     } catch (e: unknown) {
       toast({
         title: "Publish failed",
@@ -1472,12 +1473,6 @@ export function ScheduleViewerPage({
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-auto p-4 lg:p-6">
-          {isSimulationView ? (
-            <div className="sticky top-0 z-20 mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-100">
-              <span className="font-semibold">What-if scenario result:</span>{" "}
-              You are viewing a sandbox timetable result. This is not a published or active timetable.
-            </div>
-          ) : null}
           <div className="mx-auto w-full max-w-[1680px]">
           <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-1">
@@ -1605,60 +1600,6 @@ export function ScheduleViewerPage({
           ) : null}
 
           <div className="space-y-4">
-            {isSimulationView ? (
-              <Card className="border-orange-300 bg-orange-50 dark:bg-orange-950/20">
-                <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-                  <div className="min-w-0 space-y-1">
-                    <p className="text-sm font-semibold text-orange-900 dark:text-orange-100">
-                      Scenario simulation (draft timetable)
-                    </p>
-                    <p className="text-xs leading-relaxed text-orange-950/85 dark:text-orange-100/90">
-                      This result is saved as a draft—not an official published timetable—and cannot be used as the base
-                      for another scenario run. Compare before/after or apply to merge the sandbox onto the baseline
-                      timetable.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {simulationRunId ? (
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href={`/dashboard/what-if/compare?runIds=${simulationRunId}&mode=before_after`}>
-                          Compare before vs after
-                        </Link>
-                      </Button>
-                    ) : null}
-                    <Button
-                      size="sm"
-                      disabled={conflictSummaryLoading}
-                      onClick={() => {
-                        if (!simulationRunId || conflictSummaryLoading) return
-                        if (!conflictSummary?.requiresConflictAcknowledgment) {
-                          void (async () => {
-                            try {
-                              await ApiClient.request(`/what-if/runs/${simulationRunId}/apply`, {
-                                method: "POST",
-                                body: JSON.stringify({}),
-                              })
-                              window.location.reload()
-                            } catch (e: unknown) {
-                              toast({
-                                title: "Apply failed",
-                                description: e instanceof Error ? e.message : "Unknown error",
-                                variant: "destructive",
-                              })
-                            }
-                          })()
-                          return
-                        }
-                        setApplyConflictAcknowledged(false)
-                        setApplyConflictAckOpen(true)
-                      }}
-                    >
-                      Apply to Production
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : null}
             {!hideScheduleSelection ? (
             <CompactCollapsibleCard title="Schedule Selection">
                   <CardDescription className="text-xs">
@@ -1702,7 +1643,7 @@ export function ScheduleViewerPage({
                             {timetableVersionSelectModel.runOrder.map((runNum) => {
                               const items = timetableVersionSelectModel.runs.get(runNum) ?? []
                               const oldest = items[items.length - 1]
-                              const lineStarted = oldest ? formatTimetableGeneratedAt(oldest.generatedAt) : ""
+                              const lineStarted = oldest ? formatDateTime(oldest.generatedAt) : ""
                               return (
                                 <SelectGroup key={`draft-line-${runNum}`}>
                                   <SelectLabel>
@@ -1712,7 +1653,7 @@ export function ScheduleViewerPage({
                                   {items.map((tt) => (
                                     <SelectItem key={tt.timetableId} value={String(tt.timetableId)}>
                                       [{timetableDropdownPrefix(tt)}] v{tt.versionNumber} ·{" "}
-                                      {formatTimetableGeneratedAt(tt.generatedAt)}
+                                      {formatDateTime(tt.generatedAt)}
                                     </SelectItem>
                                   ))}
                                 </SelectGroup>
@@ -1726,7 +1667,7 @@ export function ScheduleViewerPage({
                                   {timetableVersionSelectModel.published.map((tt) => (
                                     <SelectItem key={tt.timetableId} value={String(tt.timetableId)}>
                                       {timetableStatusBadges(tt)[0]?.label ?? "Published"} · v{tt.versionNumber} ·{" "}
-                                      {tt.academicYear} {tt.semester} · {formatTimetableGeneratedAt(tt.generatedAt)}
+                                      {tt.academicYear} {tt.semester} · {formatDateTime(tt.generatedAt)}
                                     </SelectItem>
                                   ))}
                                 </SelectGroup>
@@ -1922,7 +1863,7 @@ export function ScheduleViewerPage({
                       <CardDescription className="space-y-2">
                         {timetableId ? (
                           <span className="block">
-                            {timetable ? `${formatTimetableGeneratedAt(timetable.generatedAt)} • ` : ""}
+                            {timetable ? `${formatDateTime(timetable.generatedAt)} • ` : ""}
                             {uniqueSectionCount} sections
                           </span>
                         ) : (
@@ -2012,7 +1953,7 @@ export function ScheduleViewerPage({
                             style={{ gridTemplateColumns: `130px repeat(${days.length}, minmax(140px, 1fr))` }}
                           >
                             <div className="border-r bg-muted/20 p-3 text-center text-sm text-muted-foreground flex items-center justify-center">
-                              {t}
+                              {formatSessionTimeRange(t)}
                             </div>
                             {days.map((day) => {
                               const cell = entriesByDayTime.get(`${day}__${t}`) ?? []
@@ -2129,7 +2070,9 @@ export function ScheduleViewerPage({
                                   <td className="px-3 py-2.5 text-center">{highlightMatch(e.lecturerName, trimmedSearch)}</td>
                                   <td className="px-3 py-2.5 text-center">{highlightMatch(e.sectionNumber, trimmedSearch)}</td>
                                   <td className="px-3 py-2.5 text-center">{highlightMatch(e.day, trimmedSearch)}</td>
-                                  <td className="px-3 py-2.5 text-center tabular-nums whitespace-nowrap">{highlightMatch(`${e.startTime}-${e.endTime}`, trimmedSearch)}</td>
+                                  <td className="px-3 py-2.5 text-center tabular-nums whitespace-nowrap">
+                                    {highlightMatch(formatSessionTimeRange(e.timeRange), trimmedSearch)}
+                                  </td>
                                   <td className="px-3 py-2.5 text-center">{getDurationLabel(e.startTime, e.endTime)}</td>
                                   <td className="px-3 py-2.5 text-center">{highlightMatch(e.roomNumber, trimmedSearch)}</td>
                                   <td className="px-3 py-2.5 text-center">{highlightMatch(e.isLab ? "Lab" : "Lecture", trimmedSearch)}</td>
@@ -2149,66 +2092,6 @@ export function ScheduleViewerPage({
           </div>
           </div>
 
-          <Dialog
-            open={applyConflictAckOpen}
-            onOpenChange={(open) => {
-              setApplyConflictAckOpen(open)
-              if (!open) setApplyConflictAcknowledged(false)
-            }}
-          >
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Apply timetable with hard conflicts?</DialogTitle>
-                <DialogDescription>
-                  This merges the scenario result into the base timetable and replaces its sessions. Only continue if you
-                  accept the risks.
-                </DialogDescription>
-              </DialogHeader>
-              <HardConflictsAcknowledgmentFields
-                summary={conflictSummary}
-                loading={conflictSummaryLoading}
-                acknowledged={applyConflictAcknowledged}
-                onAcknowledgedChange={setApplyConflictAcknowledged}
-                contextLabel="Applying replaces the base timetable’s schedule with this result."
-              />
-              <DialogFooter>
-                <Button variant="outline" type="button" onClick={() => setApplyConflictAckOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  type="button"
-                  disabled={
-                    conflictSummaryLoading ||
-                    !conflictSummary?.requiresConflictAcknowledgment ||
-                    !applyConflictAcknowledged ||
-                    !simulationRunId
-                  }
-                  onClick={() => {
-                    void (async () => {
-                      if (!simulationRunId) return
-                      try {
-                        await ApiClient.request(`/what-if/runs/${simulationRunId}/apply`, {
-                          method: "POST",
-                          body: JSON.stringify({ acknowledgedHardConflicts: true }),
-                        })
-                        setApplyConflictAckOpen(false)
-                        window.location.reload()
-                      } catch (e: unknown) {
-                        toast({
-                          title: "Apply failed",
-                          description: e instanceof Error ? e.message : "Unknown error",
-                          variant: "destructive",
-                        })
-                      }
-                    })()
-                  }}
-                >
-                  Confirm apply
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </main>
       </div>
     </div>

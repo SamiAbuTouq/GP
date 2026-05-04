@@ -1,6 +1,7 @@
-import type { User } from '@prisma/client';
+import { Role, type User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProfileDto, UpdatePreferencesDto } from './dto/update-user.dto';
+import { UpdateNotificationPrefsDto } from './dto/update-notification-prefs.dto';
 import { ConfigService } from '@nestjs/config';
 export declare class UsersService {
     private readonly prisma;
@@ -20,6 +21,10 @@ export declare class UsersService {
         theme_preference: string;
         date_format: string;
         time_format: string;
+        notification_preferences: Record<string, boolean>;
+    }>;
+    updateNotificationPreferences(userId: number, role: Role, dto: UpdateNotificationPrefsDto): Promise<{
+        notification_preferences: Record<string, boolean>;
     }>;
     updateProfile(userId: number, dto: UpdateProfileDto): Promise<{
         user_id: number;

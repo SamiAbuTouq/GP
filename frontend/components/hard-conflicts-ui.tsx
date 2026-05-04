@@ -34,26 +34,24 @@ export function HardConflictsViewerBanner({
       : null
 
   return (
-    <Alert variant="destructive" className="border-2 shadow-sm">
-      <AlertTriangle className="h-4 w-4" aria-hidden />
-      <AlertTitle>
+    <Alert variant="destructive" className="border-2 border-destructive/50 bg-destructive/5 shadow-sm dark:bg-destructive/10">
+      <AlertTriangle className="h-4 w-4 text-destructive" aria-hidden />
+      <AlertTitle className="text-destructive">
         Hard conflicts detected ({summary.hardConflictCount})
       </AlertTitle>
-      <AlertDescription className="space-y-3 text-sm">
-        <p className="font-medium text-destructive-foreground">
+      <AlertDescription className="space-y-3 text-sm text-foreground">
+        <p className="font-medium text-foreground">
           This timetable has hard scheduling conflicts. Do not apply it to production or publish it until you understand
           every issue below. You can still browse sessions normally.
         </p>
-        {syntheticNote ? <p className="text-destructive-foreground/95">{syntheticNote}</p> : null}
+        {syntheticNote ? <p className="text-muted-foreground">{syntheticNote}</p> : null}
         {summary.conflicts.length > 0 ? (
           <ScrollArea className="max-h-52 rounded-md border border-destructive/40 bg-background/80 pr-3 dark:bg-background/40">
             <ul className="list-disc space-y-2 py-2 pl-5 pr-2 text-left">
               {summary.conflicts.map((c: TimetableConflictRow) => (
-                <li key={c.conflictId} className="marker:text-destructive">
-                  <span className="text-foreground">{formatConflictRowSummary(c)}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    ({c.severity})
-                  </span>
+                <li key={c.conflictId} className="text-foreground marker:text-destructive">
+                  <span>{formatConflictRowSummary(c)}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">({c.severity})</span>
                 </li>
               ))}
             </ul>
@@ -89,10 +87,10 @@ export function HardConflictsAcknowledgmentFields({
 
   return (
     <div className="space-y-3">
-      <Alert variant="destructive" className="border-2 shadow-sm">
-        <AlertTriangle className="h-4 w-4" aria-hidden />
-        <AlertTitle>Hard conflicts</AlertTitle>
-        <AlertDescription className="space-y-2 text-sm">
+      <Alert variant="destructive" className="border-2 border-destructive/50 bg-destructive/5 shadow-sm dark:bg-destructive/10">
+        <AlertTriangle className="h-4 w-4 text-destructive" aria-hidden />
+        <AlertTitle className="text-destructive">Hard conflicts</AlertTitle>
+        <AlertDescription className="space-y-2 text-sm text-foreground">
           <p>
             This timetable has {summary.hardConflictCount} hard conflict
             {summary.hardConflictCount === 1 ? "" : "s"}.{contextLabel ? ` ${contextLabel}` : ""} Only proceed if you accept

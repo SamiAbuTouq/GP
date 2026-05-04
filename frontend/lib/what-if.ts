@@ -91,7 +91,7 @@ export type TimetableOption = {
   isScenarioResult: boolean;
   timetableKind: "draft" | "published";
   draftOrigin?: "optimizer" | "scenario" | "other" | null;
-  /** From API: bases allowed for scenario runs (published schedules + GWO UI drafts only). */
+  /** From API: bases allowed for scenario runs (published schedules + optimizer-saved drafts). */
   canUseAsScenarioBase?: boolean;
 };
 
@@ -124,34 +124,78 @@ export async function getRuns(scenarioId: number): Promise<WhatIfRun[]> {
   return rows.map(normalizeRun);
 }
 
-export async function getTimetables(opts?: { scenarioRunBasesOnly?: boolean }): Promise<TimetableOption[]> {
-  const path = opts?.scenarioRunBasesOnly ? "/timetables?scenarioRunBasesOnly=true" : "/timetables";
-  const rows = await ApiClient.request<any[]>(path);
-  return rows.map((row) => {
-    const gen = String(row.generationType ?? row.generation_type ?? "").toLowerCase();
-    const isPublishedApi = Boolean(row.isPublished ?? row.is_published ?? (row.semesterId ?? row.semester_id) != null);
-    const isScenarioResult = Boolean(
-      row.isScenarioResult ?? row.is_scenario_result ?? gen === "what_if",
-    );
-    const inferredCanBase = !isScenarioResult && (isPublishedApi || gen === "gwo_ui");
-    const apiCanUse = row.canUseAsScenarioBase ?? row.can_use_as_scenario_base;
-    const canUse = apiCanUse != null ? Boolean(apiCanUse) : inferredCanBase;
+function mapTimetableRowToOption(row: any): TimetableOption {
+  const gen = String(row.generationType ?? row.generation_type ?? "").toLowerCase();
+  const isPublishedApi = Boolean(row.isPublished ?? row.is_published ?? (row.semesterId ?? row.semester_id) != null);
+  const isScenarioResult = Boolean(
+    row.isScenarioResult ?? row.is_scenario_result ?? gen === "what_if",
+  );
+  const inferredCanBase =
+    !isScenarioResult && (isPublishedApi || gen === "gwo_ui" || gen === "gwo");
+  const apiCanUse = row.canUseAsScenarioBase ?? row.can_use_as_scenario_base;
+  const canUse = apiCanUse != null ? Boolean(apiCanUse) : inferredCanBase;
 
-    return {
-      timetableId: Number(row.timetableId ?? row.timetable_id),
-      semester: String(row.semester ?? row.semesterName ?? "Semester"),
-      academicYear: String(row.academicYear ?? row.academic_year ?? "-"),
-      versionNumber: Number(row.versionNumber ?? row.version_number ?? 1),
-      status: row.status,
-      generationType: String(row.generationType ?? row.generation_type ?? ""),
-      isDraft: Boolean(row.isDraft ?? row.is_draft ?? (row.semesterId ?? row.semester_id) == null),
-      isPublished: isPublishedApi,
-      isScenarioResult,
-      timetableKind: (isPublishedApi ? "published" : "draft") as "draft" | "published",
-      draftOrigin: (row.draftOrigin ?? row.draft_origin ?? null) as TimetableOption["draftOrigin"],
-      canUseAsScenarioBase: canUse,
-    };
-  });
+  return {
+    timetableId: Number(row.timetableId ?? row.timetable_id),
+    semester: String(row.semester ?? row.semesterName ?? "Semester"),
+    academicYear: String(row.academicYear ?? row.academic_year ?? "-"),
+    versionNumber: Number(row.versionNumber ?? row.version_number ?? 1),
+    status: row.status,
+    generationType: String(row.generationType ?? row.generation_type ?? ""),
+    isDraft: Boolean(row.isDraft ?? row.is_draft ?? (row.semesterId ?? row.semester_id) == null),
+    isPublished: isPublishedApi,
+    isScenarioResult,
+    timetableKind: (isPublishedApi ? "published" : "draft") as "draft" | "published",
+    draftOrigin: (row.draftOrigin ?? row.draft_origin ?? null) as TimetableOption["draftOrigin"],
+    canUseAsScenarioBase: canUse,
+  };
+}
+
+/**
+ * Baseline timetables for scenario runs: merges Nest `/timetables?scenarioRunBasesOnly=true` with
+ * `GET /api/timetables/scenario-bases` (same DB as timetable-generation persist). That way drafts
+ * saved from the Next persist route still appear if `DATABASE_URL` differs between frontend and backend.
+ */
+export async function getTimetables(opts?: { scenarioRunBasesOnly?: boolean }): Promise<TimetableOption[]> {
+  if (!opts?.scenarioRunBasesOnly) {
+    const rows = await ApiClient.request<any[]>("/timetables");
+    return rows.map(mapTimetableRowToOption);
+  }
+
+  const nestP = ApiClient.request<any[]>("/timetables?scenarioRunBasesOnly=true").catch((): any[] => []);
+  const bearer = ApiClient.getAccessToken();
+  const nextHeaders: HeadersInit = {};
+  if (bearer) nextHeaders.Authorization = `Bearer ${bearer}`;
+  const nextP = fetch("/api/timetables/scenario-bases", {
+    credentials: "include",
+    cache: "no-store",
+    headers: nextHeaders,
+  }).then(
+    async (res) => {
+      if (!res.ok) return [];
+      try {
+        return (await res.json()) as any[];
+      } catch {
+        return [];
+      }
+    },
+  ).catch((): any[] => []);
+
+  const [nestRows, nextRows] = await Promise.all([nestP, nextP]);
+
+  const byId = new Map<number, any>();
+  for (const r of nestRows) {
+    const id = Number(r.timetableId ?? r.timetable_id);
+    if (Number.isFinite(id)) byId.set(id, r);
+  }
+  for (const r of nextRows) {
+    const id = Number(r.timetableId ?? r.timetable_id);
+    if (Number.isFinite(id) && !byId.has(id)) byId.set(id, r);
+  }
+
+  const options = [...byId.values()].map(mapTimetableRowToOption);
+  options.sort((a, b) => b.timetableId - a.timetableId);
+  return options;
 }
 
 export function conditionLabel(type: string): string {
@@ -280,11 +324,20 @@ export function normalizeRun(row: any): WhatIfRun {
       row.generationSeconds ??
       row.generation_seconds ??
       null,
-    baseTimetableName:
-      row.baseTimetableName ??
-      (row.semester
-        ? `${row.semester.academicYear ?? row.semester.academic_year ?? ""}`
-        : `Timetable ${row.baseTimetableId ?? row.base_timetable_id}`),
+    baseTimetableName: (() => {
+      const direct = row.baseTimetableName ?? row.base_timetable_name;
+      if (typeof direct === "string" && direct.trim()) return direct;
+      const sem = row.semester;
+      if (sem && typeof sem === "object") {
+        const o = sem as Record<string, unknown>;
+        const ay = String(o.academicYear ?? o.academic_year ?? "").trim();
+        const st = String(o.semesterType ?? o.semester_type ?? "").trim();
+        const parts = [ay, st].filter(Boolean);
+        if (parts.length) return parts.join(" · ");
+      }
+      const bid = row.baseTimetableId ?? row.base_timetable_id;
+      return `Timetable ${bid ?? "?"}`;
+    })(),
     baseTimetableId: Number(row.baseTimetableId ?? row.base_timetable_id ?? 0),
     resultTimetableId:
       row.resultTimetableId != null
@@ -318,4 +371,28 @@ function normalizeScenario(row: any): Scenario {
       (Array.isArray(row.runs) && row.runs.some((r: any) => r.status === "applied")),
     isRunning: Boolean(row.isRunning),
   };
+}
+
+/** Next.js route for the What-If comparison wizard. */
+export const WHAT_IF_COMPARE_PATH = "/dashboard/what-if/compare";
+
+export type WhatIfCompareApiMode = "before_after" | "cross_timetable" | "cross_scenario";
+
+/**
+ * Build compare URLs with optional pre-selection (mode, run IDs, scenario/timetable filters).
+ * Omitted params are left for the user to choose in the wizard.
+ */
+export function buildWhatIfCompareHref(opts: {
+  mode?: WhatIfCompareApiMode | null;
+  runIds?: readonly number[] | null;
+  scenarioId?: number | null;
+  timetableId?: number | null;
+}): string {
+  const params = new URLSearchParams();
+  if (opts.mode) params.set("mode", opts.mode);
+  if (opts.runIds?.length) params.set("runIds", [...opts.runIds].join(","));
+  if (opts.scenarioId != null && opts.scenarioId > 0) params.set("scenarioId", String(opts.scenarioId));
+  if (opts.timetableId != null && opts.timetableId > 0) params.set("timetableId", String(opts.timetableId));
+  const qs = params.toString();
+  return qs ? `${WHAT_IF_COMPARE_PATH}?${qs}` : WHAT_IF_COMPARE_PATH;
 }

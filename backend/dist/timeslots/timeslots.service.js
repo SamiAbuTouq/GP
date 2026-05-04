@@ -13,11 +13,14 @@ exports.TimeslotsService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
+const notifications_service_1 = require("../notifications/notifications.service");
+const notification_prefs_1 = require("../notifications/notification-prefs");
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
 const DAY_VALUES = { Sunday: 1, Monday: 2, Tuesday: 4, Wednesday: 8, Thursday: 16 };
 let TimeslotsService = class TimeslotsService {
-    constructor(prisma) {
+    constructor(prisma, notifications) {
         this.prisma = prisma;
+        this.notifications = notifications;
     }
     async ensureLecturerProfileExists(tx, userId) {
         const user = await tx.user.findUnique({
@@ -211,6 +214,16 @@ let TimeslotsService = class TimeslotsService {
             uniqueBySlot.set(item.slotId, item.isPreferred);
         }
         const normalized = Array.from(uniqueBySlot.entries()).map(([slotId, isPreferred]) => ({ slotId, isPreferred }));
+        const priorCount = await this.prisma.lecturerPreference.count({
+            where: { user_id: userId },
+        });
+        const lecturer = await this.prisma.user.findUnique({
+            where: { user_id: userId },
+            select: { first_name: true, last_name: true },
+        });
+        const fullName = lecturer != null
+            ? `${lecturer.first_name ?? ''} ${lecturer.last_name ?? ''}`.trim()
+            : `Lecturer #${userId}`;
         await this.prisma.$transaction(async (tx) => {
             await this.ensureLecturerProfileExists(tx, userId);
             await tx.lecturerPreference.deleteMany({
@@ -227,6 +240,13 @@ let TimeslotsService = class TimeslotsService {
                 });
             }
         });
+        const isFirst = priorCount === 0;
+        const suffix = `\n[[lecturer_user_id:${userId}]]`;
+        void this.notifications
+            .notifyAdmins(isFirst ? 'Preferences Submitted' : 'Preferences Updated', (isFirst
+            ? `${fullName} submitted their time preferences for the first time.`
+            : `${fullName} updated their time preferences. Re-running timetable generation may be needed to reflect the changes.`) + suffix, { preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_PREFERENCES })
+            .catch(() => { });
         return { success: true };
     }
     async findArchived(isSummer) {
@@ -313,6 +333,7 @@ let TimeslotsService = class TimeslotsService {
 exports.TimeslotsService = TimeslotsService;
 exports.TimeslotsService = TimeslotsService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        notifications_service_1.NotificationsService])
 ], TimeslotsService);
 //# sourceMappingURL=timeslots.service.js.map

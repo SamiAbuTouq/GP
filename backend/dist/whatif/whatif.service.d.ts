@@ -3,6 +3,7 @@ import { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApplyScenarioRunDto, CompareDto, CompareMode, CreateScenarioDto, UpdateScenarioDto } from './dto/whatif.dto';
 import { TimetablesService } from '../timetables/timetables.service';
+import { NotificationsService } from '../notifications/notifications.service';
 export interface MetricsSnapshot {
     conflicts: number;
     roomUtilizationRate: number;
@@ -11,16 +12,41 @@ export interface MetricsSnapshot {
     lecturerBalanceScore: number | null;
     isValid: boolean;
 }
+export interface ConflictBreakdown {
+    roomConflicts: number;
+    lecturerConflicts: number;
+    timeslotClashes: number;
+}
+export interface SectionChangePerCourse {
+    courseId: number;
+    courseCode: string;
+    sectionsAffected: number;
+    sectionsWithRoomChange: number;
+    sectionsWithLecturerChange: number;
+    sectionsWithSlotChange: number;
+}
+export interface SectionChangeSummary {
+    added: number;
+    removed: number;
+    changed: number;
+    unchanged: number;
+    baselineCount: number;
+    resultCount: number;
+    percentSectionsAffected: number;
+    perCourse: SectionChangePerCourse[];
+}
 export declare class WhatIfService {
     private readonly prisma;
     private readonly config;
     private readonly timetablesService;
+    private readonly notifications;
     private readonly logger;
     private readonly activeProcesses;
+    private readonly userCancelledRunIds;
     private holdsGlobalOptimizerLock;
     private pendingProcessStarts;
     private queuedScenarioRuns;
-    constructor(prisma: PrismaService, config: ConfigService, timetablesService: TimetablesService);
+    constructor(prisma: PrismaService, config: ConfigService, timetablesService: TimetablesService, notifications: NotificationsService);
     listScenarios(): Promise<{
         id: any;
         name: any;
@@ -138,6 +164,7 @@ export declare class WhatIfService {
     }>;
     private releaseGlobalOptimizerLockIfIdle;
     private _startNextQueuedRunIfIdle;
+    private waitForActiveScenarioProcess;
     streamRunProgress(runId: number, res: Response): Promise<void>;
     getRunStatus(runId: number): Promise<{
         runId: number;
@@ -159,6 +186,7 @@ export declare class WhatIfService {
         runId: number;
         scenarioId: number;
         baseTimetableId: number;
+        baseTimetableName: string;
         resultTimetableId: number | null;
         status: string;
         startedAt: Date | null;
@@ -179,6 +207,7 @@ export declare class WhatIfService {
             runId: number;
             scenarioId: number;
             scenarioName: string;
+            conditionCount: number;
             baseTimetableId: number;
             resultTimetableId: number | null;
             status: string;
@@ -195,15 +224,18 @@ export declare class WhatIfService {
                 fitnessScore: number;
                 lecturerBalanceScore: number | null;
             } | null;
+            baselineConflictBreakdown: ConflictBreakdown;
+            resultConflictBreakdown: ConflictBreakdown | null;
+            conflictBreakdownDelta: {
+                roomConflicts: number;
+                lecturerConflicts: number;
+                timeslotClashes: number;
+            } | null;
+            gwoIterationsRun: number | null;
+            generationSeconds: number | null;
+            disruptionLevel: string;
             recommendation: string;
-            sectionChanges: {
-                added: number;
-                removed: number;
-                changed: number;
-                unchanged: number;
-                baselineCount: number;
-                resultCount: number;
-            };
+            sectionChanges: SectionChangeSummary;
         }[];
     }>;
     applyScenarioRun(runId: number, dto?: ApplyScenarioRunDto): Promise<{
@@ -222,9 +254,19 @@ export declare class WhatIfService {
     }>;
     private _spawnRunnerProcess;
     private _handlePythonLine;
+    private notifyAdminsScenarioRunSucceeded;
+    private decodeSemesterTypeLabel;
+    private _timetableCourseSectionStats;
     private _buildRunnerConfig;
     private _computeLecturerBalanceScore;
     private serializeScenario;
     private _generateRecommendation;
+    private readonly _dayLabelByBit;
+    private _decodeDaysMask;
+    private _timeToMinutes;
+    private _expandAtomicSlots;
+    private _pairOverlaps;
+    private _countGroupedOverlaps;
+    private _computeConflictBreakdownFromSchedule;
     private _computeSectionChangeSummary;
 }

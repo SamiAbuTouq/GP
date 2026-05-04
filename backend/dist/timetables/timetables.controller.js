@@ -16,6 +16,7 @@ exports.TimetablesController = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const roles_decorator_1 = require("../common/decorators/roles.decorator");
+const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const publish_draft_dto_1 = require("./dto/publish-draft.dto");
 const timetables_service_1 = require("./timetables.service");
 let TimetablesController = class TimetablesController {
@@ -62,12 +63,12 @@ let TimetablesController = class TimetablesController {
     replaceSchedulePayload(id, body) {
         return this.timetablesService.replaceScheduleFromPayload(id, body?.schedule);
     }
-    publishDraft(id, body) {
+    publishDraft(user, id, body) {
         return this.timetablesService.publishDraftTimetable(id, {
             academicYear: body?.academicYear,
             semesterType: body?.semesterType,
             acknowledgedHardConflicts: body?.acknowledgedHardConflicts,
-        });
+        }, { userId: user.user_id, firstName: user.first_name, lastName: user.last_name });
     }
 };
 exports.TimetablesController = TimetablesController;
@@ -115,10 +116,11 @@ __decorate([
 __decorate([
     (0, common_1.Post)(':id/publish'),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
-    __param(1, (0, common_1.Body)()),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, publish_draft_dto_1.PublishDraftDto]),
+    __metadata("design:paramtypes", [Object, Number, publish_draft_dto_1.PublishDraftDto]),
     __metadata("design:returntype", void 0)
 ], TimetablesController.prototype, "publishDraft", null);
 exports.TimetablesController = TimetablesController = __decorate([

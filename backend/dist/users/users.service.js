@@ -45,6 +45,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UsersService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
+const notification_prefs_1 = require("../notifications/notification-prefs");
 const config_1 = require("@nestjs/config");
 const cloudinary_1 = require("cloudinary");
 const bcrypt = __importStar(require("bcrypt"));
@@ -105,6 +106,42 @@ let UsersService = class UsersService {
             theme_preference: user.theme_preference || 'system',
             date_format: user.date_format || 'DD/MM/YYYY',
             time_format: user.time_format || '24',
+            notification_preferences: (0, notification_prefs_1.mergeNotificationPrefs)(user.notification_prefs),
+        };
+    }
+    async updateNotificationPreferences(userId, role, dto) {
+        const allowed = notification_prefs_1.ALLOWED_NOTIFICATION_PREF_KEYS_BY_ROLE[role];
+        if (!allowed) {
+            throw new common_1.BadRequestException('Invalid role for notification preferences.');
+        }
+        const incoming = dto.prefs ?? {};
+        const sanitized = {};
+        for (const [k, v] of Object.entries(incoming)) {
+            if (!allowed.has(k))
+                continue;
+            if (typeof v === 'boolean')
+                sanitized[k] = v;
+        }
+        const existing = await this.prisma.user.findUnique({
+            where: { user_id: userId },
+            select: { notification_prefs: true },
+        });
+        const prev = existing?.notification_prefs != null &&
+            typeof existing.notification_prefs === 'object' &&
+            !Array.isArray(existing.notification_prefs)
+            ? existing.notification_prefs
+            : {};
+        const mergedJson = { ...prev, ...sanitized };
+        await this.prisma.user.update({
+            where: { user_id: userId },
+            data: { notification_prefs: mergedJson },
+        });
+        const fresh = await this.prisma.user.findUnique({
+            where: { user_id: userId },
+            select: { notification_prefs: true },
+        });
+        return {
+            notification_preferences: (0, notification_prefs_1.mergeNotificationPrefs)(fresh?.notification_prefs ?? null),
         };
     }
     async updateProfile(userId, dto) {
