@@ -178,10 +178,10 @@ function LoginPageContent() {
             priority
           />
           <h1 className="mt-8 text-5xl font-bold leading-tight text-[var(--text-primary)]">
-            <span>University</span>
+            <span>Smart University</span>
             <br />
             <span className="bg-gradient-to-r from-[#1E54B7] via-[#2563EB] to-[#48CAE4] bg-clip-text text-transparent">
-              Timetabling
+              Timetable
             </span>
             <br />
             <span>System</span>
@@ -361,6 +361,16 @@ function LoginPageContent() {
             )}
           </Button>
             </form>
+
+            <p className="mt-5 text-center text-[0.9rem] text-white">
+              <span>Are you a lecturer? </span>
+              <Link
+                href="/lecturer-access-request"
+                className="font-medium text-[#48CAE4] transition-colors hover:text-[#90E0EF]"
+              >
+                Request access →
+              </Link>
+            </p>
 
             <p className="mt-8 text-center text-[0.85rem] text-white/50">
               Need help?{" "}

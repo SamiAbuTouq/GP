@@ -42,7 +42,7 @@ export class MailService {
 
     const fromName = this.configService.get<string>(
       'EMAIL_FROM_NAME',
-      'University Timetabling System',
+      'Smart University Timetable System',
     );
     const fromAddress = this.configService.get<string>('SMTP_FROM', user);
     const replyTo = this.configService.get<string>('SMTP_REPLY_TO', user);
@@ -80,7 +80,7 @@ export class MailService {
       <div style="font-family: Arial, sans-serif; background-color: #f4f5f7; padding: 40px 20px; min-height: 100%;">
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
           <div style="background-color: #1a365d; padding: 30px; text-align: left;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: bold;">University Timetabling System</h1>
+            <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: bold;">Smart University Timetable System</h1>
             <p style="color: #cbd5e1; margin: 8px 0 0 0; font-size: 14px;">Account Access Details</p>
           </div>
 
@@ -128,6 +128,82 @@ export class MailService {
             </div>
 
             <p style="color: #94a3b8; font-size: 13px; margin: 0;">Please do not reply to this message. This mailbox is not monitored.</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `"${fromName}" <${fromAddress}>`,
+      replyTo,
+      to: params.to,
+      subject,
+      text,
+      html,
+    });
+  }
+
+  async sendLecturerAccessRequestRejectedEmail(params: {
+    to: string;
+    fullName: string;
+    reason: string | null;
+  }): Promise<void> {
+    const host = this.configService.get<string>('SMTP_HOST');
+    const port = Number(this.configService.get<string>('SMTP_PORT', '587'));
+    const secure = this.configService.get<string>('SMTP_SECURE', 'false') === 'true';
+    const user = this.configService.get<string>('SMTP_USER');
+    const pass = this.configService.get<string>('SMTP_PASS');
+
+    if (!host || !user || !pass) {
+      this.logger.warn(
+        `Access request rejection email skipped for ${params.to}: SMTP configuration is incomplete.`,
+      );
+      return;
+    }
+
+    const fromName = this.configService.get<string>(
+      'EMAIL_FROM_NAME',
+      'Smart University Timetable System',
+    );
+    const fromAddress = this.configService.get<string>('SMTP_FROM', user);
+    const replyTo = this.configService.get<string>('SMTP_REPLY_TO', user);
+    const genericReason =
+      'At this time, we are unable to approve your access request. Please contact IT support for assistance.';
+    const finalReason = params.reason?.trim() || genericReason;
+
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+    });
+
+    const subject = 'Lecturer Access Request Update';
+    const text = [
+      `Hello ${params.fullName},`,
+      '',
+      'Your lecturer access request was not approved.',
+      '',
+      `Reason: ${finalReason}`,
+      '',
+      'If you have questions, please contact IT support.',
+    ].join('\n');
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; background-color: #f4f5f7; padding: 40px 20px;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
+          <div style="background-color: #1a365d; padding: 30px;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 22px;">Smart University Timetable System</h1>
+            <p style="color: #cbd5e1; margin: 8px 0 0 0; font-size: 14px;">Access Request Update</p>
+          </div>
+          <div style="padding: 30px;">
+            <p style="color: #475569; font-size: 16px;">Hello ${params.fullName},</p>
+            <p style="color: #475569; font-size: 16px;">Your lecturer access request was not approved.</p>
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-top: 16px;">
+              <p style="color: #0f172a; font-size: 14px; margin: 0 0 8px 0; font-weight: bold;">Reason</p>
+              <p style="color: #475569; font-size: 14px; margin: 0;">${finalReason}</p>
+            </div>
+            <p style="color: #64748b; font-size: 14px; margin-top: 20px;">If you have questions, please contact IT support.</p>
           </div>
         </div>
       </div>

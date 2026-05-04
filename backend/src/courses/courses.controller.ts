@@ -13,11 +13,18 @@ import { Role } from '@prisma/client';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto, UpdateCourseDto } from './dto/course.dto';
 import { Roles } from '../common/decorators/roles.decorator';
+import { Public } from '../common/decorators/public.decorator';
 
 @Controller('courses')
 @Roles(Role.ADMIN)
 export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
+
+  @Public()
+  @Get('public/catalog')
+  findPublicCatalog() {
+    return this.coursesService.findPublicCatalog();
+  }
 
   @Get()
   findAll() {

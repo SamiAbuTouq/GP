@@ -82,6 +82,7 @@ const mainNavItems: NavItem[] = [
 const entityNavItems: NavItem[] = [
   { title: "Courses", href: "/entity/courses", icon: BookOpenTextIcon, animated: true },
   { title: "Lecturers", href: "/entity/lecturers", icon: UserRoundIcon, animated: true },
+  { title: "Access Requests", href: "/entity/access-requests", icon: FileTextIcon, animated: true },
   { title: "Rooms", href: "/entity/rooms", icon: DoorOpen },
   { title: "Time Slots", href: "/entity/timeslots", icon: ClockIcon, animated: true },
   { title: "Study Plans", href: "/entity/study-plans", icon: GraduationCapIcon, animated: true },

@@ -13,6 +13,7 @@ import { SemestersModule } from './semesters/semesters.module';
 import { TimetablesModule } from './timetables/timetables.module';
 import { WhatIfModule } from './whatif/whatif.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AccessRequestsModule } from './access-requests/access-requests.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { AppController } from './app.controller';
@@ -37,6 +38,7 @@ import { AppService } from './app.service';
     TimetablesModule,
     WhatIfModule,
     NotificationsModule,
+    AccessRequestsModule,
   ],
   controllers: [AppController],
   providers: [

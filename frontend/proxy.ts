@@ -9,7 +9,7 @@ import type { NextRequest } from 'next/server';
  */
 
 // Public routes that don't require authentication
-const publicPaths = ["/", "/login", "/forgot-password", "/reset-password", "/help"];
+const publicPaths = ["/", "/login", "/forgot-password", "/reset-password", "/help", "/lecturer-access-request"];
 
 // Static assets and API routes to skip
 const skipPaths = ['/_next', '/api', '/images', '/favicon.ico'];

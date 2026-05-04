@@ -15,7 +15,7 @@ const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mon
 
 export const metadata: Metadata = {
   title: "University Timetabling - PSUT",
-  description: "University Timetabling System - Automated scheduling for optimal resource utilization",
+  description: "Smart University Timetable System - Automated scheduling for optimal resource utilization",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

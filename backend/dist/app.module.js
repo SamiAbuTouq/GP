@@ -21,6 +21,7 @@ const semesters_module_1 = require("./semesters/semesters.module");
 const timetables_module_1 = require("./timetables/timetables.module");
 const whatif_module_1 = require("./whatif/whatif.module");
 const notifications_module_1 = require("./notifications/notifications.module");
+const access_requests_module_1 = require("./access-requests/access-requests.module");
 const jwt_auth_guard_1 = require("./common/guards/jwt-auth.guard");
 const roles_guard_1 = require("./common/guards/roles.guard");
 const app_controller_1 = require("./app.controller");
@@ -46,6 +47,7 @@ exports.AppModule = AppModule = __decorate([
             timetables_module_1.TimetablesModule,
             whatif_module_1.WhatIfModule,
             notifications_module_1.NotificationsModule,
+            access_requests_module_1.AccessRequestsModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [

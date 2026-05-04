@@ -23,6 +23,12 @@ enum DeliveryMode {
   FACE_TO_FACE
 }
 
+enum AccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // ─────────────────────────────────────────────
 // USER
 // ─────────────────────────────────────────────
@@ -366,6 +372,24 @@ model Notification {
 
   @@index([user_id])
   @@map("notification")
+}
+
+model LecturerAccessRequest {
+  request_id        Int                 @id @default(autoincrement())
+  full_name         String              @db.VarChar(120)
+  email             String              @db.VarChar(100)
+  department        String              @db.VarChar(100)
+  max_workload      Int
+  courses           Json?
+  status            AccessRequestStatus @default(PENDING)
+  rejection_reason  String?             @db.Text
+  submitted_at      DateTime            @default(now())
+  expires_at        DateTime
+  reviewed_at       DateTime?
+
+  @@index([status, submitted_at])
+  @@index([email, status])
+  @@map("lecturer_access_request")
 }
 
 // ─────────────────────────────────────────────

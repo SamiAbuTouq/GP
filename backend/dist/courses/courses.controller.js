@@ -18,9 +18,13 @@ const client_1 = require("@prisma/client");
 const courses_service_1 = require("./courses.service");
 const course_dto_1 = require("./dto/course.dto");
 const roles_decorator_1 = require("../common/decorators/roles.decorator");
+const public_decorator_1 = require("../common/decorators/public.decorator");
 let CoursesController = class CoursesController {
     constructor(coursesService) {
         this.coursesService = coursesService;
+    }
+    findPublicCatalog() {
+        return this.coursesService.findPublicCatalog();
     }
     findAll() {
         return this.coursesService.findAll();
@@ -51,6 +55,13 @@ let CoursesController = class CoursesController {
     }
 };
 exports.CoursesController = CoursesController;
+__decorate([
+    (0, public_decorator_1.Public)(),
+    (0, common_1.Get)('public/catalog'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], CoursesController.prototype, "findPublicCatalog", null);
 __decorate([
     (0, common_1.Get)(),
     __metadata("design:type", Function),

@@ -3,6 +3,10 @@ import { CreateCourseDto, UpdateCourseDto } from './dto/course.dto';
 export declare class CoursesController {
     private readonly coursesService;
     constructor(coursesService: CoursesService);
+    findPublicCatalog(): Promise<{
+        code: string;
+        name: string;
+    }[]>;
     findAll(): Promise<{
         id: number;
         code: string;

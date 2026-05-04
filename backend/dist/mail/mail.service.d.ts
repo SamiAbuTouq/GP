@@ -9,4 +9,9 @@ export declare class MailService {
         fullName: string;
         temporaryPassword: string;
     }): Promise<void>;
+    sendLecturerAccessRequestRejectedEmail(params: {
+        to: string;
+        fullName: string;
+        reason: string | null;
+    }): Promise<void>;
 }

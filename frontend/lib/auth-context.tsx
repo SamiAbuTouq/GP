@@ -25,7 +25,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Routes that don't require authentication
-const publicRoutes = ["/", "/login", "/forgot-password", "/reset-password", "/help"];
+const publicRoutes = ["/", "/login", "/forgot-password", "/reset-password", "/help", "/lecturer-access-request"];
 const SETTINGS_ROUTE = "/settings";
 const LECTURER_TIME_PREFERENCES_ROUTE = "/lecturer-time-preferences";
 const LECTURER_SCHEDULE_ROUTE = "/lecturer-schedule";

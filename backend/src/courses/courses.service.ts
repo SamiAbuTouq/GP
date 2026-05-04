@@ -22,6 +22,21 @@ type CourseWithDepartment = {
 export class CoursesService {
   constructor(private prisma: PrismaService) {}
 
+  async findPublicCatalog() {
+    const courses = await this.prisma.course.findMany({
+      where: { is_active: true },
+      select: {
+        course_code: true,
+        course_name: true,
+      },
+      orderBy: { course_code: 'asc' },
+    });
+    return courses.map((course) => ({
+      code: course.course_code,
+      name: course.course_name,
+    }));
+  }
+
   async findAll() {
     const courses = await this.prisma.course.findMany({
       where: { is_active: true },

@@ -3,6 +3,10 @@ import { CreateCourseDto, UpdateCourseDto } from './dto/course.dto';
 export declare class CoursesService {
     private prisma;
     constructor(prisma: PrismaService);
+    findPublicCatalog(): Promise<{
+        code: string;
+        name: string;
+    }[]>;
     findAll(): Promise<{
         id: number;
         code: string;
