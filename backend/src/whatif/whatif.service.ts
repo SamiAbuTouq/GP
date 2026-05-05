@@ -1046,8 +1046,6 @@ export class WhatIfService {
       });
     });
 
-    void this.timetablesService.notifyPreferenceViolationsForTimetable(baseTimetableId).catch(() => {});
-
     return {
       ok: true,
       appliedToTimetableId: baseTimetableId,

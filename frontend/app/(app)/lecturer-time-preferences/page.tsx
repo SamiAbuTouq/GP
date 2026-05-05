@@ -28,6 +28,13 @@ type GroupByMode = "days" | "slotType";
 
 const DAY_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
 const normalizeSlotType = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
+const normalizeSearchText = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    // remove punctuation/separators like commas so "sunday," matches "sunday"
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ");
 
 function sortDays(days: string[]) {
   return [...days].sort(
@@ -80,7 +87,7 @@ export default function LecturerTimePreferencesPage() {
   }, []);
 
   const filteredSlots = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = normalizeSearchText(searchQuery);
     return slots.filter((slot) => {
       if (dayFilter !== "all" && !slot.days.includes(dayFilter)) return false;
       if (slotTypeFilter !== "all" && normalizeSlotType(slot.slotType) !== slotTypeFilter) return false;
@@ -93,8 +100,8 @@ export default function LecturerTimePreferencesPage() {
         slot.slotType,
         normalizeSlotType(slot.slotType),
         `${slot.start} - ${slot.end}`,
-      ].join(" ").toLowerCase();
-      return searchable.includes(q);
+      ].join(" ");
+      return normalizeSearchText(searchable).includes(q);
     });
   }, [slots, searchQuery, dayFilter, slotTypeFilter, preferenceFilter]);
 

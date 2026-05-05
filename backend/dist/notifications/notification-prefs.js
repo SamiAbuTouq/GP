@@ -9,14 +9,12 @@ exports.ADMIN_NOTIFICATION_PREF_KEYS = {
     HARD_CONFLICTS: 'admin_hard_conflicts',
     OPTIMIZATION_FAILED: 'admin_optimization_failed',
     LECTURER_PREFERENCES: 'admin_lecturer_preferences',
-    TIMETABLE_PUBLISHED_BY_OTHER: 'admin_timetable_published_by_other',
     ACCESS_REQUESTS: 'admin_access_requests',
     LECTURER_DEACTIVATION_IMPACT: 'admin_lecturer_deactivation_impact',
 };
 exports.LECTURER_NOTIFICATION_PREF_KEYS = {
     SCHEDULE_PUBLISHED: 'lec_schedule_published',
     SCHEDULE_REVISED: 'lec_schedule_revised',
-    PREFERENCE_NOT_HONORED: 'lec_preference_not_honored',
     PROFILE_UPDATED_BY_ADMIN: 'lec_profile_updated_by_admin',
 };
 function notificationPrefsAllow(raw, key) {
@@ -36,18 +34,17 @@ function mergeNotificationPrefs(raw) {
         [exports.ADMIN_NOTIFICATION_PREF_KEYS.HARD_CONFLICTS]: true,
         [exports.ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED]: true,
         [exports.ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_PREFERENCES]: true,
-        [exports.ADMIN_NOTIFICATION_PREF_KEYS.TIMETABLE_PUBLISHED_BY_OTHER]: true,
         [exports.ADMIN_NOTIFICATION_PREF_KEYS.ACCESS_REQUESTS]: true,
         [exports.ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_DEACTIVATION_IMPACT]: true,
         [exports.LECTURER_NOTIFICATION_PREF_KEYS.SCHEDULE_PUBLISHED]: true,
         [exports.LECTURER_NOTIFICATION_PREF_KEYS.SCHEDULE_REVISED]: true,
-        [exports.LECTURER_NOTIFICATION_PREF_KEYS.PREFERENCE_NOT_HONORED]: true,
         [exports.LECTURER_NOTIFICATION_PREF_KEYS.PROFILE_UPDATED_BY_ADMIN]: true,
     };
     if (raw != null && typeof raw === 'object' && !Array.isArray(raw)) {
         for (const [k, v] of Object.entries(raw)) {
-            if (typeof v === 'boolean')
+            if (typeof v === 'boolean' && Object.prototype.hasOwnProperty.call(base, k)) {
                 base[k] = v;
+            }
         }
     }
     return base;

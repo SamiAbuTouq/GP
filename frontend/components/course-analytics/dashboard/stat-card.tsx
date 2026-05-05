@@ -34,10 +34,10 @@ export function StatCard({
   className 
 }: StatCardProps) {
   const variantStyles = {
-    default: 'bg-card border-border',
-    primary: 'bg-card border-border',
-    success: 'bg-card border-border',
-    warning: 'bg-card border-border',
+    default: 'bg-card border-border/90',
+    primary: 'bg-card border-border/90',
+    success: 'bg-card border-border/90',
+    warning: 'bg-card border-border/90',
   }
 
   const iconStyles = {
@@ -55,16 +55,22 @@ export function StatCard({
   }
 
   return (
-    <Card className={cn('relative overflow-hidden transition-all hover:shadow-lg', variantStyles[variant], className)}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
+    <Card
+      className={cn(
+        'relative overflow-hidden rounded-2xl shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
+        variantStyles[variant],
+        className,
+      )}
+    >
+      <CardContent className="p-3.5 md:p-4">
+        <div className="flex items-start justify-between gap-2.5">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground">{title}</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/90">{title}</span>
               {methodBadge && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Badge className="h-5 rounded-sm border-0 bg-primary/15 px-1.5 text-[10px] font-semibold tracking-wide text-primary">
+                    <Badge className="h-4 rounded-sm border border-border bg-muted px-1.5 text-[10px] font-semibold tracking-wide text-foreground/80">
                       {methodBadge.label}
                     </Badge>
                   </TooltipTrigger>
@@ -73,26 +79,25 @@ export function StatCard({
               )}
             </div>
             <span className={cn(
-              "text-xl font-bold tracking-tight sm:text-2xl",
+              'text-lg font-bold tracking-tight sm:text-xl',
               valueStyles[variant]
             )}>
               {typeof value === 'number' ? value.toLocaleString() : value}
             </span>
             {description && (
-              <span className="text-xs text-muted-foreground">{description}</span>
+              <span className="line-clamp-2 text-[11px] text-muted-foreground">{description}</span>
             )}
             {trend && (
               <span className={cn(
-                'mt-0.5 text-xs font-medium',
-                trend.isPositive ? 'text-chart-3' : 'text-destructive'
+                'mt-0.5 text-[11px] font-medium text-muted-foreground'
               )}>
                 {trend.isPositive ? '+' : ''}{trend.value}% vs last semester
               </span>
             )}
           </div>
           {Icon && (
-            <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', iconStyles[variant])}>
-              <Icon className="h-5 w-5" />
+            <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', iconStyles[variant])}>
+              <Icon className="h-4 w-4" />
             </div>
           )}
         </div>
@@ -111,28 +116,26 @@ interface MiniStatProps {
 
 export function MiniStat({ label, value, subValue, icon: Icon, highlight = false }: MiniStatProps) {
   return (
-    <div className="flex items-center gap-3">
+    <div className={cn('flex items-center gap-2 rounded-md p-0.5', highlight && 'bg-muted/60')}>
       {Icon && (
         <div className={cn(
-          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-          highlight ? "bg-chart-4/15" : "bg-muted"
+          'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
+          'bg-muted'
         )}>
           <Icon className={cn(
-            "h-4 w-4",
-            highlight ? "text-chart-4" : "text-muted-foreground"
+            'h-3 w-3 text-muted-foreground'
           )} />
         </div>
       )}
       <div className="min-w-0 flex-1">
         <p className={cn(
-          "text-lg font-bold leading-tight",
-          highlight && "text-chart-4"
+          'text-[15px] font-semibold leading-tight text-foreground'
         )}>
           {typeof value === 'number' ? value.toLocaleString() : value}
         </p>
-        <p className="truncate text-xs text-muted-foreground">{label}</p>
+        <p className="truncate text-[10px] text-muted-foreground">{label}</p>
         {subValue && (
-          <p className="truncate text-[10px] text-muted-foreground/70">{subValue}</p>
+          <p className="truncate text-[9px] text-muted-foreground/70">{subValue}</p>
         )}
       </div>
     </div>

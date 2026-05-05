@@ -61,9 +61,6 @@ export function getNotificationHref(
   if (t === "Your Schedule is Ready" || t === "Schedule Updated") {
     return "/lecturer-schedule";
   }
-  if (t === "Preference Not Honored") {
-    return "/lecturer-time-preferences";
-  }
   if (t === "Your Profile Was Updated") {
     return "/settings";
   }

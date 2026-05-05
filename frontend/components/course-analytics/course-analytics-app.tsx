@@ -293,10 +293,10 @@ export default function CourseAnalyticsApp({
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1680px] px-4 pt-6 pb-8 sm:px-6 lg:px-8 flex flex-col gap-6">
+      <div className="mx-auto max-w-[1680px] px-4 pt-6 pb-8 sm:px-6 lg:px-8 flex flex-col gap-4">
 
         {/* Primary KPIs */}
-        <section className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <section className="mb-3 grid grid-cols-2 gap-4 md:grid-cols-4">
           <StatCard
             title={
               (() => {
@@ -344,9 +344,9 @@ export default function CourseAnalyticsApp({
         </section>
 
         {/* Secondary KPIs */}
-        <section className="mb-6">
+        <section className="mb-1">
           <Card>
-            <CardContent className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 lg:p-5">
+            <CardContent className="grid grid-cols-2 gap-2.5 p-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-8 lg:gap-3 lg:p-3">
               <MiniStat label="Avg Class Size" value={stats.avgClassSize} icon={Users} />
               <MiniStat
                 label="Full Sections"

@@ -10,6 +10,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TimetablesService = void 0;
+exports.decodeSemesterType = decodeSemesterType;
+exports.decodeDaysMask = decodeDaysMask;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
@@ -258,12 +260,6 @@ let TimetablesService = class TimetablesService {
         const publisherName = publisher
             ? `${publisher.firstName} ${publisher.lastName}`.trim() || 'An administrator'
             : 'An administrator';
-        void this.notifications
-            .notifyAdmins('Timetable Published', `${publisherName} published the timetable for ${semesterLabel}. [[timetable_id:${timetableId}]]`, {
-            exceptUserId: publisher?.userId,
-            preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.TIMETABLE_PUBLISHED_BY_OTHER,
-        })
-            .catch(() => { });
         const lecturerRows = await this.prisma.sectionScheduleEntry.findMany({
             where: { timetable_id: timetableId },
             select: { user_id: true },
@@ -285,49 +281,7 @@ let TimetablesService = class TimetablesService {
             })
                 .catch(() => { });
         }
-        void this.notifyPreferenceViolationsForTimetable(timetableId).catch(() => { });
         return this.mapTimetableSummary(updated);
-    }
-    async notifyPreferenceViolationsForTimetable(timetableId) {
-        const entries = await this.prisma.sectionScheduleEntry.findMany({
-            where: { timetable_id: timetableId },
-            select: {
-                user_id: true,
-                slot_id: true,
-                timeslot: {
-                    select: {
-                        days_mask: true,
-                        start_time: true,
-                        end_time: true,
-                    },
-                },
-            },
-        });
-        const unpreferred = await this.prisma.lecturerPreference.findMany({
-            where: { is_preferred: false },
-            select: { user_id: true, slot_id: true },
-        });
-        const badSet = new Set(unpreferred.map((p) => `${p.user_id}:${p.slot_id}`));
-        const seen = new Set();
-        for (const e of entries) {
-            if (e.user_id == null)
-                continue;
-            if (!badSet.has(`${e.user_id}:${e.slot_id}`))
-                continue;
-            const key = `${e.user_id}:${e.slot_id}`;
-            if (seen.has(key))
-                continue;
-            seen.add(key);
-            const slot = e.timeslot;
-            const label = slot
-                ? `${decodeDaysMask(slot.days_mask)
-                    .map((d) => d.slice(0, 3))
-                    .join('/')} ${formatTimeHHmm(slot.start_time)}–${formatTimeHHmm(slot.end_time)}`
-                : `slot ${e.slot_id}`;
-            void this.notifications
-                .createForUser(e.user_id, 'Preference Not Honored', `You were assigned ${label}, which you marked as unavailable. If this is unexpected, contact the timetabling office.`, { preferenceKey: notification_prefs_1.LECTURER_NOTIFICATION_PREF_KEYS.PREFERENCE_NOT_HONORED })
-                .catch(() => { });
-        }
     }
     async listEntries(params) {
         const timetable = await this.prisma.timetable.findUnique({

@@ -784,7 +784,6 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
                 data: { generation_type: 'what_if_applied' },
             });
         });
-        void this.timetablesService.notifyPreferenceViolationsForTimetable(baseTimetableId).catch(() => { });
         return {
             ok: true,
             appliedToTimetableId: baseTimetableId,

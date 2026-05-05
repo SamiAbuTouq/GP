@@ -1,5 +1,7 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+export declare function decodeSemesterType(type: number): string;
+export declare function decodeDaysMask(daysMask: number): string[];
 export declare class TimetablesService {
     private prisma;
     private readonly notifications;
@@ -80,7 +82,6 @@ export declare class TimetablesService {
             isValid: any;
         } | null;
     }>;
-    notifyPreferenceViolationsForTimetable(timetableId: number): Promise<void>;
     listEntries(params: {
         timetableId: number;
         courseId?: number;

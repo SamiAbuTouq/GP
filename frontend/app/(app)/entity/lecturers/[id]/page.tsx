@@ -185,7 +185,7 @@ export default function LecturerDetailsPage() {
   )
 
   return (
-    <EntityLayout title="Lecturer Details" description="Detailed lecturer profile and preference visibility for admins.">
+    <EntityLayout title="Lecturer Details">
       <div className="mb-4">
         <Button variant="outline" size="sm" asChild>
           <Link href="/entity/lecturers">

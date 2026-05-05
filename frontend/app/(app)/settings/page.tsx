@@ -359,11 +359,6 @@ const ADMIN_NOTIFICATION_PREF_ROWS: NotificationPrefRowDef[] = [
     description: "When a lecturer submits or updates their time preferences.",
   },
   {
-    key: ADMIN_NOTIFICATION_PREF_KEYS.TIMETABLE_PUBLISHED_BY_OTHER,
-    title: "Timetable published by another admin",
-    description: "When a colleague publishes a timetable.",
-  },
-  {
     key: ADMIN_NOTIFICATION_PREF_KEYS.ACCESS_REQUESTS,
     title: "Lecturer access requests",
     description: "When someone submits a new lecturer access request.",
@@ -386,11 +381,6 @@ const LECTURER_NOTIFICATION_PREF_ROWS: NotificationPrefRowDef[] = [
     key: LECTURER_NOTIFICATION_PREF_KEYS.SCHEDULE_REVISED,
     title: "Schedule revised",
     description: "Get notified when a published timetable you are part of gets updated.",
-  },
-  {
-    key: LECTURER_NOTIFICATION_PREF_KEYS.PREFERENCE_NOT_HONORED,
-    title: "Preference not honored",
-    description: "Get notified when a timeslot you marked unavailable was assigned to you anyway.",
   },
   {
     key: LECTURER_NOTIFICATION_PREF_KEYS.PROFILE_UPDATED_BY_ADMIN,
@@ -1184,19 +1174,6 @@ function SettingsContent() {
                           <span className="font-medium text-foreground">in-app</span> notifications.
                           They do not send email or push alerts. Email (e.g. access-request messages)
                           is controlled separately by the server.
-                        </div>
-
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-foreground">
-                            {profile.role === "ADMIN"
-                              ? "Administrator alerts"
-                              : "Your schedule and profile"}
-                          </p>
-                          <p className="text-xs text-muted-foreground text-pretty">
-                            {profile.role === "ADMIN"
-                              ? "System events for timetable runs, conflicts, and publishing."
-                              : "Updates about your published schedule and account."}
-                          </p>
                         </div>
 
                         <div className="space-y-4">

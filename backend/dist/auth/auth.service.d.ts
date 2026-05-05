@@ -17,5 +17,5 @@ export declare class AuthService {
     private generateTokens;
     private storeRefreshToken;
     private revokeAllUserTokens;
-    private parseExpiry;
+    protected parseExpiry(expiry: string): Date;
 }

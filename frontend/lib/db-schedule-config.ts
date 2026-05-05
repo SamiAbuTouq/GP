@@ -25,10 +25,10 @@ function pickNewestSemester(semesters: SemesterRow[]): SemesterRow | null {
 }
 
 /**
- * For GWO lecture counts: distinct parallel sections per course from `section_schedule_entry`
- * in the latest semester of the given kind (first/second vs summer). When no schedule history
- * exists for that kind, returns null so callers fall back to `course.sections_normal` /
- * `course.sections_summer`.
+ * Loads latest published-semester schedule aggregates for class-size hints.
+ * Section count for generation is intentionally NOT derived from history; it
+ * must always come from `course.sections_normal` / `course.sections_summer`
+ * so Entity Management edits are reflected immediately in GWO runs.
  */
 async function loadSectionCountsFromLatestScheduleSemester(
   semesterMode: SemesterMode,
@@ -286,11 +286,9 @@ function maxRoomCapacity(rooms: Record<string, RoomConfigValue>): number {
  * Scheduling rules from the DB:
  * - Lecturers: only rows with `is_available === true`; each slot may only use lecturers listed in
  *   `lecturer_can_teach_course` (mapped to indices in the `lecturers` array).
- * - Courses: parallel section count comes from `section_schedule_entry` in the newest
- *   first-or-second-semester (`semester_type` 1 or 2) when `semesterMode === "normal"`, or the
- *   newest summer term (`semester_type` 3) when `semesterMode === "summer"`, counting distinct
- *   `section_number` per course. Max registered students for class size use the same term.
- *   If no such timetable rows exist, falls back to `course.sections_normal` / `course.sections_summer`.
+ * - Courses: parallel section count always comes from `course.sections_normal` /
+ *   `course.sections_summer` (editable in Entity Management > Courses).
+ *   Max registered students for class size can still use latest schedule history for sizing hints.
  */
 // BUG 2 + 4 FIX: extended return type includes availability and per-lecturer max workload.
 export async function loadScheduleConfigEntitiesFromDatabase(
@@ -443,12 +441,7 @@ export async function loadScheduleConfigEntitiesFromDatabase(
   for (const c of courses) {
     const dbFallback =
       semesterMode === "summer" ? c.sections_summer : c.sections_normal;
-    const sectionCountFromHistory =
-      scheduleSectionAgg?.sectionCountByCourseId.get(c.course_id) ?? null;
-    const sectionCount =
-      scheduleSectionAgg != null
-        ? (sectionCountFromHistory ?? 0)
-        : dbFallback;
+    const sectionCount = dbFallback;
     if (sectionCount <= 0) continue;
 
     const allowed: number[] = [

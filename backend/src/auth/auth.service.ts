@@ -179,7 +179,7 @@ export class AuthService {
   /**
    * Parses a JWT expiry string like "7d", "15m", "1h" into a future Date.
    */
-  private parseExpiry(expiry: string): Date {
+  protected parseExpiry(expiry: string): Date {
     const unit = expiry.slice(-1);
     const value = parseInt(expiry.slice(0, -1), 10);
     const now = new Date();
