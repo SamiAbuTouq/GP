@@ -7,7 +7,6 @@ import {
   useEffect,
   useMemo,
   Suspense,
-  type ComponentType,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -63,14 +62,6 @@ import {
   AlertCircle,
   CheckCircle2,
   XCircle,
-  Sparkles,
-  AlertTriangle,
-  ClipboardList,
-  Megaphone,
-  CalendarCheck,
-  CalendarClock,
-  ShieldAlert,
-  UserCog,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ApiClient, type UserProfile } from "@/lib/api-client";
@@ -80,6 +71,7 @@ import {
   LECTURER_NOTIFICATION_PREF_KEYS,
   defaultNotificationPrefsMerged,
 } from "@/lib/notification-prefs";
+import { cn } from "@/lib/utils";
 
 function AvatarCropDialog({
   open,
@@ -335,33 +327,52 @@ type NotificationPrefRowDef = {
   key: string;
   title: string;
   description: string;
-  Icon: ComponentType<{ className?: string }>;
 };
 
 const ADMIN_NOTIFICATION_PREF_ROWS: NotificationPrefRowDef[] = [
   {
+    key: ADMIN_NOTIFICATION_PREF_KEYS.GWO_BROWSER_COMPLETED,
+    title: "Browser generation finished",
+    description:
+      "When the Grey Wolf optimizer completes on the Timetable generation page (in-memory result; save separately to store in the database).",
+  },
+  {
     key: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_COMPLETED,
-    title: "Optimization completed",
-    description: "Get notified when a timetable generation run finishes.",
-    Icon: Sparkles,
+    title: "Timetable saved or simulation finished",
+    description:
+      "When a timetable is saved to the database from the app, or a What-If scenario run completes successfully.",
   },
   {
     key: ADMIN_NOTIFICATION_PREF_KEYS.HARD_CONFLICTS,
     title: "Hard conflicts detected",
-    description: "Get notified when conflicts are found in a generated timetable.",
-    Icon: AlertTriangle,
+    description: "When validation reports hard conflicts in a generated or saved timetable.",
+  },
+  {
+    key: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED,
+    title: "Optimization or run failures",
+    description:
+      "When the browser optimizer, Python runner, or a What-If scenario reports a failure (excluding your own cancel).",
   },
   {
     key: ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_PREFERENCES,
     title: "Lecturer preferences submitted",
-    description: "Get notified when a lecturer submits or updates their time preferences.",
-    Icon: ClipboardList,
+    description: "When a lecturer submits or updates their time preferences.",
   },
   {
     key: ADMIN_NOTIFICATION_PREF_KEYS.TIMETABLE_PUBLISHED_BY_OTHER,
     title: "Timetable published by another admin",
-    description: "Get notified when a colleague publishes a timetable.",
-    Icon: Megaphone,
+    description: "When a colleague publishes a timetable.",
+  },
+  {
+    key: ADMIN_NOTIFICATION_PREF_KEYS.ACCESS_REQUESTS,
+    title: "Lecturer access requests",
+    description: "When someone submits a new lecturer access request.",
+  },
+  {
+    key: ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_DEACTIVATION_IMPACT,
+    title: "Lecturer deactivation — schedule impact",
+    description:
+      "When a lecturer is deactivated and still had sections assigned on timetables (may need rescheduling).",
   },
 ];
 
@@ -370,44 +381,70 @@ const LECTURER_NOTIFICATION_PREF_ROWS: NotificationPrefRowDef[] = [
     key: LECTURER_NOTIFICATION_PREF_KEYS.SCHEDULE_PUBLISHED,
     title: "Schedule published",
     description: "Get notified when a new timetable that includes you is published.",
-    Icon: CalendarCheck,
   },
   {
     key: LECTURER_NOTIFICATION_PREF_KEYS.SCHEDULE_REVISED,
     title: "Schedule revised",
     description: "Get notified when a published timetable you are part of gets updated.",
-    Icon: CalendarClock,
   },
   {
     key: LECTURER_NOTIFICATION_PREF_KEYS.PREFERENCE_NOT_HONORED,
     title: "Preference not honored",
     description: "Get notified when a timeslot you marked unavailable was assigned to you anyway.",
-    Icon: ShieldAlert,
   },
   {
     key: LECTURER_NOTIFICATION_PREF_KEYS.PROFILE_UPDATED_BY_ADMIN,
     title: "Profile updated by admin",
     description: "Get notified when an admin makes changes to your account.",
-    Icon: UserCog,
   },
 ];
+
+function SettingsTabHeader({
+  title,
+  description,
+  aside,
+}: {
+  title: string;
+  description: React.ReactNode;
+  aside?: React.ReactNode;
+}) {
+  return (
+    <CardHeader>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <CardTitle>{title}</CardTitle>
+          <CardDescription className="mt-1.5 text-pretty max-w-2xl">
+            {description}
+          </CardDescription>
+        </div>
+        {aside ? (
+          <div className="flex shrink-0 items-center gap-1.5 pt-0.5 text-xs text-muted-foreground">
+            {aside}
+          </div>
+        ) : null}
+      </div>
+    </CardHeader>
+  );
+}
 
 function SettingRow({
   title,
   description,
   children,
+  controlClassName,
 }: {
   title: string;
   description: string;
   children: React.ReactNode;
+  controlClassName?: string;
 }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="space-y-0.5">
+      <div className="min-w-0 space-y-0.5">
         <p className="text-sm font-medium">{title}</p>
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
-      <div className="sm:min-w-[180px]">{children}</div>
+      <div className={cn("sm:min-w-[180px]", controlClassName)}>{children}</div>
     </div>
   );
 }
@@ -487,7 +524,7 @@ function SettingsContent() {
     "idle" | "saving" | "saved"
   >("idle");
   const [notificationPrefsSaveState, setNotificationPrefsSaveState] = useState<
-    "idle" | "saving" | "saved"
+    "idle" | "saving" | "saved" | "error"
   >("idle");
   const preferencesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notificationPrefsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -734,19 +771,14 @@ function SettingsContent() {
       );
       setNotificationPrefsSaveState("saved");
     } catch {
-      console.log(
-        "[v0] Notification preferences saved locally - backend may not be running",
-      );
-      notificationPrefsBaselineRef.current = JSON.stringify(notificationPrefs);
-      setNotificationPrefsSaveState("saved");
-      ApiClient.notifyProfileUpdate({
-        notification_preferences: notificationPrefs,
+      setNotificationPrefsSaveState("error");
+      toast({
+        title: "Could not save notification preferences",
+        description: "Check your connection and try toggling again. Your choices stay on screen until they sync.",
+        variant: "destructive",
       });
-      setProfile((prev) =>
-        prev ? { ...prev, notification_preferences: notificationPrefs } : null,
-      );
     }
-  }, [notificationPrefs]);
+  }, [notificationPrefs, toast]);
 
   useEffect(() => {
     if (!mounted || isLoading) return;
@@ -803,11 +835,11 @@ function SettingsContent() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-auto p-4 lg:p-6">
-          <div className="mx-auto w-full max-w-[1680px]">
-          <div className="mb-6">
+          <div className="mx-auto w-full min-w-0 max-w-[1680px]">
+          <div className="mb-6 min-w-0 max-w-2xl">
             <h1 className="text-2xl font-bold text-balance">Settings</h1>
-            <p className="text-muted-foreground">
-              Manage your account and system preferences
+            <p className="text-muted-foreground text-pretty">
+              Manage your account and system preferences.
             </p>
           </div>
 
@@ -822,20 +854,17 @@ function SettingsContent() {
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 ${
+                        className={cn(
+                          "relative flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium transition-colors duration-200 ease-in-out",
                           activeTab === tab.id
-                            ? "bg-primary/10 text-primary shadow-sm"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }`}
+                            ? "bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground bg-transparent",
+                        )}
                       >
                         {activeTab === tab.id ? (
-                          <span className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-primary" />
+                          <span className="absolute inset-y-1 left-0 w-1 rounded-r-full bg-primary" />
                         ) : null}
-                        <span
-                          className={`grid h-7 w-7 place-items-center rounded-md ${
-                            activeTab === tab.id ? "bg-primary/15" : "bg-transparent"
-                          }`}
-                        >
+                        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center">
                           <Icon className="h-4 w-4 shrink-0" />
                         </span>
                         <span className="hidden sm:inline">{tab.label}</span>
@@ -851,12 +880,10 @@ function SettingsContent() {
               {/* Profile Tab */}
               {activeTab === "profile" && (
                 <Card className="border shadow-sm">
-                  <CardHeader>
-                    <CardTitle>Profile Information</CardTitle>
-                    <CardDescription>
-                      Update your personal information and role details
-                    </CardDescription>
-                  </CardHeader>
+                  <SettingsTabHeader
+                    title="Profile"
+                    description="Update your name, avatar, and read-only account details."
+                  />
                   <CardContent className="space-y-6">
                     {isLoading ? (
                       <div className="flex items-center justify-center py-8">
@@ -992,23 +1019,25 @@ function SettingsContent() {
               {/* Preferences Tab */}
               {activeTab === "preferences" && (
                 <Card className="border shadow-sm">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <CardTitle>Application Preferences</CardTitle>
-                        <CardDescription>
-                          Customize how the application looks and behaves.
-                        </CardDescription>
-                      </div>
-                      <div className="pt-0.5 text-xs text-muted-foreground">
-                        {preferencesSaveState === "saving"
-                          ? "Saving..."
-                          : preferencesSaveState === "saved"
-                            ? "Saved"
-                            : "Autosave enabled"}
-                      </div>
-                    </div>
-                  </CardHeader>
+                  <SettingsTabHeader
+                    title="Preferences"
+                    description="Customize how the application looks and behaves."
+                    aside={
+                      preferencesSaveState === "saving" ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : preferencesSaveState === "saved" ? (
+                        <>
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          <span className="text-emerald-700 dark:text-emerald-400">Saved</span>
+                        </>
+                      ) : (
+                        <span>Autosave on</span>
+                      )
+                    }
+                  />
                   <CardContent className="space-y-6">
                     {isLoading ? (
                       <div className="flex items-center justify-center py-8">
@@ -1112,99 +1141,90 @@ function SettingsContent() {
               {/* Notifications Tab */}
               {activeTab === "notifications" && (
                 <Card className="border shadow-sm">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <CardTitle>In-app notification preferences</CardTitle>
-                        <CardDescription className="mt-1.5 max-w-2xl">
-                          Choose which events appear in your notification center (bell). Turning a
-                          category off stops{" "}
-                          <span className="font-medium text-foreground">new</span> notifications of
-                          that type — existing messages stay in your list.
-                        </CardDescription>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1.5 pt-0.5 text-xs text-muted-foreground">
-                        {notificationPrefsSaveState === "saving" ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            <span>Saving...</span>
-                          </>
-                        ) : notificationPrefsSaveState === "saved" ? (
-                          <>
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                            <span className="text-emerald-700 dark:text-emerald-400">Saved</span>
-                          </>
-                        ) : (
-                          <span>Autosave enabled</span>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
+                  <SettingsTabHeader
+                    title="Notifications"
+                    description={
+                      <>
+                        Choose which events appear in your notification center (bell). Turning a
+                        category off stops{" "}
+                        <span className="font-medium text-foreground">new</span> notifications of
+                        that type — existing messages stay in your list.
+                      </>
+                    }
+                    aside={
+                      notificationPrefsSaveState === "saving" ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : notificationPrefsSaveState === "saved" ? (
+                        <>
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          <span className="text-emerald-700 dark:text-emerald-400">Saved</span>
+                        </>
+                      ) : notificationPrefsSaveState === "error" ? (
+                        <>
+                          <XCircle className="h-3.5 w-3.5 text-destructive" />
+                          <span className="text-destructive">Not saved — check connection</span>
+                        </>
+                      ) : (
+                        <span>Autosave on</span>
+                      )
+                    }
+                  />
                   <CardContent className="space-y-6">
                     {isLoading ? (
-                      <div className="flex items-center justify-center py-10">
+                      <div className="flex items-center justify-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                       </div>
                     ) : profile ? (
                       <>
-                        <div className="rounded-xl border border-dashed bg-muted/25 px-4 py-3 text-sm text-muted-foreground">
+                        <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground text-pretty">
                           These toggles only apply to{" "}
-                          <span className="font-medium text-foreground">in-app</span>{" "}
-                          notifications. They do not send email or push alerts.
+                          <span className="font-medium text-foreground">in-app</span> notifications.
+                          They do not send email or push alerts. Email (e.g. access-request messages)
+                          is controlled separately by the server.
                         </div>
 
-                        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-                          <div className="border-b bg-muted/40 px-4 py-3">
-                            <p className="text-sm font-medium text-foreground">
-                              {profile.role === "ADMIN"
-                                ? "Administrator alerts"
-                                : "Your schedule & profile"}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {profile.role === "ADMIN"
-                                ? "System events for timetable runs, conflicts, and publishing."
-                                : "Updates about your published schedule and account."}
-                            </p>
-                          </div>
-                          <div className="divide-y divide-border/80">
-                            {notificationPrefRows.map((row) => {
-                              const Icon = row.Icon;
-                              const checked = notificationPrefs[row.key] !== false;
-                              return (
-                                <div
-                                  key={row.key}
-                                  className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
-                                >
-                                  <div className="flex min-w-0 gap-3">
-                                    <span className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
-                                      <Icon className="h-[18px] w-[18px]" />
-                                    </span>
-                                    <div className="min-w-0 space-y-1">
-                                      <p className="text-sm font-medium leading-snug">{row.title}</p>
-                                      <p className="text-sm text-muted-foreground leading-snug">
-                                        {row.description}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="flex shrink-0 justify-end sm:min-w-[52px]">
-                                    <Switch
-                                      checked={checked}
-                                      onCheckedChange={(v) =>
-                                        setNotificationPrefs((prev) => ({
-                                          ...prev,
-                                          [row.key]: v,
-                                        }))
-                                      }
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-foreground">
+                            {profile.role === "ADMIN"
+                              ? "Administrator alerts"
+                              : "Your schedule and profile"}
+                          </p>
+                          <p className="text-xs text-muted-foreground text-pretty">
+                            {profile.role === "ADMIN"
+                              ? "System events for timetable runs, conflicts, and publishing."
+                              : "Updates about your published schedule and account."}
+                          </p>
+                        </div>
+
+                        <div className="space-y-4">
+                          {notificationPrefRows.map((row) => {
+                            const checked = notificationPrefs[row.key] !== false;
+                            return (
+                              <SettingRow
+                                key={row.key}
+                                title={row.title}
+                                description={row.description}
+                                controlClassName="sm:min-w-[52px] flex shrink-0 justify-end"
+                              >
+                                <Switch
+                                  checked={checked}
+                                  onCheckedChange={(v) =>
+                                    setNotificationPrefs((prev) => ({
+                                      ...prev,
+                                      [row.key]: v,
+                                    }))
+                                  }
+                                />
+                              </SettingRow>
+                            );
+                          })}
                         </div>
                       </>
                     ) : (
-                      <div className="py-10 text-center text-muted-foreground">
+                      <div className="py-8 text-center text-muted-foreground">
                         Unable to load notification preferences.
                       </div>
                     )}
@@ -1215,15 +1235,13 @@ function SettingsContent() {
               {/* Security Tab */}
               {activeTab === "security" && (
                 <Card className="border shadow-sm">
-                  <CardHeader>
-                    <CardTitle>Security Settings</CardTitle>
-                    <CardDescription>
-                      Manage your password and security preferences.
-                    </CardDescription>
-                  </CardHeader>
+                  <SettingsTabHeader
+                    title="Security"
+                    description="Change your password. Requirements update as you type."
+                  />
                   <CardContent className="space-y-6">
-                    <div className="space-y-4 rounded-xl border bg-muted/30 p-4">
-                      <h4 className="font-medium">Change Password</h4>
+                    <div className="space-y-4 rounded-xl border bg-card p-4">
+                      <p className="text-sm font-medium">Change password</p>
                       <PasswordField
                         id="current-password"
                         label="Current Password"

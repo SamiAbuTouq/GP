@@ -1,10 +1,16 @@
 /** Stored under `User.notification_prefs` as `{ [key]: boolean }`; omitted keys default to enabled (true). */
 
 export const ADMIN_NOTIFICATION_PREF_KEYS = {
+  /** Persisted timetable / What-If simulation completed successfully. */
   OPTIMIZATION_COMPLETED: 'admin_optimization_completed',
+  /** Timetable generation page (`/api/run` / GWO in browser) finished successfully. */
+  GWO_BROWSER_COMPLETED: 'admin_gwo_browser_completed',
   HARD_CONFLICTS: 'admin_hard_conflicts',
+  OPTIMIZATION_FAILED: 'admin_optimization_failed',
   LECTURER_PREFERENCES: 'admin_lecturer_preferences',
   TIMETABLE_PUBLISHED_BY_OTHER: 'admin_timetable_published_by_other',
+  ACCESS_REQUESTS: 'admin_access_requests',
+  LECTURER_DEACTIVATION_IMPACT: 'admin_lecturer_deactivation_impact',
 } as const;
 
 export const LECTURER_NOTIFICATION_PREF_KEYS = {
@@ -25,9 +31,13 @@ export function notificationPrefsAllow(raw: unknown, key: string): boolean {
 export function mergeNotificationPrefs(raw: unknown): Record<string, boolean> {
   const base: Record<string, boolean> = {
     [ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_COMPLETED]: true,
+    [ADMIN_NOTIFICATION_PREF_KEYS.GWO_BROWSER_COMPLETED]: true,
     [ADMIN_NOTIFICATION_PREF_KEYS.HARD_CONFLICTS]: true,
+    [ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED]: true,
     [ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_PREFERENCES]: true,
     [ADMIN_NOTIFICATION_PREF_KEYS.TIMETABLE_PUBLISHED_BY_OTHER]: true,
+    [ADMIN_NOTIFICATION_PREF_KEYS.ACCESS_REQUESTS]: true,
+    [ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_DEACTIVATION_IMPACT]: true,
     [LECTURER_NOTIFICATION_PREF_KEYS.SCHEDULE_PUBLISHED]: true,
     [LECTURER_NOTIFICATION_PREF_KEYS.SCHEDULE_REVISED]: true,
     [LECTURER_NOTIFICATION_PREF_KEYS.PREFERENCE_NOT_HONORED]: true,

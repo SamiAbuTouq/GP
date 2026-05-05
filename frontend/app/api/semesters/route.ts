@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAdminFromRefreshCookie } from '@/lib/server-auth'
+import { requireAdminFromRefreshOrBearer } from '@/lib/server-auth'
 
 function decodeSemesterType(type: number): string {
   const map: Record<number, string> = {
@@ -11,8 +11,8 @@ function decodeSemesterType(type: number): string {
   return map[type] ?? `Semester ${type}`
 }
 
-export async function GET() {
-  const auth = await requireAdminFromRefreshCookie()
+export async function GET(request: Request) {
+  const auth = await requireAdminFromRefreshOrBearer(request)
   if (!auth.ok) return auth.response
 
   try {

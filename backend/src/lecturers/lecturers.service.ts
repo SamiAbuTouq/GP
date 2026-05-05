@@ -11,7 +11,10 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { LECTURER_NOTIFICATION_PREF_KEYS } from '../notifications/notification-prefs';
+import {
+  ADMIN_NOTIFICATION_PREF_KEYS,
+  LECTURER_NOTIFICATION_PREF_KEYS,
+} from '../notifications/notification-prefs';
 
 /** Policy max workload (hours) shown and stored for all lecturers. */
 const STANDARD_MAX_WORKLOAD_HOURS = 15;
@@ -455,6 +458,7 @@ export class LecturersService {
         .notifyAdmins(
           'Lecturer Deactivated — Schedule Impact',
           `${fullName || `Lecturer #${id}`} was deactivated and had ${sectionCount} schedule section row(s) assigned across timetables.`,
+          { preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_DEACTIVATION_IMPACT },
         )
         .catch(() => {});
     }

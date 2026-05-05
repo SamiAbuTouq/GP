@@ -5,6 +5,8 @@ import { notificationPrefsAllow } from './notification-prefs';
 
 export type NotificationListFilter = 'all' | 'unread' | 'read';
 
+const MESSAGE_BODY_MAX = 2000;
+
 @Injectable()
 export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -28,11 +30,12 @@ export class NotificationsService {
       }
     }
     const title = messageTitle.slice(0, 100);
+    const body = message.slice(0, MESSAGE_BODY_MAX);
     return this.prisma.notification.create({
       data: {
         user_id: userId,
         message_title: title,
-        message,
+        message: body,
         is_read: false,
       },
     });
@@ -42,11 +45,12 @@ export class NotificationsService {
     const unique = [...new Set(userIds.filter((id) => Number.isFinite(id) && id > 0))];
     if (unique.length === 0) return { count: 0 };
     const title = messageTitle.slice(0, 100);
+    const body = message.slice(0, MESSAGE_BODY_MAX);
     const res = await this.prisma.notification.createMany({
       data: unique.map((user_id) => ({
         user_id,
         message_title: title,
-        message,
+        message: body,
         is_read: false,
       })),
     });

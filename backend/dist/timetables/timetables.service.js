@@ -266,7 +266,7 @@ let TimetablesService = class TimetablesService {
             ? `${publisher.firstName} ${publisher.lastName}`.trim() || 'An administrator'
             : 'An administrator';
         void this.notifications
-            .notifyAdmins('Timetable Published', `${publisherName} published the timetable for ${semesterLabel}.`, {
+            .notifyAdmins('Timetable Published', `${publisherName} published the timetable for ${semesterLabel}. [[timetable_id:${timetableId}]]`, {
             exceptUserId: publisher?.userId,
             preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.TIMETABLE_PUBLISHED_BY_OTHER,
         })

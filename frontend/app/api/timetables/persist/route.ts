@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdminFromRefreshOrBearer, resolveAuthUser } from "@/lib/server-auth";
+import { requireAdminFromRefreshOrBearer } from "@/lib/server-auth";
 import { notifyAdminsTimetablePersisted } from "@/lib/server-notifications";
 import {
   prismaTimeslotRowToConfig,
@@ -368,17 +368,8 @@ export async function POST(req: NextRequest) {
     }
 
     const hardConflictCount = conflictRows.filter((c) => c.severity === "hard").length;
-    const authUser = await resolveAuthUser(req);
-    const rawSub = authUser?.sub;
-    const publisherId =
-      typeof rawSub === "number" && Number.isFinite(rawSub)
-        ? rawSub
-        : typeof rawSub === "string" && Number.isFinite(Number(rawSub))
-          ? Number(rawSub)
-          : undefined;
 
     void notifyAdminsTimetablePersisted({
-      exceptUserId: publisherId,
       timetableName,
       timetableId: timetable.timetable_id,
       versionNumber: nextVersion,

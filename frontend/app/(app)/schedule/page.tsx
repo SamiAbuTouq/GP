@@ -739,7 +739,6 @@ export function ScheduleViewerPage({
       .then((data) => {
         if (!mounted) return
         setTimetables(data)
-        const first = data[0] ?? null
         const preferredRequestedId =
           isSimulationView && simulationResultTimetableId != null
             ? simulationResultTimetableId
@@ -756,7 +755,7 @@ export function ScheduleViewerPage({
           }
           return
         }
-        setTimetableId(requested?.timetableId ?? first?.timetableId ?? null)
+        setTimetableId(requested?.timetableId ?? null)
       })
       .catch((e) => {
         if (!mounted) return

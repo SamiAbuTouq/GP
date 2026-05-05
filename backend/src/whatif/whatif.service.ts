@@ -1264,7 +1264,9 @@ export class WhatIfService {
           });
           if (!wasUserCancel) {
             void this.notifications
-              .notifyAdmins('Optimization Failed', `Scenario run #${runId} failed: ${error_message.slice(0, 800)}`)
+              .notifyAdmins('Optimization Failed', `Scenario run #${runId} failed: ${error_message.slice(0, 800)}`, {
+                preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED,
+              })
               .catch(() => {});
           }
         }
@@ -1288,7 +1290,9 @@ export class WhatIfService {
         },
       });
       void this.notifications
-        .notifyAdmins('Optimization Failed', `Scenario run #${runId} could not start: ${err.message.slice(0, 800)}`)
+        .notifyAdmins('Optimization Failed', `Scenario run #${runId} could not start: ${err.message.slice(0, 800)}`, {
+          preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED,
+        })
         .catch(() => {});
       this.logger.error(`Scenario runner spawn error for run ${runId}: ${err.message}`);
       await this._startNextQueuedRunIfIdle();
@@ -1343,7 +1347,9 @@ export class WhatIfService {
         },
       });
       void this.notifications
-        .notifyAdmins('Optimization Failed', `Scenario run #${runId} failed: ${resolvedError.slice(0, 800)}`)
+        .notifyAdmins('Optimization Failed', `Scenario run #${runId} failed: ${resolvedError.slice(0, 800)}`, {
+          preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED,
+        })
         .catch(() => {});
     }
   }
@@ -1387,16 +1393,18 @@ export class WhatIfService {
     }
 
     const scenarioName = run.scenario?.name?.trim() || `Scenario #${run.scenario_id}`;
+    const resultTimetableTag =
+      tid != null ? ` [[timetable_id:${tid}]]` : '';
     await this.notifications.notifyAdmins(
       'Timetable Generated',
-      `${semesterLabel}: scenario "${scenarioName}" finished (run #${runId}). Fitness score ${fitness}. Hard conflicts reported: ${hardConflictCount}.`,
+      `${semesterLabel}: scenario "${scenarioName}" finished (run #${runId}). Fitness score ${fitness}. Hard conflicts reported: ${hardConflictCount}. [[scenario_run_id:${runId}]]${resultTimetableTag}`,
       { preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_COMPLETED },
     );
 
     if (hardConflictCount > 0 && tid != null) {
       await this.notifications.notifyAdmins(
         'Hard Conflicts Detected',
-        `${hardConflictCount} hard conflict(s) found in generated timetable #${tid} (${scenarioName}, run #${runId}).`,
+        `${hardConflictCount} hard conflict(s) found in generated timetable #${tid} (${scenarioName}, run #${runId}). [[timetable_id:${tid}]]`,
         { preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.HARD_CONFLICTS },
       );
     }

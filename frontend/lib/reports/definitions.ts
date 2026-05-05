@@ -6,7 +6,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     name: "Room Utilization Report",
     shortName: "Room utilization",
     description:
-      "Occupancy rates, peak utilization windows, and capacity usage by room and building.",
+      "Per-room hours, seat-fill (where applicable), busiest weekday, and load vs. the busiest room.",
     formats: ["pdf", "excel", "csv"],
     comingSoon: false,
   },
@@ -15,7 +15,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     name: "Lecturer Workload Report",
     shortName: "Lecturer workload",
     description:
-      "Teaching load, contact hours, and distribution across departments and course levels.",
+      "Hours, load vs. max workload, sections/courses, labs; optional department roll-up.",
     formats: ["pdf", "excel", "csv"],
     comingSoon: false,
   },
@@ -24,7 +24,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     name: "Course Distribution Report",
     shortName: "Course distribution",
     description:
-      "Course offerings by department, modality, and level with enrollment and section counts.",
+      "By department: catalog vs. scheduled courses, sections, enrollment, modalities, UG vs. grad.",
     formats: ["pdf", "excel", "csv"],
     comingSoon: false,
   },
@@ -33,8 +33,8 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     name: "Conflict Analysis Report",
     shortName: "Conflict analysis",
     description:
-      "Scheduling conflicts, overlaps, and constraint violations across the active timetable.",
-    formats: ["pdf", "excel", "csv"],
+      "Hard and soft violations with type, course/section, and narrative detail.",
+    formats: ["pdf", "csv"],
     comingSoon: false,
   },
   {
@@ -42,8 +42,8 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     name: "Optimization Summary Report",
     shortName: "Optimization summary",
     description:
-      "Algorithm runs, fitness progression, and constraint satisfaction metrics for timetable optimization.",
-    formats: ["pdf", "excel"],
+      "Compare optimizer runs: fitness, validity, and scheduled section counts.",
+    formats: ["pdf", "csv"],
     comingSoon: false,
   },
   {
@@ -51,7 +51,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     name: "Lecturer Preference Compliance Report",
     shortName: "Preference compliance",
     description:
-      "Preferred and avoided-slot compliance per lecturer, highlighting violations that require attention.",
+      "Per lecturer: preferred / avoided / neutral sessions and avoided-slot compliance score.",
     formats: ["pdf", "excel", "csv"],
     comingSoon: false,
   },
@@ -60,7 +60,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     name: "Room Type Matching Report",
     shortName: "Room matching",
     description:
-      "Flags sections assigned to unsuitable room types and distinguishes hard vs soft mismatches.",
+      "Lab fit, online-in-room, capacity checks. PDF shows mismatches only; Excel/CSV list all sections.",
     formats: ["pdf", "excel", "csv"],
     comingSoon: false,
   },

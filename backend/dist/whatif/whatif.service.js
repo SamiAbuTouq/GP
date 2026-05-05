@@ -937,7 +937,9 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
                         });
                         if (!wasUserCancel) {
                             void this.notifications
-                                .notifyAdmins('Optimization Failed', `Scenario run #${runId} failed: ${error_message.slice(0, 800)}`)
+                                .notifyAdmins('Optimization Failed', `Scenario run #${runId} failed: ${error_message.slice(0, 800)}`, {
+                                preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED,
+                            })
                                 .catch(() => { });
                         }
                     }
@@ -957,7 +959,9 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
                     },
                 });
                 void this.notifications
-                    .notifyAdmins('Optimization Failed', `Scenario run #${runId} could not start: ${err.message.slice(0, 800)}`)
+                    .notifyAdmins('Optimization Failed', `Scenario run #${runId} could not start: ${err.message.slice(0, 800)}`, {
+                    preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED,
+                })
                     .catch(() => { });
                 this.logger.error(`Scenario runner spawn error for run ${runId}: ${err.message}`);
                 await this._startNextQueuedRunIfIdle();
@@ -1006,7 +1010,9 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
                 },
             });
             void this.notifications
-                .notifyAdmins('Optimization Failed', `Scenario run #${runId} failed: ${resolvedError.slice(0, 800)}`)
+                .notifyAdmins('Optimization Failed', `Scenario run #${runId} failed: ${resolvedError.slice(0, 800)}`, {
+                preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED,
+            })
                 .catch(() => { });
         }
     }
@@ -1044,9 +1050,10 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
             }
         }
         const scenarioName = run.scenario?.name?.trim() || `Scenario #${run.scenario_id}`;
-        await this.notifications.notifyAdmins('Timetable Generated', `${semesterLabel}: scenario "${scenarioName}" finished (run #${runId}). Fitness score ${fitness}. Hard conflicts reported: ${hardConflictCount}.`, { preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_COMPLETED });
+        const resultTimetableTag = tid != null ? ` [[timetable_id:${tid}]]` : '';
+        await this.notifications.notifyAdmins('Timetable Generated', `${semesterLabel}: scenario "${scenarioName}" finished (run #${runId}). Fitness score ${fitness}. Hard conflicts reported: ${hardConflictCount}. [[scenario_run_id:${runId}]]${resultTimetableTag}`, { preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_COMPLETED });
         if (hardConflictCount > 0 && tid != null) {
-            await this.notifications.notifyAdmins('Hard Conflicts Detected', `${hardConflictCount} hard conflict(s) found in generated timetable #${tid} (${scenarioName}, run #${runId}).`, { preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.HARD_CONFLICTS });
+            await this.notifications.notifyAdmins('Hard Conflicts Detected', `${hardConflictCount} hard conflict(s) found in generated timetable #${tid} (${scenarioName}, run #${runId}). [[timetable_id:${tid}]]`, { preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.HARD_CONFLICTS });
         }
     }
     decodeSemesterTypeLabel(type) {

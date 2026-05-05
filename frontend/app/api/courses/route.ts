@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { proxyToBackend } from '@/lib/proxy-backend'
-import { requireAdminFromRefreshCookie } from '@/lib/server-auth'
+import { requireAdminFromRefreshOrBearer } from '@/lib/server-auth'
 
 
 function decodeSemesterType(type: number): string {
@@ -45,7 +45,7 @@ function formatTime(value: Date | string | null | undefined): string {
  * `lib/course-analytics/course-data.ts` (Year, Semester, Course_Number, …).
  */
 export async function GET(request: Request) {
-  const auth = await requireAdminFromRefreshCookie()
+  const auth = await requireAdminFromRefreshOrBearer(request)
   if (!auth.ok) return auth.response
 
   try {

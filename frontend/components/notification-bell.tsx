@@ -19,10 +19,10 @@ import { onNotificationsRefresh } from "@/lib/notification-bus";
 import { getNotificationHref, stripNotificationMachineTags } from "@/lib/notification-navigation";
 import Link from "next/link";
 
-/** While the tab is visible, poll often so new notifications show up almost immediately. */
-const POLL_MS_WHEN_VISIBLE = 2_500;
+/** While the tab is visible, poll at a steady interval (SSE refresh also bumps the bell after local actions). */
+const POLL_MS_WHEN_VISIBLE = 5_000;
 /** When the tab is in the background, back off to limit server load. */
-const POLL_MS_WHEN_HIDDEN = 60_000;
+const POLL_MS_WHEN_HIDDEN = 90_000;
 /** Avoid duplicate refetches when both focus and visibility fire together. */
 const FOCUS_REFETCH_THROTTLE_MS = 2_000;
 const PREVIEW = 5;

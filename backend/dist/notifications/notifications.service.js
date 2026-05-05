@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const client_1 = require("@prisma/client");
 const notification_prefs_1 = require("./notification-prefs");
+const MESSAGE_BODY_MAX = 2000;
 let NotificationsService = class NotificationsService {
     constructor(prisma) {
         this.prisma = prisma;
@@ -29,11 +30,12 @@ let NotificationsService = class NotificationsService {
             }
         }
         const title = messageTitle.slice(0, 100);
+        const body = message.slice(0, MESSAGE_BODY_MAX);
         return this.prisma.notification.create({
             data: {
                 user_id: userId,
                 message_title: title,
-                message,
+                message: body,
                 is_read: false,
             },
         });
@@ -43,11 +45,12 @@ let NotificationsService = class NotificationsService {
         if (unique.length === 0)
             return { count: 0 };
         const title = messageTitle.slice(0, 100);
+        const body = message.slice(0, MESSAGE_BODY_MAX);
         const res = await this.prisma.notification.createMany({
             data: unique.map((user_id) => ({
                 user_id,
                 message_title: title,
-                message,
+                message: body,
                 is_read: false,
             })),
         });

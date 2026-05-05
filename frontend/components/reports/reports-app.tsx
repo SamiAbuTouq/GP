@@ -66,6 +66,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+import { ApiClient } from "@/lib/api-client"
 import { REPORT_DEFINITIONS } from "@/lib/reports/definitions"
 import type { ExportFormat, GeneratedReportRecord, ReportTypeId } from "@/lib/reports/types"
 import { fetchReportDataset } from "@/lib/reports/fetch-dataset"
@@ -89,6 +90,7 @@ const ZIP_CSV_REPORT_TYPES = new Set<ReportTypeId>([
   "lecturer-workload",
   "course-distribution",
   "conflict-analysis",
+  "optimization-summary",
   "lecturer-preference-compliance",
   "room-type-matching",
 ])
@@ -122,6 +124,35 @@ type SemesterListItem = {
 function semesterDisplayLabel(s: SemesterListItem) {
   const yr = s.academicYear.replace(/-/g, "–")
   return `${yr} ${s.semester}`
+}
+
+/** Matches Nest `/timetables` list — includes GWO and what-if drafts. */
+type ReportTimetableOption = {
+  timetableId: number
+  semesterId: number | null
+  academicYear: string
+  semester: string
+  versionNumber: number
+  status: string
+  generationType: string
+  generatedAt: string
+  isScenarioResult?: boolean
+}
+
+function reportTimetableLabel(tt: ReportTimetableOption): string {
+  const kind =
+    tt.semesterId != null
+      ? "Published"
+      : tt.isScenarioResult || tt.generationType?.toLowerCase() === "what_if"
+        ? "What-if / scenario"
+        : tt.generationType?.toLowerCase() === "gwo_ui"
+          ? "Timetable generation"
+          : "Draft"
+  const sem =
+    tt.semesterId != null && tt.academicYear && tt.academicYear !== "Unassigned"
+      ? `${tt.academicYear.replace(/-/g, "–")} ${tt.semester}`
+      : "Unassigned"
+  return `#${tt.timetableId} v${tt.versionNumber} · ${kind} · ${sem} · ${tt.status}`
 }
 
 function ReportTypeButton({
@@ -205,6 +236,13 @@ export function ReportsApp() {
   const [hasChosenYear, setHasChosenYear] = useState(false)
   const [semesterId, setSemesterId] = useState<string>("")
   const [hasChosenSemester, setHasChosenSemester] = useState(false)
+  /** `semester` = active (or only) published timetable for that term; `timetable` = any stored version including drafts. */
+  const [scheduleScope, setScheduleScope] = useState<"semester" | "timetable">("semester")
+  const [timetableOptions, setTimetableOptions] = useState<ReportTimetableOption[]>([])
+  const [timetablesLoading, setTimetablesLoading] = useState(false)
+  const [timetablesError, setTimetablesError] = useState<string | null>(null)
+  const [pickedTimetableId, setPickedTimetableId] = useState<string>("")
+  const [hasChosenTimetablePick, setHasChosenTimetablePick] = useState(false)
   const [selectionResetKey, setSelectionResetKey] = useState(0)
   const [isGenerating, setIsGenerating] = useState(false)
 
@@ -222,9 +260,13 @@ export function ReportsApp() {
   )
 
   const timetableLabel = useMemo(() => {
+    if (scheduleScope === "timetable" && pickedTimetableId) {
+      const tt = timetableOptions.find((x) => String(x.timetableId) === pickedTimetableId)
+      return tt ? reportTimetableLabel(tt) : ""
+    }
     const s = semesters.find((x) => String(x.semesterId) === semesterId)
     return s ? semesterDisplayLabel(s) : semesterId ? `Semester #${semesterId}` : ""
-  }, [semesters, semesterId])
+  }, [scheduleScope, pickedTimetableId, timetableOptions, semesters, semesterId])
 
   const yearOptions = useMemo(() => {
     const set = new Set(semesters.map((s) => s.academicYear))
@@ -284,6 +326,31 @@ export function ReportsApp() {
   }, [hasChosenSemester, hasChosenYear])
 
   useEffect(() => {
+    if (scheduleScope !== "timetable") return
+    let cancelled = false
+    ;(async () => {
+      setTimetablesLoading(true)
+      setTimetablesError(null)
+      try {
+        const rows = await ApiClient.request<ReportTimetableOption[]>("/timetables")
+        if (!cancelled) {
+          setTimetableOptions(Array.isArray(rows) ? rows : [])
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setTimetablesError(e instanceof Error ? e.message : "Could not load timetables")
+          setTimetableOptions([])
+        }
+      } finally {
+        if (!cancelled) setTimetablesLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [scheduleScope])
+
+  useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
@@ -305,19 +372,31 @@ export function ReportsApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const timetableSelectionComplete = useMemo(() => {
+    if (scheduleScope === "semester") {
+      return Boolean(selectedYear && hasChosenYear && semesterId && hasChosenSemester)
+    }
+    return Boolean(pickedTimetableId && hasChosenTimetablePick)
+  }, [
+    scheduleScope,
+    selectedYear,
+    hasChosenYear,
+    semesterId,
+    hasChosenSemester,
+    pickedTimetableId,
+    hasChosenTimetablePick,
+  ])
+
   const wizardProgress = useMemo(() => {
     let p = 0
     if (selectedReportId) p += 30
     if (selectedReportId && exportFormat !== "" && hasChosenFormat) p += 25
-    if (selectedReportId && selectedYear && hasChosenYear && semesterId && hasChosenSemester) p += 25
+    if (selectedReportId && timetableSelectionComplete) p += 25
     if (
       selectedReportId &&
       exportFormat !== "" &&
       hasChosenFormat &&
-      selectedYear &&
-      hasChosenYear &&
-      semesterId &&
-      hasChosenSemester &&
+      timetableSelectionComplete &&
       !selectedDef?.comingSoon
     )
       p += 20
@@ -326,10 +405,7 @@ export function ReportsApp() {
     selectedReportId,
     exportFormat,
     hasChosenFormat,
-    selectedYear,
-    hasChosenYear,
-    semesterId,
-    hasChosenSemester,
+    timetableSelectionComplete,
     selectedDef?.comingSoon,
   ])
 
@@ -342,10 +418,35 @@ export function ReportsApp() {
     setHasChosenYear(false)
     setSemesterId("")
     setHasChosenSemester(false)
+    setScheduleScope("semester")
+    setPickedTimetableId("")
+    setHasChosenTimetablePick(false)
+    setTimetablesError(null)
     setHasGenerated(false)
   }
 
-  const generationKey = `${selectedReportId}|${exportFormat}|${selectedYear}|${semesterId}`
+  /** Draft / unpublished timetables only (`semesterId == null`); excludes official published semester schedules. */
+  const sortedDraftTimetableOptions = useMemo(() => {
+    return [...timetableOptions]
+      .filter((tt) => tt.semesterId == null)
+      .sort((a, b) => {
+        const ta = new Date(a.generatedAt).getTime()
+        const tb = new Date(b.generatedAt).getTime()
+        if (tb !== ta) return tb - ta
+        return b.timetableId - a.timetableId
+      })
+  }, [timetableOptions])
+
+  useEffect(() => {
+    if (scheduleScope !== "timetable" || !pickedTimetableId) return
+    const sel = timetableOptions.find((x) => String(x.timetableId) === pickedTimetableId)
+    if (sel && sel.semesterId != null) {
+      setPickedTimetableId("")
+      setHasChosenTimetablePick(false)
+    }
+  }, [scheduleScope, pickedTimetableId, timetableOptions])
+
+  const generationKey = `${selectedReportId}|${exportFormat}|${scheduleScope}|${selectedYear}|${semesterId}|${pickedTimetableId}`
   useEffect(() => {
     setHasGenerated(false)
   }, [generationKey])
@@ -354,13 +455,11 @@ export function ReportsApp() {
     !!selectedReportId &&
     exportFormat !== "" &&
     hasChosenFormat &&
-    !!selectedYear &&
-    hasChosenYear &&
-    !!semesterId &&
-    hasChosenSemester &&
+    timetableSelectionComplete &&
     !selectedDef?.comingSoon &&
     !semestersLoading &&
     !semestersError &&
+    (scheduleScope !== "timetable" || (!timetablesLoading && !timetablesError)) &&
     !isGenerating
 
   const handleGenerate = async (opts: { download: boolean }) => {
@@ -368,17 +467,17 @@ export function ReportsApp() {
       !selectedReportId ||
       exportFormat === "" ||
       !hasChosenFormat ||
-      !selectedYear ||
-      !hasChosenYear ||
-      !semesterId ||
-      !hasChosenSemester ||
+      !timetableSelectionComplete ||
       !selectedDef ||
       selectedDef.comingSoon
     )
       return
     setIsGenerating(true)
     try {
-      const dataset = await fetchReportDataset(Number(semesterId))
+      const dataset =
+        scheduleScope === "timetable"
+          ? await fetchReportDataset({ timetableId: Number(pickedTimetableId) })
+          : await fetchReportDataset({ semesterId: Number(semesterId) })
       const { blob, mimeType, extension, baseFilename } = await generateReportBlob({
         reportTypeId: selectedReportId,
         format: exportFormat as ExportFormat,
@@ -414,6 +513,9 @@ export function ReportsApp() {
       setHasChosenYear(false)
       setSemesterId("")
       setHasChosenSemester(false)
+      setScheduleScope("semester")
+      setPickedTimetableId("")
+      setHasChosenTimetablePick(false)
       setSelectionResetKey((prev) => prev + 1)
       toast({
         title: "Report generated",
@@ -533,7 +635,7 @@ export function ReportsApp() {
     {
       n: 3,
       label: "Timetable",
-      done: Boolean(selectedReportId && selectedYear && hasChosenYear && semesterId && hasChosenSemester),
+      done: Boolean(selectedReportId && timetableSelectionComplete),
       showCircle: true,
     },
     { n: 4, label: "Generate", done: Boolean(hasGenerated), showCircle: false },
@@ -648,7 +750,10 @@ export function ReportsApp() {
                                         ? "Print-ready layout"
                                         : f === "excel"
                                           ? "Multi-sheet workbook"
-                                          : "Flat data interchange"}
+                                          : selectedReportId &&
+                                              ZIP_CSV_REPORT_TYPES.has(selectedReportId)
+                                            ? "ZIP with summary + detail CSV files"
+                                            : "Flat data interchange"}
                                     </div>
                                   </div>
                                 </div>
@@ -664,70 +769,168 @@ export function ReportsApp() {
                         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                           Step 3 — Timetable
                         </h2>
-                        <div className="max-w-md space-y-2">
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            <div className="space-y-2">
-                              <Label htmlFor="year-select">Academic year</Label>
-                              <Select
-                                key={`year-${selectionResetKey}`}
-                                value={selectedYear || undefined}
-                                onValueChange={(v) => {
-                                  setSelectedYear(v)
-                                  setHasChosenYear(true)
-                                  setSemesterId("")
-                                  setHasChosenSemester(false)
-                                }}
-                                disabled={!selectedReportId || semestersLoading || semesters.length === 0}
-                              >
-                                <SelectTrigger id="year-select" className="h-11">
-                                  <SelectValue placeholder={semestersLoading ? "Loading years…" : "Select year"} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {yearOptions.map((y) => (
-                                    <SelectItem key={y} value={y}>
-                                      {y.replace(/-/g, "–")}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
+                        <div className="max-w-2xl space-y-4">
+                          <RadioGroup
+                            value={scheduleScope}
+                            onValueChange={(v) => {
+                              const next = v as "semester" | "timetable"
+                              setScheduleScope(next)
+                              if (next === "semester") {
+                                setPickedTimetableId("")
+                                setHasChosenTimetablePick(false)
+                              } else {
+                                setSelectedYear("")
+                                setHasChosenYear(false)
+                                setSemesterId("")
+                                setHasChosenSemester(false)
+                              }
+                            }}
+                            className="grid gap-2 sm:grid-cols-2"
+                            disabled={!selectedReportId}
+                          >
+                            <label
+                              className={cn(
+                                "flex cursor-pointer items-start gap-3 rounded-xl border border-border/80 bg-card p-4 transition-colors has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5",
+                                !selectedReportId && "cursor-not-allowed opacity-50",
+                              )}
+                            >
+                              <RadioGroupItem value="semester" id="scope-semester" className="mt-0.5" />
+                              <div>
+                                <div className="text-sm font-medium">Published semester</div>
+                                <p className="text-muted-foreground mt-1 text-xs leading-snug">
+                                  Official semester schedule: choose year and term; reports use the active published
+                                  timetable for that period.
+                                </p>
+                              </div>
+                            </label>
+                            <label
+                              className={cn(
+                                "flex cursor-pointer items-start gap-3 rounded-xl border border-border/80 bg-card p-4 transition-colors has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5",
+                                !selectedReportId && "cursor-not-allowed opacity-50",
+                              )}
+                            >
+                              <RadioGroupItem value="timetable" id="scope-timetable" className="mt-0.5" />
+                              <div>
+                                <div className="text-sm font-medium">Specific timetable</div>
+                                <p className="text-muted-foreground mt-1 text-xs leading-snug">
+                                  Draft schedules only: unpublished outputs from timetable generation or what-if runs.
+                                </p>
+                              </div>
+                            </label>
+                          </RadioGroup>
 
-                            <div className="space-y-2">
-                              <Label htmlFor="semester-select">Semester</Label>
+                          {scheduleScope === "semester" ? (
+                            <div className="max-w-md space-y-2">
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                  <Label htmlFor="year-select">Academic year</Label>
+                                  <Select
+                                    key={`year-${selectionResetKey}`}
+                                    value={selectedYear || undefined}
+                                    onValueChange={(v) => {
+                                      setSelectedYear(v)
+                                      setHasChosenYear(true)
+                                      setSemesterId("")
+                                      setHasChosenSemester(false)
+                                    }}
+                                    disabled={!selectedReportId || semestersLoading || semesters.length === 0}
+                                  >
+                                    <SelectTrigger id="year-select" className="h-11">
+                                      <SelectValue placeholder={semestersLoading ? "Loading years…" : "Select year"} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {yearOptions.map((y) => (
+                                        <SelectItem key={y} value={y}>
+                                          {y.replace(/-/g, "–")}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label htmlFor="semester-select">Semester</Label>
+                                  <Select
+                                    key={`semester-${selectionResetKey}`}
+                                    value={semesterId || undefined}
+                                    onValueChange={(v) => {
+                                      setSemesterId(v)
+                                      setHasChosenSemester(true)
+                                    }}
+                                    disabled={
+                                      !selectedReportId ||
+                                      semestersLoading ||
+                                      semesters.length === 0 ||
+                                      !selectedYear ||
+                                      !hasChosenYear
+                                    }
+                                  >
+                                    <SelectTrigger id="semester-select" className="h-11">
+                                      <SelectValue placeholder={selectedYear ? "Select semester" : "Select year first"} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {semesterOptionsForYear.map((t) => (
+                                        <SelectItem key={t.semesterId} value={String(t.semesterId)}>
+                                          {t.semester}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                              {semestersError ? (
+                                <p className="text-destructive text-xs">{semestersError}</p>
+                              ) : (
+                                <p className="text-muted-foreground text-xs">
+                                  Choose year and semester; the export uses that term&apos;s active published timetable.
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="max-w-xl space-y-2">
+                              <Label htmlFor="timetable-pick">Timetable</Label>
                               <Select
-                                key={`semester-${selectionResetKey}`}
-                                value={semesterId || undefined}
+                                key={`tt-${selectionResetKey}`}
+                                value={pickedTimetableId || undefined}
                                 onValueChange={(v) => {
-                                  setSemesterId(v)
-                                  setHasChosenSemester(true)
+                                  setPickedTimetableId(v)
+                                  setHasChosenTimetablePick(true)
                                 }}
                                 disabled={
                                   !selectedReportId ||
-                                  semestersLoading ||
-                                  semesters.length === 0 ||
-                                  !selectedYear ||
-                                  !hasChosenYear
+                                  timetablesLoading ||
+                                  sortedDraftTimetableOptions.length === 0
                                 }
                               >
-                                <SelectTrigger id="semester-select" className="h-11">
-                                  <SelectValue placeholder={selectedYear ? "Select semester" : "Select year first"} />
+                                <SelectTrigger id="timetable-pick" className="h-11 min-h-[2.75rem] py-2">
+                                  <SelectValue
+                                    placeholder={
+                                      timetablesLoading
+                                        ? "Loading timetables…"
+                                        : sortedDraftTimetableOptions.length === 0
+                                          ? "No draft timetables available"
+                                          : "Choose a draft timetable"
+                                    }
+                                  />
                                 </SelectTrigger>
-                                <SelectContent>
-                                  {semesterOptionsForYear.map((t) => (
-                                    <SelectItem key={t.semesterId} value={String(t.semesterId)}>
-                                      {t.semester}
+                                <SelectContent className="max-h-[min(320px,50vh)]">
+                                  {sortedDraftTimetableOptions.map((tt) => (
+                                    <SelectItem key={tt.timetableId} value={String(tt.timetableId)}>
+                                      <span className="block whitespace-normal break-words text-left">
+                                        {reportTimetableLabel(tt)}
+                                      </span>
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
+                              {timetablesError ? (
+                                <p className="text-destructive text-xs">{timetablesError}</p>
+                              ) : (
+                                <p className="text-muted-foreground text-xs">
+                                  Drafts only, newest first. For official term schedules, use Published semester.
+                                </p>
+                              )}
                             </div>
-                          </div>
-                          {semestersError ? (
-                            <p className="text-destructive text-xs">{semestersError}</p>
-                          ) : (
-                            <p className="text-muted-foreground text-xs">
-                              Select an academic year and semester to generate a report for that period.
-                            </p>
                           )}
                         </div>
                       </section>
@@ -879,9 +1082,7 @@ export function ReportsApp() {
                               Timetable
                             </div>
                             <div className="font-medium">
-                              {selectedReportId && selectedYear && hasChosenYear && semesterId && hasChosenSemester
-                                ? timetableLabel
-                                : "—"}
+                              {selectedReportId && timetableSelectionComplete ? timetableLabel : "—"}
                             </div>
                           </div>
                         </CardContent>

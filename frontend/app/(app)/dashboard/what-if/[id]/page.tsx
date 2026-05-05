@@ -436,7 +436,7 @@ export default function WhatIfScenarioDetailPage() {
         if (streamAbortRef.current === ac) {
           streamAbortRef.current = null;
         }
-        endRun();
+        endRun(ac);
       }
     })();
   }, [
@@ -569,7 +569,7 @@ export default function WhatIfScenarioDetailPage() {
       if (streamAbortRef.current === ac) {
         streamAbortRef.current = null;
       }
-      endRun();
+      endRun(ac);
       if (pageMountedRef.current) {
         setSimStarting(false);
       }

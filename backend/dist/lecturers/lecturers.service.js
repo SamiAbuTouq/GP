@@ -397,7 +397,7 @@ let LecturersService = LecturersService_1 = class LecturersService {
         });
         if (sectionCount > 0) {
             void this.notifications
-                .notifyAdmins('Lecturer Deactivated — Schedule Impact', `${fullName || `Lecturer #${id}`} was deactivated and had ${sectionCount} schedule section row(s) assigned across timetables.`)
+                .notifyAdmins('Lecturer Deactivated — Schedule Impact', `${fullName || `Lecturer #${id}`} was deactivated and had ${sectionCount} schedule section row(s) assigned across timetables.`, { preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_DEACTIVATION_IMPACT })
                 .catch(() => { });
         }
         return { message: 'Lecturer deactivated successfully' };

@@ -7,6 +7,15 @@ import {
   formatDateTime,
   type DateTimeFormatPreferences,
 } from "@/lib/datetime-format"
+import {
+  csvStandardMetadataRows,
+  excelCoverBlock,
+  lecturerDepartmentRollups,
+  modalitySplitFromCourseRows,
+  pdfBrandFooterLeft,
+  pdfSubtitleLines,
+  timetableSourceFootnote,
+} from "./report-metadata"
 
 function slugFilePart(label: string) {
   return label
@@ -34,6 +43,22 @@ function rowsToCsvNoHeader(data: (string | number)[][]): string {
   return data.map((row) => row.map(csvEscape).join(",")).join("\r\n") + "\r\n"
 }
 
+/** Blank Excel cells for optional numeric fields (keeps columns numeric when present). */
+function xlOptNum(n: number | null | undefined): number | "" {
+  if (n == null || Number.isNaN(n)) return ""
+  return n
+}
+
+function applyDetailSheetLayout(ws: XLSX.WorkSheet) {
+  if (!ws["!ref"]) return
+  ws["!autofilter"] = { ref: ws["!ref"] }
+}
+
+/** Summary sheets use a Metric | Value layout — wide columns avoid truncated labels (e.g. “Export format version”). */
+function applyTwoColumnKeyValueWidths(ws: XLSX.WorkSheet) {
+  ws["!cols"] = [{ wch: 44 }, { wch: 56 }]
+}
+
 type PdfTableSection = {
   title: string
   tableHead: string[][]
@@ -47,20 +72,12 @@ async function buildCsvZip(files: { filename: string; content: string }[]): Prom
     archive[f.filename] = strToU8(f.content)
   }
   const zipped = zipSync(archive, { level: 6 })
-  return new Blob([zipped], { type: "application/zip" })
-}
-
-function timetableFootnote(ds: ReportDataset, prefs: DateTimeFormatPreferences): string {
-  const t = ds.timetable
-  if (!t) {
-    return "No timetable version is stored for this semester; room and workload tables reflect zero scheduled activity."
-  }
-  return `Source timetable #${t.timetableId} (${t.status}, v${t.versionNumber}, ${t.generationType}), generated ${formatDateTime(new Date(t.generatedAt), prefs)}.`
+  return new Blob([new Uint8Array(zipped)], { type: "application/zip" })
 }
 
 async function buildPdf(
   title: string,
-  timetableLabel: string,
+  subtitleLines: string[],
   summaryLines: string[],
   tableHead: string[][],
   tableBody: (string | number)[][],
@@ -86,10 +103,12 @@ async function buildPdf(
   doc.setFontSize(10)
   doc.setFont("helvetica", "normal")
   doc.setTextColor(80)
-  doc.text(`Academic period: ${timetableLabel}`, margin, y)
-  y += 5
-  doc.text(`Generated: ${fmtGen(new Date())}`, margin, y)
-  y += 8
+  for (const line of subtitleLines) {
+    const wrapped = doc.splitTextToSize(line, pageW - margin * 2)
+    doc.text(wrapped, margin, y)
+    y += wrapped.length * 4.5 + 1
+  }
+  y += 4
 
   doc.setTextColor(0)
   doc.setFont("helvetica", "bold")
@@ -119,6 +138,15 @@ async function buildPdf(
   }
   y += 4
 
+  const drawPdfFooter = (data: { pageNumber: number }) => {
+    const pageH = doc.internal.pageSize.getHeight()
+    doc.setFontSize(7.5)
+    doc.setTextColor(130)
+    doc.text(pdfBrandFooterLeft(), margin, pageH - 8)
+    doc.text(`Page ${data.pageNumber}`, pageW - margin - 14, pageH - 8)
+    doc.setTextColor(0)
+  }
+
   autoTable(doc, {
     startY: y,
     head: tableHead,
@@ -129,16 +157,7 @@ async function buildPdf(
     margin: { left: margin, right: margin },
     tableWidth: "auto",
     showHead: "everyPage",
-    didDrawPage(data) {
-      doc.setFontSize(8)
-      doc.setTextColor(140)
-      doc.text(
-        `Page ${data.pageNumber}`,
-        pageW - margin - 12,
-        doc.internal.pageSize.getHeight() - 8,
-      )
-      doc.setTextColor(0)
-    },
+    didDrawPage: drawPdfFooter,
   })
 
   if (appendSections?.length) {
@@ -160,16 +179,7 @@ async function buildPdf(
         margin: { left: margin, right: margin },
         tableWidth: "auto",
         showHead: "everyPage",
-        didDrawPage(data) {
-          doc.setFontSize(8)
-          doc.setTextColor(140)
-          doc.text(
-            `Page ${data.pageNumber}`,
-            pageW - margin - 12,
-            doc.internal.pageSize.getHeight() - 8,
-          )
-          doc.setTextColor(0)
-        },
+        didDrawPage: drawPdfFooter,
       })
       doc.setFont("helvetica", "normal")
     }
@@ -181,14 +191,9 @@ async function buildPdf(
 function buildRoomExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
   const { roomRows: rows, insights: ins, timetable: t } = ds
   const wb = XLSX.utils.book_new()
-  const fmtGen = (d: Date) => formatDateTime(d, prefs)
 
   const summaryData: (string | number)[][] = [
-    ["Room Utilization Report"],
-    ["Academic period", ds.semesterLabel],
-    ["Generated", fmtGen(new Date())],
-    [timetableFootnote(ds, prefs)],
-    [],
+    ...excelCoverBlock("Room Utilization Report", ds, prefs),
     ["Metric", "Value"],
     ["Rooms in catalog", ins.totalRoomsInCatalog],
     ["Rooms with scheduled sessions", ins.roomsWithSchedule],
@@ -201,14 +206,13 @@ function buildRoomExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
     ],
     [
       "Weighted avg seat fill (face-to-face & blended, hours-weighted)",
-      ins.totalSeatFillWeightedPct ?? "—",
+      xlOptNum(ins.totalSeatFillWeightedPct),
     ],
-    [
-      "Solver room utilization rate (timetable metrics)",
-      t?.roomUtilizationRate ?? "—",
-    ],
+    ["Solver room utilization rate (timetable metrics)", xlOptNum(t?.roomUtilizationRate ?? null)],
   ]
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), "Summary")
+  const summaryWsRoom = XLSX.utils.aoa_to_sheet(summaryData)
+  applyTwoColumnKeyValueWidths(summaryWsRoom)
+  XLSX.utils.book_append_sheet(wb, summaryWsRoom, "Summary")
 
   const detail = rows.map((r) => ({
     "Room number": r.roomNumber,
@@ -218,18 +222,19 @@ function buildRoomExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
     "Sessions scheduled": r.sessionsCount,
     "Weekly instructional hours": r.weeklyInstructionalHours,
     "Relative load vs busiest room (%)": r.relativeLoadPct,
-    "Avg seat fill — F2F/blended (%)": r.avgSeatFillPct ?? "—",
-    "Busiest weekday": r.peakDay,
+    "Avg seat fill — F2F/blended (%)": xlOptNum(r.avgSeatFillPct),
+    "Busiest weekday (by session count)": r.peakDay,
     "Online or blended sessions": r.onlineOrBlendedSessions,
   }))
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detail), "Room detail")
+  const detailWs = XLSX.utils.json_to_sheet(detail)
+  applyDetailSheetLayout(detailWs)
+  XLSX.utils.book_append_sheet(wb, detailWs, "Room detail")
   return wb
 }
 
 function buildLecturerExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
   const { lecturerRows: rows, insights: ins } = ds
   const wb = XLSX.utils.book_new()
-  const fmtGen = (d: Date) => formatDateTime(d, prefs)
   const avgLoad =
     rows.length > 0
       ? Math.round((rows.reduce((s, r) => s + r.loadIndex, 0) / rows.length) * 1000) /
@@ -239,11 +244,7 @@ function buildLecturerExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences)
   const totalHrs = Math.round(rows.reduce((s, r) => s + r.weeklyContactHours, 0) * 100) / 100
 
   const summaryData: (string | number)[][] = [
-    ["Lecturer Workload Report"],
-    ["Academic period", ds.semesterLabel],
-    ["Generated", fmtGen(new Date())],
-    [timetableFootnote(ds, prefs)],
-    [],
+    ...excelCoverBlock("Lecturer Workload Report", ds, prefs),
     ["Metric", "Value"],
     ["Lecturers with assignments", ins.lecturerCountScheduled],
     ["Lecturers with no assignments", ins.lecturersWithNoAssignments],
@@ -251,7 +252,9 @@ function buildLecturerExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences)
     ["Total scheduled weekly contact hours", totalHrs],
     ["Faculty at or above 1.20 load index", highLoad],
   ]
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), "Summary")
+  const summaryWs = XLSX.utils.aoa_to_sheet(summaryData)
+  applyTwoColumnKeyValueWidths(summaryWs)
+  XLSX.utils.book_append_sheet(wb, summaryWs, "Summary")
 
   const detail = rows.map((r) => ({
     Lecturer: r.lecturerName,
@@ -262,7 +265,7 @@ function buildLecturerExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences)
     "Lab sections": r.labSections,
     "Weekly contact hours": r.weeklyContactHours,
     "Load index": r.loadIndex,
-    "% of personal max": r.loadPctOfMax ?? "—",
+    "% of personal max": xlOptNum(r.loadPctOfMax),
   }))
   const totalsRow = {
     Lecturer: "TOTAL",
@@ -281,29 +284,49 @@ function buildLecturerExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences)
     const cell = detailSheet[`${col}${totalRowNum}`]
     if (cell) cell.s = { font: { bold: true } }
   }
+  applyDetailSheetLayout(detailSheet)
   XLSX.utils.book_append_sheet(wb, detailSheet, "Workload detail")
+
+  const rollup = lecturerDepartmentRollups(rows)
+  const rollupWs = XLSX.utils.json_to_sheet(
+    rollup.map((r) => ({
+      Department: r.department,
+      "Lecturers (scheduled)": r.lecturers,
+      Sections: r.sections,
+      "Weekly contact hours": r.weeklyContactHours,
+    })),
+  )
+  applyDetailSheetLayout(rollupWs)
+  XLSX.utils.book_append_sheet(wb, rollupWs, "By department")
+
   return wb
 }
 
 function buildCourseExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
   const { courseDistributionRows: rows, insights: ins } = ds
   const wb = XLSX.utils.book_new()
-  const fmtGen = (d: Date) => formatDateTime(d, prefs)
+  const mod = modalitySplitFromCourseRows(rows)
 
   const summaryData: (string | number)[][] = [
-    ["Course Distribution Report"],
-    ["Academic period", ds.semesterLabel],
-    ["Generated", fmtGen(new Date())],
-    [timetableFootnote(ds, prefs)],
-    [],
+    ...excelCoverBlock("Course Distribution Report", ds, prefs),
     ["Metric", "Value"],
     ["Departments listed", rows.length],
     ["Distinct courses on timetable", ins.distinctCoursesScheduled],
     ["Section instances", ins.totalScheduleEntries],
     ["Total registered students (sum of sections)", rows.reduce((s, r) => s + r.totalEnrollment, 0)],
     ["Departments with ≥1 section", ins.departmentsScheduled],
+    [],
+    ["Modality (section instances)", "Count"],
+    ["Online", mod.online],
+    ["Blended", mod.blended],
+    ["Face-to-face", mod.faceToFace],
+    ["% of section instances — online", xlOptNum(mod.pctOnline)],
+    ["% of section instances — blended", xlOptNum(mod.pctBlended)],
+    ["% of section instances — face-to-face", xlOptNum(mod.pctFaceToFace)],
   ]
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryData), "Summary")
+  const summaryWs = XLSX.utils.aoa_to_sheet(summaryData)
+  applyTwoColumnKeyValueWidths(summaryWs)
+  XLSX.utils.book_append_sheet(wb, summaryWs, "Summary")
 
   const detail = rows.map((r) => ({
     Department: r.department,
@@ -317,6 +340,10 @@ function buildCourseExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
     "Blended sections": r.blendedSections,
     "Face-to-face sections": r.faceToFaceSections,
     "Avg enrollment / section": r.avgSectionEnrollment,
+    "% sections online (dept)":
+      r.sectionInstances > 0
+        ? Math.round((r.onlineSections / r.sectionInstances) * 1000) / 10
+        : "",
   }))
   const totalSections = rows.reduce((s, r) => s + r.sectionInstances, 0)
   const totalEnrollment = rows.reduce((s, r) => s + r.totalEnrollment, 0)
@@ -332,13 +359,15 @@ function buildCourseExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
     "Blended sections": rows.reduce((s, r) => s + r.blendedSections, 0),
     "Face-to-face sections": rows.reduce((s, r) => s + r.faceToFaceSections, 0),
     "Avg enrollment / section": totalSections > 0 ? Math.round((totalEnrollment / totalSections) * 100) / 100 : 0,
+    "% sections online (dept)": "",
   }
   const detailSheet = XLSX.utils.json_to_sheet([...detail, totalsRow])
   const totalRowNum = detail.length + 2
-  for (const col of ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"] as const) {
+  for (const col of ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"] as const) {
     const cell = detailSheet[`${col}${totalRowNum}`]
     if (cell) cell.s = { font: { bold: true } }
   }
+  applyDetailSheetLayout(detailSheet)
   XLSX.utils.book_append_sheet(wb, detailSheet, "By department")
   return wb
 }
@@ -370,9 +399,19 @@ export async function generateReportBlob(params: {
   const base = getReportBaseFilename(reportTypeId, timetableLabel)
 
   const footnotes = [
-    timetableFootnote(ds, dateTimePrefs),
+    timetableSourceFootnote(ds, dateTimePrefs),
     "Undergraduate vs. graduate course counts use academic_level: levels below 500 count as undergraduate; 500+ as graduate.",
     "Weekly hours multiply slot length by the number of days in each timeslot’s days mask (recurring meetings per week).",
+  ]
+
+  const roomFootnotes = [
+    ...footnotes,
+    "Busiest weekday uses the day with the highest count of scheduled sessions in that room (not instructional hours).",
+  ]
+
+  const courseFootnotes = [
+    ...footnotes,
+    "% online (dept): portion of that department’s section instances scheduled as online delivery.",
   ]
 
   if (reportTypeId === "room-utilization") {
@@ -381,23 +420,19 @@ export async function generateReportBlob(params: {
     const official = ds.timetable?.roomUtilizationRate
 
     if (format === "csv") {
-      const summaryCsv = rowsToCsvNoHeader(
+      const summaryCsv = rowsToCsvNoHeader([
+        ["Metric", "Value"],
+        ...csvStandardMetadataRows(ds, dateTimePrefs, "Room Utilization"),
+        ["Rooms in catalog", ins.totalRoomsInCatalog],
+        ["Rooms with scheduled sessions", ins.roomsWithSchedule],
+        ["Total section instances", ins.totalScheduleEntries],
+        ["Total weekly instructional hours", ins.totalWeeklyScheduledHours],
         [
-          ["Metric", "Value"],
-          ["Report", "Room Utilization"],
-          ["Academic period", timetableLabel],
-          ["Generated", fmtGen(new Date())],
-          ["Rooms in catalog", ins.totalRoomsInCatalog],
-          ["Rooms with scheduled sessions", ins.roomsWithSchedule],
-          ["Total section instances", ins.totalScheduleEntries],
-          ["Total weekly instructional hours", ins.totalWeeklyScheduledHours],
-          [
-            "Weighted seat fill % (face-to-face & blended)",
-            ins.totalSeatFillWeightedPct ?? "",
-          ],
-          ["Solver room utilization rate %", official ?? ""],
+          "Weighted seat fill % (face-to-face & blended)",
+          ins.totalSeatFillWeightedPct ?? "",
         ],
-      )
+        ["Solver room utilization rate %", official ?? ""],
+      ])
       const detailCsv = rowsToCsv(
         [
           "Room number",
@@ -408,8 +443,8 @@ export async function generateReportBlob(params: {
           "Weekly hours",
           "Load %",
           "Seat fill %",
-          "Peak day",
-          "Online & Blended sessions",
+          "Busiest weekday (by session count)",
+          "Online & blended sessions",
         ],
         rows.map((r) => [
           r.roomNumber,
@@ -467,7 +502,7 @@ export async function generateReportBlob(params: {
     const idleRooms = rows.filter((r) => r.isAvailable && r.sessionsCount === 0)
     const blob = await buildPdf(
       "Room Utilization Report",
-      timetableLabel,
+      pdfSubtitleLines(ds, dateTimePrefs),
       summaryLines,
       [
         [
@@ -479,8 +514,8 @@ export async function generateReportBlob(params: {
           "Hours/week",
           "Load %",
           "Seat fill %",
-          "Peak day",
-          "Online & Blended",
+          "Busiest weekday (sessions)",
+          "Online & blended",
         ],
       ],
       rows.map((r) => [
@@ -495,7 +530,7 @@ export async function generateReportBlob(params: {
         r.peakDay,
         r.onlineOrBlendedSessions,
       ]),
-      footnotes,
+      roomFootnotes,
       idleRooms.length
         ? [
             {
@@ -524,19 +559,15 @@ export async function generateReportBlob(params: {
     const noAssignments = ds.insights.lecturersWithNoAssignments
 
     if (format === "csv") {
-      const summaryCsv = rowsToCsvNoHeader(
-        [
-          ["Metric", "Value"],
-          ["Report", "Lecturer Workload"],
-          ["Academic period", timetableLabel],
-          ["Generated", fmtGen(new Date())],
-          ["Lecturers with assignments", ins.lecturerCountScheduled],
-          ["Lecturers with no assignments", noAssignments],
-          ["Average load index", avgLoad],
-          ["Total weekly contact hours", totalHrs],
-          ["Lecturers at or above 1.20 load index", highLoad],
-        ],
-      )
+      const summaryCsv = rowsToCsvNoHeader([
+        ["Metric", "Value"],
+        ...csvStandardMetadataRows(ds, dateTimePrefs, "Lecturer Workload"),
+        ["Lecturers with assignments", ins.lecturerCountScheduled],
+        ["Lecturers with no assignments", noAssignments],
+        ["Average load index", avgLoad],
+        ["Total weekly contact hours", totalHrs],
+        ["Lecturers at or above 1.20 load index", highLoad],
+      ])
       const detailCsv = rowsToCsv(
         [
           "Name",
@@ -594,11 +625,12 @@ export async function generateReportBlob(params: {
       `Collectively they deliver ${totalHrs} weekly contact hours. ${highLoad} faculty meet or exceed a 1.20 load index.`,
       `${noAssignments} active lecturers currently have no scheduled sections this term.`,
       "Labs are counted separately so chairs can see experimental teaching intensity alongside lecture contact hours.",
+      "The Excel export includes a “By department” sheet aggregating scheduled faculty workload by academic unit.",
     ]
 
     const blob = await buildPdf(
       "Lecturer Workload Report",
-      timetableLabel,
+      pdfSubtitleLines(ds, dateTimePrefs),
       summaryLines,
       [
         [
@@ -640,19 +672,22 @@ export async function generateReportBlob(params: {
     if (format === "csv") {
       const totalSections = rows.reduce((s, r) => s + r.sectionInstances, 0)
       const weightedAvg = totalSections > 0 ? Math.round((totalEnroll / totalSections) * 100) / 100 : 0
-      const summaryCsv = rowsToCsvNoHeader(
-        [
-          ["Metric", "Value"],
-          ["Report", "Course Distribution"],
-          ["Academic period", timetableLabel],
-          ["Generated", fmtGen(new Date())],
-          ["Departments", rows.length],
-          ["Distinct courses scheduled", ins.distinctCoursesScheduled],
-          ["Total section instances", ins.totalScheduleEntries],
-          ["Total enrollment", totalEnroll],
-          ["Departments with at least one section", ins.departmentsScheduled],
-        ],
-      )
+      const mod = modalitySplitFromCourseRows(rows)
+      const summaryCsv = rowsToCsvNoHeader([
+        ["Metric", "Value"],
+        ...csvStandardMetadataRows(ds, dateTimePrefs, "Course Distribution"),
+        ["Departments", rows.length],
+        ["Distinct courses scheduled", ins.distinctCoursesScheduled],
+        ["Total section instances", ins.totalScheduleEntries],
+        ["Total enrollment", totalEnroll],
+        ["Departments with at least one section", ins.departmentsScheduled],
+        ["Section instances — online", mod.online],
+        ["Section instances — blended", mod.blended],
+        ["Section instances — face-to-face", mod.faceToFace],
+        ["% of section instances — online", mod.pctOnline ?? ""],
+        ["% of section instances — blended", mod.pctBlended ?? ""],
+        ["% of section instances — face-to-face", mod.pctFaceToFace ?? ""],
+      ])
       const detailCsv = rowsToCsv(
         [
           "Department",
@@ -666,6 +701,7 @@ export async function generateReportBlob(params: {
           "Blended",
           "Face-to-face",
           "Avg enrollment",
+          "% section instances online (dept)",
         ],
         [
           ...rows.map((r) => [
@@ -680,6 +716,9 @@ export async function generateReportBlob(params: {
             r.blendedSections,
             r.faceToFaceSections,
             r.avgSectionEnrollment,
+            r.sectionInstances > 0
+              ? Math.round((r.onlineSections / r.sectionInstances) * 1000) / 10
+              : "",
           ]),
           [
             "TOTAL",
@@ -693,6 +732,7 @@ export async function generateReportBlob(params: {
             rows.reduce((s, r) => s + r.blendedSections, 0),
             rows.reduce((s, r) => s + r.faceToFaceSections, 0),
             weightedAvg,
+            "",
           ],
         ],
       )
@@ -724,15 +764,16 @@ export async function generateReportBlob(params: {
       }
     }
 
+    const modPdf = modalitySplitFromCourseRows(rows)
     const summaryLines = [
       `${rows.length} academic units are listed, combining catalog breadth with the live timetable.`,
       `${ins.distinctCoursesScheduled} distinct courses run this term in ${ins.totalScheduleEntries} section instances, enrolling ${totalEnroll.toLocaleString()} student seats in aggregate.`,
-      `Modalities split as follows across all departments: ${rows.reduce((s, r) => s + r.onlineSections, 0)} online, ${rows.reduce((s, r) => s + r.blendedSections, 0)} blended, and ${rows.reduce((s, r) => s + r.faceToFaceSections, 0)} face-to-face section instances.`,
+      `Modalities (section instances): ${modPdf.online} online (${modPdf.pctOnline ?? 0}%), ${modPdf.blended} blended (${modPdf.pctBlended ?? 0}%), ${modPdf.faceToFace} face-to-face (${modPdf.pctFaceToFace ?? 0}%).`,
     ]
 
     const blob = await buildPdf(
       "Course Distribution Report",
-      timetableLabel,
+      pdfSubtitleLines(ds, dateTimePrefs),
       summaryLines,
       [
         [
@@ -747,6 +788,7 @@ export async function generateReportBlob(params: {
           "Blended",
           "Face-to-face",
           "Avg enrollment",
+          "% online (dept)",
         ],
       ],
       (() => {
@@ -765,6 +807,9 @@ export async function generateReportBlob(params: {
             r.blendedSections,
             r.faceToFaceSections,
             r.avgSectionEnrollment,
+            r.sectionInstances > 0
+              ? Math.round((r.onlineSections / r.sectionInstances) * 1000) / 10
+              : "—",
           ]),
           [
             "TOTAL",
@@ -778,10 +823,11 @@ export async function generateReportBlob(params: {
             rows.reduce((s, r) => s + r.blendedSections, 0),
             rows.reduce((s, r) => s + r.faceToFaceSections, 0),
             weightedAvg,
+            "",
           ],
         ]
       })(),
-      footnotes,
+      courseFootnotes,
       undefined,
       fmtGen,
     )
@@ -796,39 +842,52 @@ export async function generateReportBlob(params: {
       .sort((a, b) => (a.fitnessScore ?? Number.POSITIVE_INFINITY) - (b.fitnessScore ?? Number.POSITIVE_INFINITY))[0] ?? null
     const validRuns = runs.filter((r) => r.isValid === true).length
 
-    if (format === "excel") {
-      const wb = XLSX.utils.book_new()
-      const summary = [
+    if (format === "csv") {
+      const summaryPart = rowsToCsvNoHeader([
         ["Metric", "Value"],
-        ["Report", "Optimization Summary"],
-        ["Academic period", timetableLabel],
-        ["Generated", fmtGen(new Date())],
-        ["Total runs this semester", runs.length],
+        ...csvStandardMetadataRows(ds, dateTimePrefs, "Optimization Summary"),
+        ["Total runs", runs.length],
         ["Active version", active ? `v${active.versionNumber}` : "N/A"],
         ["Best fitness score", best ? `${best.fitnessScore} (v${best.versionNumber})` : "N/A"],
         ["Valid runs", `${validRuns} of ${runs.length}`],
-      ]
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), "Summary")
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(
-          runs.map((r) => ({
-            Version: `v${r.versionNumber}`,
-            Type: r.generationTypeLabel,
-            Status: r.status,
-            Generated: fmtGen(new Date(r.generatedAt)),
-            "Fitness score": r.fitnessScore ?? "",
-            "Soft constraints score": r.softConstraintsScore ?? "",
-            "Room utilization %": r.roomUtilizationRate ?? "",
-            Valid: r.isValid ? "Yes" : "No",
-            Sections: r.sectionsCount,
-            Active: r.isActive ? "YES" : "",
-          })),
-        ),
-        "Run comparison",
+      ])
+      const runsPart = rowsToCsv(
+        [
+          "Version",
+          "Type",
+          "Status",
+          "Generated",
+          "Fitness score",
+          "Soft constraints score",
+          "Room utilization %",
+          "Valid",
+          "Sections",
+          "Active",
+        ],
+        runs.map((r) => [
+          `v${r.versionNumber}`,
+          r.generationTypeLabel,
+          r.status,
+          fmtGen(new Date(r.generatedAt)),
+          r.fitnessScore ?? "",
+          r.softConstraintsScore ?? "",
+          r.roomUtilizationRate ?? "",
+          r.isValid ? "Yes" : "No",
+          r.sectionsCount,
+          r.isActive ? "Yes" : "",
+        ]),
       )
-      const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" })
-      return { blob: new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", extension: "xlsx", baseFilename: base }
+      const blob = await buildCsvZip([
+        {
+          filename: `optimization-summary-${slugFilePart(timetableLabel)}-summary.csv`,
+          content: summaryPart,
+        },
+        {
+          filename: `optimization-summary-${slugFilePart(timetableLabel)}-runs.csv`,
+          content: runsPart,
+        },
+      ])
+      return { blob, mimeType: "application/zip", extension: "zip", baseFilename: base }
     }
 
     const summaryLines = [
@@ -839,7 +898,7 @@ export async function generateReportBlob(params: {
     ]
     const blob = await buildPdf(
       "Optimization Summary Report",
-      timetableLabel,
+      pdfSubtitleLines(ds, dateTimePrefs),
       summaryLines,
       [["Version", "Type", "Status", "Generated", "Fitness score", "Soft constraints score", "Room utilization %", "Valid", "Sections"]],
       runs.map((r) => [
@@ -882,15 +941,39 @@ export async function generateReportBlob(params: {
       ({ lecturer_double_booking: "Lecturer double-booking", room_double_booking: "Room double-booking", capacity_exceeded: "Capacity exceeded", lecturer_overload: "Lecturer overload", wrong_timeslot_type: "Wrong timeslot type", wrong_room_type: "Wrong room type", cohort_overlap: "Cohort overlap", preference_violation: "Preference violation" } as Record<string, string>)[t] ?? t
 
     if (format === "csv") {
-      const summaryCsv = rowsToCsv(["Type", "Severity", "Count"], [
-        ...[...byType.entries()].flatMap(([type, c]) => [
-          ...(c.hard > 0 ? [[typeLabel(type), "hard", c.hard]] : []),
-          ...(c.soft > 0 ? [[typeLabel(type), "soft", c.soft]] : []),
-        ]),
-        ["Total hard violations", "hard", hardCount],
-        ["Total soft violations", "soft", softCount],
+      const metricsCsv = rowsToCsvNoHeader([
+        ["Metric", "Value"],
+        ...csvStandardMetadataRows(ds, dateTimePrefs, "Conflict Analysis"),
+        ["Timetable version", ds.timetable ? `v${ds.timetable.versionNumber}` : "N/A"],
+        ["Total hard violations", hardCount],
+        ["Total soft violations", softCount],
       ])
-      const detailCsv = rowsToCsv(["Severity", "Type", "Course", "Section", "Lecturer", "Room", "Timeslot", "Detail"], conflicts.map((c) => [c.severity, typeLabel(c.type), c.courseCode, c.sectionNumber, c.lecturerName ?? "", c.roomNumber ?? "", c.timeslotLabel ?? "", c.detail]))
+      const byTypeCsv = rowsToCsv(
+        ["Conflict type", "Hard count", "Soft count", "Total"],
+        [
+          ...[...byType.entries()].map(([t, c]) => [
+            typeLabel(t),
+            c.hard,
+            c.soft,
+            c.hard + c.soft,
+          ]),
+          ["All types", hardCount, softCount, hardCount + softCount],
+        ],
+      )
+      const summaryCsv = `${metricsCsv}\r\n${byTypeCsv}`
+      const detailCsv = rowsToCsv(
+        ["Severity", "Type", "Course", "Section", "Lecturer", "Room", "Timeslot", "Detail"],
+        conflicts.map((c) => [
+          c.severity === "hard" ? "Hard" : "Soft",
+          typeLabel(c.type),
+          c.courseCode,
+          c.sectionNumber,
+          c.lecturerName ?? "",
+          c.roomNumber ?? "",
+          c.timeslotLabel ?? "",
+          c.detail,
+        ]),
+      )
       const blob = await buildCsvZip([
         { filename: `conflict-analysis-${slugFilePart(timetableLabel)}-summary.csv`, content: summaryCsv },
         { filename: `conflict-analysis-${slugFilePart(timetableLabel)}-detail.csv`, content: detailCsv },
@@ -898,38 +981,64 @@ export async function generateReportBlob(params: {
       return { blob, mimeType: "application/zip", extension: "zip", baseFilename: base }
     }
 
-    if (format === "excel") {
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-        ["Metric", "Value"],
-        ["Report", "Conflict Analysis"],
-        ["Academic period", timetableLabel],
-        ["Generated", fmtGen(new Date())],
-        ["Timetable version", ds.timetable ? `v${ds.timetable.versionNumber}` : "N/A"],
-        ["Total hard violations", hardCount],
-        ["Total soft violations", softCount],
-        [],
-        ["Type", "Hard count", "Soft count"],
-        ...[...byType.entries()].map(([t, c]) => [typeLabel(t), c.hard, c.soft]),
-      ]), "Summary")
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(conflicts.map((c) => ({ Severity: c.severity === "hard" ? "Hard" : "Soft", Type: typeLabel(c.type), Course: c.courseCode, Section: c.sectionNumber, Lecturer: c.lecturerName ?? "", Room: c.roomNumber ?? "", Timeslot: c.timeslotLabel ?? "", Detail: c.detail }))), "Conflict detail")
-      const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" })
-      return { blob: new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", extension: "xlsx", baseFilename: base }
+    const hardConflicts = conflicts.filter((c) => c.severity === "hard")
+    const softConflicts = conflicts.filter((c) => c.severity !== "hard")
+    const tableHead: string[][] = [
+      ["Severity", "Type", "Course", "Section", "Lecturer", "Room", "Timeslot", "Detail"],
+    ]
+    const mapConflictPdfRow = (c: (typeof conflicts)[number]) =>
+      [
+        c.severity === "hard" ? "Hard" : "Soft",
+        typeLabel(c.type),
+        c.courseCode,
+        c.sectionNumber,
+        c.lecturerName ?? "",
+        c.roomNumber ?? "",
+        c.timeslotLabel ?? "",
+        c.detail,
+      ] as (string | number)[]
+
+    let mainBody: (string | number)[][]
+    let softAppend: PdfTableSection[] | undefined
+
+    if (conflicts.length === 0) {
+      mainBody = [["", "", "", "", "", "", "", "No conflict records for this timetable version."]]
+      softAppend = undefined
+    } else {
+      mainBody =
+        hardConflicts.length > 0
+          ? hardConflicts.map((c) => mapConflictPdfRow(c))
+          : [["", "", "", "", "", "", "", "No hard violations."]]
+      softAppend = [
+        {
+          title: "Soft violations",
+          tableHead,
+          tableBody:
+            softConflicts.length > 0
+              ? softConflicts.map((c) => mapConflictPdfRow(c))
+              : [["", "", "", "", "", "", "", "No soft violations."]],
+        },
+      ]
     }
 
     const summaryLines = [
       `Total hard violations: ${hardCount}. Total soft violations: ${softCount}.`,
       `Breakdown by type: ${[...byType.entries()].map(([t, c]) => `${typeLabel(t)} (${c.hard + c.soft})`).join(", ") || "none"}.`,
       ...(conflicts.length === 0 ? ["No conflicts or violations were recorded for this timetable."] : []),
+      ...(conflicts.length > 0
+        ? [
+            "First table: hard violations. The following section lists soft violations (or states explicitly if there are none).",
+          ]
+        : []),
     ]
     const blob = await buildPdf(
       "Conflict Analysis Report",
-      timetableLabel,
+      pdfSubtitleLines(ds, dateTimePrefs),
       summaryLines,
-      [["Severity", "Type", "Course", "Section", "Lecturer", "Room", "Timeslot", "Detail"]],
-      conflicts.map((c) => [c.severity === "hard" ? "Hard" : "Soft", typeLabel(c.type), c.courseCode, c.sectionNumber, c.lecturerName ?? "", c.roomNumber ?? "", c.timeslotLabel ?? "", c.detail]),
+      tableHead,
+      mainBody,
       undefined,
-      undefined,
+      softAppend,
       fmtGen,
     )
     return { blob, mimeType: "application/pdf", extension: "pdf", baseFilename: base }
@@ -941,9 +1050,7 @@ export async function generateReportBlob(params: {
     if (format === "csv") {
       const summaryCsv = rowsToCsvNoHeader([
         ["Metric", "Value"],
-        ["Report", "Lecturer Preference Compliance"],
-        ["Academic period", timetableLabel],
-        ["Generated", fmtGen(new Date())],
+        ...csvStandardMetadataRows(ds, dateTimePrefs, "Lecturer Preference Compliance"),
         ["Lecturers with preferences defined", s.lecturersWithPreferences],
         ["Lecturers with no preferences", s.lecturersWithoutPreferences],
         ["Total avoided-slot violations", s.totalAvoidedViolations],
@@ -959,14 +1066,36 @@ export async function generateReportBlob(params: {
     }
     if (format === "excel") {
       const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Metric", "Value"], ["Report", "Lecturer Preference Compliance"], ["Academic period", timetableLabel], ["Generated", fmtGen(new Date())], ["Lecturers with preferences defined", s.lecturersWithPreferences], ["Lecturers with no preferences", s.lecturersWithoutPreferences], ["Total avoided-slot violations", s.totalAvoidedViolations], ["Total preferred-slot hits", s.totalPreferredHits], ["Lecturers requiring attention (>=1 avoided violation)", s.lecturersRequiringAttention]]), "Summary")
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.map((r) => ({ Lecturer: r.lecturerName, Department: r.department, "Sessions assigned": r.sessionsAssigned, "On preferred": r.onPreferred, "On avoided": r.onAvoided, Neutral: r.neutral, "Compliance score": r.hasPreferences ? `${r.complianceScore ?? 0}%` : "N/A" }))), "Compliance detail")
+      const prefSummaryWs = XLSX.utils.aoa_to_sheet([
+        ...excelCoverBlock("Lecturer Preference Compliance Report", ds, dateTimePrefs),
+        ["Metric", "Value"],
+        ["Lecturers with preferences defined", s.lecturersWithPreferences],
+        ["Lecturers with no preferences", s.lecturersWithoutPreferences],
+        ["Total avoided-slot violations", s.totalAvoidedViolations],
+        ["Total preferred-slot hits", s.totalPreferredHits],
+        ["Lecturers requiring attention (>=1 avoided violation)", s.lecturersRequiringAttention],
+      ])
+      applyTwoColumnKeyValueWidths(prefSummaryWs)
+      XLSX.utils.book_append_sheet(wb, prefSummaryWs, "Summary")
+      const compWs = XLSX.utils.json_to_sheet(
+        rows.map((r) => ({
+          Lecturer: r.lecturerName,
+          Department: r.department,
+          "Sessions assigned": r.sessionsAssigned,
+          "On preferred": r.onPreferred,
+          "On avoided": r.onAvoided,
+          Neutral: r.neutral,
+          "Compliance score": r.hasPreferences ? `${r.complianceScore ?? 0}%` : "N/A",
+        })),
+      )
+      applyDetailSheetLayout(compWs)
+      XLSX.utils.book_append_sheet(wb, compWs, "Compliance detail")
       const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" })
       return { blob: new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", extension: "xlsx", baseFilename: base }
     }
     const blob = await buildPdf(
       "Lecturer Preference Compliance Report",
-      timetableLabel,
+      pdfSubtitleLines(ds, dateTimePrefs),
       [
         `${s.lecturersWithPreferences} scheduled lecturers have preferences defined; ${s.lecturersWithoutPreferences} have none.`,
         `Institution-wide avoided-slot violations: ${s.totalAvoidedViolations}. Preferred-slot hits: ${s.totalPreferredHits}.`,
@@ -996,39 +1125,96 @@ export async function generateReportBlob(params: {
     const s = ds.roomTypeSummary
     const mismatches = rows.filter((r) => r.matchStatus !== "OK")
     if (format === "csv") {
-      const summaryCsv = rowsToCsv(["Match status", "Count"], [["OK", s.okCount], ["Hard mismatch", s.hardMismatchCount], ["Soft mismatch", s.softMismatchCount]])
-      const detailCsv = rowsToCsv(["Course", "Section", "Delivery", "Lab", "Room", "Room type", "Capacity", "Enrolled", "Match status", "Issue"], rows.map((r) => [r.courseCode, r.sectionNumber, r.deliveryLabel, r.isLab ? "Yes" : "No", r.roomNumber, r.roomTypeLabel, r.capacity, r.enrolled, r.matchStatus, r.issue]))
+      const metricsCsv = rowsToCsvNoHeader([
+        ["Metric", "Value"],
+        ...csvStandardMetadataRows(ds, dateTimePrefs, "Room Type Matching"),
+        ["Total sections evaluated", s.totalSections],
+        ["Correctly matched", s.okCount],
+        ["Hard mismatches", s.hardMismatchCount],
+        ["Soft mismatches", s.softMismatchCount],
+      ])
+      const statusCsv = rowsToCsv(
+        ["Match status", "Count"],
+        [
+          ["OK", s.okCount],
+          ["Hard mismatch", s.hardMismatchCount],
+          ["Soft mismatch", s.softMismatchCount],
+        ],
+      )
+      const summaryCsv = `${metricsCsv}\r\n${statusCsv}`
+      const detailCsv = rowsToCsv(
+        ["Course", "Section", "Delivery", "Lab", "Room", "Room type", "Capacity", "Enrolled", "Match status", "Issue"],
+        rows.map((r) => [
+          r.courseCode,
+          r.sectionNumber,
+          r.deliveryLabel,
+          r.isLab ? "Yes" : "No",
+          r.roomNumber,
+          r.roomTypeLabel,
+          r.capacity,
+          r.enrolled,
+          r.matchStatus,
+          r.issue,
+        ]),
+      )
       const blob = await buildCsvZip([{ filename: `room-type-matching-${slugFilePart(timetableLabel)}-summary.csv`, content: summaryCsv }, { filename: `room-type-matching-${slugFilePart(timetableLabel)}-detail.csv`, content: detailCsv }])
       return { blob, mimeType: "application/zip", extension: "zip", baseFilename: base }
     }
     if (format === "excel") {
       const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Metric", "Value"], ["Report", "Room Type Matching"], ["Academic period", timetableLabel], ["Generated", fmtGen(new Date())], ["Total sections", s.totalSections], ["Correctly matched", s.okCount], ["Hard mismatches", s.hardMismatchCount], ["Soft mismatches", s.softMismatchCount]]), "Summary")
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.map((r) => ({ Course: r.courseCode, Section: r.sectionNumber, Delivery: r.deliveryLabel, Lab: r.isLab ? "Yes" : "No", Room: r.roomNumber, "Room type": r.roomTypeLabel, Capacity: r.capacity, Enrolled: r.enrolled, "Match status": r.matchStatus, Issue: r.issue }))), "All sections")
+      const rtSummaryWs = XLSX.utils.aoa_to_sheet([
+        ...excelCoverBlock("Room Type Matching Report", ds, dateTimePrefs),
+        ["Metric", "Value"],
+        ["Total sections evaluated", s.totalSections],
+        ["Correctly matched", s.okCount],
+        ["Hard mismatches", s.hardMismatchCount],
+        ["Soft mismatches", s.softMismatchCount],
+      ])
+      applyTwoColumnKeyValueWidths(rtSummaryWs)
+      XLSX.utils.book_append_sheet(wb, rtSummaryWs, "Summary")
+      const allWs = XLSX.utils.json_to_sheet(
+        rows.map((r) => ({
+          Course: r.courseCode,
+          Section: r.sectionNumber,
+          Delivery: r.deliveryLabel,
+          Lab: r.isLab ? "Yes" : "No",
+          Room: r.roomNumber,
+          "Room type": r.roomTypeLabel,
+          Capacity: r.capacity,
+          Enrolled: r.enrolled,
+          "Match status": r.matchStatus,
+          Issue: r.issue,
+        })),
+      )
+      applyDetailSheetLayout(allWs)
+      XLSX.utils.book_append_sheet(wb, allWs, "All sections")
       const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" })
       return { blob: new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", extension: "xlsx", baseFilename: base }
     }
     const summaryLines = [
-      `Total sections: ${s.totalSections}. Correctly matched: ${s.okCount}. Hard mismatches: ${s.hardMismatchCount}. Soft mismatches: ${s.softMismatchCount}.`,
-      ...(mismatches.length === 0 ? ["All sections are assigned to appropriate room types."] : []),
+      `Total sections evaluated: ${s.totalSections}. Correctly matched: ${s.okCount}. Hard mismatches: ${s.hardMismatchCount}. Soft mismatches: ${s.softMismatchCount}.`,
+      `${s.okCount} conformant sections are omitted from the PDF detail table; Excel and CSV list every section.`,
+      ...(mismatches.length === 0 ? ["All sections satisfy the room-type rules checked by this report."] : []),
     ]
     const blob = await buildPdf(
       "Room Type Matching Report",
-      timetableLabel,
+      pdfSubtitleLines(ds, dateTimePrefs),
       summaryLines,
       [["Course", "Section", "Delivery", "Lab", "Room", "Room type", "Capacity", "Enrolled", "Severity", "Issue"]],
-      mismatches.map((r) => [
-        r.courseCode,
-        r.sectionNumber,
-        r.deliveryLabel,
-        r.isLab ? "Yes" : "No",
-        r.roomNumber,
-        r.roomTypeLabel,
-        r.capacity,
-        r.enrolled,
-        r.severity === "hard" ? "Hard" : "Soft",
-        r.issue,
-      ]),
+      mismatches.length
+        ? mismatches.map((r) => [
+            r.courseCode,
+            r.sectionNumber,
+            r.deliveryLabel,
+            r.isLab ? "Yes" : "No",
+            r.roomNumber,
+            r.roomTypeLabel,
+            r.capacity,
+            r.enrolled,
+            r.severity === "hard" ? "Hard" : "Soft",
+            r.issue,
+          ])
+        : [["—", "—", "—", "—", "—", "—", "—", "—", "—", "No mismatches — detail intentionally omits conformant sections in PDF."]],
       [
         "Hard mismatch: a lab course is not in a lab or computer-lab room, or a non-lab course occupies a lab room. Soft mismatch: an online course is allocated a physical room, or an in-person section's enrollment approaches or exceeds room capacity.",
       ],

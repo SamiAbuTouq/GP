@@ -1,11 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { writeFileSync } from "fs";
 import { getGwoControlFilePath } from "@/lib/gwo-control-path";
 import { setGwoRunPaused } from "@/lib/gwo-server-run-lock";
+import { requireAdminFromRefreshOrBearer } from "@/lib/server-auth";
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const auth = await requireAdminFromRefreshOrBearer(request);
+  if (!auth.ok) return auth.response;
   try {
     const body = (await request.json()) as { action?: string };
     const action = body?.action;

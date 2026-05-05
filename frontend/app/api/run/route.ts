@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { spawn, type ChildProcessWithoutNullStreams } from "child_process";
 import path from "path";
 import { existsSync, writeFileSync } from "fs";
@@ -17,7 +17,11 @@ import {
   tryAcquireOptimizerGlobalLock,
 } from "@/lib/optimizer-global-lock";
 import { writeGwoConfigFileMergedWithDatabase } from "@/lib/write-gwo-config";
-import { notifyAdminsOptimizerFailed } from "@/lib/server-notifications";
+import {
+  notifyAdminsGwoBrowserRunFinished,
+  notifyAdminsOptimizerFailed,
+} from "@/lib/server-notifications";
+import { requireAdminFromRefreshOrBearer } from "@/lib/server-auth";
 
 /** Next.js route max duration (seconds). Match the Python spawn timeout below. */
 export const maxDuration = 10_800; // 3 hours
@@ -227,8 +231,11 @@ function safeCloseStream(
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   console.log("[v0] POST /api/run called (SSE stream)");
+
+  const auth = await requireAdminFromRefreshOrBearer(request);
+  if (!auth.ok) return auth.response;
 
   let semesterMode: "normal" | "summer" = "normal";
   try {
@@ -389,6 +396,7 @@ export async function POST(request: Request) {
 
           if (exitCode === 0) {
             setGwoRunFinalizing();
+            void notifyAdminsGwoBrowserRunFinished({ semesterMode }).catch(() => {});
             send("complete", {
               success: true,
               output: stdout,

@@ -5,14 +5,19 @@ import { CreateAccessRequestDto } from './dto/create-access-request.dto';
 import { RejectAccessRequestDto } from './dto/reject-access-request.dto';
 import { LecturersService } from '../lecturers/lecturers.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ADMIN_NOTIFICATION_PREF_KEYS } from '../notifications/notification-prefs';
 import { MailService } from '../mail/mail.service';
 
 const EXPIRY_DAYS = 14;
+/** Avoid running the expiry sweep on every list request (tab switches); submit/approve still run it. */
+const EXPIRE_SWEEP_MIN_INTERVAL_MS = 45_000;
 const GENERIC_ELIGIBILITY_MESSAGE =
   'If this email is eligible for access, you will be contacted with further instructions.';
 
 @Injectable()
 export class AccessRequestsService {
+  private lastExpireSweepAtMs = 0;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly lecturersService: LecturersService,
@@ -63,6 +68,14 @@ export class AccessRequestsService {
         reviewed_at: now,
       },
     });
+  }
+
+  /** Throttled expiry for read-heavy paths (e.g. admin list tabs). */
+  private async expirePendingRequestsThrottled() {
+    const now = Date.now();
+    if (now - this.lastExpireSweepAtMs < EXPIRE_SWEEP_MIN_INTERVAL_MS) return;
+    this.lastExpireSweepAtMs = now;
+    await this.expirePendingRequests();
   }
 
   async checkEmail(emailRaw: string) {
@@ -134,6 +147,7 @@ export class AccessRequestsService {
       .notifyAdmins(
         'New Lecturer Access Request',
         `${fullName} (${email}) submitted a lecturer access request.`,
+        { preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.ACCESS_REQUESTS },
       )
       .catch(() => {});
 
@@ -153,12 +167,27 @@ export class AccessRequestsService {
   }
 
   async listByStatus(status: AccessRequestStatus) {
-    await this.expirePendingRequests();
+    await this.expirePendingRequestsThrottled();
     const rows = await this.prisma.lecturerAccessRequest.findMany({
       where: { status },
       orderBy: { submitted_at: 'desc' },
     });
-    return rows.map((r) => this.mapRow(r));
+    const mapped = rows.map((r) => this.mapRow(r));
+    const allCodes = [...new Set(mapped.flatMap((m) => m.courses))];
+    const courseRows = allCodes.length
+      ? await this.prisma.course.findMany({
+          where: { course_code: { in: allCodes } },
+          select: { course_code: true, course_name: true },
+        })
+      : [];
+    const nameByCode = new Map(courseRows.map((c) => [c.course_code, c.course_name] as const));
+    return mapped.map((m) => ({
+      ...m,
+      courses: m.courses.map((code) => ({
+        code,
+        name: nameByCode.get(code) ?? null,
+      })),
+    }));
   }
 
   async approve(requestId: number) {

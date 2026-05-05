@@ -32,6 +32,7 @@ import { LogoutIcon } from "@/components/ui/logout-icon";
 import { ChevronDownIcon } from "@/components/ui/chevron-down-icon";
 import { UsersRoundIcon } from "@/components/ui/users-round-icon";
 import { UserRoundIcon } from "@/components/ui/user-round-icon";
+import { UserRoundPlusIcon } from "@/components/ui/user-round-plus-icon";
 import { ClockIcon } from "@/components/ui/clock";
 import { BookOpenTextIcon } from "@/components/ui/book-open-text-icon";
 import { GraduationCapIcon } from "@/components/ui/graduation-cap";
@@ -87,10 +88,23 @@ const entityNavItems: NavItem[] = [
   { title: "Study Plans", href: "/entity/study-plans", icon: GraduationCapIcon, animated: true },
 ];
 
+/** Entity Management accordion — excludes e.g. /entity/access-requests (moved to footer nav). */
+function isEntityManagementSectionActive(pathname: string): boolean {
+  return entityNavItems.some(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+  );
+}
+
 const otherNavItems: NavItem[] = [
-  { title: "Access Requests", href: "/entity/access-requests", icon: FileTextIcon, animated: true },
   { title: "Reports", href: "/reports", icon: FileTextIcon, animated: true },
 ];
+
+const accessRequestsNavItem = {
+  title: "Access Requests",
+  href: "/entity/access-requests",
+  icon: UserRoundPlusIcon,
+  animated: true,
+};
 
 const helpNavItem = {
   title: "Help & Support",
@@ -160,8 +174,8 @@ function NavButton({
           collapsed
             ? "h-9 w-9 justify-center px-0 py-0"
             : cn(
-                "w-full min-w-0 justify-start gap-3 overflow-hidden py-2.5",
-                isSubItem ? "pl-8" : "px-2",
+                "w-full min-w-0 justify-start overflow-hidden",
+                isSubItem ? "gap-2 py-1 pl-8" : "gap-2.5 px-2 py-1.5",
               ),
           isActive
             ? "bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary"
@@ -172,7 +186,10 @@ function NavButton({
         {isActive ? (
           <motion.span
             layoutId="active-nav-indicator"
-            className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-primary"
+            className={cn(
+              "absolute left-0 w-1 rounded-r-full bg-primary",
+              isSubItem ? "inset-y-0.5" : "inset-y-1",
+            )}
             transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
           />
         ) : null}
@@ -233,15 +250,19 @@ function SidebarNavigation({
   const pathname = usePathname();
   const { user, authLoading } = useAuth();
   const isLecturer = user?.role === "LECTURER";
-  const [entityOpen, setEntityOpen] = useState(pathname.startsWith("/entity"));
+  const [entityOpen, setEntityOpen] = useState(() => isEntityManagementSectionActive(pathname));
   const showRestrictedNavigation = authLoading || isLecturer;
   const entityRef = useRef<AnimatedIconHandle | null>(null);
 
+  useEffect(() => {
+    if (isEntityManagementSectionActive(pathname)) setEntityOpen(true);
+  }, [pathname]);
+
   return (
-    <ScrollArea className="min-w-0 flex-1 py-4">
+    <ScrollArea className="min-w-0 flex-1 py-2">
       <div
         className={cn(
-          "flex min-w-0 flex-col space-y-1 transition-all duration-200 ease-in-out",
+          "flex min-w-0 flex-col space-y-0 transition-all duration-200 ease-in-out",
           collapsed ? "w-full items-center px-0" : "px-3",
         )}
       >
@@ -262,7 +283,7 @@ function SidebarNavigation({
 
         {/* Entity Management section */}
         {!showRestrictedNavigation && (
-          <div className="pt-3">
+          <div className="pt-0">
             {collapsed ? (
             /* In collapsed mode, show entity icons individually */
             entityNavItems.map((item) => (
@@ -287,9 +308,9 @@ function SidebarNavigation({
                   onMouseEnter={() => entityRef.current?.startAnimation()}
                   onMouseLeave={() => entityRef.current?.stopAnimation()}
                   className={cn(
-                    "w-full min-w-0 justify-between gap-2 overflow-hidden rounded-lg px-2 py-2.5 text-sm font-medium transition-colors",
+                    "w-full min-w-0 justify-between gap-2 overflow-hidden rounded-lg px-2 py-1.5 text-sm font-medium transition-colors",
                     "border-0 outline-none ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:outline-none",
-                    pathname.startsWith("/entity")
+                    isEntityManagementSectionActive(pathname)
                       ? "bg-sidebar-accent text-sidebar-accent-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground bg-transparent",
                   )}
@@ -307,7 +328,7 @@ function SidebarNavigation({
                   />
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-0.5 pt-1">
+              <CollapsibleContent className="space-y-0 pt-0">
                 {entityNavItems.map((item) => (
                   <NavButton
                     key={item.href}
@@ -330,7 +351,7 @@ function SidebarNavigation({
         )}
 
         {!showRestrictedNavigation && (
-          <div className="pt-3">
+          <div className="pt-0">
             {otherNavItems.map((item) => (
               <NavButton
                 key={item.href}
@@ -349,7 +370,7 @@ function SidebarNavigation({
         )}
 
         {showRestrictedNavigation && (
-          <div className="pt-3">
+          <div className="pt-0">
             {lecturerNavItems.map((item) => (
               <NavButton
                 key={item.href}
@@ -378,7 +399,6 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const showRestrictedNavigation = authLoading || isLecturer;
   const { collapsed, toggle } = useSidebar();
   const logoutRef = useRef<AnimatedIconHandle | null>(null);
-  const entityRef = useRef<AnimatedIconHandle | null>(null);
 
   const handleNavigate = () => {
     onNavigate?.();
@@ -401,7 +421,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground bg-transparent",
           collapsed
             ? "h-9 w-9 justify-center px-0 py-0 gap-0"
-            : "w-full justify-start gap-3 px-3 py-2.5 text-sm font-medium",
+            : "w-full justify-start gap-2.5 px-3 py-1.5 text-sm font-medium",
         )}
       >
       <LogoutIcon ref={logoutRef} className="h-5 w-5 shrink-0" />
@@ -460,10 +480,21 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         {/* Bottom Navigation */}
         <div
           className={cn(
-            "space-y-1 border-t border-sidebar-border py-3 transition-all duration-200 ease-in-out",
+            "space-y-0 border-t border-sidebar-border py-2 transition-all duration-200 ease-in-out",
             collapsed ? "flex flex-col items-center px-0" : "px-3",
           )}
         >
+          {!showRestrictedNavigation && (
+            <NavButton
+              href={accessRequestsNavItem.href}
+              icon={accessRequestsNavItem.icon}
+              title={accessRequestsNavItem.title}
+              isActive={pathname === accessRequestsNavItem.href}
+              collapsed={collapsed}
+              onClick={handleNavigate}
+              animated={accessRequestsNavItem.animated}
+            />
+          )}
           {!showRestrictedNavigation && (
             <NavButton
               href={helpNavItem.href}
@@ -502,7 +533,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         {/* Collapse toggle (separated; always last) */}
         <div
           className={cn(
-            "border-t border-sidebar-border py-2 transition-all duration-200 ease-in-out",
+            "border-t border-sidebar-border py-1.5 transition-all duration-200 ease-in-out",
             collapsed ? "flex justify-center" : "flex justify-end px-3",
           )}
         >
@@ -597,7 +628,11 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { logout, user, authLoading } = useAuth();
   const isLecturer = user?.role === "LECTURER";
   const showRestrictedNavigation = authLoading || isLecturer;
-  const [entityOpen, setEntityOpen] = useState(pathname.startsWith("/entity"));
+  const [entityOpen, setEntityOpen] = useState(() => isEntityManagementSectionActive(pathname));
+
+  useEffect(() => {
+    if (isEntityManagementSectionActive(pathname)) setEntityOpen(true);
+  }, [pathname]);
 
   const handleLogout = async () => {
     onNavigate?.();
@@ -626,8 +661,8 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 py-4">
-        <div className="space-y-1 px-3">
+      <ScrollArea className="flex-1 py-2">
+        <div className="space-y-0 px-3">
           {!showRestrictedNavigation && mainNavItems.map((item) => (
             <NavButton
               key={item.href}
@@ -643,15 +678,15 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             />
           ))}
 
-          {!showRestrictedNavigation && <div className="pt-3">
+          {!showRestrictedNavigation && <div className="pt-0">
             <Collapsible open={entityOpen} onOpenChange={setEntityOpen}>
               <CollapsibleTrigger asChild>
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full min-w-0 justify-between gap-2 overflow-hidden rounded-lg px-2 py-2.5 text-sm font-medium transition-colors",
+                    "w-full min-w-0 justify-between gap-2 overflow-hidden rounded-lg px-2 py-1.5 text-sm font-medium transition-colors",
                     "border-0 outline-none ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:outline-none",
-                    pathname.startsWith("/entity")
+                    isEntityManagementSectionActive(pathname)
                       ? "bg-sidebar-accent text-sidebar-accent-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground bg-transparent",
                   )}
@@ -669,7 +704,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   />
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-0.5 pt-1">
+              <CollapsibleContent className="space-y-0 pt-0">
                 {entityNavItems.map((item) => (
                   <NavButton
                     key={item.href}
@@ -689,7 +724,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             </Collapsible>
           </div>}
 
-          {!showRestrictedNavigation && <div className="pt-3">
+          {!showRestrictedNavigation && <div className="pt-0">
             {otherNavItems.map((item) => (
               <NavButton
                 key={item.href}
@@ -707,7 +742,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </div>}
 
           {showRestrictedNavigation && (
-            <div className="pt-3">
+            <div className="pt-0">
               {lecturerNavItems.map((item) => (
                 <NavButton
                   key={item.href}
@@ -727,7 +762,18 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </ScrollArea>
 
-      <div className="border-t border-sidebar-border px-3 py-3 space-y-1">
+      <div className="border-t border-sidebar-border space-y-0 px-3 py-2">
+        {!showRestrictedNavigation && (
+          <NavButton
+            href={accessRequestsNavItem.href}
+            icon={accessRequestsNavItem.icon}
+            title={accessRequestsNavItem.title}
+            isActive={pathname === accessRequestsNavItem.href}
+            collapsed={false}
+            onClick={onNavigate}
+            animated={accessRequestsNavItem.animated}
+          />
+        )}
         {!showRestrictedNavigation && (
           <NavButton
             href={helpNavItem.href}
@@ -752,7 +798,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         />
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors border-0 outline-none ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:outline-none text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground bg-transparent"
+          className="w-full justify-start gap-2.5 rounded-lg border-0 px-3 py-1.5 text-sm font-medium text-muted-foreground outline-none ring-0 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus:ring-0 focus-visible:ring-0 focus-visible:outline-none bg-transparent"
           onClick={handleLogout}
         >
           <LogoutIcon className="h-5 w-5 shrink-0" />

@@ -15,8 +15,10 @@ const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const lecturers_service_1 = require("../lecturers/lecturers.service");
 const notifications_service_1 = require("../notifications/notifications.service");
+const notification_prefs_1 = require("../notifications/notification-prefs");
 const mail_service_1 = require("../mail/mail.service");
 const EXPIRY_DAYS = 14;
+const EXPIRE_SWEEP_MIN_INTERVAL_MS = 45_000;
 const GENERIC_ELIGIBILITY_MESSAGE = 'If this email is eligible for access, you will be contacted with further instructions.';
 let AccessRequestsService = class AccessRequestsService {
     constructor(prisma, lecturersService, notifications, mailService) {
@@ -24,6 +26,7 @@ let AccessRequestsService = class AccessRequestsService {
         this.lecturersService = lecturersService;
         this.notifications = notifications;
         this.mailService = mailService;
+        this.lastExpireSweepAtMs = 0;
     }
     mapRow(row) {
         return {
@@ -55,6 +58,13 @@ let AccessRequestsService = class AccessRequestsService {
                 reviewed_at: now,
             },
         });
+    }
+    async expirePendingRequestsThrottled() {
+        const now = Date.now();
+        if (now - this.lastExpireSweepAtMs < EXPIRE_SWEEP_MIN_INTERVAL_MS)
+            return;
+        this.lastExpireSweepAtMs = now;
+        await this.expirePendingRequests();
     }
     async checkEmail(emailRaw) {
         await this.expirePendingRequests();
@@ -113,7 +123,7 @@ let AccessRequestsService = class AccessRequestsService {
             return name ? `${code} - ${name}` : code;
         });
         void this.notifications
-            .notifyAdmins('New Lecturer Access Request', `${fullName} (${email}) submitted a lecturer access request.`)
+            .notifyAdmins('New Lecturer Access Request', `${fullName} (${email}) submitted a lecturer access request.`, { preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.ACCESS_REQUESTS })
             .catch(() => { });
         void this.mailService
             .sendLecturerAccessRequestSubmittedEmail({
@@ -129,12 +139,27 @@ let AccessRequestsService = class AccessRequestsService {
         return this.mapRow(created);
     }
     async listByStatus(status) {
-        await this.expirePendingRequests();
+        await this.expirePendingRequestsThrottled();
         const rows = await this.prisma.lecturerAccessRequest.findMany({
             where: { status },
             orderBy: { submitted_at: 'desc' },
         });
-        return rows.map((r) => this.mapRow(r));
+        const mapped = rows.map((r) => this.mapRow(r));
+        const allCodes = [...new Set(mapped.flatMap((m) => m.courses))];
+        const courseRows = allCodes.length
+            ? await this.prisma.course.findMany({
+                where: { course_code: { in: allCodes } },
+                select: { course_code: true, course_name: true },
+            })
+            : [];
+        const nameByCode = new Map(courseRows.map((c) => [c.course_code, c.course_name]));
+        return mapped.map((m) => ({
+            ...m,
+            courses: m.courses.map((code) => ({
+                code,
+                name: nameByCode.get(code) ?? null,
+            })),
+        }));
     }
     async approve(requestId) {
         await this.expirePendingRequests();

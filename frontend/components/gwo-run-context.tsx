@@ -4,6 +4,7 @@ import { Loader2, Pause } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSWRConfig } from "swr";
 import { ApiClient } from "@/lib/api-client";
+import { dispatchNotificationsRefresh } from "@/lib/notification-bus";
 import { getScenarios } from "@/lib/what-if";
 import {
   createContext,
@@ -17,6 +18,14 @@ import {
 } from "react";
 import type { SchedulePayload } from "@/lib/schedule-data";
 import { parseSseBlocks } from "@/lib/parse-sse-blocks";
+
+/** Auth for Next.js `/api/run/*` route handlers (Bearer + refresh cookie fallback). */
+function gwoNextAuthHeaders(): Record<string, string> {
+  const h: Record<string, string> = { "Content-Type": "application/json" };
+  const t = ApiClient.getAccessToken();
+  if (t) h.Authorization = `Bearer ${t}`;
+  return h;
+}
 
 /** Mirrors JSON emitted by the Python optimizer (`__GWO_PROGRESS__` lines). */
 export type GwoOptimizerProgressPayload = {
@@ -226,7 +235,8 @@ type GwoRunContextValue = {
   /** Update high-level status (e.g. while waiting on the network or stream). */
   setRunPhase: (phase: string, detail?: string) => void;
   setFinalizing: () => void;
-  endRun: () => void;
+  /** Pass the {@link AbortController} from {@link beginRun} so a superseded run does not clear a newer one. */
+  endRun: (onlyIfMatching?: AbortController) => void;
   cancelRun: () => void;
   pauseRun: () => Promise<void>;
   resumeRun: () => Promise<void>;
@@ -256,6 +266,13 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
   const [activeRunId, setActiveRunId] = useState<number | null>(null);
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  /**
+   * Run kind + scenario run id for *this tab's* active stream only — updated in beginRun/bindRunId/endRun.
+   * Never mirror polling state here; polling could flip React state to scenario while a timetable /api/run fetch is live.
+   */
+  const ownedStreamRef = useRef<{ source: GwoRunSource; runId: number | null } | null>(
+    null,
+  );
   /** Wall time when first iteration sample is taken — origin for active-ms axis */
   const progressEpochWallRef = useRef<number | null>(null);
   const progressSamplesRef = useRef<ProgressSample[]>([]);
@@ -306,6 +323,7 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     }
     const ac = new AbortController();
     abortRef.current = ac;
+    ownedStreamRef.current = { source, runId };
     setIsPaused(false);
     setIsRunning(true);
     setRunSource(source);
@@ -328,6 +346,9 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
 
   const bindRunId = useCallback((runId: number | null) => {
     setActiveRunId(runId);
+    if (ownedStreamRef.current) {
+      ownedStreamRef.current = { ...ownedStreamRef.current, runId };
+    }
   }, []);
 
   const setRunPhase = useCallback((phase: string, detail?: string) => {
@@ -497,8 +518,12 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     });
   }, [setDeadline]);
 
-  const endRun = useCallback(() => {
+  const endRun = useCallback((onlyIfMatching?: AbortController) => {
+    if (onlyIfMatching != null && abortRef.current !== onlyIfMatching) {
+      return;
+    }
     abortRef.current = null;
+    ownedStreamRef.current = null;
     setIsRunning(false);
     setIsPaused(false);
     setRunSource(null);
@@ -522,22 +547,28 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
 
   const cancelRun = useCallback(() => {
     void (async () => {
-      if (runSource === "scenario" && activeRunId != null) {
+      const owned = ownedStreamRef.current;
+      if (owned?.source === "scenario" && owned.runId != null) {
         try {
-          await ApiClient.request(`/what-if/runs/${activeRunId}/cancel`, { method: "POST" });
+          await ApiClient.request(`/what-if/runs/${owned.runId}/cancel`, { method: "POST" });
         } catch {
           /* ignore */
         }
       } else {
         try {
-          await fetch("/api/run/cancel", { method: "POST", cache: "no-store" });
+          await fetch("/api/run/cancel", {
+            method: "POST",
+            cache: "no-store",
+            credentials: "include",
+            headers: gwoNextAuthHeaders(),
+          });
         } catch {
           /* ignore */
         }
       }
       abortRef.current?.abort();
     })();
-  }, [runSource, activeRunId]);
+  }, []);
 
   const runOptimizer = useCallback(async (options?: {
     semesterMode?: GwoSemesterMode;
@@ -548,7 +579,8 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch("/api/run", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: gwoNextAuthHeaders(),
+        credentials: "include",
         body: JSON.stringify({ semesterMode }),
         signal: runAbort.signal,
       });
@@ -646,6 +678,7 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
               { revalidate: true },
             );
             setOptimizerScheduleEpoch((n) => n + 1);
+            dispatchNotificationsRefresh();
             return null;
           }
         }
@@ -660,7 +693,7 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
       console.error("[v0] Error running algorithm:", err);
       return errorMsg;
     } finally {
-      endRun();
+      endRun(runAbort);
     }
   }, [beginRun, endRun, mutate, setFinalizing, setRunPhase, updateProgress]);
 
@@ -668,8 +701,9 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const syncFromServer = async () => {
-      // When this tab owns the scenario stream, keep its live phase/progress.
-      if (runSource === "scenario" && abortRef.current) return;
+      // Do not clobber runSource while this tab holds an active fetch/SSE — otherwise a stray
+      // active scenario in the API makes Cancel call What-If instead of POST /api/run/cancel.
+      if (abortRef.current) return;
       try {
         const response = await fetch("/api/run", { cache: "no-store" });
         if (!response.ok) return;
@@ -714,7 +748,7 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [applyScenarioStatus, applyServerStatus, runSource]);
+  }, [applyScenarioStatus, applyServerStatus]);
 
   const resolveScenarioRunId = useCallback(async (): Promise<number | null> => {
     if (activeRunId != null) return activeRunId;
@@ -736,9 +770,11 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
   }, [activeRunId]);
 
   const pauseRun = useCallback(async () => {
+    const owned = ownedStreamRef.current;
+    const src = owned?.source ?? runSource;
     try {
-      if (runSource === "scenario") {
-        const runId = await resolveScenarioRunId();
+      if (src === "scenario") {
+        const runId = owned?.runId ?? (await resolveScenarioRunId());
         if (runId == null) return;
         await ApiClient.request(`/what-if/runs/${runId}/control`, {
           method: "POST",
@@ -747,7 +783,8 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
       } else {
         await fetch("/api/run/control", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: gwoNextAuthHeaders(),
+          credentials: "include",
           body: JSON.stringify({ action: "pause" }),
         });
       }
@@ -771,9 +808,11 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
   }, [runSource, resolveScenarioRunId, setDeadline]);
 
   const resumeRun = useCallback(async () => {
+    const owned = ownedStreamRef.current;
+    const src = owned?.source ?? runSource;
     try {
-      if (runSource === "scenario") {
-        const runId = await resolveScenarioRunId();
+      if (src === "scenario") {
+        const runId = owned?.runId ?? (await resolveScenarioRunId());
         if (runId == null) return;
         await ApiClient.request(`/what-if/runs/${runId}/control`, {
           method: "POST",
@@ -782,7 +821,8 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
       } else {
         await fetch("/api/run/control", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: gwoNextAuthHeaders(),
+          credentials: "include",
           body: JSON.stringify({ action: "resume" }),
         });
       }

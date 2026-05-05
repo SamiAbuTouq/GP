@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server"
+import type { Semester, Timetable, TimetableMetrics } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { requireAdminFromRefreshCookie } from "@/lib/server-auth"
+
+type TimetableWithMetricsAndSemester = Timetable & {
+  timetable_metrics: TimetableMetrics | null
+  semester: Semester | null
+}
 
 function decodeSemesterType(type: number): string {
   const map: Record<number, string> = {
@@ -88,33 +94,75 @@ export async function GET(request: Request) {
   }
 
   try {
-    const semesterId = Number(new URL(request.url).searchParams.get("semesterId"))
-    if (!Number.isFinite(semesterId) || semesterId <= 0) {
-      return NextResponse.json({ error: "Valid semesterId is required." }, { status: 400 })
+    const url = new URL(request.url)
+    const explicitTimetableId = Number(url.searchParams.get("timetableId"))
+    const semesterIdParam = Number(url.searchParams.get("semesterId"))
+    const useExplicitTimetable =
+      Number.isFinite(explicitTimetableId) && explicitTimetableId > 0
+
+    let semesterLabel: string
+    let academicYear: string
+    let semesterTypeName: string
+    let totalStudents: number | null
+
+    let selectedTimetable: TimetableWithMetricsAndSemester | null = null
+    let timetablesForOptimizationRuns: TimetableWithMetricsAndSemester[] = []
+
+    if (useExplicitTimetable) {
+      const tt = await prisma.timetable.findUnique({
+        where: { timetable_id: explicitTimetableId },
+        include: { semester: true, timetable_metrics: true },
+      })
+      if (!tt) {
+        return NextResponse.json({ error: "Timetable not found." }, { status: 404 })
+      }
+      selectedTimetable = tt
+      timetablesForOptimizationRuns = [tt]
+      if (tt.semester_id != null && tt.semester) {
+        const sem = tt.semester
+        const baseLabel = formatSemesterLabel(sem.academic_year, sem.semester_type)
+        semesterLabel = `${baseLabel} · Timetable #${tt.timetable_id} (v${tt.version_number})`
+        academicYear = sem.academic_year
+        semesterTypeName = decodeSemesterType(sem.semester_type)
+        totalStudents = sem.total_students
+      } else {
+        semesterLabel = `Draft timetable #${tt.timetable_id} (${generationTypeLabel(tt.generation_type)}, v${tt.version_number})`
+        academicYear = "Unassigned"
+        semesterTypeName = "Draft"
+        totalStudents = null
+      }
+    } else {
+      if (!Number.isFinite(semesterIdParam) || semesterIdParam <= 0) {
+        return NextResponse.json(
+          { error: "Provide a valid semesterId or timetableId." },
+          { status: 400 },
+        )
+      }
+
+      const semester = await prisma.semester.findUnique({
+        where: { semester_id: semesterIdParam },
+      })
+      if (!semester) {
+        return NextResponse.json({ error: "Semester not found." }, { status: 404 })
+      }
+
+      semesterLabel = formatSemesterLabel(semester.academic_year, semester.semester_type)
+      academicYear = semester.academic_year
+      semesterTypeName = decodeSemesterType(semester.semester_type)
+      totalStudents = semester.total_students
+
+      const timetables = await prisma.timetable.findMany({
+        where: { semester_id: semesterIdParam },
+        orderBy: [{ generated_at: "asc" }, { timetable_id: "asc" }],
+        include: { timetable_metrics: true, semester: true },
+      })
+
+      timetablesForOptimizationRuns = timetables
+      selectedTimetable =
+        timetables.find((t) => t.status.toLowerCase() === "active") ?? timetables[0] ?? null
     }
 
-    const semester = await prisma.semester.findUnique({
-      where: { semester_id: semesterId },
-    })
-    if (!semester) {
-      return NextResponse.json({ error: "Semester not found." }, { status: 404 })
-    }
-
-    const semesterLabel = formatSemesterLabel(
-      semester.academic_year,
-      semester.semester_type,
-    )
-    const semesterTypeName = decodeSemesterType(semester.semester_type)
-
-    const timetables = await prisma.timetable.findMany({
-      where: { semester_id: semesterId },
-      orderBy: [{ generated_at: "asc" }, { timetable_id: "asc" }],
-      include: { timetable_metrics: true },
-    })
-
-    const selectedTimetable =
-      timetables.find((t) => t.status.toLowerCase() === "active") ?? timetables[0] ?? null
-    const timetableIds = timetables.map((t) => t.timetable_id)
+    const timetableIds = timetablesForOptimizationRuns.map((t) => t.timetable_id)
     const sectionCounts =
       timetableIds.length > 0
         ? await prisma.sectionScheduleEntry.groupBy({
@@ -163,9 +211,9 @@ export async function GET(request: Request) {
     if (!selectedTimetable) {
       return NextResponse.json({
         semesterLabel,
-        academicYear: semester.academic_year,
+        academicYear,
         semesterTypeName,
-        totalStudents: semester.total_students,
+        totalStudents,
         timetable: null,
         insights: {
           totalScheduleEntries: 0,
@@ -336,23 +384,25 @@ export async function GET(request: Request) {
       }
 
       const uid = e.user_id
-      if (!byLecturer.has(uid)) {
-        const u = e.lecturer.user
-        byLecturer.set(uid, {
-          sections: 0,
-          courses: new Set(),
-          weeklyHours: 0,
-          labs: 0,
-          name: `${u.first_name} ${u.last_name}`,
-          department: e.lecturer.department.dept_name,
-          maxWorkload: e.lecturer.max_workload,
-        })
+      if (uid != null && e.lecturer) {
+        if (!byLecturer.has(uid)) {
+          const u = e.lecturer.user
+          byLecturer.set(uid, {
+            sections: 0,
+            courses: new Set(),
+            weeklyHours: 0,
+            labs: 0,
+            name: `${u.first_name} ${u.last_name}`,
+            department: e.lecturer.department.dept_name,
+            maxWorkload: e.lecturer.max_workload,
+          })
+        }
+        const la = byLecturer.get(uid)!
+        la.sections++
+        la.courses.add(e.course_id)
+        la.weeklyHours += wh
+        if (e.course.is_lab) la.labs++
       }
-      const la = byLecturer.get(uid)!
-      la.sections++
-      la.courses.add(e.course_id)
-      la.weeklyHours += wh
-      if (e.course.is_lab) la.labs++
 
       const dname = e.course.department.dept_name
       if (!deptSchedule.has(dname)) {
@@ -497,7 +547,7 @@ export async function GET(request: Request) {
       })
 
     const metrics = selectedTimetable.timetable_metrics
-    const optimizationRuns = timetables.map((t) => ({
+    const optimizationRuns = timetablesForOptimizationRuns.map((t) => ({
       timetableId: t.timetable_id,
       versionNumber: t.version_number,
       generationType: t.generation_type,
@@ -644,9 +694,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       semesterLabel,
-      academicYear: semester.academic_year,
+      academicYear,
       semesterTypeName,
-      totalStudents: semester.total_students,
+      totalStudents,
       timetable: {
         timetableId: selectedTimetable.timetable_id,
         status: selectedTimetable.status,

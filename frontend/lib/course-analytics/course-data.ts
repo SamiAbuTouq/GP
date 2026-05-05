@@ -1,4 +1,12 @@
 import { z } from 'zod'
+import { ApiClient } from '@/lib/api-client'
+
+/** Next route handlers may not see the Nest refresh cookie (different host); forward the SPA access token. */
+function nextApiAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {}
+  const token = ApiClient.getAccessToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 const CourseSchema = z.object({
   Year: z.string().default(''),
@@ -106,6 +114,7 @@ export async function loadCourseData(opts?: {
   const response = await fetch(url, {
     credentials: 'include',
     cache: 'no-store',
+    headers: nextApiAuthHeaders(),
   })
 
   if (!response.ok) {
@@ -128,6 +137,7 @@ export async function loadSemesterTotals(): Promise<SemesterTotal[]> {
   const response = await fetch('/api/semesters', {
     credentials: 'include',
     cache: 'no-store',
+    headers: nextApiAuthHeaders(),
   })
 
   if (!response.ok) {
@@ -291,7 +301,13 @@ export function getFilterOptions(courses: Course[]): FilterOptions {
   const rawSemesters = [...new Set(courses.map(c => c.Semester))].filter(s => s)
   const semesters = semesterOrder.filter(s => rawSemesters.includes(s))
   const departments = [...new Set(courses.map(c => c.Department))].filter(d => d).sort()
-  const years = [...new Set(courses.map(c => c.Year))].sort()
+  const yearStart = (y: string) => {
+    const n = parseInt(String(y).slice(0, 4), 10)
+    return Number.isFinite(n) ? n : 0
+  }
+  const years = [...new Set(courses.map(c => c.Year))]
+    .filter(Boolean)
+    .sort((a, b) => yearStart(b) - yearStart(a))
 
   return { semesters, departments, years }
 }

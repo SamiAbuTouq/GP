@@ -333,7 +333,7 @@ export class TimetablesService {
     void this.notifications
       .notifyAdmins(
         'Timetable Published',
-        `${publisherName} published the timetable for ${semesterLabel}.`,
+        `${publisherName} published the timetable for ${semesterLabel}. [[timetable_id:${timetableId}]]`,
         {
           exceptUserId: publisher?.userId,
           preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.TIMETABLE_PUBLISHED_BY_OTHER,

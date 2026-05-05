@@ -22,12 +22,15 @@ export declare class AccessRequestsController {
         reviewedAt: string | null;
     }>;
     list(status?: string): Promise<{
+        courses: {
+            code: string;
+            name: string | null;
+        }[];
         requestId: number;
         fullName: string;
         email: string;
         department: string;
         maxWorkload: number;
-        courses: string[];
         status: import(".prisma/client").$Enums.AccessRequestStatus;
         rejectionReason: string | null;
         submittedAt: string;
