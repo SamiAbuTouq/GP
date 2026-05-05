@@ -10,6 +10,14 @@ export type ScenarioSseHandlers = {
 export type ScenarioSseOutcome = "continue" | "completed" | "failed";
 type ScenarioRunTerminalState = "cancelled" | "failed" | "completed" | null;
 
+function mapScenarioPreGwoPercent(rawPct: number): number {
+  const n = Number(rawPct);
+  if (!Number.isFinite(n)) return 0;
+  const clamped = Math.max(0, Math.min(100, n));
+  // Compress all setup/condition phases into the first 10% of the bar.
+  return Math.round((clamped / 100) * 10);
+}
+
 function isCancelledMessage(message: unknown): boolean {
   if (typeof message !== "string") return false;
   const t = message.trim().toLowerCase();
@@ -185,14 +193,19 @@ export function applyScenarioSsePayload(
     }
 
     const rawPct = parsed.pct;
-    if (typeof rawPct === "number" && Number.isFinite(rawPct)) {
-      handlers.setPercent(rawPct);
+    const phaseKey = typeof parsed.phase === "string" ? parsed.phase.trim().toLowerCase() : "";
+    // During active GWO iteration streaming, prefer iteration-derived percentage.
+    // Mixing both signals causes visible jitter/bounce in some runs.
+    const shouldApplyRawPct = !(hasIterationProgress && phaseKey === "gwo");
+    if (shouldApplyRawPct && typeof rawPct === "number" && Number.isFinite(rawPct)) {
+      const mappedPct = phaseKey === "gwo" ? rawPct : mapScenarioPreGwoPercent(rawPct);
+      handlers.setPercent(mappedPct);
     }
 
     // Non-iteration updates: show run_scenario.py phase + message (not a generic “connected” label).
     if (!hasIterationProgress && !shouldHideScenarioDetailMessage(parsed.message)) {
-      const phaseKey = typeof parsed.phase === "string" ? parsed.phase.trim() : "";
-      const title = phaseKey ? scenarioPhaseTitle(phaseKey) : "Waiting on server";
+      const phaseTitleKey = typeof parsed.phase === "string" ? parsed.phase.trim() : "";
+      const title = phaseTitleKey ? scenarioPhaseTitle(phaseTitleKey) : "Waiting on server";
       handlers.setRunPhase(title, (parsed.message as string).trim());
     }
     return "continue";

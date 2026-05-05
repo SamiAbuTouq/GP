@@ -1768,10 +1768,23 @@ export default function WhatIfScenariosPage() {
               disabled={Boolean(deleteTarget?.hasAppliedRuns) && !forceDelete}
               onClick={async () => {
                 if (!deleteTarget) return;
-                await ApiClient.request(`/what-if/scenarios/${deleteTarget.id}?force=${forceDelete ? "true" : "false"}`, { method: "DELETE" });
-                toast({ title: "Scenario deleted" });
-                setDeleteTarget(null);
-                await load();
+                try {
+                  await ApiClient.request(`/what-if/scenarios/${deleteTarget.id}?force=${forceDelete ? "true" : "false"}`, { method: "DELETE" });
+                  toast({ title: "Scenario deleted" });
+                  setDeleteTarget(null);
+                  await load();
+                } catch (error: unknown) {
+                  toast({
+                    title: "Could not delete scenario",
+                    description:
+                      error instanceof ApiError
+                        ? error.message
+                        : error instanceof Error
+                          ? error.message
+                          : "Unknown error",
+                    variant: "destructive",
+                  });
+                }
               }}
             >
               Delete

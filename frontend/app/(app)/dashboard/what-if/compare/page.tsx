@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/header";
@@ -16,6 +16,8 @@ import { HardConflictsAcknowledgmentFields } from "@/components/hard-conflicts-u
 import { ApiClient, ApiError } from "@/lib/api-client";
 import {
   fetchTimetableConflictSummary,
+  resolveHardConflictCount,
+  type HardConflictByTimetableId,
   type TimetableConflictSummary,
 } from "@/lib/timetable-conflicts";
 import {
@@ -336,11 +338,25 @@ function metricTable(
   baseline: MetricSnapshot | null,
   result: MetricSnapshot | null,
   deltas: ComparisonRow["deltas"],
-  opts?: { showVerdicts?: boolean },
+  opts?: {
+    showVerdicts?: boolean;
+    baselineTimetableId?: number | null;
+    resultTimetableId?: number | null;
+    hardConflictByTimetableId?: HardConflictByTimetableId;
+  },
 ) {
   const showVerdicts = opts?.showVerdicts ?? false;
+  const hardMap = opts?.hardConflictByTimetableId ?? {};
+  const bHard = resolveHardConflictCount(
+    opts?.baselineTimetableId ?? null,
+    baseline?.conflicts ?? null,
+    hardMap,
+  );
+  const rHard = resolveHardConflictCount(opts?.resultTimetableId ?? null, result?.conflicts ?? null, hardMap);
+  const conflictsDelta =
+    bHard != null && rHard != null ? rHard - bHard : (deltas?.conflicts ?? null);
   const rows = [
-    ["Conflicts", "conflicts", baseline?.conflicts, result?.conflicts, deltas?.conflicts, true],
+    ["Hard conflicts", "conflicts", bHard, rHard, conflictsDelta, true],
     ["Room utilization", "roomUtilizationRate", baseline?.roomUtilizationRate, result?.roomUtilizationRate, deltas?.roomUtilizationRate, false],
     ["Soft constraints", "softConstraintsScore", baseline?.softConstraintsScore, result?.softConstraintsScore, deltas?.softConstraintsScore, false],
     ["Fitness", "fitnessScore", baseline?.fitnessScore, result?.fitnessScore, deltas?.fitnessScore, false],
@@ -449,14 +465,37 @@ function conflictBreakdownPanel(
   );
 }
 
-function metricSnapshotMiniTable(title: string, snapshot: MetricSnapshot | null, footnote?: string) {
-  const rows: Array<[string, number | null]> = snapshot
+function metricSnapshotMiniTable(
+  title: string,
+  snapshot: MetricSnapshot | null,
+  footnote?: string,
+  opts?: {
+    timetableId?: number | null;
+    hardConflictByTimetableId?: HardConflictByTimetableId;
+  },
+) {
+  const hardMap = opts?.hardConflictByTimetableId ?? {};
+  const hardConflicts =
+    snapshot != null
+      ? resolveHardConflictCount(opts?.timetableId ?? null, snapshot.conflicts, hardMap)
+      : null;
+  const metricsConflictSnap = snapshot?.conflicts ?? null;
+  const conflictDebug =
+    hardConflicts != null &&
+    metricsConflictSnap != null &&
+    Math.round(hardConflicts) !== Math.round(metricsConflictSnap);
+
+  const rows: Array<[string, number | null, ReactNode]> = snapshot
     ? [
-        ["Conflicts", snapshot.conflicts],
-        ["Room utilization %", snapshot.roomUtilizationRate],
-        ["Soft constraints", snapshot.softConstraintsScore],
-        ["Fitness", snapshot.fitnessScore],
-        ["Lecturer balance", snapshot.lecturerBalanceScore],
+        ["Hard conflicts", hardConflicts, conflictDebug ? (
+          <span className="block text-[11px] font-normal text-muted-foreground">
+            Run metrics snapshot: {metricsConflictSnap}
+          </span>
+        ) : null],
+        ["Room utilization %", snapshot.roomUtilizationRate, null],
+        ["Soft constraints", snapshot.softConstraintsScore, null],
+        ["Fitness", snapshot.fitnessScore, null],
+        ["Lecturer balance", snapshot.lecturerBalanceScore, null],
       ]
     : [];
   return (
@@ -470,10 +509,13 @@ function metricSnapshotMiniTable(title: string, snapshot: MetricSnapshot | null,
           <p className="text-sm text-muted-foreground">No metrics recorded.</p>
         ) : (
           <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-            {rows.map(([label, val]) => (
+            {rows.map(([label, val, extra]) => (
               <div key={label} className="flex justify-between gap-3 border-b border-border/40 py-2 last:border-0">
                 <dt className="text-muted-foreground">{label}</dt>
-                <dd className="tabular-nums font-medium">{val == null ? "—" : val}</dd>
+                <dd className="text-right tabular-nums font-medium">
+                  <span className="block">{val == null ? "—" : val}</span>
+                  {extra}
+                </dd>
               </div>
             ))}
           </dl>
@@ -536,13 +578,26 @@ function jDominatesI(j: MetricSnapshot, i: MetricSnapshot): boolean {
   return ge && strict;
 }
 
-function paretoOptimalFlags(rows: ComparisonRow[]): boolean[] {
+function paretoOptimalFlags(
+  rows: ComparisonRow[],
+  hardConflictByTimetableId: HardConflictByTimetableId = {},
+): boolean[] {
+  const resultWithResolved = (c: ComparisonRow): MetricSnapshot | null => {
+    if (!c.result) return null;
+    const co = resolveHardConflictCount(
+      c.resultTimetableId,
+      c.result.conflicts ?? null,
+      hardConflictByTimetableId,
+    );
+    if (co == null) return c.result;
+    return { ...c.result, conflicts: co };
+  };
   return rows.map((_, idx) => {
-    const ri = rows[idx]?.result;
+    const ri = resultWithResolved(rows[idx]!);
     if (!ri) return false;
     for (let j = 0; j < rows.length; j++) {
       if (j === idx) continue;
-      const rj = rows[j]?.result;
+      const rj = resultWithResolved(rows[j]!);
       if (rj && jDominatesI(rj, ri)) return false;
     }
     return true;
@@ -551,9 +606,11 @@ function paretoOptimalFlags(rows: ComparisonRow[]): boolean[] {
 
 function CrossTimetableComparisonBlock({
   comparisons,
+  hardConflictByTimetableId,
   openApply,
 }: {
   comparisons: ComparisonRow[];
+  hardConflictByTimetableId: HardConflictByTimetableId;
   openApply: (runId: number) => void;
 }) {
   const bestOverallIdx = useMemo(() => {
@@ -562,14 +619,18 @@ function CrossTimetableComparisonBlock({
     for (let i = 1; i < comparisons.length; i++) {
       const a = comparisons[best]!;
       const b = comparisons[i]!;
-      const ca = a.result?.conflicts ?? Number.POSITIVE_INFINITY;
-      const cb = b.result?.conflicts ?? Number.POSITIVE_INFINITY;
+      const ca =
+        resolveHardConflictCount(a.resultTimetableId, a.result?.conflicts ?? null, hardConflictByTimetableId) ??
+        Number.POSITIVE_INFINITY;
+      const cb =
+        resolveHardConflictCount(b.resultTimetableId, b.result?.conflicts ?? null, hardConflictByTimetableId) ??
+        Number.POSITIVE_INFINITY;
       const fa = a.result?.fitnessScore ?? Number.NEGATIVE_INFINITY;
       const fb = b.result?.fitnessScore ?? Number.NEGATIVE_INFINITY;
       if (cb < ca || (cb === ca && fb > fa)) best = i;
     }
     return best;
-  }, [comparisons]);
+  }, [comparisons, hardConflictByTimetableId]);
 
   const scenarioLabel = comparisons[0]?.scenarioName ?? "Scenario";
 
@@ -586,10 +647,14 @@ function CrossTimetableComparisonBlock({
   const improvedHowMany = useMemo(() => {
     return comparisons.filter((c) => {
       const d = c.deltas;
-      if (!d) return false;
-      return d.conflicts < 0 || d.fitnessScore > 0.0001;
+      const bH = resolveHardConflictCount(c.baseTimetableId, c.baseline?.conflicts ?? null, hardConflictByTimetableId);
+      const rH = resolveHardConflictCount(c.resultTimetableId, c.result?.conflicts ?? null, hardConflictByTimetableId);
+      const conflictDelta = bH != null && rH != null ? rH - bH : d?.conflicts;
+      const fitnessOk = d != null && d.fitnessScore > 0.0001;
+      if (conflictDelta != null && conflictDelta < 0) return true;
+      return fitnessOk;
     }).length;
-  }, [comparisons]);
+  }, [comparisons, hardConflictByTimetableId]);
 
   const consistencyLines = useMemo(() => {
     const lines: string[] = [];
@@ -614,7 +679,12 @@ function CrossTimetableComparisonBlock({
     };
     summarize(
       "Conflict Δ",
-      comparisons.map((c) => c.deltas?.conflicts),
+      comparisons.map((c) => {
+        const bH = resolveHardConflictCount(c.baseTimetableId, c.baseline?.conflicts ?? null, hardConflictByTimetableId);
+        const rH = resolveHardConflictCount(c.resultTimetableId, c.result?.conflicts ?? null, hardConflictByTimetableId);
+        if (bH != null && rH != null) return rH - bH;
+        return c.deltas?.conflicts;
+      }),
       true,
     );
     summarize(
@@ -628,14 +698,17 @@ function CrossTimetableComparisonBlock({
       false,
     );
     return lines;
-  }, [comparisons]);
+  }, [comparisons, hardConflictByTimetableId]);
 
   const conflictRanks = useMemo(
-    () => competitionRanks(
-      comparisons.map((c) => c.result?.conflicts ?? null),
-      true,
-    ),
-    [comparisons],
+    () =>
+      competitionRanks(
+        comparisons.map((c) =>
+          resolveHardConflictCount(c.resultTimetableId, c.result?.conflicts ?? null, hardConflictByTimetableId),
+        ),
+        true,
+      ),
+    [comparisons, hardConflictByTimetableId],
   );
   const fitnessRanks = useMemo(
     () => competitionRanks(
@@ -664,12 +737,16 @@ function CrossTimetableComparisonBlock({
   const metricRows = (
     c: ComparisonRow,
     idx: number,
-  ): Array<{ label: string; b: number | null | undefined; r: number | null | undefined; d: number | null | undefined; lower: boolean; rank: number | null }> => [
+  ): Array<{ label: string; b: number | null | undefined; r: number | null | undefined; d: number | null | undefined; lower: boolean; rank: number | null }> => {
+    const bH = resolveHardConflictCount(c.baseTimetableId, c.baseline?.conflicts ?? null, hardConflictByTimetableId);
+    const rH = resolveHardConflictCount(c.resultTimetableId, c.result?.conflicts ?? null, hardConflictByTimetableId);
+    const dH = bH != null && rH != null ? rH - bH : c.deltas?.conflicts;
+    return [
     {
-      label: "Conflicts",
-      b: c.baseline?.conflicts,
-      r: c.result?.conflicts,
-      d: c.deltas?.conflicts,
+      label: "Hard conflicts",
+      b: bH ?? undefined,
+      r: rH ?? undefined,
+      d: dH,
       lower: true,
       rank: conflictRanks[idx] ?? null,
     },
@@ -697,7 +774,8 @@ function CrossTimetableComparisonBlock({
       lower: false,
       rank: fitnessRanks[idx] ?? null,
     },
-  ];
+    ];
+  };
 
   return (
     <div className="space-y-4">
@@ -866,15 +944,20 @@ type ScenarioSortCol =
 
 function CrossScenarioComparisonBlock({
   comparisons,
+  hardConflictByTimetableId,
   openApply,
 }: {
   comparisons: ComparisonRow[];
+  hardConflictByTimetableId: HardConflictByTimetableId;
   openApply: (runId: number) => void;
 }) {
   const [sortCol, setSortCol] = useState<ScenarioSortCol>("fitness");
   const [sortAsc, setSortAsc] = useState(false);
 
-  const pareto = useMemo(() => paretoOptimalFlags(comparisons), [comparisons]);
+  const pareto = useMemo(
+    () => paretoOptimalFlags(comparisons, hardConflictByTimetableId),
+    [comparisons, hardConflictByTimetableId],
+  );
 
   const winners = useMemo(() => {
     const bestIdx = (
@@ -890,14 +973,17 @@ function CrossScenarioComparisonBlock({
       return finite.filter((x) => x.v === best).map((x) => x.i);
     };
     return {
-      conflicts: bestIdx((c) => c.result?.conflicts ?? null, true),
+      conflicts: bestIdx(
+        (c) => resolveHardConflictCount(c.resultTimetableId, c.result?.conflicts ?? null, hardConflictByTimetableId),
+        true,
+      ),
       room: bestIdx((c) => c.result?.roomUtilizationRate ?? null, false),
       soft: bestIdx((c) => c.result?.softConstraintsScore ?? null, false),
       fitness: bestIdx((c) => c.result?.fitnessScore ?? null, false),
       lecturer: bestIdx((c) => c.result?.lecturerBalanceScore ?? null, false),
       disruptionLow: bestIdx((c) => c.sectionChanges?.percentSectionsAffected ?? null, true),
     };
-  }, [comparisons]);
+  }, [comparisons, hardConflictByTimetableId]);
 
   const decisionBanner = useMemo(() => {
     const parts: string[] = [];
@@ -945,7 +1031,11 @@ function CrossScenarioComparisonBlock({
             (b.sectionChanges?.percentSectionsAffected ?? 0);
           break;
         case "conflicts":
-          cmp = (a.result?.conflicts ?? 1e9) - (b.result?.conflicts ?? 1e9);
+          cmp =
+            (resolveHardConflictCount(a.resultTimetableId, a.result?.conflicts ?? null, hardConflictByTimetableId) ??
+              1e9) -
+            (resolveHardConflictCount(b.resultTimetableId, b.result?.conflicts ?? null, hardConflictByTimetableId) ??
+              1e9);
           break;
         case "room":
           cmp = (a.result?.roomUtilizationRate ?? -1e9) - (b.result?.roomUtilizationRate ?? -1e9);
@@ -966,7 +1056,7 @@ function CrossScenarioComparisonBlock({
       return sortAsc ? cmp : -cmp;
     });
     return copy;
-  }, [comparisons, sortAsc, sortCol]);
+  }, [comparisons, hardConflictByTimetableId, sortAsc, sortCol]);
 
   const toggleSort = (col: ScenarioSortCol) => {
     setSortCol((prev) => {
@@ -1003,7 +1093,7 @@ function CrossScenarioComparisonBlock({
                 % sections disrupted
               </TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("conflicts")}>
-                Conflicts (base → result)
+                Hard conflicts (base → result)
               </TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("room")}>
                 Room util. (base → result)
@@ -1053,7 +1143,20 @@ function CrossScenarioComparisonBlock({
                     {c.sectionChanges ? `${c.sectionChanges.percentSectionsAffected.toFixed(1)}%` : "—"}
                   </TableCell>
                   <TableCell className={`text-center ${cellClass(wConf)}`}>
-                    {pair(c.baseline?.conflicts, c.result?.conflicts, c.deltas?.conflicts)}
+                    {(() => {
+                      const bH = resolveHardConflictCount(
+                        c.baseTimetableId,
+                        c.baseline?.conflicts ?? null,
+                        hardConflictByTimetableId,
+                      );
+                      const rH = resolveHardConflictCount(
+                        c.resultTimetableId,
+                        c.result?.conflicts ?? null,
+                        hardConflictByTimetableId,
+                      );
+                      const dH = bH != null && rH != null ? rH - bH : c.deltas?.conflicts;
+                      return pair(bH ?? undefined, rH ?? undefined, dH);
+                    })()}
                   </TableCell>
                   <TableCell className={`text-center ${cellClass(wRoom)}`}>
                     {pair(
@@ -1145,8 +1248,50 @@ export default function WhatIfComparePage() {
   const [runSearch, setRunSearch] = useState("");
   const [timetableFilter, setTimetableFilter] = useState<number | null>(null);
   const [scenarioFilter, setScenarioFilter] = useState<number | null>(null);
+  const [hardConflictByTimetableId, setHardConflictByTimetableId] = useState<HardConflictByTimetableId>({});
 
   const runIdsFromUrl = useMemo(() => parseRunIds(searchParams), [searchParams.toString()]);
+
+  useEffect(() => {
+    if (!comparisons.length) {
+      setHardConflictByTimetableId({});
+      return;
+    }
+    let cancelled = false;
+    const ids = new Set<number>();
+    for (const c of comparisons) {
+      if (Number.isFinite(c.baseTimetableId) && c.baseTimetableId > 0) {
+        ids.add(Math.trunc(c.baseTimetableId));
+      }
+      const rt = c.resultTimetableId;
+      if (rt != null && Number.isFinite(rt) && rt > 0) {
+        ids.add(Math.trunc(rt));
+      }
+    }
+    void (async () => {
+      const results = await Promise.all(
+        [...ids].map(async (id) => {
+          try {
+            const s = await fetchTimetableConflictSummary(id);
+            return [id, s.hardConflictCount] as const;
+          } catch {
+            return [id, null] as const;
+          }
+        }),
+      );
+      if (cancelled) return;
+      const next: HardConflictByTimetableId = {};
+      for (const [id, count] of results) {
+        if (count != null && typeof count === "number" && Number.isFinite(count)) {
+          next[id] = count;
+        }
+      }
+      setHardConflictByTimetableId(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [comparisons]);
 
   useEffect(() => {
     let nextMode: UiMode | null = null;
@@ -1674,7 +1819,7 @@ export default function WhatIfComparePage() {
             {mode && filterReady ? (
               <Card className="border-border/80 shadow-sm">
               <CardHeader className="border-b bg-muted/30">
-                <CardTitle className="text-lg">Step 3 —image.png Pick runs</CardTitle>
+                <CardTitle className="text-lg">Step 3 — Pick runs</CardTitle>
                 <CardDescription>
                   {mode === "before-after" && "Select exactly one completed run."}
                   {mode === "cross-timetable" && "Select two or more runs for the same scenario."}
@@ -1832,6 +1977,7 @@ export default function WhatIfComparePage() {
                           "Original timetable (baseline)",
                           c.baseline,
                           `Baseline timetable #${c.baseTimetableId}`,
+                          { timetableId: c.baseTimetableId, hardConflictByTimetableId },
                         )}
                         {metricSnapshotMiniTable(
                           "Scenario result (draft timetable)",
@@ -1839,6 +1985,7 @@ export default function WhatIfComparePage() {
                           c.resultTimetableId != null
                             ? `Draft timetable #${c.resultTimetableId}`
                             : undefined,
+                          { timetableId: c.resultTimetableId, hardConflictByTimetableId },
                         )}
                       </div>
 
@@ -1878,12 +2025,18 @@ export default function WhatIfComparePage() {
                         <CardHeader className="border-b bg-muted/30">
                           <CardTitle className="text-base">Metrics compared</CardTitle>
                           <CardDescription>
-                            Baseline vs sandbox — verdict badges encode directionality (lower conflicts / higher fitness is
-                            better).
+                            Baseline vs sandbox — verdict badges encode directionality (lower hard conflicts / higher
+                            fitness is better). Hard conflicts use the same persisted summary as the schedule viewer; run
+                            metrics may differ when the snapshot row is stale.
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="pt-4">
-                          {metricTable(c.baseline, c.result, c.deltas, { showVerdicts: true })}
+                          {metricTable(c.baseline, c.result, c.deltas, {
+                            showVerdicts: true,
+                            baselineTimetableId: c.baseTimetableId,
+                            resultTimetableId: c.resultTimetableId,
+                            hardConflictByTimetableId,
+                          })}
                         </CardContent>
                       </Card>
 
@@ -1968,11 +2121,13 @@ export default function WhatIfComparePage() {
               ) : mode === "cross-scenario" ? (
                 <CrossScenarioComparisonBlock
                   comparisons={comparisons}
+                  hardConflictByTimetableId={hardConflictByTimetableId}
                   openApply={(id) => void openApply(id)}
                 />
               ) : (
                 <CrossTimetableComparisonBlock
                   comparisons={comparisons}
+                  hardConflictByTimetableId={hardConflictByTimetableId}
                   openApply={(id) => void openApply(id)}
                 />
               )

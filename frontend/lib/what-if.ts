@@ -130,8 +130,7 @@ function mapTimetableRowToOption(row: any): TimetableOption {
   const isScenarioResult = Boolean(
     row.isScenarioResult ?? row.is_scenario_result ?? gen === "what_if",
   );
-  const inferredCanBase =
-    !isScenarioResult && (isPublishedApi || gen === "gwo_ui" || gen === "gwo");
+  const inferredCanBase = !isScenarioResult;
   const apiCanUse = row.canUseAsScenarioBase ?? row.can_use_as_scenario_base;
   const canUse = apiCanUse != null ? Boolean(apiCanUse) : inferredCanBase;
 

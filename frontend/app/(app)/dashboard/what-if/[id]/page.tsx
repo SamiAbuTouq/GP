@@ -155,6 +155,7 @@ export default function WhatIfScenarioDetailPage() {
     (!applyNeedsConflictAck || applyConflictAcknowledged) &&
     !applyConflictLoading;
   const runStatus = scenario?.latestRun?.status;
+  const scenarioLatestRunId = scenario?.latestRun?.id ?? null;
   const latestRunErrorMessage = scenario?.latestRun?.errorMessage;
   const runWasCancelledByUser = runStatus === "failed" && isUserCancelledRun(latestRunErrorMessage);
   const blockedByTimetable = runServerStatus?.globalLockOwner === "timetable";
@@ -163,7 +164,10 @@ export default function WhatIfScenarioDetailPage() {
     Boolean(scenario?.isRunning) ||
     runStatus === "running" ||
     runStatus === "pending" ||
-    (gwoRunSource === "scenario" && gwoIsRunning) ||
+    (gwoRunSource === "scenario" &&
+      gwoIsRunning &&
+      scenarioLatestRunId != null &&
+      Number(recoveringRunIdRef.current) === Number(scenarioLatestRunId)) ||
     simStarting;
   const scenarioPaused = gwoRunSource === "scenario" && localScenarioActive && gwoIsPaused;
   const blockedByOtherScenarioRun = blockedByWhatIf && !localScenarioActive;
@@ -288,7 +292,9 @@ export default function WhatIfScenarioDetailPage() {
         })
         .filter((x): x is WhatIfLookupOption => x !== null);
 
-      const nextCourses: WhatIfLookupOption[] = firstArray(coursesRes)
+      const nextCourses: WhatIfLookupOption[] = firstArray(
+        (coursesRes as { courses?: unknown[] } | null | undefined)?.courses ?? [],
+      )
         .map((c: any) => {
           const value = numericString(c.id ?? c.course_id ?? c.courseId);
           if (!value) return null;
@@ -987,9 +993,7 @@ export default function WhatIfScenarioDetailPage() {
                         className="shrink-0 text-xs capitalize"
                       >
                         {t.isPublished
-                          ? String(t.generationType ?? "").toLowerCase() === "imported"
-                            ? "Published · seeded"
-                            : "Published · official"
+                          ? "Published"
                           : ["gwo_ui", "gwo"].includes(String(t.generationType ?? "").toLowerCase())
                             ? "Draft · optimizer"
                             : "Draft"}

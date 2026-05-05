@@ -31,12 +31,6 @@ function scenarioBaseWhere() {
   return {
     AND: [
       { generation_type: { notIn: ["what_if", "what_if_applied"] } },
-      {
-        OR: [
-          { semester_id: { not: null } },
-          { generation_type: { in: ["gwo_ui", "gwo", "GWO_UI", "GWO", "Gwo_Ui"] } },
-        ],
-      },
     ],
   };
 }
@@ -62,9 +56,7 @@ function mapTimetableSummary(t: {
 }) {
   const isDraft = t.semester_id == null;
   const isScenarioResult = t.generation_type === "what_if";
-  const canUseAsScenarioBase =
-    !isScenarioResult &&
-    (t.semester_id != null || isOptimizerScenarioRunBaseGenerationType(t.generation_type));
+  const canUseAsScenarioBase = !isScenarioResult;
   const draftOrigin: "optimizer" | "scenario" | "other" | null = isDraft
     ? isScenarioResult
       ? "scenario"

@@ -84,12 +84,11 @@ const ETA_MAX_MS = 48 * 60 * 60 * 1000;
 const TIMETABLE_ITERATION_PROGRESS_CAP = 97;
 
 /**
- * What-if `run_scenario.py` keeps work before validating in ~5–37%, GWO in ~38–92%
- * (see pct remapping around GWO subprocess output), then validating / save / done.
- * Map iteration counts into the GWO band so the bar matches phase pcts from SSE.
+ * What-if scenario UX: reserve first 10% for setup/conditions and drive the
+ * remaining 90% from optimizer iterations.
  */
-const SCENARIO_GWO_PROGRESS_LO = 38;
-const SCENARIO_GWO_PROGRESS_HI = 92;
+const SCENARIO_GWO_PROGRESS_LO = 10;
+const SCENARIO_GWO_PROGRESS_HI = 100;
 
 /**
  * Scenario runs may restart iteration counters between GWO batches (run 1/N).
@@ -315,9 +314,21 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const beginRun = useCallback((source: GwoRunSource = "timetable", runId: number | null = null): AbortController => {
+    const owned = ownedStreamRef.current;
+    const existing = abortRef.current;
+    const sameSource = owned?.source === source;
+    const sameRun =
+      runId != null &&
+      owned?.runId != null &&
+      owned.runId === runId;
+    // Reuse the same run context to avoid visible "bouncing" when the UI reconnects
+    // to an already-running stream (same scenario run/page refresh reconciliation).
+    if (existing && sameSource && sameRun) {
+      return existing;
+    }
     // Ensure no stale stream can continue updating progress after a new run starts.
     try {
-      abortRef.current?.abort();
+      existing?.abort();
     } catch {
       /* ignore */
     }

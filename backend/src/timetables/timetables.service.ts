@@ -73,9 +73,7 @@ export class TimetablesService {
         ? t._count.scenario_runs_as_result
         : 0;
     const isScenarioResult = t.generation_type === 'what_if' || resultRunCount > 0;
-    const canUseAsScenarioBase =
-      !isScenarioResult &&
-      (t.semester_id != null || isOptimizerScenarioRunBaseGenerationType(t.generation_type));
+    const canUseAsScenarioBase = !isScenarioResult;
     const draftOrigin: 'optimizer' | 'scenario' | 'other' | null = isDraft
       ? isScenarioResult
         ? 'scenario'
@@ -116,8 +114,8 @@ export class TimetablesService {
    * @param semesterId When set to a positive DB id, only timetables for that semester.
    * @param draftsOnly When true, only timetables with no semester (e.g. GWO UI store draft).
    * When both omitted, returns all timetables.
-   * scenarioRunBasesOnly: eligible bases for scenario runs — semester-linked schedules (published/official)
-   * or optimizer-generated drafts from timetable generation (`gwo_ui` / `gwo`, any common casing); excludes scenario-result timetables.
+   * scenarioRunBasesOnly: eligible bases for scenario runs — any non-scenario timetable
+   * (published or draft); excludes scenario-result timetables.
    */
   async list(semesterId?: number, draftsOnly?: boolean, scenarioRunBasesOnly?: boolean) {
     const hasSemesterFilter =
@@ -130,12 +128,6 @@ export class TimetablesService {
       AND: [
         { NOT: { scenario_runs_as_result: { some: {} } } },
         { generation_type: { notIn: ['what_if', 'what_if_applied'] } },
-        {
-          OR: [
-            { semester_id: { not: null } },
-            { generation_type: { in: ['gwo_ui', 'gwo', 'GWO_UI', 'GWO', 'Gwo_Ui'] } },
-          ],
-        },
       ],
     };
 

@@ -17,6 +17,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ApiClient, ApiError } from "@/lib/api-client";
 import {
   fetchTimetableConflictSummary,
+  resolveHardConflictCount,
+  type HardConflictByTimetableId,
   type TimetableConflictSummary,
 } from "@/lib/timetable-conflicts";
 import {
@@ -76,14 +78,14 @@ function shortSemesterLabel(semester: string): string {
   return s.replace(/\s+semester$/i, "").trim();
 }
 
-function metricsRowsForRun(run: WhatIfRun): MetricsTableRow[] {
+function metricsRowsForRun(run: WhatIfRun, hardByTimetableId: HardConflictByTimetableId): MetricsTableRow[] {
   const baseline = run.metricsBaseline;
   const result = run.metricsResult;
   return [
     {
-      label: "Conflicts",
-      baseline: baseline?.conflicts ?? null,
-      result: result?.conflicts ?? null,
+      label: "Hard conflicts",
+      baseline: resolveHardConflictCount(run.baseTimetableId, baseline?.conflicts ?? null, hardByTimetableId),
+      result: resolveHardConflictCount(run.resultTimetableId, result?.conflicts ?? null, hardByTimetableId),
       lowerIsBetter: true,
     },
     {
@@ -125,6 +127,7 @@ export default function WhatIfRunsPage() {
   const [applyConflictLoading, setApplyConflictLoading] = useState(false);
   const [applyConflictAcknowledged, setApplyConflictAcknowledged] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "running" | "completed" | "failed" | "applied">("all");
+  const [hardConflictByTimetableId, setHardConflictByTimetableId] = useState<HardConflictByTimetableId>({});
 
   const load = useCallback(async () => {
     if (!scenarioIdValid) return;
@@ -162,6 +165,69 @@ export default function WhatIfRunsPage() {
     }
     void load();
   }, [scenarioIdValid, load, router, toast]);
+
+  const hasActiveRuns = useMemo(
+    () => runs.some((r) => r.status === "pending" || r.status === "running"),
+    [runs],
+  );
+
+  const timetableIdsForConflictFetch = useMemo(() => {
+    const ids = new Set<number>();
+    for (const r of runs) {
+      if (Number.isFinite(r.baseTimetableId) && r.baseTimetableId > 0) {
+        ids.add(Math.trunc(r.baseTimetableId));
+      }
+      const rt = r.resultTimetableId;
+      if (rt != null && Number.isFinite(rt) && rt > 0) {
+        ids.add(Math.trunc(rt));
+      }
+    }
+    return [...ids].sort((a, b) => a - b).join(",");
+  }, [runs]);
+
+  useEffect(() => {
+    if (!scenarioIdValid || !hasActiveRuns) return;
+    const t = window.setInterval(() => {
+      void load();
+    }, 2500);
+    return () => window.clearInterval(t);
+  }, [scenarioIdValid, hasActiveRuns, load]);
+
+  useEffect(() => {
+    if (!scenarioIdValid || !timetableIdsForConflictFetch) {
+      setHardConflictByTimetableId({});
+      return;
+    }
+    let cancelled = false;
+    const ids = new Set<number>();
+    for (const id of timetableIdsForConflictFetch.split(",")) {
+      const n = Number(id);
+      if (Number.isFinite(n) && n > 0) ids.add(Math.trunc(n));
+    }
+    void (async () => {
+      const results = await Promise.all(
+        [...ids].map(async (id) => {
+          try {
+            const s = await fetchTimetableConflictSummary(id);
+            return [id, s.hardConflictCount] as const;
+          } catch {
+            return [id, null] as const;
+          }
+        }),
+      );
+      if (cancelled) return;
+      const next: HardConflictByTimetableId = {};
+      for (const [id, count] of results) {
+        if (count != null && typeof count === "number" && Number.isFinite(count)) {
+          next[id] = count;
+        }
+      }
+      setHardConflictByTimetableId(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [scenarioIdValid, timetableIdsForConflictFetch]);
 
   useEffect(() => {
     const ttId = applyRun?.resultTimetableId;
@@ -255,7 +321,10 @@ export default function WhatIfRunsPage() {
                       <th className="p-2 text-left">Started</th>
                       <th className="p-2 text-left">Duration</th>
                       <th className="p-2 text-left">Status</th>
-                      <th className="p-2 text-center">Conflicts</th>
+                      <th className="p-2 text-center">
+                        Hard conflicts
+                        <span className="block text-[10px] font-normal text-muted-foreground">(result)</span>
+                      </th>
                       <th className="p-2 text-center">Optimizer Score</th>
                       <th className="p-2 text-left">Actions</th>
                     </tr>
@@ -271,7 +340,30 @@ export default function WhatIfRunsPage() {
                         <td className="p-2">{formatDateTime(run.startedAt)}</td>
                         <td className="p-2">{formatDurationSeconds(run.durationSeconds)}</td>
                         <td className="p-2">{run.status}</td>
-                        <td className="p-2 text-center">{run.metricsResult?.conflicts ?? "-"}</td>
+                        <td className="p-2 text-center">
+                          {(() => {
+                            const primary = resolveHardConflictCount(
+                              run.resultTimetableId,
+                              run.metricsResult?.conflicts ?? null,
+                              hardConflictByTimetableId,
+                            );
+                            const metrics = run.metricsResult?.conflicts ?? null;
+                            const showDebug =
+                              primary != null &&
+                              metrics != null &&
+                              Math.round(primary) !== Math.round(metrics);
+                            return (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="tabular-nums">{primary == null ? "—" : primary}</span>
+                                {showDebug ? (
+                                  <span className="max-w-[8rem] text-center text-[10px] leading-tight text-muted-foreground">
+                                    Run metrics: {metrics}
+                                  </span>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
+                        </td>
                         <td className="p-2 text-center">{formatOptimizerScore(run.metricsResult?.fitnessScore)}</td>
                         <td className="p-2">
                           <div className="flex flex-wrap gap-1">
@@ -333,7 +425,7 @@ export default function WhatIfRunsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {metricsRowsForRun(selectedRun).map((row) => {
+                    {metricsRowsForRun(selectedRun, hardConflictByTimetableId).map((row) => {
                       const delta =
                         row.baseline != null && row.result != null
                           ? row.result - row.baseline
@@ -364,6 +456,10 @@ export default function WhatIfRunsPage() {
                   </tbody>
                 </table>
               </div>
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                Hard conflicts use the timetable conflict summary (same source as the schedule viewer). Values can differ from
+                the run-metrics field when metrics were saved as an aggregate snapshot.
+              </p>
               <div className="rounded border p-2">
                 Recommendation: {selectedRun.recommendation ?? "No recommendation available."}
               </div>
