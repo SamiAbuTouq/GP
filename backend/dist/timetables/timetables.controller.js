@@ -24,19 +24,19 @@ let TimetablesController = class TimetablesController {
         this.timetablesService = timetablesService;
     }
     list(semesterIdRaw, draftsOnlyRaw, scenarioRunBasesOnlyRaw) {
-        const scenarioRunBasesOnly = scenarioRunBasesOnlyRaw === 'true' ||
-            scenarioRunBasesOnlyRaw === '1' ||
-            scenarioRunBasesOnlyRaw?.toLowerCase() === 'yes';
-        const draftsOnly = draftsOnlyRaw === 'true' ||
-            draftsOnlyRaw === '1' ||
-            draftsOnlyRaw?.toLowerCase() === 'yes';
-        const rawTrimmed = typeof semesterIdRaw === 'string' ? semesterIdRaw.trim() : '';
-        const parsedSemester = rawTrimmed !== '' &&
-            rawTrimmed.toLowerCase() !== 'null' &&
-            rawTrimmed.toLowerCase() !== 'undefined'
+        const scenarioRunBasesOnly = scenarioRunBasesOnlyRaw === "true" ||
+            scenarioRunBasesOnlyRaw === "1" ||
+            scenarioRunBasesOnlyRaw?.toLowerCase() === "yes";
+        const draftsOnly = draftsOnlyRaw === "true" ||
+            draftsOnlyRaw === "1" ||
+            draftsOnlyRaw?.toLowerCase() === "yes";
+        const rawTrimmed = typeof semesterIdRaw === "string" ? semesterIdRaw.trim() : "";
+        const parsedSemester = rawTrimmed !== "" &&
+            rawTrimmed.toLowerCase() !== "null" &&
+            rawTrimmed.toLowerCase() !== "undefined"
             ? Number(rawTrimmed)
             : undefined;
-        const semesterId = typeof parsedSemester === 'number' &&
+        const semesterId = typeof parsedSemester === "number" &&
             Number.isFinite(parsedSemester) &&
             parsedSemester > 0
             ? parsedSemester
@@ -45,12 +45,16 @@ let TimetablesController = class TimetablesController {
     }
     listEntries(id, courseIdRaw, lecturerUserIdRaw, roomIdRaw) {
         const courseId = courseIdRaw ? Number(courseIdRaw) : undefined;
-        const lecturerUserId = lecturerUserIdRaw ? Number(lecturerUserIdRaw) : undefined;
+        const lecturerUserId = lecturerUserIdRaw
+            ? Number(lecturerUserIdRaw)
+            : undefined;
         const roomId = roomIdRaw ? Number(roomIdRaw) : undefined;
         return this.timetablesService.listEntries({
             timetableId: id,
             courseId: Number.isFinite(courseId) ? courseId : undefined,
-            lecturerUserId: Number.isFinite(lecturerUserId) ? lecturerUserId : undefined,
+            lecturerUserId: Number.isFinite(lecturerUserId)
+                ? lecturerUserId
+                : undefined,
             roomId: Number.isFinite(roomId) ? roomId : undefined,
         });
     }
@@ -68,63 +72,67 @@ let TimetablesController = class TimetablesController {
             academicYear: body?.academicYear,
             semesterType: body?.semesterType,
             acknowledgedHardConflicts: body?.acknowledgedHardConflicts,
-        }, { userId: user.user_id, firstName: user.first_name, lastName: user.last_name });
+        }, {
+            userId: user.user_id,
+            firstName: user.first_name,
+            lastName: user.last_name,
+        });
     }
 };
 exports.TimetablesController = TimetablesController;
 __decorate([
     (0, common_1.Get)(),
-    __param(0, (0, common_1.Query)('semesterId')),
-    __param(1, (0, common_1.Query)('draftsOnly')),
-    __param(2, (0, common_1.Query)('scenarioRunBasesOnly')),
+    __param(0, (0, common_1.Query)("semesterId")),
+    __param(1, (0, common_1.Query)("draftsOnly")),
+    __param(2, (0, common_1.Query)("scenarioRunBasesOnly")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String, String, String]),
     __metadata("design:returntype", void 0)
 ], TimetablesController.prototype, "list", null);
 __decorate([
-    (0, common_1.Get)(':id/entries'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
-    __param(1, (0, common_1.Query)('courseId')),
-    __param(2, (0, common_1.Query)('lecturerUserId')),
-    __param(3, (0, common_1.Query)('roomId')),
+    (0, common_1.Get)(":id/entries"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Query)("courseId")),
+    __param(2, (0, common_1.Query)("lecturerUserId")),
+    __param(3, (0, common_1.Query)("roomId")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, String, String, String]),
     __metadata("design:returntype", void 0)
 ], TimetablesController.prototype, "listEntries", null);
 __decorate([
-    (0, common_1.Get)(':id/conflicts'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)(":id/conflicts"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], TimetablesController.prototype, "listConflicts", null);
 __decorate([
-    (0, common_1.Get)(':id/schedule-payload'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)(":id/schedule-payload"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], TimetablesController.prototype, "schedulePayload", null);
 __decorate([
-    (0, common_1.Put)(':id/schedule-payload'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Put)(":id/schedule-payload"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", void 0)
 ], TimetablesController.prototype, "replaceSchedulePayload", null);
 __decorate([
-    (0, common_1.Post)(':id/publish'),
+    (0, common_1.Post)(":id/publish"),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, Number, publish_draft_dto_1.PublishDraftDto]),
     __metadata("design:returntype", void 0)
 ], TimetablesController.prototype, "publishDraft", null);
 exports.TimetablesController = TimetablesController = __decorate([
-    (0, common_1.Controller)('timetables'),
+    (0, common_1.Controller)("timetables"),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.LECTURER),
     __metadata("design:paramtypes", [timetables_service_1.TimetablesService])
 ], TimetablesController);

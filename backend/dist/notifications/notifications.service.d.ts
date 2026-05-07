@@ -1,5 +1,5 @@
-import { PrismaService } from '../prisma/prisma.service';
-export type NotificationListFilter = 'all' | 'unread' | 'read';
+import { PrismaService } from "../prisma/prisma.service";
+export type NotificationListFilter = "all" | "unread" | "read";
 export declare class NotificationsService {
     private readonly prisma;
     constructor(prisma: PrismaService);
@@ -7,10 +7,10 @@ export declare class NotificationsService {
         preferenceKey?: string;
     }): Promise<{
         user_id: number;
-        message: string;
-        created_at: Date;
         message_title: string;
+        message: string;
         is_read: boolean;
+        created_at: Date;
         notification_id: number;
     } | null>;
     createForManyUsers(userIds: number[], messageTitle: string, message: string): Promise<{

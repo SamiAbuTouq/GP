@@ -1,10 +1,18 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from "@nestjs/common";
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(PrismaService.name);
   private readonly pool: Pool;
 
@@ -12,7 +20,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
       throw new Error(
-        'DATABASE_URL is required to initialize Prisma. Add it to backend/.env or export it in your shell.',
+        "DATABASE_URL is required to initialize Prisma. Add it to backend/.env or export it in your shell.",
       );
     }
 
@@ -20,19 +28,19 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const adapter = new PrismaPg(pool);
     super({
       adapter,
-      log: ['error'],
+      log: ["error"],
     });
     this.pool = pool;
   }
 
   async onModuleInit() {
     await this.$connect();
-    this.logger.log('Database connected');
+    this.logger.log("Database connected");
   }
 
   async onModuleDestroy() {
     await this.$disconnect();
     await this.pool.end();
-    this.logger.log('Database disconnected');
+    this.logger.log("Database disconnected");
   }
 }

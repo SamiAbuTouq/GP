@@ -58,6 +58,9 @@ export function getNotificationHref(
   if (t === "New Lecturer Access Request") {
     return "/entity/access-requests";
   }
+  if (t === "New Course Modification Request") {
+    return "/entity/access-requests?type=COURSE_MODIFICATION";
+  }
   if (t === "Your Schedule is Ready" || t === "Schedule Updated") {
     return "/lecturer-schedule";
   }

@@ -1,4 +1,4 @@
-import { IsObject } from 'class-validator';
+import { IsObject } from "class-validator";
 
 export class UpdateNotificationPrefsDto {
   @IsObject()

@@ -1,18 +1,23 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { AccessRequestStatus, Role } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateAccessRequestDto } from './dto/create-access-request.dto';
-import { RejectAccessRequestDto } from './dto/reject-access-request.dto';
-import { LecturersService } from '../lecturers/lecturers.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { ADMIN_NOTIFICATION_PREF_KEYS } from '../notifications/notification-prefs';
-import { MailService } from '../mail/mail.service';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { AccessRequestStatus, Role } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+import { CreateAccessRequestDto } from "./dto/create-access-request.dto";
+import { RejectAccessRequestDto } from "./dto/reject-access-request.dto";
+import { LecturersService } from "../lecturers/lecturers.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { ADMIN_NOTIFICATION_PREF_KEYS } from "../notifications/notification-prefs";
+import { MailService } from "../mail/mail.service";
 
 const EXPIRY_DAYS = 14;
 /** Avoid running the expiry sweep on every list request (tab switches); submit/approve still run it. */
 const EXPIRE_SWEEP_MIN_INTERVAL_MS = 45_000;
 const GENERIC_ELIGIBILITY_MESSAGE =
-  'If this email is eligible for access, you will be contacted with further instructions.';
+  "If this email is eligible for access, you will be contacted with further instructions.";
 
 @Injectable()
 export class AccessRequestsService {
@@ -45,7 +50,7 @@ export class AccessRequestsService {
       department: row.department,
       maxWorkload: row.max_workload,
       courses: Array.isArray(row.courses)
-        ? row.courses.filter((c): c is string => typeof c === 'string')
+        ? row.courses.filter((c): c is string => typeof c === "string")
         : [],
       status: row.status,
       rejectionReason: row.rejection_reason,
@@ -64,7 +69,7 @@ export class AccessRequestsService {
       },
       data: {
         status: AccessRequestStatus.REJECTED,
-        rejection_reason: 'This request expired after 14 days without review.',
+        rejection_reason: "This request expired after 14 days without review.",
         reviewed_at: now,
       },
     });
@@ -81,10 +86,13 @@ export class AccessRequestsService {
   async checkEmail(emailRaw: string) {
     await this.expirePendingRequests();
     const email = emailRaw.trim().toLowerCase();
-    if (!email) throw new BadRequestException('Email is required.');
+    if (!email) throw new BadRequestException("Email is required.");
 
     const [user, pendingRequest] = await Promise.all([
-      this.prisma.user.findUnique({ where: { email }, select: { user_id: true } }),
+      this.prisma.user.findUnique({
+        where: { email },
+        select: { user_id: true },
+      }),
       this.prisma.lecturerAccessRequest.findFirst({
         where: { email, status: AccessRequestStatus.PENDING },
         select: { request_id: true },
@@ -105,7 +113,10 @@ export class AccessRequestsService {
     const courses = (dto.courses ?? []).map((c) => c.trim()).filter(Boolean);
 
     const [existingUser, pendingRequest] = await Promise.all([
-      this.prisma.user.findUnique({ where: { email }, select: { user_id: true } }),
+      this.prisma.user.findUnique({
+        where: { email },
+        select: { user_id: true },
+      }),
       this.prisma.lecturerAccessRequest.findFirst({
         where: { email, status: AccessRequestStatus.PENDING },
         select: { request_id: true },
@@ -117,7 +128,9 @@ export class AccessRequestsService {
     }
 
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(
+      now.getTime() + EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+    );
     const created = await this.prisma.lecturerAccessRequest.create({
       data: {
         full_name: fullName,
@@ -145,7 +158,7 @@ export class AccessRequestsService {
 
     void this.notifications
       .notifyAdmins(
-        'New Lecturer Access Request',
+        "New Lecturer Access Request",
         `${fullName} (${email}) submitted a lecturer access request.`,
         { preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.ACCESS_REQUESTS },
       )
@@ -170,7 +183,7 @@ export class AccessRequestsService {
     await this.expirePendingRequestsThrottled();
     const rows = await this.prisma.lecturerAccessRequest.findMany({
       where: { status },
-      orderBy: { submitted_at: 'desc' },
+      orderBy: { submitted_at: "desc" },
     });
     const mapped = rows.map((r) => this.mapRow(r));
     const allCodes = [...new Set(mapped.flatMap((m) => m.courses))];
@@ -180,7 +193,9 @@ export class AccessRequestsService {
           select: { course_code: true, course_name: true },
         })
       : [];
-    const nameByCode = new Map(courseRows.map((c) => [c.course_code, c.course_name] as const));
+    const nameByCode = new Map(
+      courseRows.map((c) => [c.course_code, c.course_name] as const),
+    );
     return mapped.map((m) => ({
       ...m,
       courses: m.courses.map((code) => ({
@@ -195,9 +210,9 @@ export class AccessRequestsService {
     const request = await this.prisma.lecturerAccessRequest.findUnique({
       where: { request_id: requestId },
     });
-    if (!request) throw new NotFoundException('Access request not found.');
+    if (!request) throw new NotFoundException("Access request not found.");
     if (request.status !== AccessRequestStatus.PENDING) {
-      throw new BadRequestException('Only pending requests can be approved.');
+      throw new BadRequestException("Only pending requests can be approved.");
     }
 
     await this.lecturersService.create({
@@ -206,7 +221,7 @@ export class AccessRequestsService {
       department: request.department,
       maxWorkload: request.max_workload,
       courses: Array.isArray(request.courses)
-        ? request.courses.filter((c): c is string => typeof c === 'string')
+        ? request.courses.filter((c): c is string => typeof c === "string")
         : [],
     });
 
@@ -226,9 +241,9 @@ export class AccessRequestsService {
     const request = await this.prisma.lecturerAccessRequest.findUnique({
       where: { request_id: requestId },
     });
-    if (!request) throw new NotFoundException('Access request not found.');
+    if (!request) throw new NotFoundException("Access request not found.");
     if (request.status !== AccessRequestStatus.PENDING) {
-      throw new BadRequestException('Only pending requests can be rejected.');
+      throw new BadRequestException("Only pending requests can be rejected.");
     }
 
     const reason = dto.reason?.trim() || null;

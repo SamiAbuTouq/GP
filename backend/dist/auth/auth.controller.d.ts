@@ -1,8 +1,8 @@
-import { Response, Request } from 'express';
-import { ConfigService } from '@nestjs/config';
-import type { User } from '@prisma/client';
-import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
+import { Response, Request } from "express";
+import { ConfigService } from "@nestjs/config";
+import type { User } from "@prisma/client";
+import { AuthService } from "./auth.service";
+import { LoginDto } from "./dto/login.dto";
 interface AccessTokenResponse {
     access_token: string;
     requires_password_change: boolean;

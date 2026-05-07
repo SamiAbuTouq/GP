@@ -8,18 +8,18 @@ import {
   Res,
   Req,
   UnauthorizedException,
-} from '@nestjs/common';
-import { Response, Request } from 'express';
-import { ConfigService } from '@nestjs/config';
-import type { User } from '@prisma/client';
-import { Role } from '@prisma/client';
+} from "@nestjs/common";
+import { Response, Request } from "express";
+import { ConfigService } from "@nestjs/config";
+import type { User } from "@prisma/client";
+import { Role } from "@prisma/client";
 
-import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
-import { Public } from '../common/decorators/public.decorator';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { AuthService } from "./auth.service";
+import { LoginDto } from "./dto/login.dto";
+import { Public } from "../common/decorators/public.decorator";
+import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
+import { Roles } from "../common/decorators/roles.decorator";
 
 // Response type for login/refresh (only access_token in body)
 interface AccessTokenResponse {
@@ -27,7 +27,7 @@ interface AccessTokenResponse {
   requires_password_change: boolean;
 }
 
-@Controller('auth')
+@Controller("auth")
 export class AuthController {
   private readonly isProduction: boolean;
   private readonly refreshTokenMaxAge: number;
@@ -36,10 +36,10 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
   ) {
-    this.isProduction = configService.get('NODE_ENV') === 'production';
+    this.isProduction = configService.get("NODE_ENV") === "production";
     // Parse refresh token expiry for cookie maxAge (in milliseconds)
     this.refreshTokenMaxAge = this.parseExpiryToMs(
-      configService.get('JWT_REFRESH_EXPIRES_IN', '7d'),
+      configService.get("JWT_REFRESH_EXPIRES_IN", "7d"),
     );
   }
 
@@ -49,7 +49,7 @@ export class AuthController {
    * Sets refresh token in HttpOnly cookie, returns access token in body.
    */
   @Public()
-  @Post('login')
+  @Post("login")
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() dto: LoginDto,
@@ -73,7 +73,7 @@ export class AuthController {
    * Returns new access token in body, sets new refresh token in cookie.
    */
   @Public()
-  @Post('refresh')
+  @Post("refresh")
   @HttpCode(HttpStatus.OK)
   async refresh(
     @Req() req: Request,
@@ -82,7 +82,7 @@ export class AuthController {
     const refreshToken = req.cookies?.refresh_token;
 
     if (!refreshToken) {
-      throw new UnauthorizedException('Refresh token not found');
+      throw new UnauthorizedException("Refresh token not found");
     }
 
     const tokens = await this.authService.refresh(refreshToken);
@@ -104,7 +104,7 @@ export class AuthController {
    */
   @UseGuards(JwtAuthGuard)
   @Roles(Role.ADMIN, Role.LECTURER)
-  @Post('logout')
+  @Post("logout")
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(
     @CurrentUser() user: User,
@@ -123,11 +123,9 @@ export class AuthController {
    */
   @UseGuards(JwtAuthGuard)
   @Roles(Role.ADMIN, Role.LECTURER)
-  @Post('check')
+  @Post("check")
   @HttpCode(HttpStatus.OK)
-  async check(
-    @CurrentUser() user: User,
-  ): Promise<{
+  async check(@CurrentUser() user: User): Promise<{
     valid: boolean;
     user: {
       id: number;
@@ -150,22 +148,22 @@ export class AuthController {
   // ─── Cookie Helpers ───────────────────────────────────────────────────────────
 
   private setRefreshTokenCookie(res: Response, token: string): void {
-    res.cookie('refresh_token', token, {
+    res.cookie("refresh_token", token, {
       httpOnly: true,
       secure: this.isProduction,
-      sameSite: this.isProduction ? 'strict' : 'lax',
+      sameSite: this.isProduction ? "strict" : "lax",
       maxAge: this.refreshTokenMaxAge,
-      path: '/',
+      path: "/",
     });
   }
 
   private clearRefreshTokenCookie(res: Response): void {
-    res.cookie('refresh_token', '', {
+    res.cookie("refresh_token", "", {
       httpOnly: true,
       secure: this.isProduction,
-      sameSite: this.isProduction ? 'strict' : 'lax',
+      sameSite: this.isProduction ? "strict" : "lax",
       maxAge: 0,
-      path: '/',
+      path: "/",
     });
   }
 
@@ -177,13 +175,13 @@ export class AuthController {
     const value = parseInt(expiry.slice(0, -1), 10);
 
     switch (unit) {
-      case 's':
+      case "s":
         return value * 1000;
-      case 'm':
+      case "m":
         return value * 60 * 1000;
-      case 'h':
+      case "h":
         return value * 60 * 60 * 1000;
-      case 'd':
+      case "d":
         return value * 24 * 60 * 60 * 1000;
       default:
         return 7 * 24 * 60 * 60 * 1000; // default 7 days

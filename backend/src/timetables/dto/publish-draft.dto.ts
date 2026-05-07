@@ -1,4 +1,11 @@
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+} from "class-validator";
 
 export class PublishDraftDto {
   @IsOptional()

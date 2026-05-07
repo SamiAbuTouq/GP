@@ -1,10 +1,10 @@
-import { AccessRequestStatus } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateAccessRequestDto } from './dto/create-access-request.dto';
-import { RejectAccessRequestDto } from './dto/reject-access-request.dto';
-import { LecturersService } from '../lecturers/lecturers.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { MailService } from '../mail/mail.service';
+import { AccessRequestStatus } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+import { CreateAccessRequestDto } from "./dto/create-access-request.dto";
+import { RejectAccessRequestDto } from "./dto/reject-access-request.dto";
+import { LecturersService } from "../lecturers/lecturers.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { MailService } from "../mail/mail.service";
 export declare class AccessRequestsService {
     private readonly prisma;
     private readonly lecturersService;

@@ -5,7 +5,7 @@ import { GwoRunProvider } from "@/components/gwo-run-context";
 import { TimetableGridDraftProvider } from "@/components/timetable-grid-draft-context";
 import { ProtectedRoute } from "@/components/protected-route";
 
-const LECTURER_ONLY_PATHS = ["/lecturer-time-preferences", "/lecturer-schedule"];
+const LECTURER_ONLY_PATHS = ["/lecturer-time-preferences", "/lecturer-schedule", "/my-courses"];
 const SHARED_PATHS = ["/settings", "/notifications"];
 
 function matchesAny(pathname: string, paths: string[]): boolean {

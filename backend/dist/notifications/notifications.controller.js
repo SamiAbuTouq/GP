@@ -24,8 +24,8 @@ let NotificationsController = class NotificationsController {
         this.notifications = notifications;
     }
     list(user, filterRaw, pageRaw, pageSizeRaw) {
-        let filter = 'all';
-        if (filterRaw === 'unread' || filterRaw === 'read')
+        let filter = "all";
+        if (filterRaw === "unread" || filterRaw === "read")
             filter = filterRaw;
         return this.notifications.listForUser(user.user_id, {
             filter,
@@ -53,53 +53,53 @@ exports.NotificationsController = NotificationsController;
 __decorate([
     (0, common_1.Get)(),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Query)('filter')),
-    __param(2, (0, common_1.Query)('page')),
-    __param(3, (0, common_1.Query)('pageSize')),
+    __param(1, (0, common_1.Query)("filter")),
+    __param(2, (0, common_1.Query)("page")),
+    __param(3, (0, common_1.Query)("pageSize")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, String, String, String]),
     __metadata("design:returntype", void 0)
 ], NotificationsController.prototype, "list", null);
 __decorate([
-    (0, common_1.Get)('unread-count'),
+    (0, common_1.Get)("unread-count"),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], NotificationsController.prototype, "unreadCount", null);
 __decorate([
-    (0, common_1.Patch)('read-all'),
+    (0, common_1.Patch)("read-all"),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], NotificationsController.prototype, "markAllRead", null);
 __decorate([
-    (0, common_1.Patch)(':id/read'),
+    (0, common_1.Patch)(":id/read"),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, Number]),
     __metadata("design:returntype", void 0)
 ], NotificationsController.prototype, "markRead", null);
 __decorate([
-    (0, common_1.Patch)(':id/unread'),
+    (0, common_1.Patch)(":id/unread"),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, Number]),
     __metadata("design:returntype", void 0)
 ], NotificationsController.prototype, "markUnread", null);
 __decorate([
-    (0, common_1.Delete)(':id'),
+    (0, common_1.Delete)(":id"),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object, Number]),
     __metadata("design:returntype", void 0)
 ], NotificationsController.prototype, "remove", null);
 exports.NotificationsController = NotificationsController = __decorate([
-    (0, common_1.Controller)('notifications'),
+    (0, common_1.Controller)("notifications"),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.LECTURER),
     __metadata("design:paramtypes", [notifications_service_1.NotificationsService])

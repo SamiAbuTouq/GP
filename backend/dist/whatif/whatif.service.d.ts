@@ -1,9 +1,9 @@
-import { ConfigService } from '@nestjs/config';
-import { Response } from 'express';
-import { PrismaService } from '../prisma/prisma.service';
-import { ApplyScenarioRunDto, CompareDto, CompareMode, CreateScenarioDto, UpdateScenarioDto } from './dto/whatif.dto';
-import { TimetablesService } from '../timetables/timetables.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { ConfigService } from "@nestjs/config";
+import { Response } from "express";
+import { PrismaService } from "../prisma/prisma.service";
+import { ApplyScenarioRunDto, CompareDto, CompareMode, CreateScenarioDto, UpdateScenarioDto } from "./dto/whatif.dto";
+import { TimetablesService } from "../timetables/timetables.service";
+import { NotificationsService } from "../notifications/notifications.service";
 export interface MetricsSnapshot {
     conflicts: number;
     roomUtilizationRate: number;
@@ -243,7 +243,7 @@ export declare class WhatIfService {
         appliedToTimetableId: number;
         message: string;
     }>;
-    controlRun(runId: number, action: 'pause' | 'resume'): Promise<{
+    controlRun(runId: number, action: "pause" | "resume"): Promise<{
         ok: boolean;
         action: "pause" | "resume";
         runId: number;

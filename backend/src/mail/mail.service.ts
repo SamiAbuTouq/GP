@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import nodemailer from 'nodemailer';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import nodemailer from "nodemailer";
 
 @Injectable()
 export class MailService {
@@ -10,11 +10,11 @@ export class MailService {
 
   private escapeHtml(value: string): string {
     return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   /** Trim and strip a single layer of surrounding quotes (common in .env on Windows). */
@@ -31,14 +31,19 @@ export class MailService {
     return s.length > 0 ? s : undefined;
   }
 
-  private getSmtpAuthConfig():
-    | { host: string; port: number; secure: boolean; user: string; pass: string }
-    | null {
-    const host = this.configService.get<string>('SMTP_HOST');
-    const port = Number(this.configService.get<string>('SMTP_PORT', '587'));
-    const secure = this.configService.get<string>('SMTP_SECURE', 'false') === 'true';
-    const user = this.configService.get<string>('SMTP_USER');
-    const pass = this.configService.get<string>('SMTP_PASS');
+  private getSmtpAuthConfig(): {
+    host: string;
+    port: number;
+    secure: boolean;
+    user: string;
+    pass: string;
+  } | null {
+    const host = this.configService.get<string>("SMTP_HOST");
+    const port = Number(this.configService.get<string>("SMTP_PORT", "587"));
+    const secure =
+      this.configService.get<string>("SMTP_SECURE", "false") === "true";
+    const user = this.configService.get<string>("SMTP_USER");
+    const pass = this.configService.get<string>("SMTP_PASS");
     if (!host || !user || !pass) return null;
     return { host, port, secure, user, pass };
   }
@@ -69,7 +74,7 @@ export class MailService {
     };
     const candidates = [base];
     const hostLower = config.host.toLowerCase();
-    if (hostLower.includes('gmail')) {
+    if (hostLower.includes("gmail")) {
       if (config.port === 587) {
         candidates.push({ ...base, port: 465, secure: true });
       } else if (config.port === 465) {
@@ -92,7 +97,9 @@ export class MailService {
   ): Promise<void> {
     const config = this.getSmtpAuthConfig();
     if (!config) {
-      this.logger.warn(`${contextLabel} email skipped: SMTP configuration is incomplete.`);
+      this.logger.warn(
+        `${contextLabel} email skipped: SMTP configuration is incomplete.`,
+      );
       return;
     }
 
@@ -104,7 +111,9 @@ export class MailService {
           const transporter = nodemailer.createTransport(candidate);
           await transporter.sendMail(mailOptions);
           if (attempt > 1) {
-            this.logger.log(`${contextLabel} email succeeded on retry ${attempt}.`);
+            this.logger.log(
+              `${contextLabel} email succeeded on retry ${attempt}.`,
+            );
           }
           return;
         } catch (error) {
@@ -115,7 +124,9 @@ export class MailService {
         }
       }
     }
-    throw lastError instanceof Error ? lastError : new Error('Email delivery failed.');
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("Email delivery failed.");
   }
 
   async sendLecturerWelcomeEmail(params: {
@@ -132,30 +143,38 @@ export class MailService {
     }
 
     const fromName = this.configService.get<string>(
-      'EMAIL_FROM_NAME',
-      'Smart University Timetable System',
+      "EMAIL_FROM_NAME",
+      "Smart University Timetable System",
     );
-    const fromAddress = this.configService.get<string>('SMTP_FROM', smtpConfig.user);
-    const replyTo = this.configService.get<string>('SMTP_REPLY_TO', smtpConfig.user);
+    const fromAddress = this.configService.get<string>(
+      "SMTP_FROM",
+      smtpConfig.user,
+    );
+    const replyTo = this.configService.get<string>(
+      "SMTP_REPLY_TO",
+      smtpConfig.user,
+    );
 
     const appBase =
-      this.normalizeEnvValue(this.configService.get<string>('NEXT_PUBLIC_APP_URL')) ||
-      this.normalizeEnvValue(this.configService.get<string>('APP_URL')) ||
-      'http://localhost:3000';
-    const firstLoginUrl = `${appBase.replace(/\/$/, '')}/first-login-password`;
+      this.normalizeEnvValue(
+        this.configService.get<string>("NEXT_PUBLIC_APP_URL"),
+      ) ||
+      this.normalizeEnvValue(this.configService.get<string>("APP_URL")) ||
+      "http://localhost:3000";
+    const firstLoginUrl = `${appBase.replace(/\/$/, "")}/first-login-password`;
 
-    const subject = 'Your Lecturer Account Credentials';
+    const subject = "Your Lecturer Account Credentials";
     const text = [
       `Hello ${params.fullName},`,
-      '',
-      'Your lecturer account has been created.',
+      "",
+      "Your lecturer account has been created.",
       `Email: ${params.to}`,
       `Temporary password: ${params.temporaryPassword}`,
-      '',
+      "",
       `Sign in and set your password: ${firstLoginUrl}`,
-      '',
-      'For security reasons, you must change this password on your first login.',
-    ].join('\n');
+      "",
+      "For security reasons, you must change this password on your first login.",
+    ].join("\n");
 
     const html = `
       <div style="font-family: Arial, sans-serif; background-color: #f4f5f7; padding: 40px 20px; min-height: 100%;">
@@ -214,14 +233,17 @@ export class MailService {
       </div>
     `;
 
-    await this.sendMailWithRetries({
-      from: `"${fromName}" <${fromAddress}>`,
-      replyTo,
-      to: params.to,
-      subject,
-      text,
-      html,
-    }, `Welcome (${params.to})`);
+    await this.sendMailWithRetries(
+      {
+        from: `"${fromName}" <${fromAddress}>`,
+        replyTo,
+        to: params.to,
+        subject,
+        text,
+        html,
+      },
+      `Welcome (${params.to})`,
+    );
   }
 
   async sendLecturerAccessRequestRejectedEmail(params: {
@@ -238,25 +260,31 @@ export class MailService {
     }
 
     const fromName = this.configService.get<string>(
-      'EMAIL_FROM_NAME',
-      'Smart University Timetable System',
+      "EMAIL_FROM_NAME",
+      "Smart University Timetable System",
     );
-    const fromAddress = this.configService.get<string>('SMTP_FROM', smtpConfig.user);
-    const replyTo = this.configService.get<string>('SMTP_REPLY_TO', smtpConfig.user);
+    const fromAddress = this.configService.get<string>(
+      "SMTP_FROM",
+      smtpConfig.user,
+    );
+    const replyTo = this.configService.get<string>(
+      "SMTP_REPLY_TO",
+      smtpConfig.user,
+    );
     const genericReason =
-      'At this time, we are unable to approve your access request. Please contact IT support for assistance.';
+      "At this time, we are unable to approve your access request. Please contact IT support for assistance.";
     const finalReason = params.reason?.trim() || genericReason;
 
-    const subject = 'Lecturer Access Request Update';
+    const subject = "Lecturer Access Request Update";
     const text = [
       `Hello ${params.fullName},`,
-      '',
-      'Your lecturer access request was not approved.',
-      '',
+      "",
+      "Your lecturer access request was not approved.",
+      "",
       `Reason: ${finalReason}`,
-      '',
-      'If you have questions, please contact IT support.',
-    ].join('\n');
+      "",
+      "If you have questions, please contact IT support.",
+    ].join("\n");
 
     const html = `
       <div style="font-family: Arial, sans-serif; background-color: #f4f5f7; padding: 40px 20px;">
@@ -278,14 +306,17 @@ export class MailService {
       </div>
     `;
 
-    await this.sendMailWithRetries({
-      from: `"${fromName}" <${fromAddress}>`,
-      replyTo,
-      to: params.to,
-      subject,
-      text,
-      html,
-    }, `Access request rejected (${params.to})`);
+    await this.sendMailWithRetries(
+      {
+        from: `"${fromName}" <${fromAddress}>`,
+        replyTo,
+        to: params.to,
+        subject,
+        text,
+        html,
+      },
+      `Access request rejected (${params.to})`,
+    );
   }
 
   async sendLecturerAccessRequestSubmittedEmail(params: {
@@ -306,28 +337,33 @@ export class MailService {
     }
 
     const fromName = this.configService.get<string>(
-      'EMAIL_FROM_NAME',
-      'Smart University Timetable System',
+      "EMAIL_FROM_NAME",
+      "Smart University Timetable System",
     );
-    const fromAddress = this.configService.get<string>('SMTP_FROM', smtpConfig.user);
-    const replyTo = this.configService.get<string>('SMTP_REPLY_TO', smtpConfig.user);
+    const fromAddress = this.configService.get<string>(
+      "SMTP_FROM",
+      smtpConfig.user,
+    );
+    const replyTo = this.configService.get<string>(
+      "SMTP_REPLY_TO",
+      smtpConfig.user,
+    );
 
     const submittedAt = new Date(params.submittedAtIso).toLocaleString();
     const expiresAt = new Date(params.expiresAtIso).toLocaleString();
     const coursesTextBlock =
       params.courses.length > 0
-        ? params.courses.map((c) => `  • ${c}`).join('\n')
-        : '  • None selected';
+        ? params.courses.map((c) => `  • ${c}`).join("\n")
+        : "  • None selected";
 
     const coursesHtmlBlock =
       params.courses.length > 0
         ? `<ul style="margin: 8px 0 0 18px; padding: 0; color: #475569; font-size: 14px; line-height: 1.55;">
             ${params.courses
               .map(
-                (c) =>
-                  `<li style="margin: 4px 0;">${this.escapeHtml(c)}</li>`,
+                (c) => `<li style="margin: 4px 0;">${this.escapeHtml(c)}</li>`,
               )
-              .join('')}
+              .join("")}
           </ul>`
         : `<p style="margin: 8px 0 0 0; color: #64748b; font-size: 14px;">None selected</p>`;
 
@@ -335,23 +371,23 @@ export class MailService {
     const safeEmail = this.escapeHtml(params.to);
     const safeDept = this.escapeHtml(params.department);
 
-    const subject = 'Lecturer Access Request Received';
+    const subject = "Lecturer Access Request Received";
     const text = [
       `Hello ${params.fullName},`,
-      '',
-      'We received your lecturer access request. It is now pending review.',
-      '',
-      'Submitted details:',
+      "",
+      "We received your lecturer access request. It is now pending review.",
+      "",
+      "Submitted details:",
       `- Name: ${params.fullName}`,
       `- Email: ${params.to}`,
       `- Department: ${params.department}`,
       `- Max workload (hrs) for bachelor's degree: ${params.maxWorkload}`,
-      '- Courses you can teach:',
+      "- Courses you can teach:",
       coursesTextBlock,
       `- Submitted at: ${submittedAt}`,
-      '',
+      "",
       `If no action is taken, requests expire after 14 days (${expiresAt}).`,
-    ].join('\n');
+    ].join("\n");
 
     const html = `
       <div style="font-family: Arial, sans-serif; background-color: #f4f5f7; padding: 40px 20px;">
@@ -385,13 +421,16 @@ export class MailService {
       </div>
     `;
 
-    await this.sendMailWithRetries({
-      from: `"${fromName}" <${fromAddress}>`,
-      replyTo,
-      to: params.to,
-      subject,
-      text,
-      html,
-    }, `Access request confirmation (${params.to})`);
+    await this.sendMailWithRetries(
+      {
+        from: `"${fromName}" <${fromAddress}>`,
+        replyTo,
+        to: params.to,
+        subject,
+        text,
+        html,
+      },
+      `Access request confirmation (${params.to})`,
+    );
   }
 }

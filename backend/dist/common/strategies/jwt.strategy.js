@@ -15,12 +15,12 @@ const passport_1 = require("@nestjs/passport");
 const passport_jwt_1 = require("passport-jwt");
 const config_1 = require("@nestjs/config");
 const users_service_1 = require("../../users/users.service");
-let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(passport_jwt_1.Strategy, 'jwt') {
+let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(passport_jwt_1.Strategy, "jwt") {
     constructor(configService, usersService) {
         super({
             jwtFromRequest: passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
-            secretOrKey: configService.getOrThrow('JWT_ACCESS_SECRET'),
+            secretOrKey: configService.getOrThrow("JWT_ACCESS_SECRET"),
         });
         this.configService = configService;
         this.usersService = usersService;
@@ -28,7 +28,7 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
     async validate(payload) {
         const user = await this.usersService.findById(payload.sub);
         if (!user) {
-            throw new common_1.UnauthorizedException('User no longer exists');
+            throw new common_1.UnauthorizedException("User no longer exists");
         }
         return user;
     }

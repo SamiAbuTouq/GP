@@ -35,19 +35,19 @@ exports.UpdatePreferencesDto = UpdatePreferencesDto;
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsIn)(['system', 'light', 'dark']),
+    (0, class_validator_1.IsIn)(["system", "light", "dark"]),
     __metadata("design:type", String)
 ], UpdatePreferencesDto.prototype, "theme_preference", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsIn)(['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD']),
+    (0, class_validator_1.IsIn)(["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"]),
     __metadata("design:type", String)
 ], UpdatePreferencesDto.prototype, "date_format", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsIn)(['12', '24']),
+    (0, class_validator_1.IsIn)(["12", "24"]),
     __metadata("design:type", String)
 ], UpdatePreferencesDto.prototype, "time_format", void 0);
 //# sourceMappingURL=update-user.dto.js.map

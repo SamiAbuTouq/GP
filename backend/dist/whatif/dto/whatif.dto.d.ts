@@ -89,7 +89,7 @@ export declare class RunScenarioDto {
     timetableIds: number[];
 }
 export declare class ControlRunDto {
-    action: 'pause' | 'resume';
+    action: "pause" | "resume";
 }
 export declare enum CompareMode {
     BEFORE_AFTER = "before_after",

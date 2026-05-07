@@ -1,4 +1,4 @@
-import { DeliveryMode } from '@prisma/client';
+import { DeliveryMode } from "@prisma/client";
 export declare class CreateCourseDto {
     code: string;
     name: string;

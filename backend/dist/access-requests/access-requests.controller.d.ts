@@ -1,6 +1,6 @@
-import { AccessRequestsService } from './access-requests.service';
-import { CreateAccessRequestDto } from './dto/create-access-request.dto';
-import { RejectAccessRequestDto } from './dto/reject-access-request.dto';
+import { AccessRequestsService } from "./access-requests.service";
+import { CreateAccessRequestDto } from "./dto/create-access-request.dto";
+import { RejectAccessRequestDto } from "./dto/reject-access-request.dto";
 export declare class AccessRequestsController {
     private readonly service;
     constructor(service: AccessRequestsService);

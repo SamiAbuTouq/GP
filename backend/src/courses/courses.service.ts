@@ -1,8 +1,12 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import type { DeliveryMode } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateCourseDto, UpdateCourseDto } from './dto/course.dto';
-import { academicLevelFromCourseCode } from './academic-level.util';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import type { DeliveryMode } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+import { CreateCourseDto, UpdateCourseDto } from "./dto/course.dto";
+import { academicLevelFromCourseCode } from "./academic-level.util";
 
 type CourseWithDepartment = {
   course_id: number;
@@ -29,7 +33,7 @@ export class CoursesService {
         course_code: true,
         course_name: true,
       },
-      orderBy: { course_code: 'asc' },
+      orderBy: { course_code: "asc" },
     });
     return courses.map((course) => ({
       code: course.course_code,
@@ -43,7 +47,7 @@ export class CoursesService {
       include: {
         department: true,
       },
-      orderBy: { course_code: 'asc' },
+      orderBy: { course_code: "asc" },
     });
 
     return courses.map((course) => ({
@@ -163,12 +167,20 @@ export class CoursesService {
       where: { course_id: id },
       data: {
         ...(dto.name !== undefined ? { course_name: dto.name } : {}),
-        ...(dto.creditHours !== undefined ? { credit_hours: dto.creditHours } : {}),
+        ...(dto.creditHours !== undefined
+          ? { credit_hours: dto.creditHours }
+          : {}),
         academic_level: syncedLevel,
-        ...(dto.deliveryMode !== undefined ? { delivery_mode: dto.deliveryMode } : {}),
+        ...(dto.deliveryMode !== undefined
+          ? { delivery_mode: dto.deliveryMode }
+          : {}),
         dept_id: deptId,
-        ...(dto.sectionsNormal !== undefined ? { sections_normal: dto.sectionsNormal } : {}),
-        ...(dto.sectionsSummer !== undefined ? { sections_summer: dto.sectionsSummer } : {}),
+        ...(dto.sectionsNormal !== undefined
+          ? { sections_normal: dto.sectionsNormal }
+          : {}),
+        ...(dto.sectionsSummer !== undefined
+          ? { sections_summer: dto.sectionsSummer }
+          : {}),
         ...(dto.isLab !== undefined ? { is_lab: dto.isLab } : {}),
       },
       include: {
@@ -205,14 +217,14 @@ export class CoursesService {
       data: { is_active: false },
     });
 
-    return { message: 'Course archived successfully', archived: true };
+    return { message: "Course archived successfully", archived: true };
   }
 
   async findArchived() {
     const courses = await this.prisma.course.findMany({
       where: { is_active: false },
       include: { department: true },
-      orderBy: { course_code: 'asc' },
+      orderBy: { course_code: "asc" },
     });
 
     return courses.map((course) => ({
@@ -245,7 +257,7 @@ export class CoursesService {
       data: { is_active: true },
     });
 
-    return { message: 'Course restored successfully' };
+    return { message: "Course restored successfully" };
   }
 
   async getDeletionImpact(id: number) {
@@ -266,15 +278,17 @@ export class CoursesService {
           select: { generation_type: true, status: true, version_number: true },
         },
       },
-      distinct: ['timetable_id'],
-      orderBy: { timetable_id: 'asc' },
+      distinct: ["timetable_id"],
+      orderBy: { timetable_id: "asc" },
     });
 
     return {
       courseId: course.course_id,
       courseCode: course.course_code,
       courseName: course.course_name,
-      entryCount: await this.prisma.sectionScheduleEntry.count({ where: { course_id: id } }),
+      entryCount: await this.prisma.sectionScheduleEntry.count({
+        where: { course_id: id },
+      }),
       timetables: entries.map((entry) => ({
         timetableId: entry.timetable_id,
         generationType: entry.timetable.generation_type,
@@ -293,7 +307,9 @@ export class CoursesService {
       throw new NotFoundException(`Course with ID ${id} not found`);
     }
     if (course.is_active) {
-      throw new ConflictException('Only archived courses can be permanently deleted.');
+      throw new ConflictException(
+        "Only archived courses can be permanently deleted.",
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -302,6 +318,6 @@ export class CoursesService {
       await tx.course.delete({ where: { course_id: id } });
     });
 
-    return { message: 'Course permanently deleted successfully' };
+    return { message: "Course permanently deleted successfully" };
   }
 }

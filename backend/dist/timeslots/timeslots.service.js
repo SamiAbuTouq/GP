@@ -15,8 +15,14 @@ const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const notifications_service_1 = require("../notifications/notifications.service");
 const notification_prefs_1 = require("../notifications/notification-prefs");
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
-const DAY_VALUES = { Sunday: 1, Monday: 2, Tuesday: 4, Wednesday: 8, Thursday: 16 };
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
+const DAY_VALUES = {
+    Sunday: 1,
+    Monday: 2,
+    Tuesday: 4,
+    Wednesday: 8,
+    Thursday: 16,
+};
 let TimeslotsService = class TimeslotsService {
     constructor(prisma, notifications) {
         this.prisma = prisma;
@@ -40,12 +46,12 @@ let TimeslotsService = class TimeslotsService {
         if (existingLecturer)
             return;
         let fallbackDepartment = await tx.department.findFirst({
-            orderBy: { dept_id: 'asc' },
+            orderBy: { dept_id: "asc" },
             select: { dept_id: true },
         });
         if (!fallbackDepartment) {
             fallbackDepartment = await tx.department.create({
-                data: { dept_name: 'General' },
+                data: { dept_name: "General" },
                 select: { dept_id: true },
             });
         }
@@ -80,7 +86,7 @@ let TimeslotsService = class TimeslotsService {
         return date.toTimeString().slice(0, 5);
     }
     parseTime(timeStr) {
-        const [hours, minutes] = timeStr.split(':').map(Number);
+        const [hours, minutes] = timeStr.split(":").map(Number);
         const date = new Date();
         date.setHours(hours, minutes, 0, 0);
         return date;
@@ -91,7 +97,7 @@ let TimeslotsService = class TimeslotsService {
                 is_active: true,
                 ...(isSummer !== undefined ? { is_summer: isSummer } : {}),
             },
-            orderBy: [{ start_time: 'asc' }],
+            orderBy: [{ start_time: "asc" }],
         });
         return timeslots.map((slot) => ({
             id: slot.slot_id,
@@ -174,7 +180,7 @@ let TimeslotsService = class TimeslotsService {
             where: { slot_id: id },
             data: { is_active: false },
         });
-        return { message: 'Timeslot archived successfully', archived: true };
+        return { message: "Timeslot archived successfully", archived: true };
     }
     async getLecturerPreferences(userId) {
         return this.getPreferencesByUserId(userId);
@@ -185,7 +191,7 @@ let TimeslotsService = class TimeslotsService {
     async getPreferencesByUserId(userId) {
         const slots = await this.prisma.timeslot.findMany({
             where: { is_active: true },
-            orderBy: [{ start_time: 'asc' }, { end_time: 'asc' }, { slot_id: 'asc' }],
+            orderBy: [{ start_time: "asc" }, { end_time: "asc" }, { slot_id: "asc" }],
             include: {
                 lecturer_preferences: {
                     where: { user_id: userId },
@@ -203,9 +209,9 @@ let TimeslotsService = class TimeslotsService {
             isSummer: slot.is_summer,
             preference: slot.lecturer_preferences.length > 0
                 ? slot.lecturer_preferences[0].is_preferred
-                    ? 'PREFERRED'
-                    : 'NOT_PREFERRED'
-                : 'NEUTRAL',
+                    ? "PREFERRED"
+                    : "NOT_PREFERRED"
+                : "NEUTRAL",
         }));
     }
     async updateLecturerPreferences(userId, preferences) {
@@ -222,7 +228,7 @@ let TimeslotsService = class TimeslotsService {
             select: { first_name: true, last_name: true },
         });
         const fullName = lecturer != null
-            ? `${lecturer.first_name ?? ''} ${lecturer.last_name ?? ''}`.trim()
+            ? `${lecturer.first_name ?? ""} ${lecturer.last_name ?? ""}`.trim()
             : `Lecturer #${userId}`;
         await this.prisma.$transaction(async (tx) => {
             await this.ensureLecturerProfileExists(tx, userId);
@@ -243,9 +249,10 @@ let TimeslotsService = class TimeslotsService {
         const isFirst = priorCount === 0;
         const suffix = `\n[[lecturer_user_id:${userId}]]`;
         void this.notifications
-            .notifyAdmins(isFirst ? 'Preferences Submitted' : 'Preferences Updated', (isFirst
+            .notifyAdmins(isFirst ? "Preferences Submitted" : "Preferences Updated", (isFirst
             ? `${fullName} submitted their time preferences for the first time.`
-            : `${fullName} updated their time preferences. Re-running timetable generation may be needed to reflect the changes.`) + suffix, { preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_PREFERENCES })
+            : `${fullName} updated their time preferences. Re-running timetable generation may be needed to reflect the changes.`) +
+            suffix, { preferenceKey: notification_prefs_1.ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_PREFERENCES })
             .catch(() => { });
         return { success: true };
     }
@@ -255,7 +262,7 @@ let TimeslotsService = class TimeslotsService {
                 is_active: false,
                 ...(isSummer !== undefined ? { is_summer: isSummer } : {}),
             },
-            orderBy: [{ start_time: 'asc' }],
+            orderBy: [{ start_time: "asc" }],
         });
         return timeslots.map((slot) => ({
             id: slot.slot_id,
@@ -278,7 +285,7 @@ let TimeslotsService = class TimeslotsService {
             where: { slot_id: id },
             data: { is_active: true },
         });
-        return { message: 'Timeslot restored successfully' };
+        return { message: "Timeslot restored successfully" };
     }
     async getDeletionImpact(id) {
         const slot = await this.prisma.timeslot.findUnique({
@@ -296,12 +303,14 @@ let TimeslotsService = class TimeslotsService {
                     select: { generation_type: true, status: true, version_number: true },
                 },
             },
-            distinct: ['timetable_id'],
-            orderBy: { timetable_id: 'asc' },
+            distinct: ["timetable_id"],
+            orderBy: { timetable_id: "asc" },
         });
         return {
             slotId: id,
-            entryCount: await this.prisma.sectionScheduleEntry.count({ where: { slot_id: id } }),
+            entryCount: await this.prisma.sectionScheduleEntry.count({
+                where: { slot_id: id },
+            }),
             timetables: entries.map((entry) => ({
                 timetableId: entry.timetable_id,
                 generationType: entry.timetable.generation_type,
@@ -319,7 +328,7 @@ let TimeslotsService = class TimeslotsService {
             throw new common_1.NotFoundException(`Timeslot with ID ${id} not found`);
         }
         if (slot.is_active) {
-            throw new common_1.ConflictException('Only archived timeslots can be permanently deleted.');
+            throw new common_1.ConflictException("Only archived timeslots can be permanently deleted.");
         }
         await this.prisma.$transaction(async (tx) => {
             await tx.sectionScheduleEntry.deleteMany({ where: { slot_id: id } });
@@ -327,7 +336,7 @@ let TimeslotsService = class TimeslotsService {
             await tx.lecturerOfficeHours.deleteMany({ where: { slot_id: id } });
             await tx.timeslot.delete({ where: { slot_id: id } });
         });
-        return { message: 'Timeslot permanently deleted successfully' };
+        return { message: "Timeslot permanently deleted successfully" };
     }
 };
 exports.TimeslotsService = TimeslotsService;

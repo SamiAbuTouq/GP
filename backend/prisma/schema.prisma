@@ -29,6 +29,13 @@ enum AccessRequestStatus {
   REJECTED
 }
 
+enum CourseModificationRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 // ─────────────────────────────────────────────
 // USER
 // ─────────────────────────────────────────────
@@ -109,6 +116,7 @@ model Lecturer {
   lecturer_preferences      LecturerPreference[]
   lecturer_can_teach_course LecturerCanTeachCourse[]
   lecturer_office_hours     LecturerOfficeHours[]
+  course_modification_requests CourseModificationRequest[]
   section_schedule_entries  SectionScheduleEntry[]
 
   @@map("lecturer")
@@ -390,6 +398,24 @@ model LecturerAccessRequest {
   @@index([status, submitted_at])
   @@index([email, status])
   @@map("lecturer_access_request")
+}
+
+model CourseModificationRequest {
+  request_id          Int                             @id @default(autoincrement())
+  lecturer_user_id    Int
+  courses_to_add      Json?
+  courses_to_remove   Json?
+  note                String?                         @db.Text
+  status              CourseModificationRequestStatus @default(PENDING)
+  rejection_reason    String?                         @db.Text
+  submitted_at        DateTime                        @default(now())
+  reviewed_at         DateTime?
+
+  lecturer Lecturer @relation(fields: [lecturer_user_id], references: [user_id], onDelete: Cascade)
+
+  @@index([lecturer_user_id, submitted_at])
+  @@index([status, submitted_at])
+  @@map("course_modification_request")
 }
 
 // ─────────────────────────────────────────────

@@ -16,18 +16,18 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Response } from 'express';
-import { spawn, spawnSync, ChildProcess } from 'child_process';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import { PrismaService } from '../prisma/prisma.service';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Response } from "express";
+import { spawn, spawnSync, ChildProcess } from "child_process";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+import { PrismaService } from "../prisma/prisma.service";
 import {
   releaseOptimizerGlobalLock,
   tryAcquireOptimizerGlobalLock,
-} from '../common/optimizer-global-lock';
+} from "../common/optimizer-global-lock";
 import {
   ApplyScenarioRunDto,
   CompareDto,
@@ -35,10 +35,10 @@ import {
   ConditionDto,
   CreateScenarioDto,
   UpdateScenarioDto,
-} from './dto/whatif.dto';
-import { TimetablesService } from '../timetables/timetables.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { ADMIN_NOTIFICATION_PREF_KEYS } from '../notifications/notification-prefs';
+} from "./dto/whatif.dto";
+import { TimetablesService } from "../timetables/timetables.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { ADMIN_NOTIFICATION_PREF_KEYS } from "../notifications/notification-prefs";
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -91,7 +91,7 @@ interface BaselineEntry {
 }
 
 interface GwoProgressLine {
-  type: 'progress' | 'result' | 'error';
+  type: "progress" | "result" | "error";
   phase?: string;
   pct?: number;
   message?: string;
@@ -112,9 +112,13 @@ interface GwoProgressLine {
   detail?: string;
 }
 
-function isOptimizerScenarioRunBaseGenerationType(gen: string | null | undefined): boolean {
-  const g = String(gen ?? '').trim().toLowerCase();
-  return g === 'gwo_ui' || g === 'gwo';
+function isOptimizerScenarioRunBaseGenerationType(
+  gen: string | null | undefined,
+): boolean {
+  const g = String(gen ?? "")
+    .trim()
+    .toLowerCase();
+  return g === "gwo_ui" || g === "gwo";
 }
 
 @Injectable()
@@ -159,13 +163,15 @@ export class WhatIfService {
 
   async listScenarios() {
     const rows = await this.prisma.scenario.findMany({
-      orderBy: { scenario_id: 'desc' },
+      orderBy: { scenario_id: "desc" },
       include: {
-        conditions: { orderBy: { order_index: 'asc' } },
+        conditions: { orderBy: { order_index: "asc" } },
         runs: {
-          orderBy: { run_id: 'desc' },
+          orderBy: { run_id: "desc" },
           take: 1,
-          include: { base_timetable: { select: { timetable_id: true, status: true } } },
+          include: {
+            base_timetable: { select: { timetable_id: true, status: true } },
+          },
         },
       },
     });
@@ -177,9 +183,9 @@ export class WhatIfService {
     const row = await this.prisma.scenario.findUnique({
       where: { scenario_id: id },
       include: {
-        conditions: { orderBy: { order_index: 'asc' } },
+        conditions: { orderBy: { order_index: "asc" } },
         runs: {
-          orderBy: { run_id: 'desc' },
+          orderBy: { run_id: "desc" },
           include: {
             base_timetable: {
               select: { timetable_id: true, status: true, semester_id: true },
@@ -192,7 +198,7 @@ export class WhatIfService {
       },
     });
 
-    if (!row) throw new NotFoundException('Scenario not found.');
+    if (!row) throw new NotFoundException("Scenario not found.");
     return this.serializeScenario(row);
   }
 
@@ -200,8 +206,8 @@ export class WhatIfService {
     const scenario = await this.prisma.scenario.create({
       data: {
         name: dto.name.trim(),
-        status: 'draft',
-        description: dto.description?.trim() ?? '',
+        status: "draft",
+        description: dto.description?.trim() ?? "",
         conditions: dto.conditions?.length
           ? {
               create: dto.conditions.map((c, i) => ({
@@ -213,7 +219,7 @@ export class WhatIfService {
           : undefined,
       },
       include: {
-        conditions: { orderBy: { order_index: 'asc' } },
+        conditions: { orderBy: { order_index: "asc" } },
         runs: { take: 1 },
       },
     });
@@ -225,7 +231,7 @@ export class WhatIfService {
     const existing = await this.prisma.scenario.findUnique({
       where: { scenario_id: id },
     });
-    if (!existing) throw new NotFoundException('Scenario not found.');
+    if (!existing) throw new NotFoundException("Scenario not found.");
 
     // Replace conditions atomically if provided
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -252,7 +258,7 @@ export class WhatIfService {
             : {}),
         },
         include: {
-          conditions: { orderBy: { order_index: 'asc' } },
+          conditions: { orderBy: { order_index: "asc" } },
           runs: { take: 1 },
         },
       });
@@ -264,9 +270,9 @@ export class WhatIfService {
   async cloneScenario(id: number) {
     const original = await this.prisma.scenario.findUnique({
       where: { scenario_id: id },
-      include: { conditions: { orderBy: { order_index: 'asc' } } },
+      include: { conditions: { orderBy: { order_index: "asc" } } },
     });
-    if (!original) throw new NotFoundException('Scenario not found.');
+    if (!original) throw new NotFoundException("Scenario not found.");
 
     return this.createScenario({
       name: `${original.name} (Copy)`,
@@ -282,13 +288,13 @@ export class WhatIfService {
   async deleteScenario(id: number, force = false) {
     const scenario = await this.prisma.scenario.findUnique({
       where: { scenario_id: id },
-      include: { runs: { where: { status: 'applied' }, take: 1 } },
+      include: { runs: { where: { status: "applied" }, take: 1 } },
     });
-    if (!scenario) throw new NotFoundException('Scenario not found.');
+    if (!scenario) throw new NotFoundException("Scenario not found.");
 
     if (scenario.runs.length > 0 && !force) {
       throw new BadRequestException(
-        'This scenario has applied runs. Pass force=true to delete anyway.',
+        "This scenario has applied runs. Pass force=true to delete anyway.",
       );
     }
 
@@ -299,7 +305,7 @@ export class WhatIfService {
   async listConditions(scenarioId: number) {
     const conditions = await this.prisma.scenarioCondition.findMany({
       where: { scenario_id: scenarioId },
-      orderBy: { order_index: 'asc' },
+      orderBy: { order_index: "asc" },
     });
     return conditions.map((c) => ({
       conditionId: c.condition_id,
@@ -318,39 +324,39 @@ export class WhatIfService {
    * For each run: create a DB record, build the config JSON, spawn Python.
    */
   async runScenario(scenarioId: number, timetableIds: number[]) {
-    const lock = tryAcquireOptimizerGlobalLock('whatif');
+    const lock = tryAcquireOptimizerGlobalLock("whatif");
     if (!lock.ok) {
       throw new BadRequestException(
-        lock.holder === 'timetable'
-          ? 'Timetable generation is currently running. Wait for it to finish before running a scenario.'
-          : 'Another scenario run is already in progress. Wait for it to finish first.',
+        lock.holder === "timetable"
+          ? "Timetable generation is currently running. Wait for it to finish before running a scenario."
+          : "Another scenario run is already in progress. Wait for it to finish first.",
       );
     }
     this.holdsGlobalOptimizerLock = true;
     try {
       const alreadyRunning = await this.prisma.scenarioRun.findFirst({
-        where: { status: { in: ['pending', 'running'] } },
+        where: { status: { in: ["pending", "running"] } },
         select: { run_id: true },
       });
       if (alreadyRunning) {
         throw new BadRequestException(
-          'Another scenario run is already in progress. Wait for it to finish first.',
+          "Another scenario run is already in progress. Wait for it to finish first.",
         );
       }
 
       const scenario = await this.prisma.scenario.findUnique({
         where: { scenario_id: scenarioId },
-        include: { conditions: { orderBy: { order_index: 'asc' } } },
+        include: { conditions: { orderBy: { order_index: "asc" } } },
       });
-      if (!scenario) throw new NotFoundException('Scenario not found.');
+      if (!scenario) throw new NotFoundException("Scenario not found.");
       if (scenario.conditions.length === 0) {
         throw new BadRequestException(
-          'Scenario has no conditions. Add at least one condition before running.',
+          "Scenario has no conditions. Add at least one condition before running.",
         );
       }
 
       if (timetableIds.length === 0) {
-        throw new BadRequestException('Provide at least one timetable ID.');
+        throw new BadRequestException("Provide at least one timetable ID.");
       }
 
       // Verify all timetable IDs exist
@@ -367,20 +373,20 @@ export class WhatIfService {
       const missing = timetableIds.filter((id) => !foundIds.has(id));
       if (missing.length > 0) {
         throw new BadRequestException(
-          `Timetable IDs not found: ${missing.join(', ')}`,
+          `Timetable IDs not found: ${missing.join(", ")}`,
         );
       }
       const disallowedScenarioResult = timetables
         .filter(
           (t) =>
-            t.generation_type === 'what_if' ||
-            t.generation_type === 'what_if_applied' ||
+            t.generation_type === "what_if" ||
+            t.generation_type === "what_if_applied" ||
             t._count.scenario_runs_as_result > 0,
         )
         .map((t) => t.timetable_id);
       if (disallowedScenarioResult.length > 0) {
         throw new BadRequestException(
-          `Scenario result timetables cannot be used as bases: ${disallowedScenarioResult.join(', ')}`,
+          `Scenario result timetables cannot be used as bases: ${disallowedScenarioResult.join(", ")}`,
         );
       }
       const invalidDraftBases = timetables
@@ -392,7 +398,7 @@ export class WhatIfService {
         .map((t) => t.timetable_id);
       if (invalidDraftBases.length > 0) {
         throw new BadRequestException(
-          `Only published timetables or timetables saved from timetable generation (optimizer drafts) can be used as scenario bases. Invalid IDs: ${invalidDraftBases.join(', ')}`,
+          `Only published timetables or timetables saved from timetable generation (optimizer drafts) can be used as scenario bases. Invalid IDs: ${invalidDraftBases.join(", ")}`,
         );
       }
 
@@ -403,7 +409,7 @@ export class WhatIfService {
           data: {
             scenario_id: scenarioId,
             base_timetable_id: timetableId,
-            status: 'pending',
+            status: "pending",
           },
         });
 
@@ -420,7 +426,7 @@ export class WhatIfService {
       // Mark scenario as active
       await this.prisma.scenario.update({
         where: { scenario_id: scenarioId },
-        data: { status: 'active' },
+        data: { status: "active" },
       });
 
       // Start batch execution; subsequent runs are triggered after each process exits.
@@ -434,12 +440,13 @@ export class WhatIfService {
         await this.prisma.scenarioRun.updateMany({
           where: {
             run_id: { in: queuedRunIds },
-            status: 'pending',
+            status: "pending",
           },
           data: {
-            status: 'failed',
+            status: "failed",
             completed_at: new Date(),
-            error_message: 'Batch initialization failed before execution started.',
+            error_message:
+              "Batch initialization failed before execution started.",
           },
         });
       }
@@ -453,7 +460,7 @@ export class WhatIfService {
     if (this.pendingProcessStarts > 0) return;
     if (this.activeProcesses.size > 0) return;
     if (this.queuedScenarioRuns.length > 0) return;
-    releaseOptimizerGlobalLock('whatif');
+    releaseOptimizerGlobalLock("whatif");
     this.holdsGlobalOptimizerLock = false;
   }
 
@@ -480,7 +487,7 @@ export class WhatIfService {
       await this.prisma.scenarioRun.update({
         where: { run_id: next.runId },
         data: {
-          status: 'failed',
+          status: "failed",
           completed_at: new Date(),
           error_message: err.message,
         },
@@ -513,9 +520,9 @@ export class WhatIfService {
       });
       if (!row) return undefined;
       if (
-        row.status === 'completed' ||
-        row.status === 'applied' ||
-        row.status === 'failed'
+        row.status === "completed" ||
+        row.status === "applied" ||
+        row.status === "failed"
       ) {
         return undefined;
       }
@@ -524,10 +531,10 @@ export class WhatIfService {
       if (now - lastKeepalive >= 5000) {
         lastKeepalive = now;
         sendEvent({
-          type: 'progress',
-          phase: 'starting',
+          type: "progress",
+          phase: "starting",
           pct: 1,
-          message: 'Preparing scenario runner…',
+          message: "Preparing scenario runner…",
         });
       }
 
@@ -543,10 +550,10 @@ export class WhatIfService {
    */
   async streamRunProgress(runId: number, res: Response) {
     // SSE headers
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders();
 
     const sendEvent = (data: object) => {
@@ -562,7 +569,7 @@ export class WhatIfService {
       });
       if (
         runPeek &&
-        (runPeek.status === 'pending' || runPeek.status === 'running')
+        (runPeek.status === "pending" || runPeek.status === "running")
       ) {
         proc = await this.waitForActiveScenarioProcess(runId, sendEvent, {
           maxWaitMs: 120_000,
@@ -574,7 +581,7 @@ export class WhatIfService {
     if (proc) {
       // Process is still running — pipe stdout events
       const onData = (chunk: Buffer) => {
-        const lines = chunk.toString().split('\n');
+        const lines = chunk.toString().split("\n");
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed) continue;
@@ -583,34 +590,37 @@ export class WhatIfService {
             sendEvent(parsed);
           } catch {
             // Non-JSON line from Python (debug print, traceback, etc.) — forward as message
-            sendEvent({ type: 'progress', phase: 'gwo', message: trimmed });
+            sendEvent({ type: "progress", phase: "gwo", message: trimmed });
           }
         }
       };
 
       const onClose = (code: number | null) => {
         sendEvent({
-          type: 'stream_closed',
+          type: "stream_closed",
           code,
-          message: code === 0 ? 'Process exited cleanly.' : `Process exited with code ${code}.`,
+          message:
+            code === 0
+              ? "Process exited cleanly."
+              : `Process exited with code ${code}.`,
         });
         res.end();
       };
 
       const onError = (err: Error) => {
-        sendEvent({ type: 'error', message: err.message });
+        sendEvent({ type: "error", message: err.message });
         res.end();
       };
 
-      proc.stdout?.on('data', onData);
-      proc.on('close', onClose);
-      proc.on('error', onError);
+      proc.stdout?.on("data", onData);
+      proc.on("close", onClose);
+      proc.on("error", onError);
 
       // Clean up listeners when the client disconnects
-      res.on('close', () => {
-        proc.stdout?.off('data', onData);
-        proc.off('close', onClose);
-        proc.off('error', onError);
+      res.on("close", () => {
+        proc.stdout?.off("data", onData);
+        proc.off("close", onClose);
+        proc.off("error", onError);
       });
     } else {
       // Process not active — fetch final state from DB
@@ -619,14 +629,14 @@ export class WhatIfService {
       });
 
       if (!run) {
-        sendEvent({ type: 'error', message: `Run ${runId} not found.` });
+        sendEvent({ type: "error", message: `Run ${runId} not found.` });
         res.end();
         return;
       }
 
-      if (run.status === 'completed' || run.status === 'applied') {
+      if (run.status === "completed" || run.status === "applied") {
         sendEvent({
-          type: 'result',
+          type: "result",
           run_id: run.run_id,
           result_timetable_id: run.result_timetable_id,
           baseline_metrics: run.baseline_metrics,
@@ -634,21 +644,21 @@ export class WhatIfService {
           gwo_iterations_run: run.gwo_iterations_run,
           generation_seconds: run.generation_seconds,
           pct: 100,
-          phase: 'done',
-          message: 'Simulation complete.',
+          phase: "done",
+          message: "Simulation complete.",
         });
-      } else if (run.status === 'failed') {
+      } else if (run.status === "failed") {
         sendEvent({
-          type: 'error',
+          type: "error",
           run_id: run.run_id,
-          message: run.error_message ?? 'Run failed.',
+          message: run.error_message ?? "Run failed.",
         });
       } else {
         // pending but no active process — something crashed
         sendEvent({
-          type: 'error',
+          type: "error",
           run_id: run.run_id,
-          message: 'Run was interrupted. Please re-run the scenario.',
+          message: "Run was interrupted. Please re-run the scenario.",
         });
       }
 
@@ -665,7 +675,7 @@ export class WhatIfService {
         result_timetable: { select: { timetable_id: true, status: true } },
       },
     });
-    if (!run) throw new NotFoundException('Run not found.');
+    if (!run) throw new NotFoundException("Run not found.");
 
     return {
       runId: run.run_id,
@@ -690,11 +700,11 @@ export class WhatIfService {
       where: { scenario_id: scenarioId },
       select: { scenario_id: true },
     });
-    if (!scenario) throw new NotFoundException('Scenario not found.');
+    if (!scenario) throw new NotFoundException("Scenario not found.");
 
     const runs = await this.prisma.scenarioRun.findMany({
       where: { scenario_id: scenarioId },
-      orderBy: { run_id: 'desc' },
+      orderBy: { run_id: "desc" },
       include: {
         base_timetable: {
           select: {
@@ -715,7 +725,7 @@ export class WhatIfService {
         const sem = r.base_timetable.semester;
         if (sem) {
           const parts = [sem.academic_year, sem.semester_type].filter(Boolean);
-          if (parts.length) return parts.join(' · ');
+          if (parts.length) return parts.join(" · ");
         }
         return `Timetable ${r.base_timetable_id}`;
       })(),
@@ -743,13 +753,13 @@ export class WhatIfService {
 
   async compare(dto: CompareDto) {
     if (dto.runIds.length === 0) {
-      throw new BadRequestException('Provide at least one run ID.');
+      throw new BadRequestException("Provide at least one run ID.");
     }
 
     const runs = await this.prisma.scenarioRun.findMany({
       where: {
         run_id: { in: dto.runIds },
-        status: { in: ['completed', 'applied'] },
+        status: { in: ["completed", "applied"] },
       },
       include: {
         scenario: {
@@ -770,14 +780,14 @@ export class WhatIfService {
 
     if (runs.length === 0) {
       throw new BadRequestException(
-        'None of the supplied run IDs have completed results.',
+        "None of the supplied run IDs have completed results.",
       );
     }
 
     // Validate mode constraints
     if (dto.mode === CompareMode.BEFORE_AFTER && runs.length !== 1) {
       throw new BadRequestException(
-        'before_after mode requires exactly one run ID.',
+        "before_after mode requires exactly one run ID.",
       );
     }
     if (
@@ -785,7 +795,7 @@ export class WhatIfService {
       new Set(runs.map((r) => r.scenario_id)).size !== 1
     ) {
       throw new BadRequestException(
-        'cross_timetable mode requires all runs to belong to the same scenario.',
+        "cross_timetable mode requires all runs to belong to the same scenario.",
       );
     }
     if (
@@ -793,7 +803,7 @@ export class WhatIfService {
       new Set(runs.map((r) => r.base_timetable_id)).size !== 1
     ) {
       throw new BadRequestException(
-        'cross_scenario mode requires all runs to use the same base timetable.',
+        "cross_scenario mode requires all runs to use the same base timetable.",
       );
     }
 
@@ -801,7 +811,7 @@ export class WhatIfService {
       new Set(
         runs.flatMap((run) =>
           [run.base_timetable_id, run.result_timetable_id].filter(
-            (id): id is number => typeof id === 'number' && id > 0,
+            (id): id is number => typeof id === "number" && id > 0,
           ),
         ),
       ),
@@ -834,7 +844,7 @@ export class WhatIfService {
       const baseEntries = entriesByTimetable.get(run.base_timetable_id) ?? [];
       const resultEntries =
         run.result_timetable_id != null
-          ? entriesByTimetable.get(run.result_timetable_id) ?? []
+          ? (entriesByTimetable.get(run.result_timetable_id) ?? [])
           : [];
       const sectionChanges = this._computeSectionChangeSummary(
         baseEntries,
@@ -866,20 +876,24 @@ export class WhatIfService {
       const deltas =
         baseline && result
           ? {
-              conflicts:
-                (result.conflicts ?? 0) - (baseline.conflicts ?? 0),
-              roomUtilizationRate:
-                +((result.roomUtilizationRate ?? 0) -
-                  (baseline.roomUtilizationRate ?? 0)).toFixed(2),
-              softConstraintsScore:
-                +((result.softConstraintsScore ?? 0) -
-                  (baseline.softConstraintsScore ?? 0)).toFixed(2),
-              fitnessScore:
-                +((result.fitnessScore ?? 0) - (baseline.fitnessScore ?? 0)).toFixed(4),
+              conflicts: (result.conflicts ?? 0) - (baseline.conflicts ?? 0),
+              roomUtilizationRate: +(
+                (result.roomUtilizationRate ?? 0) -
+                (baseline.roomUtilizationRate ?? 0)
+              ).toFixed(2),
+              softConstraintsScore: +(
+                (result.softConstraintsScore ?? 0) -
+                (baseline.softConstraintsScore ?? 0)
+              ).toFixed(2),
+              fitnessScore: +(
+                (result.fitnessScore ?? 0) - (baseline.fitnessScore ?? 0)
+              ).toFixed(4),
               lecturerBalanceScore:
-                baseline.lecturerBalanceScore != null && result.lecturerBalanceScore != null
+                baseline.lecturerBalanceScore != null &&
+                result.lecturerBalanceScore != null
                   ? +(
-                      result.lecturerBalanceScore - baseline.lecturerBalanceScore
+                      result.lecturerBalanceScore -
+                      baseline.lecturerBalanceScore
                     ).toFixed(2)
                   : null,
             }
@@ -887,10 +901,10 @@ export class WhatIfService {
 
       const disruption =
         sectionChanges.percentSectionsAffected <= 12
-          ? 'Low'
+          ? "Low"
           : sectionChanges.percentSectionsAffected <= 28
-            ? 'Moderate'
-            : 'High';
+            ? "Moderate"
+            : "High";
 
       return {
         runId: run.run_id,
@@ -917,7 +931,7 @@ export class WhatIfService {
               gwoIterations: run.gwo_iterations_run ?? null,
               conflictBreakdownDelta,
             })
-          : 'Run the scenario first to see a recommendation.',
+          : "Run the scenario first to see a recommendation.",
         sectionChanges,
       };
     });
@@ -953,14 +967,14 @@ export class WhatIfService {
       },
     });
 
-    if (!run) throw new NotFoundException('Run not found.');
-    if (run.status !== 'completed') {
+    if (!run) throw new NotFoundException("Run not found.");
+    if (run.status !== "completed") {
       throw new BadRequestException(
         `Run is not completed (current status: ${run.status}).`,
       );
     }
     if (!run.result_timetable) {
-      throw new BadRequestException('Run has no result timetable to apply.');
+      throw new BadRequestException("Run has no result timetable to apply.");
     }
 
     await this.timetablesService.ensureHardConflictsAcknowledged(
@@ -998,14 +1012,18 @@ export class WhatIfService {
           where: { timetable_id: baseTimetableId },
           create: {
             timetable_id: baseTimetableId,
-            room_utilization_rate: resultTimetable.timetable_metrics.room_utilization_rate,
-            soft_constraints_score: resultTimetable.timetable_metrics.soft_constraints_score,
+            room_utilization_rate:
+              resultTimetable.timetable_metrics.room_utilization_rate,
+            soft_constraints_score:
+              resultTimetable.timetable_metrics.soft_constraints_score,
             fitness_score: resultTimetable.timetable_metrics.fitness_score,
             is_valid: resultTimetable.timetable_metrics.is_valid,
           },
           update: {
-            room_utilization_rate: resultTimetable.timetable_metrics.room_utilization_rate,
-            soft_constraints_score: resultTimetable.timetable_metrics.soft_constraints_score,
+            room_utilization_rate:
+              resultTimetable.timetable_metrics.room_utilization_rate,
+            soft_constraints_score:
+              resultTimetable.timetable_metrics.soft_constraints_score,
             fitness_score: resultTimetable.timetable_metrics.fitness_score,
             is_valid: resultTimetable.timetable_metrics.is_valid,
           },
@@ -1036,13 +1054,13 @@ export class WhatIfService {
       // 7. Mark run as applied
       await tx.scenarioRun.update({
         where: { run_id: runId },
-        data: { status: 'applied' },
+        data: { status: "applied" },
       });
 
       // 8. Update base timetable generation_type to mark it was modified by a scenario
       await tx.timetable.update({
         where: { timetable_id: baseTimetableId },
-        data: { generation_type: 'what_if_applied' },
+        data: { generation_type: "what_if_applied" },
       });
     });
 
@@ -1050,32 +1068,35 @@ export class WhatIfService {
       ok: true,
       appliedToTimetableId: baseTimetableId,
       message:
-        'Scenario result has been applied. The base timetable schedule has been replaced.',
+        "Scenario result has been applied. The base timetable schedule has been replaced.",
     };
   }
 
-  async controlRun(runId: number, action: 'pause' | 'resume') {
+  async controlRun(runId: number, action: "pause" | "resume") {
     const proc = this.activeProcesses.get(runId);
     if (!proc || !proc.pid) {
-      throw new BadRequestException('Run is not currently active.');
+      throw new BadRequestException("Run is not currently active.");
     }
 
     try {
-      if (process.platform === 'win32') {
+      if (process.platform === "win32") {
         const psCmd =
-          action === 'pause'
+          action === "pause"
             ? `Suspend-Process -Id ${proc.pid} -ErrorAction Stop`
             : `Resume-Process -Id ${proc.pid} -ErrorAction Stop`;
         const ps = spawnSync(
-          'powershell',
-          ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psCmd],
-          { encoding: 'utf8' },
+          "powershell",
+          ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psCmd],
+          { encoding: "utf8" },
         );
         if (ps.status !== 0) {
-          throw new Error((ps.stderr || ps.stdout || '').trim() || 'PowerShell control failed.');
+          throw new Error(
+            (ps.stderr || ps.stdout || "").trim() ||
+              "PowerShell control failed.",
+          );
         }
       } else {
-        process.kill(proc.pid, action === 'pause' ? 'SIGSTOP' : 'SIGCONT');
+        process.kill(proc.pid, action === "pause" ? "SIGSTOP" : "SIGCONT");
       }
     } catch (err) {
       throw new BadRequestException(
@@ -1101,13 +1122,13 @@ export class WhatIfService {
       where: { run_id: runId },
       select: { status: true },
     });
-    if (run && (run.status === 'running' || run.status === 'pending')) {
+    if (run && (run.status === "running" || run.status === "pending")) {
       await this.prisma.scenarioRun.update({
         where: { run_id: runId },
         data: {
-          status: 'failed',
+          status: "failed",
           completed_at: new Date(),
-          error_message: 'Run cancelled by user.',
+          error_message: "Run cancelled by user.",
         },
       });
     }
@@ -1137,165 +1158,187 @@ export class WhatIfService {
     }>,
   ) {
     try {
-    // ── 1. Build full timetable config JSON ────────────────────────────────
-    const config = await this._buildRunnerConfig(
-      runId,
-      scenarioId,
-      timetableId,
-      conditions,
-    );
-
-    // Persist baseline metrics from the source timetable at run start so
-    // comparison endpoints always read the canonical baseline snapshot.
-    await this.prisma.scenarioRun.update({
-      where: { run_id: runId },
-      data: {
-        status: 'running',
-        started_at: new Date(),
-        baseline_metrics: config.baseline_metrics as object,
-      },
-    });
-
-    // ── 2. Write config to temp file ───────────────────────────────────────
-    const tmpDir = os.tmpdir();
-    const configPath = path.join(tmpDir, `whatif_run_${runId}.json`);
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-
-    // ── 3. Resolve paths ───────────────────────────────────────────────────
-    // run_scenario.py lives in the `whatif/` directory at the project root.
-    // Adjust this path if your project layout is different.
-    const scriptPath = path.resolve(
-      process.cwd(),
-      'whatif',
-      'run_scenario.py',
-    );
-
-    const python =
-      process.env.PYTHON_BIN ??
-      process.env.PYTHON ??
-      (process.platform === 'win32' ? 'python' : 'python3');
-
-    this.logger.log(
-      `Spawning scenario runner: ${python} ${scriptPath} --config ${configPath}`,
-    );
-
-    // ── 4. Spawn ───────────────────────────────────────────────────────────
-    const proc = spawn(python, [scriptPath, '--config', configPath], {
-      env: {
-        ...process.env,
-        PYTHONUNBUFFERED: '1', // essential for real-time stdout streaming
-      },
-    });
-
-    this.activeProcesses.set(runId, proc);
-
-    // Buffers for partial lines and stderr details across chunks
-    let lineBuffer = '';
-    let stderrBuffer = '';
-
-    proc.stdout?.on('data', (chunk: Buffer) => {
-      lineBuffer += chunk.toString();
-      const lines = lineBuffer.split('\n');
-      lineBuffer = lines.pop() ?? ''; // keep incomplete last line
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        this._handlePythonLine(runId, trimmed).catch((err) => {
-          this.logger.error(`Error handling Python line for run ${runId}: ${err.message}`);
-        });
-      }
-    });
-
-    proc.stderr?.on('data', (chunk: Buffer) => {
-      const text = chunk.toString();
-      stderrBuffer += text;
-      this.logger.warn(`[run ${runId} stderr] ${text.trim()}`);
-    });
-
-    proc.on('close', async (code, signal) => {
-      this.activeProcesses.delete(runId);
-      const wasUserCancel = this.userCancelledRunIds.has(runId);
-      this.userCancelledRunIds.delete(runId);
-
-      // Flush any remaining buffered line
-      if (lineBuffer.trim()) {
-        await this._handlePythonLine(runId, lineBuffer.trim()).catch(() => {});
-      }
-
-      // Cleanup temp config file
-      try { fs.unlinkSync(configPath); } catch { /* ignore */ }
-
-      const exitedNonZero = typeof code === 'number' && code !== 0;
-      const exitedWithNullCode = code === null || code === undefined;
-      const shouldRecordFailure =
-        exitedNonZero || exitedWithNullCode || wasUserCancel;
-
-      if (shouldRecordFailure) {
-        // Mark as failed if the DB record is still 'running'
-        const run = await this.prisma.scenarioRun.findUnique({
-          where: { run_id: runId },
-          select: { status: true },
-        });
-        if (run?.status === 'running') {
-          const stderrDetail = stderrBuffer.trim();
-          let error_message: string;
-          if (wasUserCancel) {
-            error_message = 'Run cancelled by user.';
-          } else if (exitedWithNullCode) {
-            const sig = typeof signal === 'string' && signal.trim() ? signal.trim() : null;
-            error_message = stderrDetail
-              ? `Process stopped${sig ? ` (${sig})` : ''}. ${stderrDetail.slice(0, 1800)}`
-              : `Process stopped${sig ? ` (${sig})` : ''} before producing a result.`;
-          } else {
-            error_message = stderrDetail
-              ? `Process exited with code ${code}. ${stderrDetail.slice(0, 1800)}`
-              : `Process exited with code ${code}.`;
-          }
-          await this.prisma.scenarioRun.update({
-            where: { run_id: runId },
-            data: {
-              status: 'failed',
-              completed_at: new Date(),
-              error_message,
-            },
-          });
-          if (!wasUserCancel) {
-            void this.notifications
-              .notifyAdmins('Optimization Failed', `Scenario run #${runId} failed: ${error_message.slice(0, 800)}`, {
-                preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED,
-              })
-              .catch(() => {});
-          }
-        }
-      }
-
-      this.logger.log(
-        `Scenario runner for run ${runId} exited with code ${code}${signal ? ` signal=${signal}` : ''}.`,
+      // ── 1. Build full timetable config JSON ────────────────────────────────
+      const config = await this._buildRunnerConfig(
+        runId,
+        scenarioId,
+        timetableId,
+        conditions,
       );
-      await this._startNextQueuedRunIfIdle();
-      this.releaseGlobalOptimizerLockIfIdle();
-    });
 
-    proc.on('error', async (err) => {
-      this.activeProcesses.delete(runId);
+      // Persist baseline metrics from the source timetable at run start so
+      // comparison endpoints always read the canonical baseline snapshot.
       await this.prisma.scenarioRun.update({
         where: { run_id: runId },
         data: {
-          status: 'failed',
-          completed_at: new Date(),
-          error_message: err.message,
+          status: "running",
+          started_at: new Date(),
+          baseline_metrics: config.baseline_metrics as object,
         },
       });
-      void this.notifications
-        .notifyAdmins('Optimization Failed', `Scenario run #${runId} could not start: ${err.message.slice(0, 800)}`, {
-          preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED,
-        })
-        .catch(() => {});
-      this.logger.error(`Scenario runner spawn error for run ${runId}: ${err.message}`);
-      await this._startNextQueuedRunIfIdle();
-      this.releaseGlobalOptimizerLockIfIdle();
-    });
+
+      // ── 2. Write config to temp file ───────────────────────────────────────
+      const tmpDir = os.tmpdir();
+      const configPath = path.join(tmpDir, `whatif_run_${runId}.json`);
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+      // ── 3. Resolve paths ───────────────────────────────────────────────────
+      // run_scenario.py lives in the `whatif/` directory at the project root.
+      // Adjust this path if your project layout is different.
+      const scriptPath = path.resolve(
+        process.cwd(),
+        "whatif",
+        "run_scenario.py",
+      );
+
+      const python =
+        process.env.PYTHON_BIN ??
+        process.env.PYTHON ??
+        (process.platform === "win32" ? "python" : "python3");
+
+      this.logger.log(
+        `Spawning scenario runner: ${python} ${scriptPath} --config ${configPath}`,
+      );
+
+      // ── 4. Spawn ───────────────────────────────────────────────────────────
+      const proc = spawn(python, [scriptPath, "--config", configPath], {
+        env: {
+          ...process.env,
+          PYTHONUNBUFFERED: "1", // essential for real-time stdout streaming
+        },
+      });
+
+      this.activeProcesses.set(runId, proc);
+
+      // Buffers for partial lines and stderr details across chunks
+      let lineBuffer = "";
+      let stderrBuffer = "";
+
+      proc.stdout?.on("data", (chunk: Buffer) => {
+        lineBuffer += chunk.toString();
+        const lines = lineBuffer.split("\n");
+        lineBuffer = lines.pop() ?? ""; // keep incomplete last line
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          this._handlePythonLine(runId, trimmed).catch((err) => {
+            this.logger.error(
+              `Error handling Python line for run ${runId}: ${err.message}`,
+            );
+          });
+        }
+      });
+
+      proc.stderr?.on("data", (chunk: Buffer) => {
+        const text = chunk.toString();
+        stderrBuffer += text;
+        this.logger.warn(`[run ${runId} stderr] ${text.trim()}`);
+      });
+
+      proc.on("close", async (code, signal) => {
+        this.activeProcesses.delete(runId);
+        const wasUserCancel = this.userCancelledRunIds.has(runId);
+        this.userCancelledRunIds.delete(runId);
+
+        // Flush any remaining buffered line
+        if (lineBuffer.trim()) {
+          await this._handlePythonLine(runId, lineBuffer.trim()).catch(
+            () => {},
+          );
+        }
+
+        // Cleanup temp config file
+        try {
+          fs.unlinkSync(configPath);
+        } catch {
+          /* ignore */
+        }
+
+        const exitedNonZero = typeof code === "number" && code !== 0;
+        const exitedWithNullCode = code === null || code === undefined;
+        const shouldRecordFailure =
+          exitedNonZero || exitedWithNullCode || wasUserCancel;
+
+        if (shouldRecordFailure) {
+          // Mark as failed if the DB record is still 'running'
+          const run = await this.prisma.scenarioRun.findUnique({
+            where: { run_id: runId },
+            select: { status: true },
+          });
+          if (run?.status === "running") {
+            const stderrDetail = stderrBuffer.trim();
+            let error_message: string;
+            if (wasUserCancel) {
+              error_message = "Run cancelled by user.";
+            } else if (exitedWithNullCode) {
+              const sig =
+                typeof signal === "string" && signal.trim()
+                  ? signal.trim()
+                  : null;
+              error_message = stderrDetail
+                ? `Process stopped${sig ? ` (${sig})` : ""}. ${stderrDetail.slice(0, 1800)}`
+                : `Process stopped${sig ? ` (${sig})` : ""} before producing a result.`;
+            } else {
+              error_message = stderrDetail
+                ? `Process exited with code ${code}. ${stderrDetail.slice(0, 1800)}`
+                : `Process exited with code ${code}.`;
+            }
+            await this.prisma.scenarioRun.update({
+              where: { run_id: runId },
+              data: {
+                status: "failed",
+                completed_at: new Date(),
+                error_message,
+              },
+            });
+            if (!wasUserCancel) {
+              void this.notifications
+                .notifyAdmins(
+                  "Optimization Failed",
+                  `Scenario run #${runId} failed: ${error_message.slice(0, 800)}`,
+                  {
+                    preferenceKey:
+                      ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED,
+                  },
+                )
+                .catch(() => {});
+            }
+          }
+        }
+
+        this.logger.log(
+          `Scenario runner for run ${runId} exited with code ${code}${signal ? ` signal=${signal}` : ""}.`,
+        );
+        await this._startNextQueuedRunIfIdle();
+        this.releaseGlobalOptimizerLockIfIdle();
+      });
+
+      proc.on("error", async (err) => {
+        this.activeProcesses.delete(runId);
+        await this.prisma.scenarioRun.update({
+          where: { run_id: runId },
+          data: {
+            status: "failed",
+            completed_at: new Date(),
+            error_message: err.message,
+          },
+        });
+        void this.notifications
+          .notifyAdmins(
+            "Optimization Failed",
+            `Scenario run #${runId} could not start: ${err.message.slice(0, 800)}`,
+            {
+              preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED,
+            },
+          )
+          .catch(() => {});
+        this.logger.error(
+          `Scenario runner spawn error for run ${runId}: ${err.message}`,
+        );
+        await this._startNextQueuedRunIfIdle();
+        this.releaseGlobalOptimizerLockIfIdle();
+      });
     } finally {
       this.pendingProcessStarts = Math.max(0, this.pendingProcessStarts - 1);
       this.releaseGlobalOptimizerLockIfIdle();
@@ -1313,12 +1356,12 @@ export class WhatIfService {
       return; // non-JSON line — already forwarded to SSE in streamRunProgress
     }
 
-    if (parsed.type === 'result') {
+    if (parsed.type === "result") {
       // Final result — save to DB
       await this.prisma.scenarioRun.update({
         where: { run_id: runId },
         data: {
-          status: 'completed',
+          status: "completed",
           completed_at: new Date(),
           result_timetable_id: parsed.result_timetable_id ?? null,
           result_metrics: (parsed.result_metrics as object) ?? undefined,
@@ -1327,32 +1370,41 @@ export class WhatIfService {
         },
       });
       void this.notifyAdminsScenarioRunSucceeded(runId, parsed).catch(() => {});
-    } else if (parsed.type === 'error') {
-      const detail = (parsed.detail ?? '').trim();
-      const message = (parsed.message ?? '').trim();
+    } else if (parsed.type === "error") {
+      const detail = (parsed.detail ?? "").trim();
+      const message = (parsed.message ?? "").trim();
       const fallbackPayload = JSON.stringify(parsed);
       const resolvedError =
-        detail || message || `Python returned an error event without details: ${fallbackPayload}`;
+        detail ||
+        message ||
+        `Python returned an error event without details: ${fallbackPayload}`;
       this.logger.error(
         `[run ${runId}] Python reported error: ${resolvedError}`,
       );
       await this.prisma.scenarioRun.update({
         where: { run_id: runId },
         data: {
-          status: 'failed',
+          status: "failed",
           completed_at: new Date(),
           error_message: resolvedError,
         },
       });
       void this.notifications
-        .notifyAdmins('Optimization Failed', `Scenario run #${runId} failed: ${resolvedError.slice(0, 800)}`, {
-          preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED,
-        })
+        .notifyAdmins(
+          "Optimization Failed",
+          `Scenario run #${runId} failed: ${resolvedError.slice(0, 800)}`,
+          {
+            preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_FAILED,
+          },
+        )
         .catch(() => {});
     }
   }
 
-  private async notifyAdminsScenarioRunSucceeded(runId: number, parsed: GwoProgressLine) {
+  private async notifyAdminsScenarioRunSucceeded(
+    runId: number,
+    parsed: GwoProgressLine,
+  ) {
     const run = await this.prisma.scenarioRun.findUnique({
       where: { run_id: runId },
       include: {
@@ -1369,39 +1421,44 @@ export class WhatIfService {
       ? `${sem.academic_year} (${this.decodeSemesterTypeLabel(sem.semester_type)})`
       : `Draft timetable #${run.base_timetable_id}`;
 
-    const rm = parsed.result_metrics as MetricsSnapshot | undefined;
+    const rm = parsed.result_metrics;
     const fitness =
-      rm && typeof rm.fitnessScore === 'number' && Number.isFinite(rm.fitnessScore)
+      rm &&
+      typeof rm.fitnessScore === "number" &&
+      Number.isFinite(rm.fitnessScore)
         ? rm.fitnessScore.toFixed(4)
         : rm && rm.fitnessScore != null
           ? String(rm.fitnessScore)
-          : 'n/a';
+          : "n/a";
     const hardFromMetrics =
-      rm && typeof rm.conflicts === 'number' && Number.isFinite(rm.conflicts) ? rm.conflicts : null;
+      rm && typeof rm.conflicts === "number" && Number.isFinite(rm.conflicts)
+        ? rm.conflicts
+        : null;
 
     let hardConflictCount = hardFromMetrics ?? 0;
     const tid = parsed.result_timetable_id ?? run.result_timetable_id ?? null;
     if (tid != null) {
       try {
-        const summary = await this.timetablesService.getTimetableConflictSummary(tid);
+        const summary =
+          await this.timetablesService.getTimetableConflictSummary(tid);
         hardConflictCount = summary.hardConflictCount;
       } catch {
         /* ignore */
       }
     }
 
-    const scenarioName = run.scenario?.name?.trim() || `Scenario #${run.scenario_id}`;
-    const resultTimetableTag =
-      tid != null ? ` [[timetable_id:${tid}]]` : '';
+    const scenarioName =
+      run.scenario?.name?.trim() || `Scenario #${run.scenario_id}`;
+    const resultTimetableTag = tid != null ? ` [[timetable_id:${tid}]]` : "";
     await this.notifications.notifyAdmins(
-      'Timetable Generated',
+      "Timetable Generated",
       `${semesterLabel}: scenario "${scenarioName}" finished (run #${runId}). Fitness score ${fitness}. Hard conflicts reported: ${hardConflictCount}. [[scenario_run_id:${runId}]]${resultTimetableTag}`,
       { preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.OPTIMIZATION_COMPLETED },
     );
 
     if (hardConflictCount > 0 && tid != null) {
       await this.notifications.notifyAdmins(
-        'Hard Conflicts Detected',
+        "Hard Conflicts Detected",
         `${hardConflictCount} hard conflict(s) found in generated timetable #${tid} (${scenarioName}, run #${runId}). [[timetable_id:${tid}]]`,
         { preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.HARD_CONFLICTS },
       );
@@ -1410,9 +1467,9 @@ export class WhatIfService {
 
   private decodeSemesterTypeLabel(type: number): string {
     const map: Record<number, string> = {
-      1: 'First Semester',
-      2: 'Second Semester',
-      3: 'Summer Semester',
+      1: "First Semester",
+      2: "Second Semester",
+      3: "Summer Semester",
     };
     return map[type] ?? `Semester ${type}`;
   }
@@ -1441,7 +1498,7 @@ export class WhatIfService {
         set = new Set();
         distinctKeysByCourse.set(e.course_id, set);
       }
-      const label = String(e.section_number ?? '').trim();
+      const label = String(e.section_number ?? "").trim();
       set.add(label || `__entry_${e.entry_id}`);
     }
     const sectionCountByCourseId = new Map<number, number>();
@@ -1473,22 +1530,28 @@ export class WhatIfService {
             course: true,
             room: true,
             timeslot: true,
-            lecturer: { include: { user: { select: { first_name: true, last_name: true } } } },
+            lecturer: {
+              include: {
+                user: { select: { first_name: true, last_name: true } },
+              },
+            },
           },
         },
       },
     });
-    if (!timetable) throw new NotFoundException(`Timetable ${timetableId} not found.`);
+    if (!timetable)
+      throw new NotFoundException(`Timetable ${timetableId} not found.`);
 
     const isSummer = timetable.semester?.semester_type === 3;
 
-    const { courseIds, sectionCountByCourseId } = this._timetableCourseSectionStats(
-      timetable.section_schedule_entries.map((e) => ({
-        course_id: e.course_id,
-        section_number: e.section_number,
-        entry_id: e.entry_id,
-      })),
-    );
+    const { courseIds, sectionCountByCourseId } =
+      this._timetableCourseSectionStats(
+        timetable.section_schedule_entries.map((e) => ({
+          course_id: e.course_id,
+          section_number: e.section_number,
+          entry_id: e.entry_id,
+        })),
+      );
 
     // Load pools from the base timetable snapshot.
     // Lecturers are intentionally scoped to those already used in the base
@@ -1499,7 +1562,9 @@ export class WhatIfService {
       new Set(
         timetable.section_schedule_entries
           .map((e) => e.user_id)
-          .filter((id): id is number => typeof id === 'number' && Number.isFinite(id)),
+          .filter(
+            (id): id is number => typeof id === "number" && Number.isFinite(id),
+          ),
       ),
     );
 
@@ -1509,10 +1574,14 @@ export class WhatIfService {
       this.prisma.lecturer.findMany({
         where: {
           is_available: true,
-          ...(usedLecturerIds.length > 0 ? { user_id: { in: usedLecturerIds } } : {}),
+          ...(usedLecturerIds.length > 0
+            ? { user_id: { in: usedLecturerIds } }
+            : {}),
         },
         include: {
-          user: { select: { user_id: true, first_name: true, last_name: true } },
+          user: {
+            select: { user_id: true, first_name: true, last_name: true },
+          },
           lecturer_can_teach_course: { select: { course_id: true } },
         },
       }),
@@ -1523,7 +1592,7 @@ export class WhatIfService {
         ? Promise.resolve([])
         : this.prisma.course.findMany({
             where: { course_id: { in: courseIds } },
-            orderBy: { course_id: 'asc' },
+            orderBy: { course_id: "asc" },
           }),
       this.prisma.timeslot.findMany({
         where: {
@@ -1537,7 +1606,7 @@ export class WhatIfService {
     const missingCourseIds = courseIds.filter((id) => !loadedCourseIds.has(id));
     if (missingCourseIds.length > 0) {
       this.logger.warn(
-        `What-if run config: base timetable references course_id(s) not found in DB: ${missingCourseIds.join(', ')}`,
+        `What-if run config: base timetable references course_id(s) not found in DB: ${missingCourseIds.join(", ")}`,
       );
     }
 
@@ -1550,8 +1619,12 @@ export class WhatIfService {
     const baselineMetrics: MetricsSnapshot = timetable.timetable_metrics
       ? {
           conflicts: 0, // computed from conflict table
-          roomUtilizationRate: Number(timetable.timetable_metrics.room_utilization_rate),
-          softConstraintsScore: Number(timetable.timetable_metrics.soft_constraints_score),
+          roomUtilizationRate: Number(
+            timetable.timetable_metrics.room_utilization_rate,
+          ),
+          softConstraintsScore: Number(
+            timetable.timetable_metrics.soft_constraints_score,
+          ),
           fitnessScore: Number(timetable.timetable_metrics.fitness_score),
           lecturerBalanceScore,
           isValid: timetable.timetable_metrics.is_valid,
@@ -1576,14 +1649,14 @@ export class WhatIfService {
     const cwd = process.cwd();
     const candidates = [
       configuredGwoPath ? path.resolve(cwd, configuredGwoPath) : null,
-      path.resolve(cwd, 'GWO-v6.py'),
-      path.resolve(cwd, 'scripts', 'GWO-v6.py'),
-      path.resolve(cwd, '..', 'frontend', 'scripts', 'GWO-v6.py'),
-      path.resolve(cwd, '..', 'GWO-v6.py'),
+      path.resolve(cwd, "GWO-v6.py"),
+      path.resolve(cwd, "scripts", "GWO-v6.py"),
+      path.resolve(cwd, "..", "frontend", "scripts", "GWO-v6.py"),
+      path.resolve(cwd, "..", "GWO-v6.py"),
     ].filter((p): p is string => Boolean(p));
     const gwoScriptPath =
       candidates.find((p) => fs.existsSync(p)) ??
-      path.resolve(cwd, configuredGwoPath ?? 'GWO-v6.py');
+      path.resolve(cwd, configuredGwoPath ?? "GWO-v6.py");
 
     return {
       run_id: runId,
@@ -1593,7 +1666,8 @@ export class WhatIfService {
       semester_type: timetable.semester?.semester_type ?? 1,
       is_summer: isSummer,
       gwo_script_path: gwoScriptPath,
-      database_url: this.config.get<string>('DATABASE_URL') ?? process.env.DATABASE_URL,
+      database_url:
+        this.config.get<string>("DATABASE_URL") ?? process.env.DATABASE_URL,
       baseline_metrics: baselineMetrics,
       conditions: conditions.map((c) => ({
         condition_id: c.condition_id,
@@ -1609,7 +1683,9 @@ export class WhatIfService {
           dept_id: l.dept_id,
           max_workload: l.max_workload,
           is_available: l.is_available,
-          teachable_course_ids: l.lecturer_can_teach_course.map((x) => x.course_id),
+          teachable_course_ids: l.lecturer_can_teach_course.map(
+            (x) => x.course_id,
+          ),
         })),
         rooms: rooms.map((r) => ({
           room_id: r.room_id,
@@ -1709,12 +1785,13 @@ export class WhatIfService {
       status: row.status,
       description: row.description,
       conditionCount: row.conditions?.length ?? 0,
-      conditions: row.conditions?.map((c: any) => ({
-        conditionId: c.condition_id,
-        type: c.condition_type,
-        parameters: c.parameters,
-        orderIndex: c.order_index,
-      })) ?? [],
+      conditions:
+        row.conditions?.map((c: any) => ({
+          conditionId: c.condition_id,
+          type: c.condition_type,
+          parameters: c.parameters,
+          orderIndex: c.order_index,
+        })) ?? [],
       latestRun: latestRun
         ? {
             runId: latestRun.run_id,
@@ -1763,7 +1840,7 @@ export class WhatIfService {
     if (deltas.fitnessScore > 0) positives++;
     else if (deltas.fitnessScore < 0) negatives++;
 
-    if (typeof deltas.lecturerBalanceScore === 'number') {
+    if (typeof deltas.lecturerBalanceScore === "number") {
       if (deltas.lecturerBalanceScore > 0) positives++;
       else if (deltas.lecturerBalanceScore < -0.1) negatives++;
     }
@@ -1773,17 +1850,19 @@ export class WhatIfService {
     const parts: string[] = [];
 
     if (total === 0) {
-      parts.push(`"${scenarioName}" produces no measurable change in headline metrics.`);
+      parts.push(
+        `"${scenarioName}" produces no measurable change in headline metrics.`,
+      );
     } else {
       const ratio = positives / total;
       const verdict =
         ratio >= 0.8 && negatives === 0
-          ? 'Apply recommended'
+          ? "Apply recommended"
           : ratio >= 0.6
-            ? 'Apply with caution'
+            ? "Apply with caution"
             : negatives > positives
-              ? 'Apply not recommended'
-              : 'Mixed outcome';
+              ? "Apply not recommended"
+              : "Mixed outcome";
       parts.push(
         `${verdict}: "${scenarioName}" shifts ${positives} headline metric(s) favorably vs ${negatives} unfavorably (among comparable deltas).`,
       );
@@ -1791,39 +1870,46 @@ export class WhatIfService {
       const metricNotes: string[] = [];
       if (deltas.conflicts !== 0)
         metricNotes.push(
-          `Recorded conflicts ${deltas.conflicts > 0 ? 'rose' : 'fell'} by ${Math.abs(deltas.conflicts)}.`,
+          `Recorded conflicts ${deltas.conflicts > 0 ? "rose" : "fell"} by ${Math.abs(deltas.conflicts)}.`,
         );
       if (Math.abs(deltas.fitnessScore) >= 0.0001)
         metricNotes.push(
-          `Fitness ${deltas.fitnessScore > 0 ? 'improved' : 'worsened'} by ${Math.abs(deltas.fitnessScore)}.`,
+          `Fitness ${deltas.fitnessScore > 0 ? "improved" : "worsened"} by ${Math.abs(deltas.fitnessScore)}.`,
         );
       if (Math.abs(deltas.roomUtilizationRate) >= 0.05)
         metricNotes.push(
-          `Room utilization ${deltas.roomUtilizationRate > 0 ? 'up' : 'down'} ${Math.abs(deltas.roomUtilizationRate)} points.`,
+          `Room utilization ${deltas.roomUtilizationRate > 0 ? "up" : "down"} ${Math.abs(deltas.roomUtilizationRate)} points.`,
         );
       if (Math.abs(deltas.softConstraintsScore) >= 0.05)
         metricNotes.push(
-          `Soft-constraint score ${deltas.softConstraintsScore > 0 ? 'up' : 'down'} ${Math.abs(deltas.softConstraintsScore)}.`,
+          `Soft-constraint score ${deltas.softConstraintsScore > 0 ? "up" : "down"} ${Math.abs(deltas.softConstraintsScore)}.`,
         );
-      if (typeof deltas.lecturerBalanceScore === 'number' && Math.abs(deltas.lecturerBalanceScore) >= 0.05)
+      if (
+        typeof deltas.lecturerBalanceScore === "number" &&
+        Math.abs(deltas.lecturerBalanceScore) >= 0.05
+      )
         metricNotes.push(
-          `Lecturer balance ${deltas.lecturerBalanceScore > 0 ? 'improved' : 'worsened'} by ${Math.abs(deltas.lecturerBalanceScore)}.`,
+          `Lecturer balance ${deltas.lecturerBalanceScore > 0 ? "improved" : "worsened"} by ${Math.abs(deltas.lecturerBalanceScore)}.`,
         );
-      if (metricNotes.length) parts.push(metricNotes.join(' '));
+      if (metricNotes.length) parts.push(metricNotes.join(" "));
 
       if (ctx?.conflictBreakdownDelta) {
         const cd = ctx.conflictBreakdownDelta;
         const breakdownPieces = [
-          cd.roomConflicts !== 0 ? `room Δ ${cd.roomConflicts > 0 ? '+' : ''}${cd.roomConflicts}` : null,
+          cd.roomConflicts !== 0
+            ? `room Δ ${cd.roomConflicts > 0 ? "+" : ""}${cd.roomConflicts}`
+            : null,
           cd.lecturerConflicts !== 0
-            ? `lecturer Δ ${cd.lecturerConflicts > 0 ? '+' : ''}${cd.lecturerConflicts}`
+            ? `lecturer Δ ${cd.lecturerConflicts > 0 ? "+" : ""}${cd.lecturerConflicts}`
             : null,
           cd.timeslotClashes !== 0
-            ? `timeslot/cohort Δ ${cd.timeslotClashes > 0 ? '+' : ''}${cd.timeslotClashes}`
+            ? `timeslot/cohort Δ ${cd.timeslotClashes > 0 ? "+" : ""}${cd.timeslotClashes}`
             : null,
         ].filter(Boolean);
         if (breakdownPieces.length)
-          parts.push(`Schedule-derived clash pairs: ${breakdownPieces.join(', ')}.`);
+          parts.push(
+            `Schedule-derived clash pairs: ${breakdownPieces.join(", ")}.`,
+          );
       }
     }
 
@@ -1837,17 +1923,17 @@ export class WhatIfService {
         `Optimizer ran only ${ctx.gwoIterations} iteration(s); the timetable may still be far from optimal.`,
       );
 
-    return parts.join(' ');
+    return parts.join(" ");
   }
 
   private readonly _dayLabelByBit: Record<number, string> = {
-    0: 'Sunday',
-    1: 'Monday',
-    2: 'Tuesday',
-    3: 'Wednesday',
-    4: 'Thursday',
-    5: 'Friday',
-    6: 'Saturday',
+    0: "Sunday",
+    1: "Monday",
+    2: "Tuesday",
+    3: "Wednesday",
+    4: "Thursday",
+    5: "Friday",
+    6: "Saturday",
   };
 
   private _decodeDaysMask(daysMask: number): string[] {
@@ -1863,7 +1949,7 @@ export class WhatIfService {
 
   private _timeToMinutes(d: Date): number {
     const hhmm = d.toISOString().slice(11, 16);
-    const [h, m] = hhmm.split(':').map((x) => Number(x));
+    const [h, m] = hhmm.split(":").map((x) => Number(x));
     return h * 60 + m;
   }
 
@@ -1920,10 +2006,9 @@ export class WhatIfService {
   }
 
   /** Count unordered overlapping pairs within each group (matches metrics.py logic). */
-  private _countGroupedOverlaps<T extends { day: string; startMin: number; endMin: number }>(
-    atoms: T[],
-    groupKey: (row: T) => string | number | null,
-  ): number {
+  private _countGroupedOverlaps<
+    T extends { day: string; startMin: number; endMin: number },
+  >(atoms: T[], groupKey: (row: T) => string | number | null): number {
     const groups = new Map<string | number, T[]>();
     for (const atom of atoms) {
       const key = groupKey(atom);
@@ -1936,7 +2021,7 @@ export class WhatIfService {
     for (const group of groups.values()) {
       for (let i = 0; i < group.length; i += 1) {
         for (let j = i + 1; j < group.length; j += 1) {
-          if (this._pairOverlaps(group[i]!, group[j]!)) total += 1;
+          if (this._pairOverlaps(group[i], group[j])) total += 1;
         }
       }
     }
@@ -1957,7 +2042,10 @@ export class WhatIfService {
     const lecturerConflicts = this._countGroupedOverlaps(atoms, (a) =>
       a.userId != null ? a.userId : null,
     );
-    const timeslotClashes = this._countGroupedOverlaps(atoms, (a) => a.sectionKey);
+    const timeslotClashes = this._countGroupedOverlaps(
+      atoms,
+      (a) => a.sectionKey,
+    );
     return { roomConflicts, lecturerConflicts, timeslotClashes };
   }
 
@@ -1999,26 +2087,26 @@ export class WhatIfService {
       [...rows]
         .map((e) => String(e.slot_id))
         .sort()
-        .join(',');
+        .join(",");
     const roomsSig = (rows: typeof baselineEntries) =>
       [...rows]
         .map((e) => String(e.room_id))
         .sort()
-        .join(',');
+        .join(",");
     const lecturersSig = (rows: typeof baselineEntries) =>
       [...rows]
-        .map((e) => String(e.user_id ?? 'none'))
+        .map((e) => String(e.user_id ?? "none"))
         .sort()
-        .join(',');
+        .join(",");
 
     const baseline = groupBySection(baselineEntries);
     const result = groupBySection(resultEntries);
 
     const assignmentSig = (rows: typeof baselineEntries) =>
       [...rows]
-        .map((e) => `${e.slot_id}|${e.room_id}|${e.user_id ?? 'none'}`)
+        .map((e) => `${e.slot_id}|${e.room_id}|${e.user_id ?? "none"}`)
         .sort()
-        .join('||');
+        .join("||");
 
     let added = 0;
     let removed = 0;
@@ -2044,15 +2132,13 @@ export class WhatIfService {
       code: string,
       dims?: { room?: boolean; lec?: boolean; slot?: boolean },
     ) => {
-      const agg =
-        courseAgg.get(cid) ??
-        {
-          courseCode: code,
-          sectionsAffected: 0,
-          sectionsWithRoomChange: 0,
-          sectionsWithLecturerChange: 0,
-          sectionsWithSlotChange: 0,
-        };
+      const agg = courseAgg.get(cid) ?? {
+        courseCode: code,
+        sectionsAffected: 0,
+        sectionsWithRoomChange: 0,
+        sectionsWithLecturerChange: 0,
+        sectionsWithSlotChange: 0,
+      };
       agg.courseCode = code;
       agg.sectionsAffected += 1;
       if (dims?.room) agg.sectionsWithRoomChange += 1;
@@ -2064,9 +2150,11 @@ export class WhatIfService {
     for (const key of allKeys) {
       const br = baseline.get(key);
       const rr = result.get(key);
-      const courseId = Number(key.split('|')[0] ?? 0);
+      const courseId = Number(key.split("|")[0] ?? 0);
       const courseCode =
-        br?.[0]?.course?.course_code ?? rr?.[0]?.course?.course_code ?? String(courseId);
+        br?.[0]?.course?.course_code ??
+        rr?.[0]?.course?.course_code ??
+        String(courseId);
 
       if (!br && rr) {
         added += 1;
@@ -2095,7 +2183,9 @@ export class WhatIfService {
     }
 
     const percentSectionsAffected =
-      allKeys.size > 0 ? Math.round((affectedUnion / allKeys.size) * 1000) / 10 : 0;
+      allKeys.size > 0
+        ? Math.round((affectedUnion / allKeys.size) * 1000) / 10
+        : 0;
 
     const perCourse: SectionChangePerCourse[] = [...courseAgg.entries()]
       .map(([courseId, v]) => ({

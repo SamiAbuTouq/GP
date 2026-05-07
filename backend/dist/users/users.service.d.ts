@@ -1,8 +1,8 @@
-import { Role, type User } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { UpdateProfileDto, UpdatePreferencesDto } from './dto/update-user.dto';
-import { UpdateNotificationPrefsDto } from './dto/update-notification-prefs.dto';
-import { ConfigService } from '@nestjs/config';
+import { Role, type User } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+import { UpdateProfileDto, UpdatePreferencesDto } from "./dto/update-user.dto";
+import { UpdateNotificationPrefsDto } from "./dto/update-notification-prefs.dto";
+import { ConfigService } from "@nestjs/config";
 export declare class UsersService {
     private readonly prisma;
     private readonly configService;

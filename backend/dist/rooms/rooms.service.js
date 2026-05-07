@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.RoomsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
-const ROOM_TYPES = ['Classroom', 'Lecture Hall', 'Lab', 'Seminar Room'];
+const ROOM_TYPES = ["Classroom", "Lecture Hall", "Lab", "Seminar Room"];
 let RoomsService = class RoomsService {
     constructor(prisma) {
         this.prisma = prisma;
@@ -20,12 +20,12 @@ let RoomsService = class RoomsService {
     async findAll() {
         const rooms = await this.prisma.room.findMany({
             where: { is_available: true },
-            orderBy: { room_number: 'asc' },
+            orderBy: { room_number: "asc" },
         });
         return rooms.map((room) => ({
             id: room.room_number,
             databaseId: room.room_id,
-            type: ROOM_TYPES[room.room_type] || 'Classroom',
+            type: ROOM_TYPES[room.room_type] || "Classroom",
             capacity: room.capacity,
             isAvailable: room.is_available,
         }));
@@ -40,7 +40,7 @@ let RoomsService = class RoomsService {
         return {
             id: room.room_number,
             databaseId: room.room_id,
-            type: ROOM_TYPES[room.room_type] || 'Classroom',
+            type: ROOM_TYPES[room.room_type] || "Classroom",
             capacity: room.capacity,
             isAvailable: room.is_available,
         };
@@ -58,7 +58,7 @@ let RoomsService = class RoomsService {
         return {
             id: room.room_number,
             databaseId: room.room_id,
-            type: ROOM_TYPES[room.room_type] || 'Classroom',
+            type: ROOM_TYPES[room.room_type] || "Classroom",
             capacity: room.capacity,
             isAvailable: room.is_available,
         };
@@ -70,7 +70,9 @@ let RoomsService = class RoomsService {
         if (!existing) {
             throw new common_1.NotFoundException(`Room with ID ${id} not found`);
         }
-        const roomTypeIndex = dto.type ? ROOM_TYPES.indexOf(dto.type) : existing.room_type;
+        const roomTypeIndex = dto.type
+            ? ROOM_TYPES.indexOf(dto.type)
+            : existing.room_type;
         const room = await this.prisma.room.update({
             where: { room_id: id },
             data: {
@@ -82,7 +84,7 @@ let RoomsService = class RoomsService {
         return {
             id: room.room_number,
             databaseId: room.room_id,
-            type: ROOM_TYPES[room.room_type] || 'Classroom',
+            type: ROOM_TYPES[room.room_type] || "Classroom",
             capacity: room.capacity,
             isAvailable: room.is_available,
         };
@@ -101,7 +103,7 @@ let RoomsService = class RoomsService {
         return {
             id: room.room_number,
             databaseId: room.room_id,
-            type: ROOM_TYPES[room.room_type] || 'Classroom',
+            type: ROOM_TYPES[room.room_type] || "Classroom",
             capacity: room.capacity,
             isAvailable: room.is_available,
         };
@@ -117,17 +119,17 @@ let RoomsService = class RoomsService {
             where: { room_id: id },
             data: { is_available: false },
         });
-        return { message: 'Room archived successfully', archived: true };
+        return { message: "Room archived successfully", archived: true };
     }
     async findArchived() {
         const rooms = await this.prisma.room.findMany({
             where: { is_available: false },
-            orderBy: { room_number: 'asc' },
+            orderBy: { room_number: "asc" },
         });
         return rooms.map((room) => ({
             id: room.room_number,
             databaseId: room.room_id,
-            type: ROOM_TYPES[room.room_type] || 'Classroom',
+            type: ROOM_TYPES[room.room_type] || "Classroom",
             capacity: room.capacity,
             isAvailable: room.is_available,
         }));
@@ -144,7 +146,7 @@ let RoomsService = class RoomsService {
             where: { room_id: id },
             data: { is_available: true },
         });
-        return { message: 'Room restored successfully' };
+        return { message: "Room restored successfully" };
     }
     async getDeletionImpact(id) {
         const room = await this.prisma.room.findUnique({
@@ -162,13 +164,15 @@ let RoomsService = class RoomsService {
                     select: { generation_type: true, status: true, version_number: true },
                 },
             },
-            distinct: ['timetable_id'],
-            orderBy: { timetable_id: 'asc' },
+            distinct: ["timetable_id"],
+            orderBy: { timetable_id: "asc" },
         });
         return {
             roomId: room.room_id,
             roomNumber: room.room_number,
-            entryCount: await this.prisma.sectionScheduleEntry.count({ where: { room_id: id } }),
+            entryCount: await this.prisma.sectionScheduleEntry.count({
+                where: { room_id: id },
+            }),
             timetables: entries.map((entry) => ({
                 timetableId: entry.timetable_id,
                 generationType: entry.timetable.generation_type,
@@ -186,13 +190,13 @@ let RoomsService = class RoomsService {
             throw new common_1.NotFoundException(`Room with ID ${id} not found`);
         }
         if (room.is_available) {
-            throw new common_1.ConflictException('Only archived rooms can be permanently deleted.');
+            throw new common_1.ConflictException("Only archived rooms can be permanently deleted.");
         }
         await this.prisma.$transaction(async (tx) => {
             await tx.sectionScheduleEntry.deleteMany({ where: { room_id: id } });
             await tx.room.delete({ where: { room_id: id } });
         });
-        return { message: 'Room permanently deleted successfully' };
+        return { message: "Room permanently deleted successfully" };
     }
 };
 exports.RoomsService = RoomsService;

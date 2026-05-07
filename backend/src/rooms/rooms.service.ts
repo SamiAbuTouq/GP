@@ -1,9 +1,13 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateRoomDto, UpdateRoomDto } from './dto/room.dto';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { CreateRoomDto, UpdateRoomDto } from "./dto/room.dto";
 
 // Room type mapping: 0 = Classroom, 1 = Lecture Hall, 2 = Lab, 3 = Seminar Room
-const ROOM_TYPES = ['Classroom', 'Lecture Hall', 'Lab', 'Seminar Room'];
+const ROOM_TYPES = ["Classroom", "Lecture Hall", "Lab", "Seminar Room"];
 
 @Injectable()
 export class RoomsService {
@@ -12,13 +16,13 @@ export class RoomsService {
   async findAll() {
     const rooms = await this.prisma.room.findMany({
       where: { is_available: true },
-      orderBy: { room_number: 'asc' },
+      orderBy: { room_number: "asc" },
     });
 
     return rooms.map((room) => ({
       id: room.room_number,
       databaseId: room.room_id,
-      type: ROOM_TYPES[room.room_type] || 'Classroom',
+      type: ROOM_TYPES[room.room_type] || "Classroom",
       capacity: room.capacity,
       isAvailable: room.is_available,
     }));
@@ -36,7 +40,7 @@ export class RoomsService {
     return {
       id: room.room_number,
       databaseId: room.room_id,
-      type: ROOM_TYPES[room.room_type] || 'Classroom',
+      type: ROOM_TYPES[room.room_type] || "Classroom",
       capacity: room.capacity,
       isAvailable: room.is_available,
     };
@@ -44,7 +48,7 @@ export class RoomsService {
 
   async create(dto: CreateRoomDto) {
     const roomTypeIndex = ROOM_TYPES.indexOf(dto.type);
-    
+
     const room = await this.prisma.room.create({
       data: {
         room_number: dto.id,
@@ -57,7 +61,7 @@ export class RoomsService {
     return {
       id: room.room_number,
       databaseId: room.room_id,
-      type: ROOM_TYPES[room.room_type] || 'Classroom',
+      type: ROOM_TYPES[room.room_type] || "Classroom",
       capacity: room.capacity,
       isAvailable: room.is_available,
     };
@@ -72,7 +76,9 @@ export class RoomsService {
       throw new NotFoundException(`Room with ID ${id} not found`);
     }
 
-    const roomTypeIndex = dto.type ? ROOM_TYPES.indexOf(dto.type) : existing.room_type;
+    const roomTypeIndex = dto.type
+      ? ROOM_TYPES.indexOf(dto.type)
+      : existing.room_type;
 
     const room = await this.prisma.room.update({
       where: { room_id: id },
@@ -86,7 +92,7 @@ export class RoomsService {
     return {
       id: room.room_number,
       databaseId: room.room_id,
-      type: ROOM_TYPES[room.room_type] || 'Classroom',
+      type: ROOM_TYPES[room.room_type] || "Classroom",
       capacity: room.capacity,
       isAvailable: room.is_available,
     };
@@ -109,7 +115,7 @@ export class RoomsService {
     return {
       id: room.room_number,
       databaseId: room.room_id,
-      type: ROOM_TYPES[room.room_type] || 'Classroom',
+      type: ROOM_TYPES[room.room_type] || "Classroom",
       capacity: room.capacity,
       isAvailable: room.is_available,
     };
@@ -129,19 +135,19 @@ export class RoomsService {
       data: { is_available: false },
     });
 
-    return { message: 'Room archived successfully', archived: true };
+    return { message: "Room archived successfully", archived: true };
   }
 
   async findArchived() {
     const rooms = await this.prisma.room.findMany({
       where: { is_available: false },
-      orderBy: { room_number: 'asc' },
+      orderBy: { room_number: "asc" },
     });
 
     return rooms.map((room) => ({
       id: room.room_number,
       databaseId: room.room_id,
-      type: ROOM_TYPES[room.room_type] || 'Classroom',
+      type: ROOM_TYPES[room.room_type] || "Classroom",
       capacity: room.capacity,
       isAvailable: room.is_available,
     }));
@@ -160,7 +166,7 @@ export class RoomsService {
       where: { room_id: id },
       data: { is_available: true },
     });
-    return { message: 'Room restored successfully' };
+    return { message: "Room restored successfully" };
   }
 
   async getDeletionImpact(id: number) {
@@ -180,14 +186,16 @@ export class RoomsService {
           select: { generation_type: true, status: true, version_number: true },
         },
       },
-      distinct: ['timetable_id'],
-      orderBy: { timetable_id: 'asc' },
+      distinct: ["timetable_id"],
+      orderBy: { timetable_id: "asc" },
     });
 
     return {
       roomId: room.room_id,
       roomNumber: room.room_number,
-      entryCount: await this.prisma.sectionScheduleEntry.count({ where: { room_id: id } }),
+      entryCount: await this.prisma.sectionScheduleEntry.count({
+        where: { room_id: id },
+      }),
       timetables: entries.map((entry) => ({
         timetableId: entry.timetable_id,
         generationType: entry.timetable.generation_type,
@@ -206,7 +214,9 @@ export class RoomsService {
       throw new NotFoundException(`Room with ID ${id} not found`);
     }
     if (room.is_available) {
-      throw new ConflictException('Only archived rooms can be permanently deleted.');
+      throw new ConflictException(
+        "Only archived rooms can be permanently deleted.",
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -214,6 +224,6 @@ export class RoomsService {
       await tx.room.delete({ where: { room_id: id } });
     });
 
-    return { message: 'Room permanently deleted successfully' };
+    return { message: "Room permanently deleted successfully" };
   }
 }

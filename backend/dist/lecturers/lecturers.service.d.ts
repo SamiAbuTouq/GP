@@ -1,7 +1,7 @@
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateLecturerDto, UpdateLecturerDto } from './dto/lecturer.dto';
-import { MailService } from '../mail/mail.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { PrismaService } from "../prisma/prisma.service";
+import { CreateLecturerDto, UpdateLecturerDto } from "./dto/lecturer.dto";
+import { MailService } from "../mail/mail.service";
+import { NotificationsService } from "../notifications/notifications.service";
 export declare class LecturersService {
     private prisma;
     private readonly mailService;

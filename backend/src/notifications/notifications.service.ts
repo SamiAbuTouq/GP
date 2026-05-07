@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { Role } from '@prisma/client';
-import { notificationPrefsAllow } from './notification-prefs';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { Role } from "@prisma/client";
+import { notificationPrefsAllow } from "./notification-prefs";
 
-export type NotificationListFilter = 'all' | 'unread' | 'read';
+export type NotificationListFilter = "all" | "unread" | "read";
 
 const MESSAGE_BODY_MAX = 2000;
 
@@ -25,7 +25,10 @@ export class NotificationsService {
         where: { user_id: userId },
         select: { notification_prefs: true },
       });
-      if (!u || !notificationPrefsAllow(u.notification_prefs, options.preferenceKey)) {
+      if (
+        !u ||
+        !notificationPrefsAllow(u.notification_prefs, options.preferenceKey)
+      ) {
         return null;
       }
     }
@@ -41,8 +44,14 @@ export class NotificationsService {
     });
   }
 
-  async createForManyUsers(userIds: number[], messageTitle: string, message: string) {
-    const unique = [...new Set(userIds.filter((id) => Number.isFinite(id) && id > 0))];
+  async createForManyUsers(
+    userIds: number[],
+    messageTitle: string,
+    message: string,
+  ) {
+    const unique = [
+      ...new Set(userIds.filter((id) => Number.isFinite(id) && id > 0)),
+    ];
     if (unique.length === 0) return { count: 0 };
     const title = messageTitle.slice(0, 100);
     const body = message.slice(0, MESSAGE_BODY_MAX);
@@ -77,7 +86,12 @@ export class NotificationsService {
     });
     const ids = options?.preferenceKey
       ? admins
-          .filter((a) => notificationPrefsAllow(a.notification_prefs, options.preferenceKey!))
+          .filter((a) =>
+            notificationPrefsAllow(
+              a.notification_prefs,
+              options.preferenceKey!,
+            ),
+          )
           .map((a) => a.user_id)
       : admins.map((a) => a.user_id);
     return this.createForManyUsers(ids, messageTitle, message);
@@ -85,15 +99,19 @@ export class NotificationsService {
 
   async listForUser(
     userId: number,
-    params: { filter?: NotificationListFilter; page?: number; pageSize?: number },
+    params: {
+      filter?: NotificationListFilter;
+      page?: number;
+      pageSize?: number;
+    },
   ) {
-    const filter: NotificationListFilter = params.filter ?? 'all';
+    const filter: NotificationListFilter = params.filter ?? "all";
     const page = Math.max(1, Number(params.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 20));
     const where =
-      filter === 'unread'
+      filter === "unread"
         ? { user_id: userId, is_read: false }
-        : filter === 'read'
+        : filter === "read"
           ? { user_id: userId, is_read: true }
           : { user_id: userId };
 
@@ -101,7 +119,7 @@ export class NotificationsService {
       this.prisma.notification.count({ where }),
       this.prisma.notification.findMany({
         where,
-        orderBy: { created_at: 'desc' },
+        orderBy: { created_at: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
         select: {
@@ -140,7 +158,7 @@ export class NotificationsService {
     const row = await this.prisma.notification.findFirst({
       where: { notification_id: notificationId, user_id: userId },
     });
-    if (!row) throw new NotFoundException('Notification not found');
+    if (!row) throw new NotFoundException("Notification not found");
     await this.prisma.notification.update({
       where: { notification_id: notificationId },
       data: { is_read: true },
@@ -152,7 +170,7 @@ export class NotificationsService {
     const row = await this.prisma.notification.findFirst({
       where: { notification_id: notificationId, user_id: userId },
     });
-    if (!row) throw new NotFoundException('Notification not found');
+    if (!row) throw new NotFoundException("Notification not found");
     await this.prisma.notification.update({
       where: { notification_id: notificationId },
       data: { is_read: false },
@@ -172,7 +190,7 @@ export class NotificationsService {
     const row = await this.prisma.notification.findFirst({
       where: { notification_id: notificationId, user_id: userId },
     });
-    if (!row) throw new NotFoundException('Notification not found');
+    if (!row) throw new NotFoundException("Notification not found");
     await this.prisma.notification.delete({
       where: { notification_id: notificationId },
     });
@@ -182,7 +200,7 @@ export class NotificationsService {
   async recentForUser(userId: number, take: number) {
     const rows = await this.prisma.notification.findMany({
       where: { user_id: userId },
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: "desc" },
       take,
       select: {
         notification_id: true,

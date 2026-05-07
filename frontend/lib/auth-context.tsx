@@ -29,6 +29,7 @@ const publicRoutes = ["/", "/login", "/forgot-password", "/reset-password", "/he
 const SETTINGS_ROUTE = "/settings";
 const LECTURER_TIME_PREFERENCES_ROUTE = "/lecturer-time-preferences";
 const LECTURER_SCHEDULE_ROUTE = "/lecturer-schedule";
+const MY_COURSES_ROUTE = "/my-courses";
 const LECTURER_ROLE = "LECTURER";
 
 export function isAuthPublicPath(pathname: string | null): boolean {
@@ -47,7 +48,9 @@ function isAllowedLecturerPath(pathname: string | null): boolean {
     pathname === LECTURER_TIME_PREFERENCES_ROUTE ||
     pathname.startsWith(`${LECTURER_TIME_PREFERENCES_ROUTE}/`) ||
     pathname === LECTURER_SCHEDULE_ROUTE ||
-    pathname.startsWith(`${LECTURER_SCHEDULE_ROUTE}/`)
+    pathname.startsWith(`${LECTURER_SCHEDULE_ROUTE}/`) ||
+    pathname === MY_COURSES_ROUTE ||
+    pathname.startsWith(`${MY_COURSES_ROUTE}/`)
   );
 }
 

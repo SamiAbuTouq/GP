@@ -14,9 +14,9 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 function decodeSemesterType(type) {
     const map = {
-        1: 'First Semester',
-        2: 'Second Semester',
-        3: 'Summer Semester',
+        1: "First Semester",
+        2: "Second Semester",
+        3: "Summer Semester",
     };
     return map[type] ?? `Semester ${type}`;
 }
@@ -34,7 +34,7 @@ let SemestersService = class SemestersService {
                 start_date: true,
                 end_date: true,
             },
-            orderBy: [{ academic_year: 'asc' }, { semester_type: 'asc' }],
+            orderBy: [{ academic_year: "asc" }, { semester_type: "asc" }],
         });
         return semesters.map((s) => ({
             semesterId: s.semester_id,

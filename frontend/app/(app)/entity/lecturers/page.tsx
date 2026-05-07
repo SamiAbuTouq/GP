@@ -14,8 +14,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +27,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, Search, Edit, MoreHorizontal, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Eye } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { Plus, Search, Edit, MoreHorizontal, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Eye, Check, ChevronsUpDown, Minus, AlertTriangle } from "lucide-react"
 import { GoBlocked } from "react-icons/go"
 import { ImportIcon } from "@/components/custom-icons"
 import { departments, type Department } from "@/lib/data"
@@ -118,6 +120,9 @@ export default function LecturersPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingLecturer, setEditingLecturer] = useState<Lecturer | null>(null)
+  const [initialEditingLecturer, setInitialEditingLecturer] = useState<Lecturer | null>(null)
+  const [editDiscardConfirmOpen, setEditDiscardConfirmOpen] = useState(false)
+  const [addDiscardConfirmOpen, setAddDiscardConfirmOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [newLecturer, setNewLecturer] = useState<Lecturer>({
     id: "",
@@ -130,6 +135,7 @@ export default function LecturersPage() {
   })
   const [addCourseQuery, setAddCourseQuery] = useState("")
   const [editCourseQuery, setEditCourseQuery] = useState("")
+  const [editCoursePickerOpen, setEditCoursePickerOpen] = useState(false)
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -263,6 +269,24 @@ export default function LecturersPage() {
       ),
     [availableCourses, editCourseQueryLower]
   )
+  const isEditDirty = useMemo(() => {
+    if (!editingLecturer || !initialEditingLecturer) return false
+    return JSON.stringify(editingLecturer) !== JSON.stringify(initialEditingLecturer)
+  }, [editingLecturer, initialEditingLecturer])
+  const isAddDirty = useMemo(
+    () =>
+      JSON.stringify(newLecturer) !==
+      JSON.stringify({
+        id: "",
+        name: "",
+        email: "",
+        department: "Computer Science",
+        load: 0,
+        maxWorkload: 15,
+        courses: [],
+      }),
+    [newLecturer],
+  )
 
   const sortedFilteredLecturers = useMemo(
     () => sortLecturersCopy(filteredLecturers, sortColumn, sortDirection),
@@ -384,6 +408,7 @@ export default function LecturersPage() {
       
       setLecturers(lecturers.map((l) => (l.id === editingLecturer.id ? data : l)))
       setIsEditDialogOpen(false)
+      setInitialEditingLecturer(null)
       toast({ title: "Success", description: "Lecturer updated successfully." })
     } catch (error) {
       console.error('Error updating lecturer:', error)
@@ -544,6 +569,22 @@ export default function LecturersPage() {
     setLecturer({ ...lecturer, courses: newCourses })
   }
 
+  const requestCloseEditDialog = () => {
+    if (isEditDirty) {
+      setEditDiscardConfirmOpen(true)
+      return
+    }
+    setIsEditDialogOpen(false)
+    setInitialEditingLecturer(null)
+  }
+  const requestCloseAddDialog = () => {
+    if (isAddDirty) {
+      setAddDiscardConfirmOpen(true)
+      return
+    }
+    setIsAddDialogOpen(false)
+  }
+
   const lecturerColumns = [
     { key: "id" as const, label: "ID" },
     { key: "name" as const, label: "Name" },
@@ -622,19 +663,27 @@ export default function LecturersPage() {
                       .join(" · ") || undefined
                   }
                 />
-                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Lecturer
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Add New Lecturer</DialogTitle>
+                <Button size="sm" onClick={() => setIsAddDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Lecturer
+                </Button>
+                <Sheet
+                  open={isAddDialogOpen}
+                  onOpenChange={(open) => {
+                    if (open) {
+                      setIsAddDialogOpen(true)
+                      return
+                    }
+                    requestCloseAddDialog()
+                  }}
+                >
+                  <SheetContent side="right" className="w-[92vw] max-w-3xl p-0 sm:w-[760px] sm:max-w-[760px]">
+                <DialogHeader className="space-y-1 border-b px-6 py-4 pr-14 text-left">
+                  <DialogTitle className="text-xl">Add New Lecturer</DialogTitle>
                   <DialogDescription>Enter the lecturer&apos;s information below.</DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+                <div className="grid gap-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="lecturer-name">Full Name</Label>
@@ -726,8 +775,9 @@ export default function LecturersPage() {
                     </div>
                   </div>
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                </div>
+                <DialogFooter className="flex flex-wrap items-center justify-end gap-2 border-t bg-background px-6 py-4">
+                  <Button variant="outline" onClick={requestCloseAddDialog}>
                     Cancel
                   </Button>
                   <Button onClick={handleAddLecturer} disabled={saving}>
@@ -735,8 +785,8 @@ export default function LecturersPage() {
                     Add Lecturer
                   </Button>
                 </DialogFooter>
-              </DialogContent>
-            </Dialog>
+              </SheetContent>
+            </Sheet>
               </div>
             </CardHeader>
             <CardContent>
@@ -858,6 +908,7 @@ export default function LecturersPage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => {
                               setEditingLecturer({ ...lecturer })
+                              setInitialEditingLecturer({ ...lecturer })
                               setEditCourseQuery("")
                               setIsEditDialogOpen(true)
                             }}>
@@ -1031,14 +1082,23 @@ export default function LecturersPage() {
         </TabsContent>
 
       {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Lecturer</DialogTitle>
+      <Sheet
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            setIsEditDialogOpen(true)
+            return
+          }
+          requestCloseEditDialog()
+        }}
+      >
+        <SheetContent side="right" className="w-[92vw] max-w-3xl p-0 sm:w-[760px] sm:max-w-[760px]">
+          <DialogHeader className="space-y-1 border-b px-6 py-4 pr-14 text-left">
+            <DialogTitle className="text-xl">Edit Lecturer</DialogTitle>
             <DialogDescription>Update the lecturer&apos;s information.</DialogDescription>
           </DialogHeader>
           {editingLecturer && (
-            <div className="grid gap-4 py-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Lecturer ID</Label>
@@ -1100,43 +1160,163 @@ export default function LecturersPage() {
               </div>
               <div className="space-y-3">
                 <Label>Courses Can Teach</Label>
-                <Input 
-                  placeholder="Search courses..." 
-                  value={editCourseQuery}
-                  onChange={(e) => setEditCourseQuery(e.target.value)}
-                  className="h-8 mb-2"
-                />
-                <div className="flex flex-col gap-2 max-h-32 overflow-y-auto border rounded-md p-3">
-                  {filteredEditCourses.map((course) => (
-                    <div key={course.code} className="flex items-start space-x-2">
-                      <Checkbox
-                        id={`edit-course-${course.code}`}
-                        checked={editingLecturer.courses.includes(course.code)}
-                        onCheckedChange={() => toggleCourse(course.code, editingLecturer, setEditingLecturer)}
-                        className="mt-0.5"
-                      />
-                      <label htmlFor={`edit-course-${course.code}`} className="text-sm cursor-pointer leading-tight">
-                        <span className="font-semibold">{course.code}</span> - <span className="capitalize">{course.name}</span>
-                      </label>
-                    </div>
-                  ))}
-                  {availableCourses.length === 0 && (
-                    <span className="text-sm text-muted-foreground text-center py-2">No courses available</span>
-                  )}
-                  {availableCourses.length > 0 && filteredEditCourses.length === 0 && (
-                    <span className="text-sm text-muted-foreground text-center py-2">No courses match search</span>
+                <div className="max-h-52 space-y-1 overflow-y-auto rounded-md border p-2">
+                  {editingLecturer.courses.length === 0 ? (
+                    <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+                      No courses listed yet. Add courses below.
+                    </p>
+                  ) : (
+                    editingLecturer.courses.map((courseCode) => {
+                      const match = availableCourses.find((c) => c.code === courseCode)
+                      const label = match ? `${match.code} - ${match.name}` : courseCode
+                      return (
+                        <div
+                          key={courseCode}
+                          className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/25 px-2 py-2"
+                        >
+                          <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => toggleCourse(courseCode, editingLecturer, setEditingLecturer)}
+                            aria-label={`Remove ${label}`}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
+                    })
                   )}
                 </div>
+                <div className="space-y-2">
+                  <Label>Add course</Label>
+                  <Popover
+                    open={editCoursePickerOpen}
+                    onOpenChange={(open) => {
+                      setEditCoursePickerOpen(open)
+                      if (!open) setEditCourseQuery("")
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" className="w-full justify-between">
+                        <span className="truncate text-left">Search and select a course to add...</span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent portalled={false} className="z-[260] w-[var(--radix-popover-trigger-width)] p-0">
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          value={editCourseQuery}
+                          onValueChange={setEditCourseQuery}
+                          placeholder="Search courses..."
+                        />
+                        <CommandList>
+                          <CommandEmpty>No results found.</CommandEmpty>
+                          {filteredEditCourses
+                            .filter((course) => !editingLecturer.courses.includes(course.code))
+                            .map((course) => (
+                              <CommandItem
+                                key={course.code}
+                                value={`${course.code} ${course.name}`}
+                                onSelect={() => {
+                                  toggleCourse(course.code, editingLecturer, setEditingLecturer)
+                                  setEditCoursePickerOpen(false)
+                                  setEditCourseQuery("")
+                                }}
+                              >
+                                <Check className="mr-2 h-4 w-4 opacity-0" />
+                                <span className="truncate">{course.code} - {course.name}</span>
+                              </CommandItem>
+                            ))}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                {availableCourses.length === 0 && (
+                  <span className="text-sm text-muted-foreground text-center py-2">No courses available</span>
+                )}
+                {availableCourses.length > 0 &&
+                  filteredEditCourses.filter((course) => !editingLecturer.courses.includes(course.code)).length === 0 && (
+                    <span className="text-sm text-muted-foreground text-center py-2">No courses match search</span>
+                  )}
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+          <DialogFooter className="flex flex-wrap items-center justify-end gap-2 border-t bg-background px-6 py-4">
+            <Button variant="outline" onClick={requestCloseEditDialog}>
               Cancel
             </Button>
             <Button onClick={handleEditLecturer} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
+            </Button>
+          </DialogFooter>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={addDiscardConfirmOpen} onOpenChange={setAddDiscardConfirmOpen}>
+        <DialogContent className="z-[220] border-2 border-border/90 bg-popover shadow-2xl ring-1 ring-black/10 sm:max-w-lg">
+          <DialogHeader className="gap-3 text-left">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <AlertTriangle className="h-4.5 w-4.5" />
+              </div>
+              <div className="space-y-1.5">
+                <DialogTitle className="text-xl font-semibold">Discard unsaved changes?</DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+                  Your edits to this lecturer will be permanently lost. This cannot be undone.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setAddDiscardConfirmOpen(false)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setAddDiscardConfirmOpen(false)
+                setIsAddDialogOpen(false)
+              }}
+            >
+              Discard changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editDiscardConfirmOpen} onOpenChange={setEditDiscardConfirmOpen}>
+        <DialogContent className="z-[220] border-2 border-border/90 bg-popover shadow-2xl ring-1 ring-black/10 sm:max-w-lg">
+          <DialogHeader className="gap-3 text-left">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <AlertTriangle className="h-4.5 w-4.5" />
+              </div>
+              <div className="space-y-1.5">
+                <DialogTitle className="text-xl font-semibold">Discard unsaved changes?</DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+                  Your edits to this lecturer will be permanently lost. This cannot be undone.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setEditDiscardConfirmOpen(false)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setEditDiscardConfirmOpen(false)
+                setIsEditDialogOpen(false)
+                setInitialEditingLecturer(null)
+              }}
+            >
+              Discard changes
             </Button>
           </DialogFooter>
         </DialogContent>

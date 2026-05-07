@@ -16,8 +16,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +44,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  AlertTriangle,
 } from "lucide-react"
 import { ImportIcon } from "@/components/custom-icons"
 import {
@@ -174,6 +175,9 @@ export default function CoursesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingCourse, setEditingCourse] = useState<Course | null>(null)
+  const [initialEditingCourse, setInitialEditingCourse] = useState<Course | null>(null)
+  const [addDiscardConfirmOpen, setAddDiscardConfirmOpen] = useState(false)
+  const [editDiscardConfirmOpen, setEditDiscardConfirmOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [newCourse, setNewCourse] = useState<Course>({
     code: "",
@@ -202,6 +206,27 @@ export default function CoursesPage() {
   const [loadingDeletionImpact, setLoadingDeletionImpact] = useState(false)
   const [permanentlyDeleting, setPermanentlyDeleting] = useState(false)
   const { toast } = useToast()
+  const isAddDirty = useMemo(
+    () =>
+      JSON.stringify(newCourse) !==
+      JSON.stringify({
+        code: "",
+        name: "",
+        creditHours: 3,
+        academicLevel: 1,
+        deliveryMode: "FACE_TO_FACE",
+        department: "Computer Science",
+        sectionsNormal: 1,
+        sectionsSummer: 0,
+        sectionsInLatestSchedule: 0,
+        isLab: false,
+      }),
+    [newCourse],
+  )
+  const isEditDirty = useMemo(() => {
+    if (!editingCourse || !initialEditingCourse) return false
+    return JSON.stringify(editingCourse) !== JSON.stringify(initialEditingCourse)
+  }, [editingCourse, initialEditingCourse])
   const formatTimetableLabel = (t: {
     timetableId: number
     generationType: string
@@ -333,6 +358,23 @@ export default function CoursesPage() {
     return `course-row-${index}`
   }
 
+  const requestCloseAddDialog = () => {
+    if (isAddDirty) {
+      setAddDiscardConfirmOpen(true)
+      return
+    }
+    setIsAddDialogOpen(false)
+  }
+
+  const requestCloseEditDialog = () => {
+    if (isEditDirty) {
+      setEditDiscardConfirmOpen(true)
+      return
+    }
+    setEditingCourse(null)
+    setInitialEditingCourse(null)
+  }
+
   const handleAddCourse = async () => {
     if (!newCourse.code.trim()) {
       toast({ title: "Validation Error", description: "Course code is required.", variant: "destructive" })
@@ -436,6 +478,7 @@ export default function CoursesPage() {
 
       await fetchCourses({ showFullLoading: false })
       setEditingCourse(null)
+      setInitialEditingCourse(null)
       toast({
         title: "Success",
         description: "Course updated successfully.",
@@ -713,19 +756,27 @@ export default function CoursesPage() {
                       .join(" · ") || undefined
                   }
                 />
-                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Course
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Add New Course</DialogTitle>
+                <Button size="sm" onClick={() => setIsAddDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Course
+                </Button>
+                <Sheet
+                  open={isAddDialogOpen}
+                  onOpenChange={(open) => {
+                    if (open) {
+                      setIsAddDialogOpen(true)
+                      return
+                    }
+                    requestCloseAddDialog()
+                  }}
+                >
+                  <SheetContent side="right" className="w-[92vw] max-w-3xl p-0 sm:w-[760px] sm:max-w-[760px]">
+                <DialogHeader className="space-y-1 border-b px-6 py-4 pr-14 text-left">
+                  <DialogTitle className="text-xl">Add New Course</DialogTitle>
                   <DialogDescription>Enter the course information below.</DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+                <div className="grid gap-4">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2 min-w-0">
                       <Label htmlFor="course-code">Course Code</Label>
@@ -863,8 +914,9 @@ export default function CoursesPage() {
                     </Label>
                   </div>
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                </div>
+                <DialogFooter className="flex flex-wrap items-center justify-end gap-2 border-t bg-background px-6 py-4">
+                  <Button variant="outline" onClick={requestCloseAddDialog}>
                     Cancel
                   </Button>
                   <Button onClick={handleAddCourse} disabled={saving}>
@@ -872,8 +924,8 @@ export default function CoursesPage() {
                     Add Course
                   </Button>
                 </DialogFooter>
-              </DialogContent>
-            </Dialog>
+              </SheetContent>
+            </Sheet>
               </div>
             </CardHeader>
             <CardContent>
@@ -1104,12 +1156,14 @@ export default function CoursesPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onClick={() =>
-                                setEditingCourse({
+                              onClick={() => {
+                                const next = {
                                   ...course,
                                   academicLevel: academicLevelFromCourseCode(course.code),
-                                })
-                              }
+                                }
+                                setEditingCourse(next)
+                                setInitialEditingCourse(next)
+                              }}
                             >
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
@@ -1279,14 +1333,21 @@ export default function CoursesPage() {
         </TabsContent>
 
       {/* Edit Dialog */}
-      <Dialog open={!!editingCourse} onOpenChange={(open) => !open && setEditingCourse(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Course</DialogTitle>
+      <Sheet
+        open={!!editingCourse}
+        onOpenChange={(open) => {
+          if (open) return
+          requestCloseEditDialog()
+        }}
+      >
+        <SheetContent side="right" className="w-[92vw] max-w-3xl p-0 sm:w-[760px] sm:max-w-[760px]">
+          <DialogHeader className="space-y-1 border-b px-6 py-4 pr-14 text-left">
+            <DialogTitle className="text-xl">Edit Course</DialogTitle>
             <DialogDescription>Update the course information.</DialogDescription>
           </DialogHeader>
           {editingCourse && (
-            <div className="grid gap-4 py-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+            <div className="grid gap-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2 min-w-0">
                   <Label htmlFor="edit-course-code">Course Code</Label>
@@ -1408,14 +1469,80 @@ export default function CoursesPage() {
                 </Label>
               </div>
             </div>
+            </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingCourse(null)}>
+          <DialogFooter className="flex flex-wrap items-center justify-end gap-2 border-t bg-background px-6 py-4">
+            <Button variant="outline" onClick={requestCloseEditDialog}>
               Cancel
             </Button>
             <Button onClick={handleEditCourse} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
+            </Button>
+          </DialogFooter>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={addDiscardConfirmOpen} onOpenChange={setAddDiscardConfirmOpen}>
+        <DialogContent className="z-[220] border-2 border-border/90 bg-popover shadow-2xl ring-1 ring-black/10 sm:max-w-lg">
+          <DialogHeader className="gap-3 text-left">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <AlertTriangle className="h-4.5 w-4.5" />
+              </div>
+              <div className="space-y-1.5">
+                <DialogTitle className="text-xl font-semibold">Discard unsaved changes?</DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+                  Your edits to this course will be permanently lost. This cannot be undone.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setAddDiscardConfirmOpen(false)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setAddDiscardConfirmOpen(false)
+                setIsAddDialogOpen(false)
+              }}
+            >
+              Discard changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editDiscardConfirmOpen} onOpenChange={setEditDiscardConfirmOpen}>
+        <DialogContent className="z-[220] border-2 border-border/90 bg-popover shadow-2xl ring-1 ring-black/10 sm:max-w-lg">
+          <DialogHeader className="gap-3 text-left">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <AlertTriangle className="h-4.5 w-4.5" />
+              </div>
+              <div className="space-y-1.5">
+                <DialogTitle className="text-xl font-semibold">Discard unsaved changes?</DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+                  Your edits to this course will be permanently lost. This cannot be undone.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setEditDiscardConfirmOpen(false)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setEditDiscardConfirmOpen(false)
+                setEditingCourse(null)
+                setInitialEditingCourse(null)
+              }}
+            >
+              Discard changes
             </Button>
           </DialogFooter>
         </DialogContent>

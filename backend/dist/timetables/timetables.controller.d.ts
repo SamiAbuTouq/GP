@@ -1,6 +1,6 @@
-import { type User } from '@prisma/client';
-import { PublishDraftDto } from './dto/publish-draft.dto';
-import { TimetablesService } from './timetables.service';
+import { type User } from "@prisma/client";
+import { PublishDraftDto } from "./dto/publish-draft.dto";
+import { TimetablesService } from "./timetables.service";
 export declare class TimetablesController {
     private readonly timetablesService;
     constructor(timetablesService: TimetablesService);

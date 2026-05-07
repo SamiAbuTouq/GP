@@ -34,17 +34,17 @@ let TimeslotsController = class TimeslotsController {
     }
     findAll(filter) {
         let isSummer;
-        if (filter === 'summer')
+        if (filter === "summer")
             isSummer = true;
-        else if (filter === 'normal')
+        else if (filter === "normal")
             isSummer = false;
         return this.timeslotsService.findAll(isSummer);
     }
     findArchived(filter) {
         let isSummer;
-        if (filter === 'summer')
+        if (filter === "summer")
             isSummer = true;
-        else if (filter === 'normal')
+        else if (filter === "normal")
             isSummer = false;
         return this.timeslotsService.findArchived(isSummer);
     }
@@ -72,7 +72,7 @@ let TimeslotsController = class TimeslotsController {
 };
 exports.TimeslotsController = TimeslotsController;
 __decorate([
-    (0, common_1.Get)('lecturer/preferences'),
+    (0, common_1.Get)("lecturer/preferences"),
     (0, roles_decorator_1.Roles)(client_1.Role.LECTURER),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -80,7 +80,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "getLecturerPreferences", null);
 __decorate([
-    (0, common_1.Put)('lecturer/preferences'),
+    (0, common_1.Put)("lecturer/preferences"),
     (0, roles_decorator_1.Roles)(client_1.Role.LECTURER),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
@@ -89,22 +89,22 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "updateLecturerPreferences", null);
 __decorate([
-    (0, common_1.Get)('lecturer/preferences/:userId'),
-    __param(0, (0, common_1.Param)('userId', common_1.ParseIntPipe)),
+    (0, common_1.Get)("lecturer/preferences/:userId"),
+    __param(0, (0, common_1.Param)("userId", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "getLecturerPreferencesForAdmin", null);
 __decorate([
     (0, common_1.Get)(),
-    __param(0, (0, common_1.Query)('filter')),
+    __param(0, (0, common_1.Query)("filter")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "findAll", null);
 __decorate([
-    (0, common_1.Get)('archived/list'),
-    __param(0, (0, common_1.Query)('filter')),
+    (0, common_1.Get)("archived/list"),
+    __param(0, (0, common_1.Query)("filter")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
@@ -117,50 +117,50 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "create", null);
 __decorate([
-    (0, common_1.Put)(':id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Put)(":id"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, timeslot_dto_1.UpdateTimeslotDto]),
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "update", null);
 __decorate([
-    (0, common_1.Delete)(':id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Delete)(":id"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "remove", null);
 __decorate([
-    (0, common_1.Patch)(':id/restore'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Patch)(":id/restore"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "restore", null);
 __decorate([
-    (0, common_1.Get)(':id/deletion-impact'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)(":id/deletion-impact"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "getDeletionImpact", null);
 __decorate([
-    (0, common_1.Delete)(':id/permanent'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Delete)(":id/permanent"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "permanentlyDelete", null);
 __decorate([
-    (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)(":id"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "findOne", null);
 exports.TimeslotsController = TimeslotsController = __decorate([
-    (0, common_1.Controller)('timeslots'),
+    (0, common_1.Controller)("timeslots"),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
     __metadata("design:paramtypes", [timeslots_service_1.TimeslotsService])
 ], TimeslotsController);

@@ -61,7 +61,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "findAll", null);
 __decorate([
-    (0, common_1.Get)('archived/list'),
+    (0, common_1.Get)("archived/list"),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
@@ -74,57 +74,57 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "create", null);
 __decorate([
-    (0, common_1.Put)(':id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Put)(":id"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, room_dto_1.UpdateRoomDto]),
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "update", null);
 __decorate([
-    (0, common_1.Patch)(':id/toggle-availability'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Patch)(":id/toggle-availability"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "toggleAvailability", null);
 __decorate([
-    (0, common_1.Delete)(':id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Delete)(":id"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "remove", null);
 __decorate([
-    (0, common_1.Patch)(':id/restore'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Patch)(":id/restore"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "restore", null);
 __decorate([
-    (0, common_1.Get)(':id/deletion-impact'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)(":id/deletion-impact"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "getDeletionImpact", null);
 __decorate([
-    (0, common_1.Delete)(':id/permanent'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Delete)(":id/permanent"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "permanentlyDelete", null);
 __decorate([
-    (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)(":id"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "findOne", null);
 exports.RoomsController = RoomsController = __decorate([
-    (0, common_1.Controller)('rooms'),
+    (0, common_1.Controller)("rooms"),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
     __metadata("design:paramtypes", [rooms_service_1.RoomsService])
 ], RoomsController);

@@ -30,7 +30,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], SemestersController.prototype, "findAll", null);
 exports.SemestersController = SemestersController = __decorate([
-    (0, common_1.Controller)('semesters'),
+    (0, common_1.Controller)("semesters"),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
     __metadata("design:paramtypes", [semesters_service_1.SemestersService])
 ], SemestersController);

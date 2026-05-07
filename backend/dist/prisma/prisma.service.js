@@ -19,25 +19,25 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
     constructor() {
         const connectionString = process.env.DATABASE_URL;
         if (!connectionString) {
-            throw new Error('DATABASE_URL is required to initialize Prisma. Add it to backend/.env or export it in your shell.');
+            throw new Error("DATABASE_URL is required to initialize Prisma. Add it to backend/.env or export it in your shell.");
         }
         const pool = new pg_1.Pool({ connectionString });
         const adapter = new adapter_pg_1.PrismaPg(pool);
         super({
             adapter,
-            log: ['error'],
+            log: ["error"],
         });
         this.logger = new common_1.Logger(PrismaService_1.name);
         this.pool = pool;
     }
     async onModuleInit() {
         await this.$connect();
-        this.logger.log('Database connected');
+        this.logger.log("Database connected");
     }
     async onModuleDestroy() {
         await this.$disconnect();
         await this.pool.end();
-        this.logger.log('Database disconnected');
+        this.logger.log("Database disconnected");
     }
 };
 exports.PrismaService = PrismaService;

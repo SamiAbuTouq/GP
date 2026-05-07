@@ -32,17 +32,17 @@ let RolesGuard = class RolesGuard {
         ]);
         const { user } = context.switchToHttp().getRequest();
         if (!user) {
-            throw new common_1.ForbiddenException('Authentication required');
+            throw new common_1.ForbiddenException("Authentication required");
         }
-        const userRole = user.role_name ?? user.role ?? '';
+        const userRole = user.role_name ?? user.role ?? "";
         if (!requiredRoles || requiredRoles.length === 0) {
             if (userRole !== client_1.Role.ADMIN) {
-                throw new common_1.ForbiddenException('Insufficient permissions — this resource requires ADMIN access');
+                throw new common_1.ForbiddenException("Insufficient permissions — this resource requires ADMIN access");
             }
             return true;
         }
         if (!requiredRoles.includes(userRole)) {
-            throw new common_1.ForbiddenException('Insufficient permissions');
+            throw new common_1.ForbiddenException("Insufficient permissions");
         }
         return true;
     }

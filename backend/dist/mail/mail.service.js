@@ -24,11 +24,11 @@ let MailService = MailService_1 = class MailService {
     }
     escapeHtml(value) {
         return value
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
     }
     normalizeEnvValue(v) {
         if (v === undefined)
@@ -43,11 +43,11 @@ let MailService = MailService_1 = class MailService {
         return s.length > 0 ? s : undefined;
     }
     getSmtpAuthConfig() {
-        const host = this.configService.get('SMTP_HOST');
-        const port = Number(this.configService.get('SMTP_PORT', '587'));
-        const secure = this.configService.get('SMTP_SECURE', 'false') === 'true';
-        const user = this.configService.get('SMTP_USER');
-        const pass = this.configService.get('SMTP_PASS');
+        const host = this.configService.get("SMTP_HOST");
+        const port = Number(this.configService.get("SMTP_PORT", "587"));
+        const secure = this.configService.get("SMTP_SECURE", "false") === "true";
+        const user = this.configService.get("SMTP_USER");
+        const pass = this.configService.get("SMTP_PASS");
         if (!host || !user || !pass)
             return null;
         return { host, port, secure, user, pass };
@@ -64,7 +64,7 @@ let MailService = MailService_1 = class MailService {
         };
         const candidates = [base];
         const hostLower = config.host.toLowerCase();
-        if (hostLower.includes('gmail')) {
+        if (hostLower.includes("gmail")) {
             if (config.port === 587) {
                 candidates.push({ ...base, port: 465, secure: true });
             }
@@ -98,7 +98,9 @@ let MailService = MailService_1 = class MailService {
                 }
             }
         }
-        throw lastError instanceof Error ? lastError : new Error('Email delivery failed.');
+        throw lastError instanceof Error
+            ? lastError
+            : new Error("Email delivery failed.");
     }
     async sendLecturerWelcomeEmail(params) {
         const smtpConfig = this.getSmtpAuthConfig();
@@ -106,25 +108,25 @@ let MailService = MailService_1 = class MailService {
             this.logger.warn(`Welcome email skipped for ${params.to}: SMTP configuration is incomplete.`);
             return;
         }
-        const fromName = this.configService.get('EMAIL_FROM_NAME', 'Smart University Timetable System');
-        const fromAddress = this.configService.get('SMTP_FROM', smtpConfig.user);
-        const replyTo = this.configService.get('SMTP_REPLY_TO', smtpConfig.user);
-        const appBase = this.normalizeEnvValue(this.configService.get('NEXT_PUBLIC_APP_URL')) ||
-            this.normalizeEnvValue(this.configService.get('APP_URL')) ||
-            'http://localhost:3000';
-        const firstLoginUrl = `${appBase.replace(/\/$/, '')}/first-login-password`;
-        const subject = 'Your Lecturer Account Credentials';
+        const fromName = this.configService.get("EMAIL_FROM_NAME", "Smart University Timetable System");
+        const fromAddress = this.configService.get("SMTP_FROM", smtpConfig.user);
+        const replyTo = this.configService.get("SMTP_REPLY_TO", smtpConfig.user);
+        const appBase = this.normalizeEnvValue(this.configService.get("NEXT_PUBLIC_APP_URL")) ||
+            this.normalizeEnvValue(this.configService.get("APP_URL")) ||
+            "http://localhost:3000";
+        const firstLoginUrl = `${appBase.replace(/\/$/, "")}/first-login-password`;
+        const subject = "Your Lecturer Account Credentials";
         const text = [
             `Hello ${params.fullName},`,
-            '',
-            'Your lecturer account has been created.',
+            "",
+            "Your lecturer account has been created.",
             `Email: ${params.to}`,
             `Temporary password: ${params.temporaryPassword}`,
-            '',
+            "",
             `Sign in and set your password: ${firstLoginUrl}`,
-            '',
-            'For security reasons, you must change this password on your first login.',
-        ].join('\n');
+            "",
+            "For security reasons, you must change this password on your first login.",
+        ].join("\n");
         const html = `
       <div style="font-family: Arial, sans-serif; background-color: #f4f5f7; padding: 40px 20px; min-height: 100%;">
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
@@ -196,21 +198,21 @@ let MailService = MailService_1 = class MailService {
             this.logger.warn(`Access request rejection email skipped for ${params.to}: SMTP configuration is incomplete.`);
             return;
         }
-        const fromName = this.configService.get('EMAIL_FROM_NAME', 'Smart University Timetable System');
-        const fromAddress = this.configService.get('SMTP_FROM', smtpConfig.user);
-        const replyTo = this.configService.get('SMTP_REPLY_TO', smtpConfig.user);
-        const genericReason = 'At this time, we are unable to approve your access request. Please contact IT support for assistance.';
+        const fromName = this.configService.get("EMAIL_FROM_NAME", "Smart University Timetable System");
+        const fromAddress = this.configService.get("SMTP_FROM", smtpConfig.user);
+        const replyTo = this.configService.get("SMTP_REPLY_TO", smtpConfig.user);
+        const genericReason = "At this time, we are unable to approve your access request. Please contact IT support for assistance.";
         const finalReason = params.reason?.trim() || genericReason;
-        const subject = 'Lecturer Access Request Update';
+        const subject = "Lecturer Access Request Update";
         const text = [
             `Hello ${params.fullName},`,
-            '',
-            'Your lecturer access request was not approved.',
-            '',
+            "",
+            "Your lecturer access request was not approved.",
+            "",
             `Reason: ${finalReason}`,
-            '',
-            'If you have questions, please contact IT support.',
-        ].join('\n');
+            "",
+            "If you have questions, please contact IT support.",
+        ].join("\n");
         const html = `
       <div style="font-family: Arial, sans-serif; background-color: #f4f5f7; padding: 40px 20px;">
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
@@ -245,41 +247,41 @@ let MailService = MailService_1 = class MailService {
             this.logger.warn(`Access request confirmation email skipped for ${params.to}: SMTP configuration is incomplete.`);
             return;
         }
-        const fromName = this.configService.get('EMAIL_FROM_NAME', 'Smart University Timetable System');
-        const fromAddress = this.configService.get('SMTP_FROM', smtpConfig.user);
-        const replyTo = this.configService.get('SMTP_REPLY_TO', smtpConfig.user);
+        const fromName = this.configService.get("EMAIL_FROM_NAME", "Smart University Timetable System");
+        const fromAddress = this.configService.get("SMTP_FROM", smtpConfig.user);
+        const replyTo = this.configService.get("SMTP_REPLY_TO", smtpConfig.user);
         const submittedAt = new Date(params.submittedAtIso).toLocaleString();
         const expiresAt = new Date(params.expiresAtIso).toLocaleString();
         const coursesTextBlock = params.courses.length > 0
-            ? params.courses.map((c) => `  • ${c}`).join('\n')
-            : '  • None selected';
+            ? params.courses.map((c) => `  • ${c}`).join("\n")
+            : "  • None selected";
         const coursesHtmlBlock = params.courses.length > 0
             ? `<ul style="margin: 8px 0 0 18px; padding: 0; color: #475569; font-size: 14px; line-height: 1.55;">
             ${params.courses
                 .map((c) => `<li style="margin: 4px 0;">${this.escapeHtml(c)}</li>`)
-                .join('')}
+                .join("")}
           </ul>`
             : `<p style="margin: 8px 0 0 0; color: #64748b; font-size: 14px;">None selected</p>`;
         const safeName = this.escapeHtml(params.fullName);
         const safeEmail = this.escapeHtml(params.to);
         const safeDept = this.escapeHtml(params.department);
-        const subject = 'Lecturer Access Request Received';
+        const subject = "Lecturer Access Request Received";
         const text = [
             `Hello ${params.fullName},`,
-            '',
-            'We received your lecturer access request. It is now pending review.',
-            '',
-            'Submitted details:',
+            "",
+            "We received your lecturer access request. It is now pending review.",
+            "",
+            "Submitted details:",
             `- Name: ${params.fullName}`,
             `- Email: ${params.to}`,
             `- Department: ${params.department}`,
             `- Max workload (hrs) for bachelor's degree: ${params.maxWorkload}`,
-            '- Courses you can teach:',
+            "- Courses you can teach:",
             coursesTextBlock,
             `- Submitted at: ${submittedAt}`,
-            '',
+            "",
             `If no action is taken, requests expire after 14 days (${expiresAt}).`,
-        ].join('\n');
+        ].join("\n");
         const html = `
       <div style="font-family: Arial, sans-serif; background-color: #f4f5f7; padding: 40px 20px;">
         <div style="max-width: 640px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">

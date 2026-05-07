@@ -18,7 +18,7 @@ let DepartmentsService = class DepartmentsService {
     }
     async findAll() {
         const departments = await this.prisma.department.findMany({
-            orderBy: { dept_name: 'asc' },
+            orderBy: { dept_name: "asc" },
         });
         return departments.map((dept) => ({
             id: dept.dept_id,
@@ -27,20 +27,20 @@ let DepartmentsService = class DepartmentsService {
     }
     async seed() {
         const defaultDepartments = [
-            'Accounting',
-            'Basic Sciences',
-            'Business Administration',
-            'Business Information Technology',
-            'Communications Engineering',
-            'Computer Engineering',
-            'Computer Graphics',
-            'Computer Science',
-            'Coordination Unit for Service Courses',
-            'Cyber Security',
-            'Data Science',
-            'E-Marketing & Social Media',
-            'Electrical Engineering',
-            'Software Engineering',
+            "Accounting",
+            "Basic Sciences",
+            "Business Administration",
+            "Business Information Technology",
+            "Communications Engineering",
+            "Computer Engineering",
+            "Computer Graphics",
+            "Computer Science",
+            "Coordination Unit for Service Courses",
+            "Cyber Security",
+            "Data Science",
+            "E-Marketing & Social Media",
+            "Electrical Engineering",
+            "Software Engineering",
         ];
         for (const deptName of defaultDepartments) {
             await this.prisma.department.upsert({
@@ -49,7 +49,7 @@ let DepartmentsService = class DepartmentsService {
                 create: { dept_name: deptName },
             });
         }
-        return { message: 'Departments seeded successfully' };
+        return { message: "Departments seeded successfully" };
     }
 };
 exports.DepartmentsService = DepartmentsService;

@@ -33,13 +33,13 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], DepartmentsController.prototype, "findAll", null);
 __decorate([
-    (0, common_1.Post)('seed'),
+    (0, common_1.Post)("seed"),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], DepartmentsController.prototype, "seed", null);
 exports.DepartmentsController = DepartmentsController = __decorate([
-    (0, common_1.Controller)('departments'),
+    (0, common_1.Controller)("departments"),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
     __metadata("design:paramtypes", [departments_service_1.DepartmentsService])
 ], DepartmentsController);

@@ -17,8 +17,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +45,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  AlertTriangle,
 } from "lucide-react"
 import { ImportIcon } from "@/components/custom-icons"
 import { ImportDialog } from "@/components/import-dialog"
@@ -92,6 +93,9 @@ export default function RoomsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingRoom, setEditingRoom] = useState<Room | null>(null)
+  const [initialEditingRoom, setInitialEditingRoom] = useState<Room | null>(null)
+  const [addDiscardConfirmOpen, setAddDiscardConfirmOpen] = useState(false)
+  const [editDiscardConfirmOpen, setEditDiscardConfirmOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [newRoom, setNewRoom] = useState<Room>({ id: "", type: "Classroom", capacity: 30, isAvailable: true })
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
@@ -184,6 +188,16 @@ export default function RoomsPage() {
       ),
     [rooms, searchQuery]
   )
+  const isAddDirty = useMemo(
+    () =>
+      JSON.stringify(newRoom) !==
+      JSON.stringify({ id: "", type: "Classroom", capacity: 30, isAvailable: true }),
+    [newRoom],
+  )
+  const isEditDirty = useMemo(() => {
+    if (!editingRoom || !initialEditingRoom) return false
+    return JSON.stringify(editingRoom) !== JSON.stringify(initialEditingRoom)
+  }, [editingRoom, initialEditingRoom])
 
   const sortedFilteredRooms = useMemo(
     () => sortRoomsCopy(filteredRooms, sortColumn, sortDirection),
@@ -288,6 +302,7 @@ export default function RoomsPage() {
       
       setRooms(rooms.map((r) => (r.id === editingRoom.id ? data : r)))
       setEditingRoom(null)
+      setInitialEditingRoom(null)
       toast({
         title: "Success",
         description: "Room updated successfully.",
@@ -518,6 +533,23 @@ export default function RoomsPage() {
     { key: "isAvailable" as const, label: "Available" },
   ]
 
+  const requestCloseAddDialog = () => {
+    if (isAddDirty) {
+      setAddDiscardConfirmOpen(true)
+      return
+    }
+    setIsAddDialogOpen(false)
+  }
+
+  const requestCloseEditDialog = () => {
+    if (isEditDirty) {
+      setEditDiscardConfirmOpen(true)
+      return
+    }
+    setEditingRoom(null)
+    setInitialEditingRoom(null)
+  }
+
   const getTypeColor = (type: string) => {
     switch (type) {
       case "Classroom":
@@ -585,19 +617,27 @@ export default function RoomsPage() {
                       .join(" · ") || undefined
                   }
                 />
-                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Room
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add New Room</DialogTitle>
+                <Button size="sm" onClick={() => setIsAddDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Room
+                </Button>
+                <Sheet
+                  open={isAddDialogOpen}
+                  onOpenChange={(open) => {
+                    if (open) {
+                      setIsAddDialogOpen(true)
+                      return
+                    }
+                    requestCloseAddDialog()
+                  }}
+                >
+                  <SheetContent side="right" className="w-[92vw] max-w-3xl p-0 sm:w-[760px] sm:max-w-[760px]">
+                <DialogHeader className="space-y-1 border-b px-6 py-4 pr-14 text-left">
+                  <DialogTitle className="text-xl">Add New Room</DialogTitle>
                   <DialogDescription>Enter the room information below.</DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+                <div className="grid gap-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="room-id">Room Number</Label>
@@ -640,8 +680,9 @@ export default function RoomsPage() {
                     />
                   </div>
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                </div>
+                <DialogFooter className="flex flex-wrap items-center justify-end gap-2 border-t bg-background px-6 py-4">
+                  <Button variant="outline" onClick={requestCloseAddDialog}>
                     Cancel
                   </Button>
                   <Button onClick={handleAddRoom} disabled={saving}>
@@ -649,8 +690,8 @@ export default function RoomsPage() {
                     Add Room
                   </Button>
                 </DialogFooter>
-              </DialogContent>
-            </Dialog>
+              </SheetContent>
+            </Sheet>
               </div>
             </CardHeader>
             <CardContent>
@@ -730,7 +771,12 @@ export default function RoomsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setEditingRoom({ ...room })}>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingRoom({ ...room })
+                                setInitialEditingRoom({ ...room })
+                              }}
+                            >
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
@@ -899,14 +945,21 @@ export default function RoomsPage() {
         </TabsContent>
 
       {/* Edit Dialog */}
-      <Dialog open={!!editingRoom} onOpenChange={(open) => !open && setEditingRoom(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Room</DialogTitle>
+      <Sheet
+        open={!!editingRoom}
+        onOpenChange={(open) => {
+          if (open) return
+          requestCloseEditDialog()
+        }}
+      >
+        <SheetContent side="right" className="w-[92vw] max-w-3xl p-0 sm:w-[760px] sm:max-w-[760px]">
+          <DialogHeader className="space-y-1 border-b px-6 py-4 pr-14 text-left">
+            <DialogTitle className="text-xl">Edit Room</DialogTitle>
             <DialogDescription>Update the room information.</DialogDescription>
           </DialogHeader>
           {editingRoom && (
-            <div className="grid gap-4 py-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+            <div className="grid gap-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Room Number</Label>
@@ -944,14 +997,80 @@ export default function RoomsPage() {
                 />
               </div>
             </div>
+            </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingRoom(null)}>
+          <DialogFooter className="flex flex-wrap items-center justify-end gap-2 border-t bg-background px-6 py-4">
+            <Button variant="outline" onClick={requestCloseEditDialog}>
               Cancel
             </Button>
             <Button onClick={handleEditRoom} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
+            </Button>
+          </DialogFooter>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={addDiscardConfirmOpen} onOpenChange={setAddDiscardConfirmOpen}>
+        <DialogContent className="z-[220] border-2 border-border/90 bg-popover shadow-2xl ring-1 ring-black/10 sm:max-w-lg">
+          <DialogHeader className="gap-3 text-left">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <AlertTriangle className="h-4.5 w-4.5" />
+              </div>
+              <div className="space-y-1.5">
+                <DialogTitle className="text-xl font-semibold">Discard unsaved changes?</DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+                  Your edits to this room will be permanently lost. This cannot be undone.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setAddDiscardConfirmOpen(false)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setAddDiscardConfirmOpen(false)
+                setIsAddDialogOpen(false)
+              }}
+            >
+              Discard changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editDiscardConfirmOpen} onOpenChange={setEditDiscardConfirmOpen}>
+        <DialogContent className="z-[220] border-2 border-border/90 bg-popover shadow-2xl ring-1 ring-black/10 sm:max-w-lg">
+          <DialogHeader className="gap-3 text-left">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <AlertTriangle className="h-4.5 w-4.5" />
+              </div>
+              <div className="space-y-1.5">
+                <DialogTitle className="text-xl font-semibold">Discard unsaved changes?</DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+                  Your edits to this room will be permanently lost. This cannot be undone.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setEditDiscardConfirmOpen(false)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setEditDiscardConfirmOpen(false)
+                setEditingRoom(null)
+                setInitialEditingRoom(null)
+              }}
+            >
+              Discard changes
             </Button>
           </DialogFooter>
         </DialogContent>

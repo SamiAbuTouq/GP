@@ -3,18 +3,18 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateLecturerDto, UpdateLecturerDto } from './dto/lecturer.dto';
-import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
-import { MailService } from '../mail/mail.service';
-import { NotificationsService } from '../notifications/notifications.service';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+import { CreateLecturerDto, UpdateLecturerDto } from "./dto/lecturer.dto";
+import * as bcrypt from "bcrypt";
+import { randomBytes } from "crypto";
+import { MailService } from "../mail/mail.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import {
   ADMIN_NOTIFICATION_PREF_KEYS,
   LECTURER_NOTIFICATION_PREF_KEYS,
-} from '../notifications/notification-prefs';
+} from "../notifications/notification-prefs";
 
 /** Policy max workload (hours) shown and stored for all lecturers. */
 const STANDARD_MAX_WORKLOAD_HOURS = 15;
@@ -31,11 +31,11 @@ export class LecturersService {
 
   private generateTemporaryPassword(length = 16): string {
     const chars =
-      'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*';
+      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
     const bytes = randomBytes(length);
     return Array.from(bytes)
       .map((byte) => chars[byte % chars.length])
-      .join('');
+      .join("");
   }
 
   /**
@@ -51,16 +51,16 @@ export class LecturersService {
         },
       },
       orderBy: [
-        { generated_at: 'desc' },
-        { version_number: 'desc' },
-        { timetable_id: 'desc' },
+        { generated_at: "desc" },
+        { version_number: "desc" },
+        { timetable_id: "desc" },
       ],
     });
 
     if (timetables.length === 0) return null;
 
     const activeWithAssignments = timetables.find(
-      (t) => t.status === 'active' && t._count.section_schedule_entries > 0,
+      (t) => t.status === "active" && t._count.section_schedule_entries > 0,
     );
     if (activeWithAssignments) return activeWithAssignments.timetable_id;
 
@@ -69,7 +69,7 @@ export class LecturersService {
     );
     if (latestWithAssignments) return latestWithAssignments.timetable_id;
 
-    const latestActive = timetables.find((t) => t.status === 'active');
+    const latestActive = timetables.find((t) => t.status === "active");
     return latestActive?.timetable_id ?? timetables[0].timetable_id;
   }
 
@@ -83,7 +83,7 @@ export class LecturersService {
   ): Promise<Map<number, number>> {
     const rows = await this.prisma.sectionScheduleEntry.findMany({
       where: { timetable_id: timetableId },
-      distinct: ['user_id', 'course_id', 'section_number'],
+      distinct: ["user_id", "course_id", "section_number"],
       select: {
         user_id: true,
         course: { select: { credit_hours: true } },
@@ -107,7 +107,7 @@ export class LecturersService {
   ): Promise<number> {
     const rows = await this.prisma.sectionScheduleEntry.findMany({
       where: { timetable_id: timetableId, user_id: userId },
-      distinct: ['course_id', 'section_number'],
+      distinct: ["course_id", "section_number"],
       select: { course: { select: { credit_hours: true } } },
     });
     return rows.reduce((acc, row) => acc + row.course.credit_hours, 0);
@@ -130,12 +130,12 @@ export class LecturersService {
           },
         },
       },
-      orderBy: { user: { first_name: 'asc' } },
+      orderBy: { user: { first_name: "asc" } },
     });
 
     return lecturers.map((lecturer) => {
       return {
-        id: `LEC${String(lecturer.user_id).padStart(3, '0')}`,
+        id: `LEC${String(lecturer.user_id).padStart(3, "0")}`,
         databaseId: lecturer.user_id,
         name: `${lecturer.user.first_name} ${lecturer.user.last_name}`,
         email: lecturer.user.email,
@@ -143,7 +143,9 @@ export class LecturersService {
         departmentId: lecturer.dept_id,
         load: loadByUserId.get(lecturer.user_id) ?? 0,
         maxWorkload: lecturer.max_workload ?? STANDARD_MAX_WORKLOAD_HOURS,
-        courses: lecturer.lecturer_can_teach_course.map((c) => c.course.course_code),
+        courses: lecturer.lecturer_can_teach_course.map(
+          (c) => c.course.course_code,
+        ),
         isAvailable: lecturer.is_available,
       };
     });
@@ -173,11 +175,14 @@ export class LecturersService {
     const timetableId = await this.resolveLatestTimetableId();
     const load =
       timetableId !== null
-        ? await this.teachingLoadForUserOnTimetable(timetableId, lecturer.user_id)
+        ? await this.teachingLoadForUserOnTimetable(
+            timetableId,
+            lecturer.user_id,
+          )
         : 0;
 
     return {
-      id: `LEC${String(lecturer.user_id).padStart(3, '0')}`,
+      id: `LEC${String(lecturer.user_id).padStart(3, "0")}`,
       databaseId: lecturer.user_id,
       name: `${lecturer.user.first_name} ${lecturer.user.last_name}`,
       email: lecturer.user.email,
@@ -185,7 +190,9 @@ export class LecturersService {
       departmentId: lecturer.dept_id,
       load,
       maxWorkload: lecturer.max_workload ?? STANDARD_MAX_WORKLOAD_HOURS,
-      courses: lecturer.lecturer_can_teach_course.map((c) => c.course.course_code),
+      courses: lecturer.lecturer_can_teach_course.map(
+        (c) => c.course.course_code,
+      ),
       isAvailable: lecturer.is_available,
     };
   }
@@ -205,11 +212,11 @@ export class LecturersService {
       });
       if (existingLecturer) {
         throw new ConflictException(
-          'A lecturer with this email already exists.',
+          "A lecturer with this email already exists.",
         );
       }
       throw new ConflictException(
-        'This email is already registered to another account. Use a different email or update the existing user.',
+        "This email is already registered to another account. Use a different email or update the existing user.",
       );
     }
 
@@ -227,9 +234,9 @@ export class LecturersService {
     // Create user first
     const temporaryPassword = this.generateTemporaryPassword();
     const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
-    const nameParts = dto.name.split(' ');
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || '';
+    const nameParts = dto.name.split(" ");
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
 
     let user: { user_id: number };
     try {
@@ -240,22 +247,22 @@ export class LecturersService {
           must_change_password: true,
           first_name: firstName,
           last_name: lastName,
-          role_name: 'LECTURER',
+          role_name: "LECTURER",
         },
         select: { user_id: true },
       });
     } catch (e) {
       if (
         e instanceof Prisma.PrismaClientKnownRequestError &&
-        e.code === 'P2002'
+        e.code === "P2002"
       ) {
         const targets = (e.meta?.target as string[] | undefined) ?? [];
-        if (targets.includes('email')) {
-          throw new ConflictException(
-            'A user with this email already exists.',
-          );
+        if (targets.includes("email")) {
+          throw new ConflictException("A user with this email already exists.");
         }
-        throw new ConflictException('This record conflicts with existing data.');
+        throw new ConflictException(
+          "This record conflicts with existing data.",
+        );
       }
       throw e;
     }
@@ -301,7 +308,7 @@ export class LecturersService {
     }
 
     return {
-      id: `LEC${String(lecturer.user_id).padStart(3, '0')}`,
+      id: `LEC${String(lecturer.user_id).padStart(3, "0")}`,
       databaseId: lecturer.user_id,
       name: dto.name,
       email,
@@ -346,13 +353,13 @@ export class LecturersService {
 
     // Update user info
     if (dto.name || dto.email) {
-      const nameParts = dto.name?.split(' ') || [];
+      const nameParts = dto.name?.split(" ") || [];
       await this.prisma.user.update({
         where: { user_id: id },
         data: {
           ...(dto.name && {
             first_name: nameParts[0] || existing.user.first_name,
-            last_name: nameParts.slice(1).join(' ') || existing.user.last_name,
+            last_name: nameParts.slice(1).join(" ") || existing.user.last_name,
           }),
           ...(dto.email && { email: dto.email }),
         },
@@ -364,7 +371,9 @@ export class LecturersService {
       where: { user_id: id },
       data: {
         dept_id: deptId,
-        ...(dto.maxWorkload !== undefined ? { max_workload: dto.maxWorkload } : {}),
+        ...(dto.maxWorkload !== undefined
+          ? { max_workload: dto.maxWorkload }
+          : {}),
       },
     });
 
@@ -390,16 +399,23 @@ export class LecturersService {
     if (dto.department && newDept && newDept.dept_name !== oldDeptName) {
       changes.push(`department (${oldDeptName} → ${newDept.dept_name})`);
     }
-    if (dto.maxWorkload !== undefined && updatedLecturer && dto.maxWorkload !== oldMax) {
-      changes.push(`max workload (${oldMax ?? '—'} → ${dto.maxWorkload})`);
+    if (
+      dto.maxWorkload !== undefined &&
+      updatedLecturer &&
+      dto.maxWorkload !== oldMax
+    ) {
+      changes.push(`max workload (${oldMax ?? "—"} → ${dto.maxWorkload})`);
     }
     if (changes.length > 0) {
       void this.notifications
         .createForUser(
           id,
-          'Your Profile Was Updated',
-          `An administrator updated your profile: ${changes.join('; ')}.`,
-          { preferenceKey: LECTURER_NOTIFICATION_PREF_KEYS.PROFILE_UPDATED_BY_ADMIN },
+          "Your Profile Was Updated",
+          `An administrator updated your profile: ${changes.join("; ")}.`,
+          {
+            preferenceKey:
+              LECTURER_NOTIFICATION_PREF_KEYS.PROFILE_UPDATED_BY_ADMIN,
+          },
         )
         .catch(() => {});
     }
@@ -432,7 +448,11 @@ export class LecturersService {
   async remove(id: number) {
     const existing = await this.prisma.lecturer.findUnique({
       where: { user_id: id },
-      include: { user: { select: { is_active: true, first_name: true, last_name: true } } },
+      include: {
+        user: {
+          select: { is_active: true, first_name: true, last_name: true },
+        },
+      },
     });
 
     if (!existing) {
@@ -440,10 +460,11 @@ export class LecturersService {
     }
 
     if (!existing.user.is_active) {
-      return { message: 'Lecturer already deactivated' };
+      return { message: "Lecturer already deactivated" };
     }
 
-    const fullName = `${existing.user.first_name} ${existing.user.last_name}`.trim();
+    const fullName =
+      `${existing.user.first_name} ${existing.user.last_name}`.trim();
     const sectionCount = await this.prisma.sectionScheduleEntry.count({
       where: { user_id: id },
     });
@@ -456,14 +477,17 @@ export class LecturersService {
     if (sectionCount > 0) {
       void this.notifications
         .notifyAdmins(
-          'Lecturer Deactivated — Schedule Impact',
+          "Lecturer Deactivated — Schedule Impact",
           `${fullName || `Lecturer #${id}`} was deactivated and had ${sectionCount} schedule section row(s) assigned across timetables.`,
-          { preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_DEACTIVATION_IMPACT },
+          {
+            preferenceKey:
+              ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_DEACTIVATION_IMPACT,
+          },
         )
         .catch(() => {});
     }
 
-    return { message: 'Lecturer deactivated successfully' };
+    return { message: "Lecturer deactivated successfully" };
   }
 
   async findDeactivated() {
@@ -473,11 +497,11 @@ export class LecturersService {
         user: true,
         department: true,
       },
-      orderBy: { user: { first_name: 'asc' } },
+      orderBy: { user: { first_name: "asc" } },
     });
 
     return lecturers.map((lecturer) => ({
-      id: `LEC${String(lecturer.user_id).padStart(3, '0')}`,
+      id: `LEC${String(lecturer.user_id).padStart(3, "0")}`,
       databaseId: lecturer.user_id,
       name: `${lecturer.user.first_name} ${lecturer.user.last_name}`,
       email: lecturer.user.email,
@@ -501,14 +525,16 @@ export class LecturersService {
       where: { user_id: id },
       data: { is_active: true },
     });
-    return { message: 'Lecturer reactivated successfully' };
+    return { message: "Lecturer reactivated successfully" };
   }
 
   async getPurgeImpact(id: number) {
     const lecturer = await this.prisma.lecturer.findUnique({
       where: { user_id: id },
       include: {
-        user: { select: { first_name: true, last_name: true, is_active: true } },
+        user: {
+          select: { first_name: true, last_name: true, is_active: true },
+        },
       },
     });
     if (!lecturer) {
@@ -523,15 +549,18 @@ export class LecturersService {
           select: { generation_type: true, status: true, version_number: true },
         },
       },
-      distinct: ['timetable_id'],
-      orderBy: { timetable_id: 'asc' },
+      distinct: ["timetable_id"],
+      orderBy: { timetable_id: "asc" },
     });
 
     return {
       lecturerUserId: id,
-      lecturerName: `${lecturer.user.first_name} ${lecturer.user.last_name}`.trim(),
+      lecturerName:
+        `${lecturer.user.first_name} ${lecturer.user.last_name}`.trim(),
       isActive: lecturer.user.is_active,
-      entryCount: await this.prisma.sectionScheduleEntry.count({ where: { user_id: id } }),
+      entryCount: await this.prisma.sectionScheduleEntry.count({
+        where: { user_id: id },
+      }),
       timetables: entries.map((entry) => ({
         timetableId: entry.timetable_id,
         generationType: entry.timetable.generation_type,
@@ -545,17 +574,20 @@ export class LecturersService {
     const lecturer = await this.prisma.lecturer.findUnique({
       where: { user_id: id },
       include: {
-        user: { select: { first_name: true, last_name: true, is_active: true } },
+        user: {
+          select: { first_name: true, last_name: true, is_active: true },
+        },
       },
     });
     if (!lecturer) {
       throw new NotFoundException(`Lecturer with ID ${id} not found`);
     }
     if (lecturer.user.is_active) {
-      throw new ConflictException('Deactivate lecturer before purging.');
+      throw new ConflictException("Deactivate lecturer before purging.");
     }
 
-    const fullName = `${lecturer.user.first_name} ${lecturer.user.last_name}`.trim();
+    const fullName =
+      `${lecturer.user.first_name} ${lecturer.user.last_name}`.trim();
     await this.prisma.$transaction(async (tx) => {
       await tx.sectionScheduleEntry.updateMany({
         where: { user_id: id },
@@ -569,6 +601,6 @@ export class LecturersService {
       });
     });
 
-    return { message: 'Lecturer purged successfully' };
+    return { message: "Lecturer purged successfully" };
   }
 }

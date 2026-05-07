@@ -1,5 +1,5 @@
-import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { PrismaService } from "../prisma/prisma.service";
+import { NotificationsService } from "../notifications/notifications.service";
 export declare function decodeSemesterType(type: number): string;
 export declare function decodeDaysMask(daysMask: number): string[];
 export declare class TimetablesService {

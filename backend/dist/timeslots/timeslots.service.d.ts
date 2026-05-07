@@ -1,6 +1,6 @@
-import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { CreateTimeslotDto, UpdateTimeslotDto, UpdateLecturerPreferenceItemDto } from './dto/timeslot.dto';
+import { PrismaService } from "../prisma/prisma.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { CreateTimeslotDto, UpdateTimeslotDto, UpdateLecturerPreferenceItemDto } from "./dto/timeslot.dto";
 export declare class TimeslotsService {
     private prisma;
     private readonly notifications;

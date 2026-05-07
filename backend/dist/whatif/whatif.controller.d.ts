@@ -1,6 +1,6 @@
-import { Response } from 'express';
-import { WhatIfService } from './whatif.service';
-import { ApplyScenarioRunDto, CompareDto, ControlRunDto, CreateScenarioDto, DeleteScenarioQueryDto, RunScenarioDto, UpdateScenarioDto } from './dto/whatif.dto';
+import { Response } from "express";
+import { WhatIfService } from "./whatif.service";
+import { ApplyScenarioRunDto, CompareDto, ControlRunDto, CreateScenarioDto, DeleteScenarioQueryDto, RunScenarioDto, UpdateScenarioDto } from "./dto/whatif.dto";
 export declare class WhatIfController {
     private readonly whatIfService;
     constructor(whatIfService: WhatIfService);

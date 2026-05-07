@@ -1,6 +1,6 @@
-import { TimeslotsService } from './timeslots.service';
-import { CreateTimeslotDto, UpdateTimeslotDto, UpdateLecturerPreferencesDto } from './dto/timeslot.dto';
-import type { User } from '@prisma/client';
+import { TimeslotsService } from "./timeslots.service";
+import { CreateTimeslotDto, UpdateTimeslotDto, UpdateLecturerPreferencesDto } from "./dto/timeslot.dto";
+import type { User } from "@prisma/client";
 export declare class TimeslotsController {
     private readonly timeslotsService;
     constructor(timeslotsService: TimeslotsService);

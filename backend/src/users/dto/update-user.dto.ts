@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsIn } from 'class-validator';
+import { IsString, IsOptional, IsIn } from "class-validator";
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -17,16 +17,16 @@ export class UpdateProfileDto {
 export class UpdatePreferencesDto {
   @IsOptional()
   @IsString()
-  @IsIn(['system', 'light', 'dark'])
+  @IsIn(["system", "light", "dark"])
   theme_preference?: string;
 
   @IsOptional()
   @IsString()
-  @IsIn(['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'])
+  @IsIn(["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"])
   date_format?: string;
 
   @IsOptional()
   @IsString()
-  @IsIn(['12', '24'])
+  @IsIn(["12", "24"])
   time_format?: string;
 }

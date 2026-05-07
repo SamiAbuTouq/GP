@@ -18,8 +18,8 @@ import {
   Min,
   ValidateNested,
   IsObject,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+} from "class-validator";
+import { Type } from "class-transformer";
 
 // ─────────────────────────────────────────────
 // Condition types enum
@@ -27,21 +27,21 @@ import { Type } from 'class-transformer';
 
 export enum ConditionType {
   // Lecturer mutations
-  ADD_LECTURER         = 'add_lecturer',
-  DELETE_LECTURER      = 'delete_lecturer',
-  AMEND_LECTURER       = 'amend_lecturer',
+  ADD_LECTURER = "add_lecturer",
+  DELETE_LECTURER = "delete_lecturer",
+  AMEND_LECTURER = "amend_lecturer",
   // Room mutations
-  ADD_ROOM             = 'add_room',
-  DELETE_ROOM          = 'delete_room',
-  ADJUST_ROOM_CAPACITY = 'adjust_room_capacity',
+  ADD_ROOM = "add_room",
+  DELETE_ROOM = "delete_room",
+  ADJUST_ROOM_CAPACITY = "adjust_room_capacity",
   // Course / section mutations
-  ADD_COURSE           = 'add_course',
-  CHANGE_SECTION_COUNT = 'change_section_count',
+  ADD_COURSE = "add_course",
+  CHANGE_SECTION_COUNT = "change_section_count",
   // Delivery mode
-  CHANGE_DELIVERY_MODE = 'change_delivery_mode',
+  CHANGE_DELIVERY_MODE = "change_delivery_mode",
   // Timeslot mutations
-  ADD_TIMESLOT         = 'add_timeslot',
-  DELETE_TIMESLOT      = 'delete_timeslot',
+  ADD_TIMESLOT = "add_timeslot",
+  DELETE_TIMESLOT = "delete_timeslot",
 }
 
 // ─────────────────────────────────────────────
@@ -122,7 +122,7 @@ export class ChangeDeliveryModeParams {
 /** add_timeslot: add a new available timeslot */
 export class AddTimeslotParams {
   @IsString() @IsNotEmpty() startTime!: string; // "HH:MM"
-  @IsString() @IsNotEmpty() endTime!: string;   // "HH:MM"
+  @IsString() @IsNotEmpty() endTime!: string; // "HH:MM"
   @IsInt() @Min(0) daysMask!: number;
   @IsString() @IsNotEmpty() slotType!: string;
   @IsBoolean() isSummer!: boolean;
@@ -201,8 +201,8 @@ export class RunScenarioDto {
 }
 
 export class ControlRunDto {
-  @IsIn(['pause', 'resume'])
-  action!: 'pause' | 'resume';
+  @IsIn(["pause", "resume"])
+  action!: "pause" | "resume";
 }
 
 // ─────────────────────────────────────────────
@@ -210,9 +210,9 @@ export class ControlRunDto {
 // ─────────────────────────────────────────────
 
 export enum CompareMode {
-  BEFORE_AFTER     = 'before_after',     // 1 scenario, 1 timetable
-  CROSS_TIMETABLE  = 'cross_timetable',  // 1 scenario, many timetables
-  CROSS_SCENARIO   = 'cross_scenario',   // many scenarios, 1 timetable
+  BEFORE_AFTER = "before_after", // 1 scenario, 1 timetable
+  CROSS_TIMETABLE = "cross_timetable", // 1 scenario, many timetables
+  CROSS_SCENARIO = "cross_scenario", // many scenarios, 1 timetable
 }
 
 export class CompareDto {

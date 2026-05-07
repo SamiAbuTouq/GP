@@ -22,6 +22,7 @@ const timetables_module_1 = require("./timetables/timetables.module");
 const whatif_module_1 = require("./whatif/whatif.module");
 const notifications_module_1 = require("./notifications/notifications.module");
 const access_requests_module_1 = require("./access-requests/access-requests.module");
+const course_modification_requests_module_1 = require("./course-modification-requests/course-modification-requests.module");
 const jwt_auth_guard_1 = require("./common/guards/jwt-auth.guard");
 const roles_guard_1 = require("./common/guards/roles.guard");
 const app_controller_1 = require("./app.controller");
@@ -34,7 +35,7 @@ exports.AppModule = AppModule = __decorate([
         imports: [
             config_1.ConfigModule.forRoot({
                 isGlobal: true,
-                envFilePath: '.env',
+                envFilePath: ".env",
             }),
             prisma_module_1.PrismaModule,
             users_module_1.UsersModule,
@@ -48,6 +49,7 @@ exports.AppModule = AppModule = __decorate([
             whatif_module_1.WhatIfModule,
             notifications_module_1.NotificationsModule,
             access_requests_module_1.AccessRequestsModule,
+            course_modification_requests_module_1.CourseModificationRequestsModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [

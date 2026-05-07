@@ -38,7 +38,7 @@ exports.releaseOptimizerGlobalLock = releaseOptimizerGlobalLock;
 const fs = __importStar(require("fs"));
 const os = __importStar(require("os"));
 const path = __importStar(require("path"));
-const LOCK_PATH = path.join(os.tmpdir(), 'combine3-optimizer-global.lock.json');
+const LOCK_PATH = path.join(os.tmpdir(), "combine3-optimizer-global.lock.json");
 const STALE_MS = 6 * 60 * 60 * 1000;
 function isLockHolderProcessAlive(pid) {
     if (!Number.isFinite(pid) || pid < 1)
@@ -49,9 +49,9 @@ function isLockHolderProcessAlive(pid) {
     }
     catch (err) {
         const e = err;
-        if (e.code === 'ESRCH')
+        if (e.code === "ESRCH")
             return false;
-        if (e.code === 'EPERM')
+        if (e.code === "EPERM")
             return true;
         return false;
     }
@@ -60,10 +60,10 @@ function readLock() {
     if (!fs.existsSync(LOCK_PATH))
         return null;
     try {
-        const parsed = JSON.parse(fs.readFileSync(LOCK_PATH, 'utf8'));
-        if ((parsed.owner === 'timetable' || parsed.owner === 'whatif') &&
-            typeof parsed.pid === 'number' &&
-            typeof parsed.acquiredAt === 'number') {
+        const parsed = JSON.parse(fs.readFileSync(LOCK_PATH, "utf8"));
+        if ((parsed.owner === "timetable" || parsed.owner === "whatif") &&
+            typeof parsed.pid === "number" &&
+            typeof parsed.acquiredAt === "number") {
             return parsed;
         }
     }
@@ -95,13 +95,13 @@ function tryAcquireOptimizerGlobalLock(owner) {
     };
     try {
         fs.writeFileSync(LOCK_PATH, JSON.stringify(payload), {
-            encoding: 'utf8',
-            flag: 'wx',
+            encoding: "utf8",
+            flag: "wx",
         });
         return { ok: true };
     }
     catch {
-        const holder = readLock()?.owner ?? 'timetable';
+        const holder = readLock()?.owner ?? "timetable";
         return { ok: false, holder };
     }
 }

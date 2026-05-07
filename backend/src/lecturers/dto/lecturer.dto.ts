@@ -1,4 +1,13 @@
-import { IsString, IsInt, IsNotEmpty, Min, Max, IsOptional, IsArray, IsEmail } from 'class-validator';
+import {
+  IsString,
+  IsInt,
+  IsNotEmpty,
+  Min,
+  Max,
+  IsOptional,
+  IsArray,
+  IsEmail,
+} from "class-validator";
 
 export class CreateLecturerDto {
   @IsString()

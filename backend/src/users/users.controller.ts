@@ -56,6 +56,9 @@ export class UsersController {
     @CurrentUser() user: User,
     @Body() dto: UpdatePasswordDto,
   ) {
-    return this.usersService.updatePasswordForUser(user.user_id, dto.new_password);
+    return this.usersService.updatePasswordForUser(
+      user.user_id,
+      dto.new_password,
+    );
   }
 }

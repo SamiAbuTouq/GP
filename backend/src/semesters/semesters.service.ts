@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 
 function decodeSemesterType(type: number): string {
   const map: Record<number, string> = {
-    1: 'First Semester',
-    2: 'Second Semester',
-    3: 'Summer Semester',
+    1: "First Semester",
+    2: "Second Semester",
+    3: "Summer Semester",
   };
   return map[type] ?? `Semester ${type}`;
 }
@@ -24,7 +24,7 @@ export class SemestersService {
         start_date: true,
         end_date: true,
       },
-      orderBy: [{ academic_year: 'asc' }, { semester_type: 'asc' }],
+      orderBy: [{ academic_year: "asc" }, { semester_type: "asc" }],
     });
 
     return semesters.map((s) => ({
@@ -38,4 +38,3 @@ export class SemestersService {
     }));
   }
 }
-

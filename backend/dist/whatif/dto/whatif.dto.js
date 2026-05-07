@@ -316,7 +316,7 @@ class ControlRunDto {
 }
 exports.ControlRunDto = ControlRunDto;
 __decorate([
-    (0, class_validator_1.IsIn)(['pause', 'resume']),
+    (0, class_validator_1.IsIn)(["pause", "resume"]),
     __metadata("design:type", String)
 ], ControlRunDto.prototype, "action", void 0);
 var CompareMode;

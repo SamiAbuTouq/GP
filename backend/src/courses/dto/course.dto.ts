@@ -1,5 +1,14 @@
-import { IsString, IsInt, IsNotEmpty, Min, Max, IsOptional, IsBoolean, IsEnum } from 'class-validator';
-import { DeliveryMode } from '@prisma/client';
+import {
+  IsString,
+  IsInt,
+  IsNotEmpty,
+  Min,
+  Max,
+  IsOptional,
+  IsBoolean,
+  IsEnum,
+} from "class-validator";
+import { DeliveryMode } from "@prisma/client";
 
 export class CreateCourseDto {
   @IsString()

@@ -125,6 +125,7 @@ const settingsNavItem = {
 const lecturerNavItems: NavItem[] = [
   { title: "Time Preference", href: "/lecturer-time-preferences", icon: ClockIcon, animated: true },
   { title: "Schedule Viewer", href: "/lecturer-schedule", icon: EyeIcon, animated: true },
+  { title: "My Courses", href: "/my-courses", icon: BookOpenTextIcon, animated: true },
 ];
 
 function NavButton({

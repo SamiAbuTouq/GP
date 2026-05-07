@@ -26,8 +26,8 @@ let AuthController = class AuthController {
     constructor(authService, configService) {
         this.authService = authService;
         this.configService = configService;
-        this.isProduction = configService.get('NODE_ENV') === 'production';
-        this.refreshTokenMaxAge = this.parseExpiryToMs(configService.get('JWT_REFRESH_EXPIRES_IN', '7d'));
+        this.isProduction = configService.get("NODE_ENV") === "production";
+        this.refreshTokenMaxAge = this.parseExpiryToMs(configService.get("JWT_REFRESH_EXPIRES_IN", "7d"));
     }
     async login(dto, res) {
         const tokens = await this.authService.login(dto);
@@ -40,7 +40,7 @@ let AuthController = class AuthController {
     async refresh(req, res) {
         const refreshToken = req.cookies?.refresh_token;
         if (!refreshToken) {
-            throw new common_1.UnauthorizedException('Refresh token not found');
+            throw new common_1.UnauthorizedException("Refresh token not found");
         }
         const tokens = await this.authService.refresh(refreshToken);
         this.setRefreshTokenCookie(res, tokens.refresh_token);
@@ -65,34 +65,34 @@ let AuthController = class AuthController {
         };
     }
     setRefreshTokenCookie(res, token) {
-        res.cookie('refresh_token', token, {
+        res.cookie("refresh_token", token, {
             httpOnly: true,
             secure: this.isProduction,
-            sameSite: this.isProduction ? 'strict' : 'lax',
+            sameSite: this.isProduction ? "strict" : "lax",
             maxAge: this.refreshTokenMaxAge,
-            path: '/',
+            path: "/",
         });
     }
     clearRefreshTokenCookie(res) {
-        res.cookie('refresh_token', '', {
+        res.cookie("refresh_token", "", {
             httpOnly: true,
             secure: this.isProduction,
-            sameSite: this.isProduction ? 'strict' : 'lax',
+            sameSite: this.isProduction ? "strict" : "lax",
             maxAge: 0,
-            path: '/',
+            path: "/",
         });
     }
     parseExpiryToMs(expiry) {
         const unit = expiry.slice(-1);
         const value = parseInt(expiry.slice(0, -1), 10);
         switch (unit) {
-            case 's':
+            case "s":
                 return value * 1000;
-            case 'm':
+            case "m":
                 return value * 60 * 1000;
-            case 'h':
+            case "h":
                 return value * 60 * 60 * 1000;
-            case 'd':
+            case "d":
                 return value * 24 * 60 * 60 * 1000;
             default:
                 return 7 * 24 * 60 * 60 * 1000;
@@ -102,7 +102,7 @@ let AuthController = class AuthController {
 exports.AuthController = AuthController;
 __decorate([
     (0, public_decorator_1.Public)(),
-    (0, common_1.Post)('login'),
+    (0, common_1.Post)("login"),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Res)({ passthrough: true })),
@@ -112,7 +112,7 @@ __decorate([
 ], AuthController.prototype, "login", null);
 __decorate([
     (0, public_decorator_1.Public)(),
-    (0, common_1.Post)('refresh'),
+    (0, common_1.Post)("refresh"),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Res)({ passthrough: true })),
@@ -123,7 +123,7 @@ __decorate([
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.LECTURER),
-    (0, common_1.Post)('logout'),
+    (0, common_1.Post)("logout"),
     (0, common_1.HttpCode)(common_1.HttpStatus.NO_CONTENT),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Res)({ passthrough: true })),
@@ -134,7 +134,7 @@ __decorate([
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.LECTURER),
-    (0, common_1.Post)('check'),
+    (0, common_1.Post)("check"),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -142,7 +142,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "check", null);
 exports.AuthController = AuthController = __decorate([
-    (0, common_1.Controller)('auth'),
+    (0, common_1.Controller)("auth"),
     __metadata("design:paramtypes", [auth_service_1.AuthService,
         config_1.ConfigService])
 ], AuthController);

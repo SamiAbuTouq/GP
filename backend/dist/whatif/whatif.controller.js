@@ -70,117 +70,117 @@ let WhatIfController = class WhatIfController {
 };
 exports.WhatIfController = WhatIfController;
 __decorate([
-    (0, common_1.Get)('scenarios'),
+    (0, common_1.Get)("scenarios"),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "listScenarios", null);
 __decorate([
-    (0, common_1.Get)('scenarios/:id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)("scenarios/:id"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "getScenario", null);
 __decorate([
-    (0, common_1.Post)('scenarios'),
+    (0, common_1.Post)("scenarios"),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [whatif_dto_1.CreateScenarioDto]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "createScenario", null);
 __decorate([
-    (0, common_1.Patch)('scenarios/:id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Patch)("scenarios/:id"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, whatif_dto_1.UpdateScenarioDto]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "updateScenario", null);
 __decorate([
-    (0, common_1.Post)('scenarios/:id/clone'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Post)("scenarios/:id/clone"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "cloneScenario", null);
 __decorate([
-    (0, common_1.Delete)('scenarios/:id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Delete)("scenarios/:id"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, whatif_dto_1.DeleteScenarioQueryDto]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "deleteScenario", null);
 __decorate([
-    (0, common_1.Get)('scenarios/:id/conditions'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)("scenarios/:id/conditions"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "listConditions", null);
 __decorate([
-    (0, common_1.Post)('scenarios/:id/run'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Post)("scenarios/:id/run"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, whatif_dto_1.RunScenarioDto]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "runScenario", null);
 __decorate([
-    (0, common_1.Get)('runs/:runId/stream'),
-    __param(0, (0, common_1.Param)('runId', common_1.ParseIntPipe)),
+    (0, common_1.Get)("runs/:runId/stream"),
+    __param(0, (0, common_1.Param)("runId", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Res)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "streamRunProgress", null);
 __decorate([
-    (0, common_1.Get)('runs/:runId'),
-    __param(0, (0, common_1.Param)('runId', common_1.ParseIntPipe)),
+    (0, common_1.Get)("runs/:runId"),
+    __param(0, (0, common_1.Param)("runId", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "getRunStatus", null);
 __decorate([
-    (0, common_1.Get)('scenarios/:id/runs'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    (0, common_1.Get)("scenarios/:id/runs"),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "listRuns", null);
 __decorate([
-    (0, common_1.Post)('compare'),
+    (0, common_1.Post)("compare"),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [whatif_dto_1.CompareDto]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "compare", null);
 __decorate([
-    (0, common_1.Post)('runs/:runId/apply'),
-    __param(0, (0, common_1.Param)('runId', common_1.ParseIntPipe)),
+    (0, common_1.Post)("runs/:runId/apply"),
+    __param(0, (0, common_1.Param)("runId", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, whatif_dto_1.ApplyScenarioRunDto]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "applyScenarioRun", null);
 __decorate([
-    (0, common_1.Post)('runs/:runId/control'),
-    __param(0, (0, common_1.Param)('runId', common_1.ParseIntPipe)),
+    (0, common_1.Post)("runs/:runId/control"),
+    __param(0, (0, common_1.Param)("runId", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, whatif_dto_1.ControlRunDto]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "controlScenarioRun", null);
 __decorate([
-    (0, common_1.Post)('runs/:runId/cancel'),
-    __param(0, (0, common_1.Param)('runId', common_1.ParseIntPipe)),
+    (0, common_1.Post)("runs/:runId/cancel"),
+    __param(0, (0, common_1.Param)("runId", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "cancelScenarioRun", null);
 exports.WhatIfController = WhatIfController = __decorate([
-    (0, common_1.Controller)('what-if'),
+    (0, common_1.Controller)("what-if"),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
     __metadata("design:paramtypes", [whatif_service_1.WhatIfService])
 ], WhatIfController);

@@ -1,17 +1,27 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, Role } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { ADMIN_NOTIFICATION_PREF_KEYS } from '../notifications/notification-prefs';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { Prisma, Role } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { ADMIN_NOTIFICATION_PREF_KEYS } from "../notifications/notification-prefs";
 import {
   CreateTimeslotDto,
   UpdateTimeslotDto,
   UpdateLecturerPreferenceItemDto,
-} from './dto/timeslot.dto';
+} from "./dto/timeslot.dto";
 
 // Days mapping using bitmask: Sun=1, Mon=2, Tue=4, Wed=8, Thu=16
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
-const DAY_VALUES = { Sunday: 1, Monday: 2, Tuesday: 4, Wednesday: 8, Thursday: 16 };
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
+const DAY_VALUES = {
+  Sunday: 1,
+  Monday: 2,
+  Tuesday: 4,
+  Wednesday: 8,
+  Thursday: 16,
+};
 
 @Injectable()
 export class TimeslotsService {
@@ -45,13 +55,13 @@ export class TimeslotsService {
     if (existingLecturer) return;
 
     let fallbackDepartment = await tx.department.findFirst({
-      orderBy: { dept_id: 'asc' },
+      orderBy: { dept_id: "asc" },
       select: { dept_id: true },
     });
 
     if (!fallbackDepartment) {
       fallbackDepartment = await tx.department.create({
-        data: { dept_name: 'General' },
+        data: { dept_name: "General" },
         select: { dept_id: true },
       });
     }
@@ -91,7 +101,7 @@ export class TimeslotsService {
   }
 
   private parseTime(timeStr: string): Date {
-    const [hours, minutes] = timeStr.split(':').map(Number);
+    const [hours, minutes] = timeStr.split(":").map(Number);
     const date = new Date();
     date.setHours(hours, minutes, 0, 0);
     return date;
@@ -103,7 +113,7 @@ export class TimeslotsService {
         is_active: true,
         ...(isSummer !== undefined ? { is_summer: isSummer } : {}),
       },
-      orderBy: [{ start_time: 'asc' }],
+      orderBy: [{ start_time: "asc" }],
     });
 
     return timeslots.map((slot) => ({
@@ -200,7 +210,7 @@ export class TimeslotsService {
       data: { is_active: false },
     });
 
-    return { message: 'Timeslot archived successfully', archived: true };
+    return { message: "Timeslot archived successfully", archived: true };
   }
 
   async getLecturerPreferences(userId: number) {
@@ -214,7 +224,7 @@ export class TimeslotsService {
   private async getPreferencesByUserId(userId: number) {
     const slots = await this.prisma.timeslot.findMany({
       where: { is_active: true },
-      orderBy: [{ start_time: 'asc' }, { end_time: 'asc' }, { slot_id: 'asc' }],
+      orderBy: [{ start_time: "asc" }, { end_time: "asc" }, { slot_id: "asc" }],
       include: {
         lecturer_preferences: {
           where: { user_id: userId },
@@ -234,9 +244,9 @@ export class TimeslotsService {
       preference:
         slot.lecturer_preferences.length > 0
           ? slot.lecturer_preferences[0].is_preferred
-            ? 'PREFERRED'
-            : 'NOT_PREFERRED'
-          : 'NEUTRAL',
+            ? "PREFERRED"
+            : "NOT_PREFERRED"
+          : "NEUTRAL",
     }));
   }
 
@@ -263,7 +273,7 @@ export class TimeslotsService {
     });
     const fullName =
       lecturer != null
-        ? `${lecturer.first_name ?? ''} ${lecturer.last_name ?? ''}`.trim()
+        ? `${lecturer.first_name ?? ""} ${lecturer.last_name ?? ""}`.trim()
         : `Lecturer #${userId}`;
 
     await this.prisma.$transaction(async (tx) => {
@@ -289,10 +299,11 @@ export class TimeslotsService {
     const suffix = `\n[[lecturer_user_id:${userId}]]`;
     void this.notifications
       .notifyAdmins(
-        isFirst ? 'Preferences Submitted' : 'Preferences Updated',
+        isFirst ? "Preferences Submitted" : "Preferences Updated",
         (isFirst
           ? `${fullName} submitted their time preferences for the first time.`
-          : `${fullName} updated their time preferences. Re-running timetable generation may be needed to reflect the changes.`) + suffix,
+          : `${fullName} updated their time preferences. Re-running timetable generation may be needed to reflect the changes.`) +
+          suffix,
         { preferenceKey: ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_PREFERENCES },
       )
       .catch(() => {});
@@ -306,7 +317,7 @@ export class TimeslotsService {
         is_active: false,
         ...(isSummer !== undefined ? { is_summer: isSummer } : {}),
       },
-      orderBy: [{ start_time: 'asc' }],
+      orderBy: [{ start_time: "asc" }],
     });
 
     return timeslots.map((slot) => ({
@@ -332,7 +343,7 @@ export class TimeslotsService {
       where: { slot_id: id },
       data: { is_active: true },
     });
-    return { message: 'Timeslot restored successfully' };
+    return { message: "Timeslot restored successfully" };
   }
 
   async getDeletionImpact(id: number) {
@@ -352,13 +363,15 @@ export class TimeslotsService {
           select: { generation_type: true, status: true, version_number: true },
         },
       },
-      distinct: ['timetable_id'],
-      orderBy: { timetable_id: 'asc' },
+      distinct: ["timetable_id"],
+      orderBy: { timetable_id: "asc" },
     });
 
     return {
       slotId: id,
-      entryCount: await this.prisma.sectionScheduleEntry.count({ where: { slot_id: id } }),
+      entryCount: await this.prisma.sectionScheduleEntry.count({
+        where: { slot_id: id },
+      }),
       timetables: entries.map((entry) => ({
         timetableId: entry.timetable_id,
         generationType: entry.timetable.generation_type,
@@ -377,7 +390,9 @@ export class TimeslotsService {
       throw new NotFoundException(`Timeslot with ID ${id} not found`);
     }
     if (slot.is_active) {
-      throw new ConflictException('Only archived timeslots can be permanently deleted.');
+      throw new ConflictException(
+        "Only archived timeslots can be permanently deleted.",
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -387,6 +402,6 @@ export class TimeslotsService {
       await tx.timeslot.delete({ where: { slot_id: id } });
     });
 
-    return { message: 'Timeslot permanently deleted successfully' };
+    return { message: "Timeslot permanently deleted successfully" };
   }
 }

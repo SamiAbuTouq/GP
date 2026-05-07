@@ -1,15 +1,19 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { Role, type User } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import { UpdateProfileDto, UpdatePreferencesDto } from './dto/update-user.dto';
-import { UpdateNotificationPrefsDto } from './dto/update-notification-prefs.dto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { Role, type User } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+import { UpdateProfileDto, UpdatePreferencesDto } from "./dto/update-user.dto";
+import { UpdateNotificationPrefsDto } from "./dto/update-notification-prefs.dto";
 import {
   ALLOWED_NOTIFICATION_PREF_KEYS_BY_ROLE,
   mergeNotificationPrefs,
-} from '../notifications/notification-prefs';
-import { ConfigService } from '@nestjs/config';
-import { v2 as cloudinary } from 'cloudinary';
-import * as bcrypt from 'bcrypt';
+} from "../notifications/notification-prefs";
+import { ConfigService } from "@nestjs/config";
+import { v2 as cloudinary } from "cloudinary";
+import * as bcrypt from "bcrypt";
 
 @Injectable()
 export class UsersService {
@@ -19,13 +23,13 @@ export class UsersService {
   ) {}
 
   private configureCloudinary() {
-    const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME');
-    const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY');
-    const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET');
+    const cloudName = this.configService.get<string>("CLOUDINARY_CLOUD_NAME");
+    const apiKey = this.configService.get<string>("CLOUDINARY_API_KEY");
+    const apiSecret = this.configService.get<string>("CLOUDINARY_API_SECRET");
 
     if (!cloudName || !apiKey || !apiSecret) {
       throw new BadRequestException(
-        'Cloudinary is not configured. Missing CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, or CLOUDINARY_API_SECRET.',
+        "Cloudinary is not configured. Missing CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, or CLOUDINARY_API_SECRET.",
       );
     }
 
@@ -78,23 +82,29 @@ export class UsersService {
       role: user.role_name,
       avatar_url: user.avatar_url,
       department: user.lecturer?.department?.dept_name || null,
-      theme_preference: user.theme_preference || 'system',
-      date_format: user.date_format || 'DD/MM/YYYY',
-      time_format: user.time_format || '24',
+      theme_preference: user.theme_preference || "system",
+      date_format: user.date_format || "DD/MM/YYYY",
+      time_format: user.time_format || "24",
       notification_preferences: mergeNotificationPrefs(user.notification_prefs),
     };
   }
 
-  async updateNotificationPreferences(userId: number, role: Role, dto: UpdateNotificationPrefsDto) {
+  async updateNotificationPreferences(
+    userId: number,
+    role: Role,
+    dto: UpdateNotificationPrefsDto,
+  ) {
     const allowed = ALLOWED_NOTIFICATION_PREF_KEYS_BY_ROLE[role];
     if (!allowed) {
-      throw new BadRequestException('Invalid role for notification preferences.');
+      throw new BadRequestException(
+        "Invalid role for notification preferences.",
+      );
     }
     const incoming = dto.prefs ?? {};
     const sanitized: Record<string, boolean> = {};
     for (const [k, v] of Object.entries(incoming)) {
       if (!allowed.has(k)) continue;
-      if (typeof v === 'boolean') sanitized[k] = v;
+      if (typeof v === "boolean") sanitized[k] = v;
     }
 
     const existing = await this.prisma.user.findUnique({
@@ -103,7 +113,7 @@ export class UsersService {
     });
     const prev =
       existing?.notification_prefs != null &&
-      typeof existing.notification_prefs === 'object' &&
+      typeof existing.notification_prefs === "object" &&
       !Array.isArray(existing.notification_prefs)
         ? (existing.notification_prefs as Record<string, boolean>)
         : {};
@@ -119,26 +129,28 @@ export class UsersService {
       select: { notification_prefs: true },
     });
     return {
-      notification_preferences: mergeNotificationPrefs(fresh?.notification_prefs ?? null),
+      notification_preferences: mergeNotificationPrefs(
+        fresh?.notification_prefs ?? null,
+      ),
     };
   }
 
   async updateProfile(userId: number, dto: UpdateProfileDto) {
     let uploadedAvatarUrl: string | undefined = undefined;
-    
+
     if (dto.avatar_base64) {
       try {
         this.configureCloudinary();
         const result = await cloudinary.uploader.upload(dto.avatar_base64, {
-          folder: 'avatars',
+          folder: "avatars",
         });
         uploadedAvatarUrl = result.secure_url;
       } catch (error) {
-        console.error('Error uploading avatar to cloudinary:', error);
+        console.error("Error uploading avatar to cloudinary:", error);
         const cloudinaryMessage =
           error instanceof Error
             ? error.message
-            : 'Unknown Cloudinary upload error';
+            : "Unknown Cloudinary upload error";
         throw new BadRequestException(
           `Failed to upload avatar to Cloudinary: ${cloudinaryMessage}`,
         );
@@ -175,9 +187,9 @@ export class UsersService {
     });
 
     return {
-      theme_preference: user.theme_preference || 'system',
-      date_format: user.date_format || 'DD/MM/YYYY',
-      time_format: user.time_format || '24',
+      theme_preference: user.theme_preference || "system",
+      date_format: user.date_format || "DD/MM/YYYY",
+      time_format: user.time_format || "24",
     };
   }
 
@@ -190,7 +202,9 @@ export class UsersService {
       throw new NotFoundException(`User with id ${userId} not found`);
     }
 
-    const saltRounds = Number(this.configService.get('BCRYPT_SALT_ROUNDS', '12'));
+    const saltRounds = Number(
+      this.configService.get("BCRYPT_SALT_ROUNDS", "12"),
+    );
     const password_hash = await bcrypt.hash(newPassword, saltRounds);
 
     await this.prisma.user.update({

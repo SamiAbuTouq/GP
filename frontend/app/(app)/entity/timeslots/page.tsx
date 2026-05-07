@@ -18,8 +18,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +44,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  AlertTriangle,
 } from "lucide-react"
 import { ChevronDownIcon } from "@/components/ui/chevron-down-icon"
 import { ImportIcon } from "@/components/custom-icons"
@@ -108,6 +109,9 @@ export default function TimeSlotsPage() {
   const [saving, setSaving] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null)
+  const [initialEditingSlot, setInitialEditingSlot] = useState<TimeSlot | null>(null)
+  const [addDiscardConfirmOpen, setAddDiscardConfirmOpen] = useState(false)
+  const [editDiscardConfirmOpen, setEditDiscardConfirmOpen] = useState(false)
   const [newSlot, setNewSlot] = useState<TimeSlot>({
     id: 0,
     days: [],
@@ -136,6 +140,23 @@ export default function TimeSlotsPage() {
   const [loadingDeletionImpact, setLoadingDeletionImpact] = useState(false)
   const [permanentlyDeleting, setPermanentlyDeleting] = useState(false)
   const { toast } = useToast()
+  const isAddDirty = useMemo(
+    () =>
+      JSON.stringify(newSlot) !==
+      JSON.stringify({
+        id: 0,
+        days: [],
+        start: "",
+        end: "",
+        slotType: "Traditional Lecture",
+        isSummer: false,
+      }),
+    [newSlot],
+  )
+  const isEditDirty = useMemo(() => {
+    if (!editingSlot || !initialEditingSlot) return false
+    return JSON.stringify(editingSlot) !== JSON.stringify(initialEditingSlot)
+  }, [editingSlot, initialEditingSlot])
   const formatTimetableLabel = (t: {
     timetableId: number
     generationType: string
@@ -352,6 +373,7 @@ export default function TimeSlotsPage() {
         ),
       )
       setEditingSlot(null)
+      setInitialEditingSlot(null)
       toast({
         title: "Success",
         description: "Time slot updated successfully.",
@@ -536,6 +558,23 @@ export default function TimeSlotsPage() {
   const toggleDay = (day: string, slot: TimeSlot, setSlot: (s: TimeSlot) => void) => {
     const newDays = slot.days.includes(day) ? slot.days.filter((d) => d !== day) : [...slot.days, day]
     setSlot({ ...slot, days: newDays })
+  }
+
+  const requestCloseAddDialog = () => {
+    if (isAddDirty) {
+      setAddDiscardConfirmOpen(true)
+      return
+    }
+    setIsAddDialogOpen(false)
+  }
+
+  const requestCloseEditDialog = () => {
+    if (isEditDirty) {
+      setEditDiscardConfirmOpen(true)
+      return
+    }
+    setEditingSlot(null)
+    setInitialEditingSlot(null)
   }
 
   const getDayColor = (day: string) => {
@@ -817,22 +856,31 @@ export default function TimeSlotsPage() {
                     .join(" · ") || undefined
                 }
               />
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Time Slot
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
+              <Button size="sm" onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Time Slot
+              </Button>
+              <Sheet
+                open={isAddDialogOpen}
+                onOpenChange={(open) => {
+                  if (open) {
+                    setIsAddDialogOpen(true)
+                    return
+                  }
+                  requestCloseAddDialog()
+                }}
+              >
+                <SheetContent side="right" className="w-[92vw] max-w-3xl p-0 sm:w-[760px] sm:max-w-[760px]">
+                  <DialogHeader className="space-y-1 border-b px-6 py-4 pr-14 text-left">
+                    <DialogTitle className="text-xl">Add New Time Slot</DialogTitle>
                     <DialogTitle>Add New Time Slot</DialogTitle>
                     <DialogDescription>
                       Choose whether this pattern applies to the summer semester or to first/second semester
                       (normal) scheduling.
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="grid gap-4 py-4">
+                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+                  <div className="grid gap-4">
                     <div className="space-y-2">
                       <Label>Days</Label>
                       <div className="flex flex-wrap gap-3">
@@ -925,8 +973,9 @@ export default function TimeSlotsPage() {
                       </RadioGroup>
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                  </div>
+                  <DialogFooter className="flex flex-wrap items-center justify-end gap-2 border-t bg-background px-6 py-4">
+                    <Button variant="outline" onClick={requestCloseAddDialog}>
                       Cancel
                     </Button>
                     <Button onClick={handleAddSlot} disabled={saving}>
@@ -934,8 +983,8 @@ export default function TimeSlotsPage() {
                       Add Time Slot
                     </Button>
                   </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                </SheetContent>
+              </Sheet>
             </div>
           </CardHeader>
           <CardContent className="pt-0">
@@ -1036,7 +1085,12 @@ export default function TimeSlotsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => setEditingSlot({ ...slot })}>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setEditingSlot({ ...slot })
+                                  setInitialEditingSlot({ ...slot })
+                                }}
+                              >
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </DropdownMenuItem>
@@ -1387,14 +1441,21 @@ export default function TimeSlotsPage() {
       
 
       {/* Edit Dialog */}
-      <Dialog open={!!editingSlot} onOpenChange={(open) => !open && setEditingSlot(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Time Slot</DialogTitle>
+      <Sheet
+        open={!!editingSlot}
+        onOpenChange={(open) => {
+          if (open) return
+          requestCloseEditDialog()
+        }}
+      >
+        <SheetContent side="right" className="w-[92vw] max-w-3xl p-0 sm:w-[760px] sm:max-w-[760px]">
+          <DialogHeader className="space-y-1 border-b px-6 py-4 pr-14 text-left">
+            <DialogTitle className="text-xl">Edit Time Slot</DialogTitle>
             <DialogDescription>Update the time slot information.</DialogDescription>
           </DialogHeader>
           {editingSlot && (
-            <div className="grid gap-4 py-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+            <div className="grid gap-4">
               <div className="space-y-2">
                 <Label>Days</Label>
                 <div className="flex flex-wrap gap-3">
@@ -1485,14 +1546,80 @@ export default function TimeSlotsPage() {
                 </RadioGroup>
               </div>
             </div>
+            </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingSlot(null)}>
+          <DialogFooter className="flex flex-wrap items-center justify-end gap-2 border-t bg-background px-6 py-4">
+            <Button variant="outline" onClick={requestCloseEditDialog}>
               Cancel
             </Button>
             <Button onClick={handleEditSlot} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
+            </Button>
+          </DialogFooter>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={addDiscardConfirmOpen} onOpenChange={setAddDiscardConfirmOpen}>
+        <DialogContent className="z-[220] border-2 border-border/90 bg-popover shadow-2xl ring-1 ring-black/10 sm:max-w-lg">
+          <DialogHeader className="gap-3 text-left">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <AlertTriangle className="h-4.5 w-4.5" />
+              </div>
+              <div className="space-y-1.5">
+                <DialogTitle className="text-xl font-semibold">Discard unsaved changes?</DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+                  Your edits to this time slot will be permanently lost. This cannot be undone.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setAddDiscardConfirmOpen(false)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setAddDiscardConfirmOpen(false)
+                setIsAddDialogOpen(false)
+              }}
+            >
+              Discard changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editDiscardConfirmOpen} onOpenChange={setEditDiscardConfirmOpen}>
+        <DialogContent className="z-[220] border-2 border-border/90 bg-popover shadow-2xl ring-1 ring-black/10 sm:max-w-lg">
+          <DialogHeader className="gap-3 text-left">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <AlertTriangle className="h-4.5 w-4.5" />
+              </div>
+              <div className="space-y-1.5">
+                <DialogTitle className="text-xl font-semibold">Discard unsaved changes?</DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+                  Your edits to this time slot will be permanently lost. This cannot be undone.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setEditDiscardConfirmOpen(false)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setEditDiscardConfirmOpen(false)
+                setEditingSlot(null)
+                setInitialEditingSlot(null)
+              }}
+            >
+              Discard changes
             </Button>
           </DialogFooter>
         </DialogContent>

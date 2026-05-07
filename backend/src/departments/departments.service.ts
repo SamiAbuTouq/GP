@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class DepartmentsService {
@@ -7,7 +7,7 @@ export class DepartmentsService {
 
   async findAll() {
     const departments = await this.prisma.department.findMany({
-      orderBy: { dept_name: 'asc' },
+      orderBy: { dept_name: "asc" },
     });
 
     return departments.map((dept) => ({
@@ -18,20 +18,20 @@ export class DepartmentsService {
 
   async seed() {
     const defaultDepartments = [
-      'Accounting',
-      'Basic Sciences',
-      'Business Administration',
-      'Business Information Technology',
-      'Communications Engineering',
-      'Computer Engineering',
-      'Computer Graphics',
-      'Computer Science',
-      'Coordination Unit for Service Courses',
-      'Cyber Security',
-      'Data Science',
-      'E-Marketing & Social Media',
-      'Electrical Engineering',
-      'Software Engineering',
+      "Accounting",
+      "Basic Sciences",
+      "Business Administration",
+      "Business Information Technology",
+      "Communications Engineering",
+      "Computer Engineering",
+      "Computer Graphics",
+      "Computer Science",
+      "Coordination Unit for Service Courses",
+      "Cyber Security",
+      "Data Science",
+      "E-Marketing & Social Media",
+      "Electrical Engineering",
+      "Software Engineering",
     ];
 
     for (const deptName of defaultDepartments) {
@@ -42,6 +42,6 @@ export class DepartmentsService {
       });
     }
 
-    return { message: 'Departments seeded successfully' };
+    return { message: "Departments seeded successfully" };
   }
 }

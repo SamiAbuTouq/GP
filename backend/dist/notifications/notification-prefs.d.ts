@@ -5,6 +5,7 @@ export declare const ADMIN_NOTIFICATION_PREF_KEYS: {
     readonly OPTIMIZATION_FAILED: "admin_optimization_failed";
     readonly LECTURER_PREFERENCES: "admin_lecturer_preferences";
     readonly ACCESS_REQUESTS: "admin_access_requests";
+    readonly COURSE_MODIFICATION_REQUESTS: "admin_course_modification_requests";
     readonly LECTURER_DEACTIVATION_IMPACT: "admin_lecturer_deactivation_impact";
 };
 export declare const LECTURER_NOTIFICATION_PREF_KEYS: {

@@ -1,5 +1,5 @@
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateCourseDto, UpdateCourseDto } from './dto/course.dto';
+import { PrismaService } from "../prisma/prisma.service";
+import { CreateCourseDto, UpdateCourseDto } from "./dto/course.dto";
 export declare class CoursesService {
     private prisma;
     constructor(prisma: PrismaService);

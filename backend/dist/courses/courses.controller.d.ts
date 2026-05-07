@@ -1,5 +1,5 @@
-import { CoursesService } from './courses.service';
-import { CreateCourseDto, UpdateCourseDto } from './dto/course.dto';
+import { CoursesService } from "./courses.service";
+import { CreateCourseDto, UpdateCourseDto } from "./dto/course.dto";
 export declare class CoursesController {
     private readonly coursesService;
     constructor(coursesService: CoursesService);

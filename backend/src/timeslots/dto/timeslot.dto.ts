@@ -6,8 +6,8 @@ import {
   ValidateNested,
   IsInt,
   IsBoolean,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+} from "class-validator";
+import { Type } from "class-transformer";
 
 export class CreateTimeslotDto {
   @IsArray()

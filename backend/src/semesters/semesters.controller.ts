@@ -1,9 +1,9 @@
-import { Controller, Get } from '@nestjs/common';
-import { Role } from '@prisma/client';
-import { Roles } from '../common/decorators/roles.decorator';
-import { SemestersService } from './semesters.service';
+import { Controller, Get } from "@nestjs/common";
+import { Role } from "@prisma/client";
+import { Roles } from "../common/decorators/roles.decorator";
+import { SemestersService } from "./semesters.service";
 
-@Controller('semesters')
+@Controller("semesters")
 @Roles(Role.ADMIN)
 export class SemestersController {
   constructor(private readonly semestersService: SemestersService) {}
@@ -13,4 +13,3 @@ export class SemestersController {
     return this.semestersService.findAll();
   }
 }
-

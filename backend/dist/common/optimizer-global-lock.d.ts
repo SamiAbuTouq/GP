@@ -1,4 +1,4 @@
-export type OptimizerOwner = 'timetable' | 'whatif';
+export type OptimizerOwner = "timetable" | "whatif";
 export declare function tryAcquireOptimizerGlobalLock(owner: OptimizerOwner): {
     ok: true;
 } | {

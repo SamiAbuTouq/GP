@@ -1,5 +1,5 @@
-import { RoomsService } from './rooms.service';
-import { CreateRoomDto, UpdateRoomDto } from './dto/room.dto';
+import { RoomsService } from "./rooms.service";
+import { CreateRoomDto, UpdateRoomDto } from "./dto/room.dto";
 export declare class RoomsController {
     private readonly roomsService;
     constructor(roomsService: RoomsService);

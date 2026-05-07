@@ -26,16 +26,16 @@ let AccessRequestsController = class AccessRequestsController {
     }
     checkEmail(email) {
         if (!email)
-            throw new common_1.BadRequestException('email query parameter is required.');
+            throw new common_1.BadRequestException("email query parameter is required.");
         return this.service.checkEmail(email);
     }
     submit(dto) {
         return this.service.submit(dto);
     }
     list(status) {
-        const normalized = String(status ?? 'PENDING').toUpperCase();
-        if (!['PENDING', 'APPROVED', 'REJECTED'].includes(normalized)) {
-            throw new common_1.BadRequestException('Invalid status.');
+        const normalized = String(status ?? "PENDING").toUpperCase();
+        if (!["PENDING", "APPROVED", "REJECTED"].includes(normalized)) {
+            throw new common_1.BadRequestException("Invalid status.");
         }
         return this.service.listByStatus(normalized);
     }
@@ -49,8 +49,8 @@ let AccessRequestsController = class AccessRequestsController {
 exports.AccessRequestsController = AccessRequestsController;
 __decorate([
     (0, public_decorator_1.Public)(),
-    (0, common_1.Get)('check-email'),
-    __param(0, (0, common_1.Query)('email')),
+    (0, common_1.Get)("check-email"),
+    __param(0, (0, common_1.Query)("email")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
@@ -66,30 +66,30 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
-    __param(0, (0, common_1.Query)('status')),
+    __param(0, (0, common_1.Query)("status")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], AccessRequestsController.prototype, "list", null);
 __decorate([
-    (0, common_1.Patch)(':id/approve'),
+    (0, common_1.Patch)(":id/approve"),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], AccessRequestsController.prototype, "approve", null);
 __decorate([
-    (0, common_1.Patch)(':id/reject'),
+    (0, common_1.Patch)(":id/reject"),
     (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
-    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, reject_access_request_dto_1.RejectAccessRequestDto]),
     __metadata("design:returntype", void 0)
 ], AccessRequestsController.prototype, "reject", null);
 exports.AccessRequestsController = AccessRequestsController = __decorate([
-    (0, common_1.Controller)('access-requests'),
+    (0, common_1.Controller)("access-requests"),
     __metadata("design:paramtypes", [access_requests_service_1.AccessRequestsService])
 ], AccessRequestsController);
 //# sourceMappingURL=access-requests.controller.js.map

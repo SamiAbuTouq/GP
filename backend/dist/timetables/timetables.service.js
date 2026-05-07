@@ -19,9 +19,9 @@ const notifications_service_1 = require("../notifications/notifications.service"
 const notification_prefs_1 = require("../notifications/notification-prefs");
 function decodeSemesterType(type) {
     const map = {
-        1: 'First Semester',
-        2: 'Second Semester',
-        3: 'Summer Semester',
+        1: "First Semester",
+        2: "Second Semester",
+        3: "Summer Semester",
     };
     return map[type] ?? `Semester ${type}`;
 }
@@ -29,13 +29,13 @@ function formatTimeHHmm(d) {
     return d.toISOString().slice(11, 16);
 }
 const dayByBit = {
-    0: 'Sunday',
-    1: 'Monday',
-    2: 'Tuesday',
-    3: 'Wednesday',
-    4: 'Thursday',
-    5: 'Friday',
-    6: 'Saturday',
+    0: "Sunday",
+    1: "Monday",
+    2: "Tuesday",
+    3: "Wednesday",
+    4: "Thursday",
+    5: "Friday",
+    6: "Saturday",
 };
 function decodeDaysMask(daysMask) {
     const days = [];
@@ -49,8 +49,10 @@ function decodeDaysMask(daysMask) {
     return days;
 }
 function isOptimizerScenarioRunBaseGenerationType(gen) {
-    const g = String(gen ?? '').trim().toLowerCase();
-    return g === 'gwo_ui' || g === 'gwo';
+    const g = String(gen ?? "")
+        .trim()
+        .toLowerCase();
+    return g === "gwo_ui" || g === "gwo";
 }
 const DEFAULT_SOFT_WEIGHTS = {
     preferred_timeslot: 80,
@@ -69,24 +71,26 @@ let TimetablesService = class TimetablesService {
     }
     mapTimetableSummary(t) {
         const isDraft = t.semester_id == null;
-        const resultRunCount = typeof t._count?.scenario_runs_as_result === 'number'
+        const resultRunCount = typeof t._count?.scenario_runs_as_result === "number"
             ? t._count.scenario_runs_as_result
             : 0;
-        const isScenarioResult = t.generation_type === 'what_if' || resultRunCount > 0;
+        const isScenarioResult = t.generation_type === "what_if" || resultRunCount > 0;
         const canUseAsScenarioBase = !isScenarioResult;
         const draftOrigin = isDraft
             ? isScenarioResult
-                ? 'scenario'
+                ? "scenario"
                 : isOptimizerScenarioRunBaseGenerationType(t.generation_type)
-                    ? 'optimizer'
-                    : 'other'
+                    ? "optimizer"
+                    : "other"
             : null;
         return {
             timetableId: t.timetable_id,
             semesterId: t.semester_id,
-            academicYear: t.semester?.academic_year ?? 'Unassigned',
+            academicYear: t.semester?.academic_year ?? "Unassigned",
             semesterType: t.semester?.semester_type ?? 0,
-            semester: t.semester ? decodeSemesterType(t.semester.semester_type) : 'Unassigned draft',
+            semester: t.semester
+                ? decodeSemesterType(t.semester.semester_type)
+                : "Unassigned draft",
             totalStudents: t.semester?.total_students ?? null,
             generatedAt: t.generated_at,
             status: t.status,
@@ -97,7 +101,7 @@ let TimetablesService = class TimetablesService {
             isScenarioResult,
             draftOrigin,
             canUseAsScenarioBase,
-            timetableKind: isDraft ? 'draft' : 'published',
+            timetableKind: isDraft ? "draft" : "published",
             metrics: t.timetable_metrics
                 ? {
                     roomUtilizationRate: t.timetable_metrics.room_utilization_rate,
@@ -110,13 +114,13 @@ let TimetablesService = class TimetablesService {
     }
     async list(semesterId, draftsOnly, scenarioRunBasesOnly) {
         const hasSemesterFilter = semesterId != null &&
-            typeof semesterId === 'number' &&
+            typeof semesterId === "number" &&
             Number.isFinite(semesterId) &&
             semesterId > 0;
         const scenarioBaseWhere = {
             AND: [
                 { NOT: { scenario_runs_as_result: { some: {} } } },
-                { generation_type: { notIn: ['what_if', 'what_if_applied'] } },
+                { generation_type: { notIn: ["what_if", "what_if_applied"] } },
             ],
         };
         let where;
@@ -136,7 +140,7 @@ let TimetablesService = class TimetablesService {
                 timetable_metrics: true,
                 _count: { select: { scenario_runs_as_result: true } },
             },
-            orderBy: [{ generated_at: 'desc' }, { timetable_id: 'desc' }],
+            orderBy: [{ generated_at: "desc" }, { timetable_id: "desc" }],
         });
         const rows = draftsOnly && !hasSemesterFilter && !scenarioRunBasesOnly
             ? timetables.filter((t) => t.semester_id == null)
@@ -156,17 +160,19 @@ let TimetablesService = class TimetablesService {
         }
         const conflicts = await this.prisma.timetableConflict.findMany({
             where: { timetable_id: timetableId },
-            orderBy: { conflict_id: 'asc' },
+            orderBy: { conflict_id: "asc" },
         });
-        const metricsIsValid = timetable.timetable_metrics != null ? timetable.timetable_metrics.is_valid : null;
+        const metricsIsValid = timetable.timetable_metrics != null
+            ? timetable.timetable_metrics.is_valid
+            : null;
         const requiresConflictAcknowledgment = metricsIsValid === false || conflicts.length > 0;
         const hardConflictCount = (() => {
             if (conflicts.length > 0) {
                 let sum = 0;
                 for (const c of conflicts) {
-                    const t = String(c.conflict_type ?? '').toLowerCase();
-                    if (t === 'hard_conflicts' || t === 'hard conflicts') {
-                        const m = /:\s*(\d+)\s*$/m.exec(String(c.detail ?? ''));
+                    const t = String(c.conflict_type ?? "").toLowerCase();
+                    if (t === "hard_conflicts" || t === "hard conflicts") {
+                        const m = /:\s*(\d+)\s*$/m.exec(String(c.detail ?? ""));
                         if (m) {
                             sum += Number(m[1]);
                             continue;
@@ -202,7 +208,7 @@ let TimetablesService = class TimetablesService {
         if (!summary.requiresConflictAcknowledgment)
             return;
         if (acknowledgedHardConflicts !== true) {
-            throw new common_1.BadRequestException('This timetable has hard conflicts. Review them and send acknowledgedHardConflicts: true before applying or publishing.');
+            throw new common_1.BadRequestException("This timetable has hard conflicts. Review them and send acknowledgedHardConflicts: true before applying or publishing.");
         }
     }
     async resolveAllowedPublishSemesterTypes(timetableId) {
@@ -224,7 +230,7 @@ let TimetablesService = class TimetablesService {
         const slotRows = await this.prisma.sectionScheduleEntry.findMany({
             where: { timetable_id: timetableId },
             select: { timeslot: { select: { is_summer: true } } },
-            distinct: ['slot_id'],
+            distinct: ["slot_id"],
         });
         const hasSummer = slotRows.some((row) => row.timeslot.is_summer === true);
         const hasRegular = slotRows.some((row) => row.timeslot.is_summer === false);
@@ -233,18 +239,18 @@ let TimetablesService = class TimetablesService {
         if (hasRegular && !hasSummer)
             return [1, 2];
         if (!hasSummer && !hasRegular) {
-            throw new common_1.BadRequestException('Cannot determine allowed publish semester type for this timetable because it has no scheduled entries.');
+            throw new common_1.BadRequestException("Cannot determine allowed publish semester type for this timetable because it has no scheduled entries.");
         }
-        throw new common_1.BadRequestException('Cannot publish this timetable because it mixes summer and non-summer timeslots.');
+        throw new common_1.BadRequestException("Cannot publish this timetable because it mixes summer and non-summer timeslots.");
     }
     async publishDraftTimetable(timetableId, params, publisher) {
-        const academicYear = String(params.academicYear ?? '').trim();
+        const academicYear = String(params.academicYear ?? "").trim();
         const semesterType = Number(params.semesterType);
         if (!/^\d{4}-\d{4}$/.test(academicYear)) {
-            throw new common_1.BadRequestException('academicYear must be in YYYY-YYYY format (for example: 2025-2026).');
+            throw new common_1.BadRequestException("academicYear must be in YYYY-YYYY format (for example: 2025-2026).");
         }
         if (![1, 2, 3].includes(semesterType)) {
-            throw new common_1.BadRequestException('semesterType must be one of: 1 (First), 2 (Second), 3 (Summer).');
+            throw new common_1.BadRequestException("semesterType must be one of: 1 (First), 2 (Second), 3 (Summer).");
         }
         const timetable = await this.prisma.timetable.findUnique({
             where: { timetable_id: timetableId },
@@ -258,16 +264,17 @@ let TimetablesService = class TimetablesService {
             throw new common_1.NotFoundException(`Timetable with ID ${timetableId} not found`);
         }
         if (timetable.semester_id != null) {
-            throw new common_1.BadRequestException('Timetable is already published.');
+            throw new common_1.BadRequestException("Timetable is already published.");
         }
-        const isScenarioSandbox = timetable.generation_type === 'what_if' || timetable._count.scenario_runs_as_result > 0;
+        const isScenarioSandbox = timetable.generation_type === "what_if" ||
+            timetable._count.scenario_runs_as_result > 0;
         const conflictSummary = await this.getTimetableConflictSummary(timetableId);
         if (isScenarioSandbox && conflictSummary.requiresConflictAcknowledgment) {
-            throw new common_1.BadRequestException('This timetable was generated by a What-If scenario and contains hard conflicts (or is marked invalid). Fix conflicts before publishing, or apply the scenario to a base timetable instead.');
+            throw new common_1.BadRequestException("This timetable was generated by a What-If scenario and contains hard conflicts (or is marked invalid). Fix conflicts before publishing, or apply the scenario to a base timetable instead.");
         }
         if (conflictSummary.requiresConflictAcknowledgment) {
             if (params.acknowledgedHardConflicts !== true) {
-                throw new common_1.BadRequestException('This timetable has hard conflicts. Review them and send acknowledgedHardConflicts: true before publishing.');
+                throw new common_1.BadRequestException("This timetable has hard conflicts. Review them and send acknowledgedHardConflicts: true before publishing.");
             }
         }
         const allowedSemesterTypes = await this.resolveAllowedPublishSemesterTypes(timetableId);
@@ -292,7 +299,7 @@ let TimetablesService = class TimetablesService {
             where: { timetable_id: timetableId },
             data: {
                 semester_id: semester.semester_id,
-                status: 'active',
+                status: "active",
             },
             include: {
                 semester: true,
@@ -302,17 +309,20 @@ let TimetablesService = class TimetablesService {
         });
         const semesterLabel = `${academicYear} (${decodeSemesterType(semesterType)})`;
         const publisherName = publisher
-            ? `${publisher.firstName} ${publisher.lastName}`.trim() || 'An administrator'
-            : 'An administrator';
+            ? `${publisher.firstName} ${publisher.lastName}`.trim() ||
+                "An administrator"
+            : "An administrator";
         const lecturerRows = await this.prisma.sectionScheduleEntry.findMany({
             where: { timetable_id: timetableId },
             select: { user_id: true },
-            distinct: ['user_id'],
+            distinct: ["user_id"],
         });
         const lecturerIds = lecturerRows
             .map((r) => r.user_id)
             .filter((id) => id != null && Number.isFinite(id));
-        const lectTitle = isRevision ? 'Schedule Updated' : 'Your Schedule is Ready';
+        const lectTitle = isRevision
+            ? "Schedule Updated"
+            : "Your Schedule is Ready";
         const lectMessage = isRevision
             ? `The timetable for ${semesterLabel} has been revised. Please review your updated schedule.`
             : `The timetable for ${semesterLabel} has been published. You can now view your assigned courses and timeslots.`;
@@ -352,7 +362,11 @@ let TimetablesService = class TimetablesService {
                     },
                 },
             },
-            orderBy: [{ slot_id: 'asc' }, { course_id: 'asc' }, { section_number: 'asc' }],
+            orderBy: [
+                { slot_id: "asc" },
+                { course_id: "asc" },
+                { section_number: "asc" },
+            ],
         });
         return entries.map((e) => ({
             entryId: e.entry_id,
@@ -364,7 +378,7 @@ let TimetablesService = class TimetablesService {
             lecturerUserId: e.user_id,
             lecturerName: e.lecturer && e.lecturer.user
                 ? `${e.lecturer.user.first_name} ${e.lecturer.user.last_name}`.trim()
-                : (e.lecturer_name_snapshot ?? 'Unknown Lecturer'),
+                : (e.lecturer_name_snapshot ?? "Unknown Lecturer"),
             roomId: e.room_id,
             roomNumber: e.room.room_number,
             daysMask: e.timeslot.days_mask,
@@ -391,7 +405,7 @@ let TimetablesService = class TimetablesService {
             throw new common_1.NotFoundException(`Timetable with ID ${timetableId} not found`);
         }
         const isSummer = timetable.semester?.semester_type === 3;
-        const [entries, allLecturers, allRooms, allTimeslots, conflicts, preferences] = await Promise.all([
+        const [entries, allLecturers, allRooms, allTimeslots, conflicts, preferences,] = await Promise.all([
             this.prisma.sectionScheduleEntry.findMany({
                 where: { timetable_id: timetableId },
                 include: {
@@ -407,20 +421,27 @@ let TimetablesService = class TimetablesService {
                         },
                     },
                 },
-                orderBy: [{ slot_id: 'asc' }, { course_id: 'asc' }, { section_number: 'asc' }],
+                orderBy: [
+                    { slot_id: "asc" },
+                    { course_id: "asc" },
+                    { section_number: "asc" },
+                ],
             }),
             this.prisma.lecturer.findMany({
                 where: { is_available: true },
                 include: { user: true },
             }),
-            this.prisma.room.findMany({ where: { is_available: true }, orderBy: { room_id: 'asc' } }),
+            this.prisma.room.findMany({
+                where: { is_available: true },
+                orderBy: { room_id: "asc" },
+            }),
             this.prisma.timeslot.findMany({
                 where: { is_active: true, is_summer: isSummer },
-                orderBy: [{ start_time: 'asc' }, { slot_id: 'asc' }],
+                orderBy: [{ start_time: "asc" }, { slot_id: "asc" }],
             }),
             this.prisma.timetableConflict.findMany({
                 where: { timetable_id: timetableId },
-                orderBy: { conflict_id: 'asc' },
+                orderBy: { conflict_id: "asc" },
             }),
             this.prisma.lecturerPreference.findMany({
                 include: {
@@ -433,20 +454,19 @@ let TimetablesService = class TimetablesService {
             {
                 id: `slot_${slot.slot_id}`,
                 days: decodeDaysMask(slot.days_mask),
-                start_hour: Number(formatTimeHHmm(slot.start_time).split(':')[0]) +
-                    Number(formatTimeHHmm(slot.start_time).split(':')[1]) / 60,
-                duration: ((Number(formatTimeHHmm(slot.end_time).split(':')[0]) * 60 +
-                    Number(formatTimeHHmm(slot.end_time).split(':')[1]) -
-                    (Number(formatTimeHHmm(slot.start_time).split(':')[0]) * 60 +
-                        Number(formatTimeHHmm(slot.start_time).split(':')[1]))) ||
-                    90) / 60,
+                start_hour: Number(formatTimeHHmm(slot.start_time).split(":")[0]) +
+                    Number(formatTimeHHmm(slot.start_time).split(":")[1]) / 60,
+                duration: (Number(formatTimeHHmm(slot.end_time).split(":")[0]) * 60 +
+                    Number(formatTimeHHmm(slot.end_time).split(":")[1]) -
+                    (Number(formatTimeHHmm(slot.start_time).split(":")[0]) * 60 +
+                        Number(formatTimeHHmm(slot.start_time).split(":")[1])) || 90) /
+                    60,
                 slot_type: slot.slot_type,
                 start_time: formatTimeHHmm(slot.start_time),
-                duration_minutes: (Number(formatTimeHHmm(slot.end_time).split(':')[0]) * 60 +
-                    Number(formatTimeHHmm(slot.end_time).split(':')[1]) -
-                    (Number(formatTimeHHmm(slot.start_time).split(':')[0]) * 60 +
-                        Number(formatTimeHHmm(slot.start_time).split(':')[1]))) ||
-                    90,
+                duration_minutes: Number(formatTimeHHmm(slot.end_time).split(":")[0]) * 60 +
+                    Number(formatTimeHHmm(slot.end_time).split(":")[1]) -
+                    (Number(formatTimeHHmm(slot.start_time).split(":")[0]) * 60 +
+                        Number(formatTimeHHmm(slot.start_time).split(":")[1])) || 90,
             },
         ]));
         const lecturerPreferences = {};
@@ -457,18 +477,22 @@ let TimetablesService = class TimetablesService {
             if (!lecturerPreferences[name]) {
                 lecturerPreferences[name] = { preferred: [], unpreferred: [] };
             }
-            const bucket = pref.is_preferred ? 'preferred' : 'unpreferred';
+            const bucket = pref.is_preferred ? "preferred" : "unpreferred";
             lecturerPreferences[name][bucket].push(`slot_${pref.slot_id}`);
         }
         const roomTypesMap = {};
         for (const room of allRooms) {
             roomTypesMap[room.room_number] =
-                room.room_type === 2 ? 'lab_room' : room.room_type === 1 ? 'lecture_hall' : 'any';
+                room.room_type === 2
+                    ? "lab_room"
+                    : room.room_type === 1
+                        ? "lecture_hall"
+                        : "any";
         }
         const schedule = entries.map((e) => {
             const lecturerName = e.lecturer?.user != null
                 ? `${e.lecturer.user.first_name} ${e.lecturer.user.last_name}`.trim()
-                : (e.lecturer_name_snapshot ?? 'Unknown Lecturer');
+                : (e.lecturer_name_snapshot ?? "Unknown Lecturer");
             const slot = slotById.get(e.slot_id);
             const sectionKey = `${e.course.course_code}|${e.section_number}`;
             const allowed = e.lecturer?.lecturer_can_teach_course
@@ -481,29 +505,31 @@ let TimetablesService = class TimetablesService {
                 section_number: e.section_number,
                 course_code: e.course.course_code,
                 course_name: e.course.course_name,
-                room: e.course.delivery_mode === client_1.DeliveryMode.ONLINE ? null : e.room.room_number,
+                room: e.course.delivery_mode === client_1.DeliveryMode.ONLINE
+                    ? null
+                    : e.room.room_number,
                 room_capacity: e.room.capacity,
                 class_size: e.registered_students,
                 timeslot: `slot_${e.slot_id}`,
                 timeslot_label: slot != null
-                    ? `${slot.days.map((d) => d.slice(0, 3)).join('/')} ${formatTimeHHmm(e.timeslot.start_time)}-${formatTimeHHmm(e.timeslot.end_time)}`
+                    ? `${slot.days.map((d) => d.slice(0, 3)).join("/")} ${formatTimeHHmm(e.timeslot.start_time)}-${formatTimeHHmm(e.timeslot.end_time)}`
                     : `slot_${e.slot_id}`,
-                day: slot?.days[0] ?? '',
+                day: slot?.days[0] ?? "",
                 lecturer: lecturerName,
                 allowed_lecturers: allowed.length ? allowed : [lecturerName],
                 preference_issues: [],
                 has_pref_warning: false,
                 delivery_mode: e.course.delivery_mode === client_1.DeliveryMode.ONLINE
-                    ? 'online'
+                    ? "online"
                     : e.course.delivery_mode === client_1.DeliveryMode.BLENDED
-                        ? 'blended'
-                        : 'inperson',
-                session_type: e.course.is_lab ? 'lab' : 'lecture',
+                        ? "blended"
+                        : "inperson",
+                session_type: e.course.is_lab ? "lab" : "lecture",
                 slot_type: slot?.slot_type ?? e.timeslot.slot_type,
                 days: slot?.days ?? [],
                 start_hour: slot?.start_hour ?? 0,
                 duration: slot?.duration ?? 1.5,
-                room_type: roomTypesMap[e.room.room_number] ?? 'any',
+                room_type: roomTypesMap[e.room.room_number] ?? "any",
                 room_required: e.course.delivery_mode !== client_1.DeliveryMode.ONLINE,
             };
         });
@@ -512,8 +538,9 @@ let TimetablesService = class TimetablesService {
         for (const e of entries) {
             const lecturerName = e.lecturer?.user != null
                 ? `${e.lecturer.user.first_name} ${e.lecturer.user.last_name}`.trim()
-                : (e.lecturer_name_snapshot ?? 'Unknown Lecturer');
-            lecturerLoad.set(lecturerName, (lecturerLoad.get(lecturerName) ?? 0) + Number(e.course.credit_hours ?? 0));
+                : (e.lecturer_name_snapshot ?? "Unknown Lecturer");
+            lecturerLoad.set(lecturerName, (lecturerLoad.get(lecturerName) ?? 0) +
+                Number(e.course.credit_hours ?? 0));
             if (!lecturerCourses.has(lecturerName))
                 lecturerCourses.set(lecturerName, new Set());
             lecturerCourses.get(lecturerName)?.add(e.course.course_code);
@@ -547,7 +574,11 @@ let TimetablesService = class TimetablesService {
             const roomEntries = entries.filter((e) => e.room.room_number === room.room_number);
             const totalWaste = roomEntries.reduce((sum, e) => sum + Math.max(0, room.capacity - e.registered_students), 0);
             const avgWastePct = roomEntries.length > 0
-                ? roomEntries.reduce((sum, e) => sum + (room.capacity > 0 ? ((room.capacity - e.registered_students) / room.capacity) * 100 : 0), 0) / roomEntries.length
+                ? roomEntries.reduce((sum, e) => sum +
+                    (room.capacity > 0
+                        ? ((room.capacity - e.registered_students) / room.capacity) *
+                            100
+                        : 0), 0) / roomEntries.length
                 : 0;
             return {
                 name: room.room_number,
@@ -556,7 +587,7 @@ let TimetablesService = class TimetablesService {
                 total_slots: totalSlots,
                 total_wasted_seats: Math.round(totalWaste),
                 avg_waste_pct: Number(avgWastePct.toFixed(2)),
-                room_type: roomTypesMap[room.room_number] ?? 'any',
+                room_type: roomTypesMap[room.room_number] ?? "any",
             };
         });
         const distributionMap = new Map();
@@ -567,7 +598,8 @@ let TimetablesService = class TimetablesService {
         const distributionInfo = Array.from(distributionMap.entries()).map(([timeslot, classes]) => ({
             timeslot,
             classes,
-            slot_type: slotById.get(Number(timeslot.replace('slot_', '')))?.slot_type,
+            slot_type: slotById.get(Number(timeslot.replace("slot_", "")))
+                ?.slot_type,
         }));
         const workloadInfo = lecturerSummary.map((l) => ({
             lecturer: l.name,
@@ -583,36 +615,39 @@ let TimetablesService = class TimetablesService {
             capacity: e.room.capacity,
             class_size: e.registered_students,
             wasted_seats: Math.max(0, e.room.capacity - e.registered_students),
-            waste_pct: e.room.capacity > 0 ? Number((((e.room.capacity - e.registered_students) / e.room.capacity) * 100).toFixed(2)) : 0,
+            waste_pct: e.room.capacity > 0
+                ? Number((((e.room.capacity - e.registered_students) / e.room.capacity) *
+                    100).toFixed(2))
+                : 0,
             is_empty: e.registered_students === 0,
             penalty: 0,
-            room_type: roomTypesMap[e.room.room_number] ?? 'any',
+            room_type: roomTypesMap[e.room.room_number] ?? "any",
             days: decodeDaysMask(e.timeslot.days_mask),
-            start_hour: Number(formatTimeHHmm(e.timeslot.start_time).split(':')[0]) +
-                Number(formatTimeHHmm(e.timeslot.start_time).split(':')[1]) / 60,
-            duration: ((Number(formatTimeHHmm(e.timeslot.end_time).split(':')[0]) * 60 +
-                Number(formatTimeHHmm(e.timeslot.end_time).split(':')[1]) -
-                (Number(formatTimeHHmm(e.timeslot.start_time).split(':')[0]) * 60 +
-                    Number(formatTimeHHmm(e.timeslot.start_time).split(':')[1]))) ||
+            start_hour: Number(formatTimeHHmm(e.timeslot.start_time).split(":")[0]) +
+                Number(formatTimeHHmm(e.timeslot.start_time).split(":")[1]) / 60,
+            duration: (Number(formatTimeHHmm(e.timeslot.end_time).split(":")[0]) * 60 +
+                Number(formatTimeHHmm(e.timeslot.end_time).split(":")[1]) -
+                (Number(formatTimeHHmm(e.timeslot.start_time).split(":")[0]) * 60 +
+                    Number(formatTimeHHmm(e.timeslot.start_time).split(":")[1])) ||
                 90) / 60,
             slot_type: e.timeslot.slot_type,
         }));
         const wrongSlotTypeViolations = conflicts
-            .filter((c) => c.conflict_type === 'wrong_timeslot_type')
+            .filter((c) => c.conflict_type === "wrong_timeslot_type")
             .map((c) => ({
             lecture: c.course_code,
-            assigned_type: c.timeslot_label ?? '',
-            delivery_mode: '',
-            session_type: '',
+            assigned_type: c.timeslot_label ?? "",
+            delivery_mode: "",
+            session_type: "",
         }));
         const unitConflictViolations = conflicts
-            .filter((c) => c.conflict_type === 'cohort_overlap')
+            .filter((c) => c.conflict_type === "cohort_overlap")
             .map((c) => ({
-            unit: c.detail || 'Unknown unit',
+            unit: c.detail || "Unknown unit",
             course_a: c.course_code,
             course_b: c.course_code,
-            timeslot_a: c.timeslot_label ?? '',
-            timeslot_b: c.timeslot_label ?? '',
+            timeslot_a: c.timeslot_label ?? "",
+            timeslot_b: c.timeslot_label ?? "",
         }));
         const totalSlots = allRooms.length * allTimeslots.length;
         const usedSlots = new Set(entries
@@ -637,7 +672,7 @@ let TimetablesService = class TimetablesService {
                     ? Number(timetable.timetable_metrics.fitness_score)
                     : null,
                 generated_at: timetable.generated_at.toISOString(),
-                algorithm: 'GWO',
+                algorithm: "GWO",
                 soft_preference_warnings: 0,
                 gap_warnings: 0,
                 overload_violations: lecturerSummary.filter((l) => l.overloaded).length,
@@ -674,7 +709,7 @@ let TimetablesService = class TimetablesService {
     }
     async replaceScheduleFromPayload(timetableId, scheduleRaw) {
         if (!Array.isArray(scheduleRaw) || scheduleRaw.length === 0) {
-            throw new common_1.BadRequestException('schedule must be a non-empty array.');
+            throw new common_1.BadRequestException("schedule must be a non-empty array.");
         }
         const timetable = await this.prisma.timetable.findUnique({
             where: { timetable_id: timetableId },
@@ -688,13 +723,15 @@ let TimetablesService = class TimetablesService {
         });
         const lecturerByName = new Map();
         for (const l of lecturers) {
-            const full = `${l.user.first_name ?? ''} ${l.user.last_name ?? ''}`.trim().toLowerCase();
+            const full = `${l.user.first_name ?? ""} ${l.user.last_name ?? ""}`
+                .trim()
+                .toLowerCase();
             if (full)
                 lecturerByName.set(full, l.user_id);
         }
         const rooms = await this.prisma.room.findMany({
             select: { room_id: true, room_number: true, room_type: true },
-            orderBy: { room_id: 'asc' },
+            orderBy: { room_id: "asc" },
         });
         const roomByNumber = new Map();
         for (const r of rooms) {
@@ -704,7 +741,7 @@ let TimetablesService = class TimetablesService {
             rooms[0]?.room_id ??
             null;
         if (virtualRoomId == null) {
-            throw new common_1.BadRequestException('No rooms found in database.');
+            throw new common_1.BadRequestException("No rooms found in database.");
         }
         const courseRows = await this.prisma.course.findMany({
             select: { course_id: true, course_code: true },
@@ -715,13 +752,15 @@ let TimetablesService = class TimetablesService {
         }
         const rowsToCreate = [];
         for (const raw of scheduleRaw) {
-            const courseCode = String(raw.course_code ?? '').trim();
-            const lecturerName = String(raw.lecturer ?? '').trim();
-            const timeslot = String(raw.timeslot ?? '').trim();
-            const sectionNumber = String(raw.section_number ?? 'S1').trim() || 'S1';
+            const courseCode = String(raw.course_code ?? "").trim();
+            const lecturerName = String(raw.lecturer ?? "").trim();
+            const timeslot = String(raw.timeslot ?? "").trim();
+            const sectionNumber = String(raw.section_number ?? "S1").trim() || "S1";
             const classSize = Number(raw.class_size ?? 0);
-            const deliveryMode = String(raw.delivery_mode ?? 'inperson').toLowerCase().replace(/_/g, '');
-            const roomName = String(raw.room ?? '').trim();
+            const deliveryMode = String(raw.delivery_mode ?? "inperson")
+                .toLowerCase()
+                .replace(/_/g, "");
+            const roomName = String(raw.room ?? "").trim();
             const slotMatch = /^slot_(\d+)$/i.exec(timeslot);
             if (!slotMatch) {
                 throw new common_1.BadRequestException(`Unsupported timeslot id "${timeslot}". Expected DB slot id format "slot_<id>".`);
@@ -739,7 +778,7 @@ let TimetablesService = class TimetablesService {
                 throw new common_1.BadRequestException(`Unknown lecturer "${lecturerName}".`);
             }
             let roomId = virtualRoomId;
-            const needsRoom = deliveryMode !== 'online';
+            const needsRoom = deliveryMode !== "online";
             if (needsRoom) {
                 const mappedRoomId = roomByNumber.get(roomName.toLowerCase());
                 if (mappedRoomId == null) {
@@ -753,7 +792,9 @@ let TimetablesService = class TimetablesService {
                 slot_id: slotId,
                 course_id: courseId,
                 room_id: roomId,
-                registered_students: Number.isFinite(classSize) ? Math.max(0, Math.round(classSize)) : 0,
+                registered_students: Number.isFinite(classSize)
+                    ? Math.max(0, Math.round(classSize))
+                    : 0,
                 section_number: sectionNumber,
             });
         }

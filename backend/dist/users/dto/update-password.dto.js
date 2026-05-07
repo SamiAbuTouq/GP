@@ -16,18 +16,18 @@ class UpdatePasswordDto {
 exports.UpdatePasswordDto = UpdatePasswordDto;
 __decorate([
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MinLength)(8, { message: 'Password must be at least 8 characters long' }),
+    (0, class_validator_1.MinLength)(8, { message: "Password must be at least 8 characters long" }),
     (0, class_validator_1.Matches)(/[A-Z]/, {
-        message: 'Password must contain at least one uppercase letter',
+        message: "Password must contain at least one uppercase letter",
     }),
     (0, class_validator_1.Matches)(/[a-z]/, {
-        message: 'Password must contain at least one lowercase letter',
+        message: "Password must contain at least one lowercase letter",
     }),
     (0, class_validator_1.Matches)(/\d/, {
-        message: 'Password must contain at least one number',
+        message: "Password must contain at least one number",
     }),
     (0, class_validator_1.Matches)(/[@$!%*?&]/, {
-        message: 'Password must contain at least one special character (@$!%*?&)',
+        message: "Password must contain at least one special character (@$!%*?&)",
     }),
     __metadata("design:type", String)
 ], UpdatePasswordDto.prototype, "new_password", void 0);
