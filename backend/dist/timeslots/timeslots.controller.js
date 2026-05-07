@@ -23,14 +23,24 @@ let TimeslotsController = class TimeslotsController {
     constructor(timeslotsService) {
         this.timeslotsService = timeslotsService;
     }
-    getLecturerPreferences(user) {
-        return this.timeslotsService.getLecturerPreferences(user.user_id);
+    getLecturerPreferences(user, isSummerStr) {
+        const isSummer = isSummerStr === "true"
+            ? true
+            : isSummerStr === "false"
+                ? false
+                : undefined;
+        return this.timeslotsService.getLecturerPreferences(user.user_id, isSummer);
     }
     updateLecturerPreferences(user, dto) {
         return this.timeslotsService.updateLecturerPreferences(user.user_id, dto.preferences ?? []);
     }
-    getLecturerPreferencesForAdmin(userId) {
-        return this.timeslotsService.getLecturerPreferencesForAdmin(userId);
+    getLecturerPreferencesForAdmin(userId, isSummerStr) {
+        const isSummer = isSummerStr === "true"
+            ? true
+            : isSummerStr === "false"
+                ? false
+                : undefined;
+        return this.timeslotsService.getLecturerPreferencesForAdmin(userId, isSummer);
     }
     findAll(filter) {
         let isSummer;
@@ -75,8 +85,9 @@ __decorate([
     (0, common_1.Get)("lecturer/preferences"),
     (0, roles_decorator_1.Roles)(client_1.Role.LECTURER),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)("isSummer")),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "getLecturerPreferences", null);
 __decorate([
@@ -91,8 +102,9 @@ __decorate([
 __decorate([
     (0, common_1.Get)("lecturer/preferences/:userId"),
     __param(0, (0, common_1.Param)("userId", common_1.ParseIntPipe)),
+    __param(1, (0, common_1.Query)("isSummer")),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, String]),
     __metadata("design:returntype", void 0)
 ], TimeslotsController.prototype, "getLecturerPreferencesForAdmin", null);
 __decorate([

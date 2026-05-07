@@ -7,10 +7,10 @@ export declare class NotificationsService {
         preferenceKey?: string;
     }): Promise<{
         user_id: number;
-        message_title: string;
         message: string;
-        is_read: boolean;
         created_at: Date;
+        message_title: string;
+        is_read: boolean;
         notification_id: number;
     } | null>;
     createForManyUsers(userIds: number[], messageTitle: string, message: string): Promise<{

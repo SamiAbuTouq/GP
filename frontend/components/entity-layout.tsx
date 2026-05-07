@@ -21,8 +21,8 @@ export function EntityLayout({ children, title, description, headerActions }: En
           <div className="mx-auto w-full max-w-[1680px]">
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-balance">{title}</h1>
-                <p className="text-muted-foreground">{description}</p>
+                <h1 className="text-2xl font-bold text-balance text-foreground">{title}</h1>
+                <p className="text-sm text-muted-foreground">{description}</p>
               </div>
               {headerActions ? <div className="shrink-0">{headerActions}</div> : null}
             </div>

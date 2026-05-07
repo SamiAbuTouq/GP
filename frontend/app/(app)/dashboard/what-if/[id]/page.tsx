@@ -672,7 +672,7 @@ export default function WhatIfScenarioDetailPage() {
                       {scenarioLoading ? (
                         <Skeleton className="h-9 w-32" />
                       ) : (
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">{scenario?.name}</h1>
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground">{scenario?.name}</h1>
                       )}
                       {scenarioLoading ? null : scenario?.status ? (
                         <Badge variant="secondary" className="shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">

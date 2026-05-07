@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import React, { createContext, useContext, useEffect, useState, type RefObject } from 'react'
-import { useCourseAnalyticsTheme } from '@/lib/course-analytics/analytics-theme-context'
+import { useTheme } from 'next-themes'
 import { palettes, DEFAULT_PALETTE_ID, type Palette } from '@/lib/course-analytics/palettes'
 
 type PaletteContextValue = {
@@ -22,7 +22,7 @@ export function PaletteProvider({
   children: React.ReactNode
   containerRef: RefObject<HTMLElement | null>
 }) {
-  const { resolvedTheme } = useCourseAnalyticsTheme()
+  const { resolvedTheme } = useTheme()
   const [activePaletteId, setActivePaletteId] = useState<string>(DEFAULT_PALETTE_ID)
   const [mounted, setMounted] = useState(false)
 

@@ -1530,7 +1530,7 @@ export function ScheduleViewerPage({
           <div className="mx-auto w-full max-w-[1680px]">
           <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-1">
-              <h1 className="text-xl font-bold text-balance text-foreground">Schedule Viewer</h1>
+              <h1 className="text-2xl font-bold text-balance text-foreground">Schedule Viewer</h1>
               <p className="hidden text-sm text-muted-foreground lg:block">
                 Browse GWO-generated drafts and published timetables from the database, then switch grid, list, or
                 calendar and export what you see.
@@ -2100,7 +2100,7 @@ export function ScheduleViewerPage({
                           <thead className="bg-muted/40">
                             <tr className="border-b">
                               {[
-                                { key: "courseCode", label: "Course Code" },
+                                { key: "courseCode", label: "Code" },
                                 { key: "course", label: "Course" },
                                 { key: "lecturer", label: "Lecturer" },
                                 { key: "section", label: "Section" },
@@ -2129,8 +2129,9 @@ export function ScheduleViewerPage({
                                       ? "justify-end"
                                       : "justify-center"
                                 const noWrapClass = col.key === "courseCode" ? "whitespace-nowrap" : ""
+                                const widthClass = col.key === "courseCode" ? "w-[92px] min-w-[92px]" : ""
                                 return (
-                                  <th key={col.key} className={cn("px-3 py-2 font-semibold text-muted-foreground", headerAlignClass)}>
+                                  <th key={col.key} className={cn("px-3 py-2 font-semibold text-muted-foreground", headerAlignClass, widthClass)}>
                                     <button
                                       type="button"
                                       onClick={() => toggleListSort(col.key as ListSortField)}
@@ -2151,7 +2152,9 @@ export function ScheduleViewerPage({
                           <tbody>
                             {sortedListEntries.map((e) => (
                                 <tr key={`${e.entryId}-${e.day}-${e.startTime}`} className="border-b last:border-b-0 odd:bg-muted/10 hover:bg-muted/25">
-                                  <td className="px-3 py-2.5 font-medium">{highlightMatch(e.courseCode, trimmedSearch)}</td>
+                                  <td className="w-[92px] min-w-[92px] whitespace-nowrap px-3 py-2.5 font-medium">
+                                    {highlightMatch(e.courseCode, trimmedSearch)}
+                                  </td>
                                   <td className="px-3 py-2.5 text-left">{highlightMatch(getDisplayCourseName(e.courseName, e.isLab), trimmedSearch)}</td>
                                   <td className="px-3 py-2.5 text-center">{highlightMatch(e.lecturerName, trimmedSearch)}</td>
                                   <td className="px-3 py-2.5 text-center">{highlightMatch(e.sectionNumber, trimmedSearch)}</td>

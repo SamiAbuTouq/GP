@@ -46,7 +46,7 @@ export declare class TimeslotsService {
         message: string;
         archived: boolean;
     }>;
-    getLecturerPreferences(userId: number): Promise<{
+    getLecturerPreferences(userId: number, isSummer?: boolean): Promise<{
         slotId: number;
         days: string[];
         start: string;
@@ -55,7 +55,7 @@ export declare class TimeslotsService {
         isSummer: boolean;
         preference: string;
     }[]>;
-    getLecturerPreferencesForAdmin(userId: number): Promise<{
+    getLecturerPreferencesForAdmin(userId: number, isSummer?: boolean): Promise<{
         slotId: number;
         days: string[];
         start: string;

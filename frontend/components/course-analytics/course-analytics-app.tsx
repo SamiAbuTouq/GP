@@ -73,14 +73,12 @@ import {
 import { Card, CardContent } from '@/components/course-analytics-ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/course-analytics-ui/tabs'
 import { Badge } from '@/components/course-analytics-ui/badge'
-import { ThemeToggle } from '@/components/course-analytics/theme-toggle'
 import { PalettePicker } from '@/components/course-analytics/palette-picker'
 import { useDebounce } from '@/hooks/use-debounce'
 import { segmentedNavTabItemRadiusClass } from '@/lib/segmented-nav-tabs'
 
 /**
- * Scope dashboard tab styles to the dashboard's own theme state (`ca-dark`) instead
- * of the global app `.dark` class so mixed-theme shells render correctly.
+ * Scope dashboard tab styles to the analytics surface so they follow app theme.
  */
 const DASHBOARD_TAB_TRIGGER_CLASS = `relative ${segmentedNavTabItemRadiusClass} px-4 py-2 text-sm font-semibold text-slate-600 shadow-none transition-colors duration-200 data-[state=active]:bg-transparent data-[state=active]:text-primary-foreground data-[state=active]:shadow-none data-[state=active]:hover:bg-transparent ca-dark:text-slate-400 ca-dark:data-[state=active]:bg-transparent ca-dark:data-[state=active]:text-primary-foreground`
 const DASHBOARD_TAB_LIST_CLASS = `flex h-auto w-full flex-wrap items-stretch justify-start gap-1 ${segmentedNavTabItemRadiusClass} border border-slate-200/80 bg-slate-100/80 p-1 shadow-inner ca-dark:border-slate-700 ca-dark:bg-slate-900/50`
@@ -284,8 +282,6 @@ export default function CourseAnalyticsApp({
                 </Badge>
               )}
               <div className="flex items-center gap-2 rounded-full border border-border bg-background/50 p-0.5 backdrop-blur-md h-9">
-                <ThemeToggle />
-                <div className="h-4 w-[1px] bg-border" />
                 <PalettePicker />
               </div>
             </div>

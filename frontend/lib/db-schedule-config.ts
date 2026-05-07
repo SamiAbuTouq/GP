@@ -159,7 +159,7 @@ function daysMaskToWeekdayNames(mask: number): string[] {
 
 /** Prisma `@db.Time()` → fractional hour (UTC components; matches seed `parseTime`). */
 function timeDateToHourFraction(d: Date): number {
-  return d.getUTCHours() + d.getUTCMinutes() / 60 + d.getUTCSeconds() / 3600;
+  return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
 }
 
 function approxEq(a: number, b: number, eps = 0.08): boolean {
@@ -172,6 +172,8 @@ function approxEq(a: number, b: number, eps = 0.08): boolean {
  */
 function inferGwoSlotType(days: string[], durationHours: number, dbSlotType: string): string {
   const t = dbSlotType.trim();
+
+  // Lab: explicit DB label wins; duration >= 2.5h is a reliable fallback.
   if (/lab/i.test(t) || durationHours >= 2.5) {
     return "lab";
   }
@@ -185,10 +187,12 @@ function inferGwoSlotType(days: string[], durationHours: number, dbSlotType: str
     if (n === 1 && has("Monday")) return "blended_mon";
     if (n === 1 && has("Wednesday")) return "blended_wed";
     if (has("Sunday") && has("Tuesday") && !has("Thursday")) return "blended_st";
-    // Summer (or custom) blended patterns that don't match the standard templates.
+    // Any other blended pattern (summer, custom) — use generic blended.
     return "blended_generic";
   }
 
+  // Traditional Lecture: try to match standard patterns first,
+  // then fall back gracefully based on the authoritative DB label.
   if (n === 2 && has("Monday") && has("Wednesday") && approxEq(durationHours, 1.5)) {
     return "lecture_mw";
   }
@@ -196,7 +200,14 @@ function inferGwoSlotType(days: string[], durationHours: number, dbSlotType: str
     return "lecture_stt";
   }
 
-  // Summer (or custom) lecture patterns that don't match the standard templates.
+  // For Traditional Lecture slots that don't match the standard MW/STT templates
+  // (e.g. summer sessions on Sun/Tue, Mon/Wed/Thu, etc.) use lecture_generic
+  // so the engine still applies lecture-type constraints rather than defaulting
+  // to an unknown type.
+  if (/traditional/i.test(t) || !/blended|lab/i.test(t)) {
+    return "lecture_generic";
+  }
+
   return "lecture_generic";
 }
 
@@ -242,7 +253,7 @@ export async function loadTimeslotsFromDatabase(
 
   const isSummer = semesterMode === "summer";
   const rows = await prisma.timeslot.findMany({
-    where: { days_mask: { not: 0 }, is_summer: isSummer },
+    where: { days_mask: { not: 0 }, is_summer: isSummer, is_active: true },
     orderBy: { slot_id: "asc" },
   });
 

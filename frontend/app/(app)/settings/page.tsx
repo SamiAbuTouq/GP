@@ -827,8 +827,8 @@ function SettingsContent() {
         <main className="flex-1 overflow-auto p-4 lg:p-6">
           <div className="mx-auto w-full min-w-0 max-w-[1680px]">
           <div className="mb-6 min-w-0 max-w-2xl">
-            <h1 className="text-2xl font-bold text-balance">Settings</h1>
-            <p className="text-muted-foreground text-pretty">
+            <h1 className="text-2xl font-bold text-balance text-foreground">Settings</h1>
+            <p className="text-sm text-muted-foreground text-pretty">
               Manage your account and system preferences.
             </p>
           </div>
@@ -1217,80 +1217,77 @@ function SettingsContent() {
                     description="Change your password. Requirements update as you type."
                   />
                   <CardContent className="space-y-6">
-                    <div className="space-y-4 rounded-xl border bg-card p-4">
-                      <p className="text-sm font-medium">Change password</p>
+                    <PasswordField
+                      id="current-password"
+                      label="Current Password"
+                      value={passwordData.currentPassword}
+                      onChange={(value) => {
+                        setPasswordFeedback(null);
+                        setPasswordData((prev) => ({ ...prev, currentPassword: value }));
+                      }}
+                      placeholder="Enter your current password"
+                      shown={showPasswords.current}
+                      onToggleShown={() =>
+                        setShowPasswords((prev) => ({ ...prev, current: !prev.current }))
+                      }
+                    />
+                    <div className="grid gap-4 sm:grid-cols-2">
                       <PasswordField
-                        id="current-password"
-                        label="Current Password"
-                        value={passwordData.currentPassword}
-                          onChange={(value) => {
-                            setPasswordFeedback(null);
-                            setPasswordData((prev) => ({ ...prev, currentPassword: value }));
-                          }}
-                        placeholder="Enter your current password"
-                        shown={showPasswords.current}
+                        id="new-password"
+                        label="New Password"
+                        value={passwordData.newPassword}
+                        onChange={(value) => {
+                          setPasswordFeedback(null);
+                          setPasswordData((prev) => ({ ...prev, newPassword: value }));
+                        }}
+                        placeholder="Enter new password"
+                        shown={showPasswords.new}
                         onToggleShown={() =>
-                          setShowPasswords((prev) => ({ ...prev, current: !prev.current }))
+                          setShowPasswords((prev) => ({ ...prev, new: !prev.new }))
                         }
                       />
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <PasswordField
-                          id="new-password"
-                          label="New Password"
-                          value={passwordData.newPassword}
-                          onChange={(value) => {
-                            setPasswordFeedback(null);
-                            setPasswordData((prev) => ({ ...prev, newPassword: value }));
-                          }}
-                          placeholder="Enter new password"
-                          shown={showPasswords.new}
-                          onToggleShown={() =>
-                            setShowPasswords((prev) => ({ ...prev, new: !prev.new }))
-                          }
-                        />
-                        <PasswordField
-                          id="confirm-password"
-                          label="Confirm Password"
-                          value={passwordData.confirmPassword}
-                          onChange={(value) => {
-                            setPasswordFeedback(null);
-                            setPasswordData((prev) => ({ ...prev, confirmPassword: value }));
-                          }}
-                          placeholder="Confirm new password"
-                          shown={showPasswords.confirm}
-                          onToggleShown={() =>
-                            setShowPasswords((prev) => ({ ...prev, confirm: !prev.confirm }))
-                          }
-                        />
-                      </div>
-                      
-                      {/* Password Requirements */}
-                      {passwordData.newPassword && (
-                        <div className="rounded-lg border p-4 bg-muted/30">
-                          <p className="text-sm font-medium mb-3">Password Requirements</p>
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {[
-                              { key: "minLength", label: "At least 8 characters" },
-                              { key: "hasUppercase", label: "One uppercase letter" },
-                              { key: "hasLowercase", label: "One lowercase letter" },
-                              { key: "hasNumber", label: "One number" },
-                              { key: "passwordsMatch", label: "Passwords match" },
-                            ].map((req) => (
-                              <div key={req.key} className="flex items-center gap-2 text-sm">
-                                {passwordValidation[req.key as keyof typeof passwordValidation] ? (
-                                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                                ) : (
-                                  <XCircle className="h-4 w-4 text-muted-foreground" />
-                                )}
-                                <span className={passwordValidation[req.key as keyof typeof passwordValidation] ? "text-foreground" : "text-muted-foreground"}>
-                                  {req.label}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      <PasswordField
+                        id="confirm-password"
+                        label="Confirm Password"
+                        value={passwordData.confirmPassword}
+                        onChange={(value) => {
+                          setPasswordFeedback(null);
+                          setPasswordData((prev) => ({ ...prev, confirmPassword: value }));
+                        }}
+                        placeholder="Confirm new password"
+                        shown={showPasswords.confirm}
+                        onToggleShown={() =>
+                          setShowPasswords((prev) => ({ ...prev, confirm: !prev.confirm }))
+                        }
+                      />
                     </div>
+
+                    {/* Password Requirements */}
+                    {passwordData.newPassword && (
+                      <div className="rounded-lg border p-4 bg-muted/30">
+                        <p className="mb-3 text-sm font-medium">Password Requirements</p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {[
+                            { key: "minLength", label: "At least 8 characters" },
+                            { key: "hasUppercase", label: "One uppercase letter" },
+                            { key: "hasLowercase", label: "One lowercase letter" },
+                            { key: "hasNumber", label: "One number" },
+                            { key: "passwordsMatch", label: "Passwords match" },
+                          ].map((req) => (
+                            <div key={req.key} className="flex items-center gap-2 text-sm">
+                              {passwordValidation[req.key as keyof typeof passwordValidation] ? (
+                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              <span className={passwordValidation[req.key as keyof typeof passwordValidation] ? "text-foreground" : "text-muted-foreground"}>
+                                {req.label}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {passwordFeedback && (
                       <Alert
                         variant={passwordFeedback.type === "error" ? "destructive" : "default"}

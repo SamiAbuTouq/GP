@@ -220,7 +220,7 @@ export default function LecturerTimePreferencesPage() {
           <div className="mx-auto w-full max-w-[1680px]">
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
-              <h1 className="text-xl font-bold text-foreground">Time Preference</h1>
+              <h1 className="text-2xl font-bold text-foreground">Time Preference</h1>
               <p className="text-sm text-muted-foreground">
                 Mark each predefined time slot as preferred or not preferred.
               </p>

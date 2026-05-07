@@ -1480,7 +1480,7 @@ export default function WhatIfScenariosPage() {
           <div className="mx-auto w-full max-w-[1680px] space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h1 className="text-2xl font-bold">What-If Scenarios</h1>
+                <h1 className="text-2xl font-bold text-foreground">What-If Scenarios</h1>
                 <p className="text-sm text-muted-foreground">Simulate timetable changes in an isolated sandbox before applying them.</p>
               </div>
               <div className="flex gap-2">

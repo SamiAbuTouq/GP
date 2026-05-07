@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -13,14 +14,24 @@ import {
   UpdateLecturerPreferenceItemDto,
 } from "./dto/timeslot.dto";
 
-// Days mapping using bitmask: Sun=1, Mon=2, Tue=4, Wed=8, Thu=16
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
+// Days mapping using bitmask: Sun=1, Mon=2, Tue=4, Wed=8, Thu=16, Fri=32, Sat=64
+const DAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 const DAY_VALUES = {
   Sunday: 1,
   Monday: 2,
   Tuesday: 4,
   Wednesday: 8,
   Thursday: 16,
+  Friday: 32,
+  Saturday: 64,
 };
 
 @Injectable()
@@ -88,11 +99,28 @@ export class TimeslotsService {
 
   private daysArrayToMask(days: string[]): number {
     let mask = 0;
-    for (const day of days) {
-      if (DAY_VALUES[day as keyof typeof DAY_VALUES]) {
-        mask |= DAY_VALUES[day as keyof typeof DAY_VALUES];
+    const invalid: string[] = [];
+
+    for (const raw of days) {
+      const day = String(raw).trim();
+      if (!day) continue;
+
+      const value = DAY_VALUES[day as keyof typeof DAY_VALUES];
+      if (value) {
+        mask |= value;
+      } else {
+        invalid.push(day);
       }
     }
+
+    if (invalid.length > 0) {
+      const uniqueInvalid = Array.from(new Set(invalid));
+      throw new BadRequestException(
+        `Invalid day name${uniqueInvalid.length > 1 ? "s" : ""}: ${uniqueInvalid.join(", ")}. ` +
+          `Valid values are: ${Object.keys(DAY_VALUES).join(", ")}.`,
+      );
+    }
+
     return mask;
   }
 
@@ -213,17 +241,20 @@ export class TimeslotsService {
     return { message: "Timeslot archived successfully", archived: true };
   }
 
-  async getLecturerPreferences(userId: number) {
-    return this.getPreferencesByUserId(userId);
+  async getLecturerPreferences(userId: number, isSummer?: boolean) {
+    return this.getPreferencesByUserId(userId, isSummer);
   }
 
-  async getLecturerPreferencesForAdmin(userId: number) {
-    return this.getPreferencesByUserId(userId);
+  async getLecturerPreferencesForAdmin(userId: number, isSummer?: boolean) {
+    return this.getPreferencesByUserId(userId, isSummer);
   }
 
-  private async getPreferencesByUserId(userId: number) {
+  private async getPreferencesByUserId(userId: number, isSummer?: boolean) {
     const slots = await this.prisma.timeslot.findMany({
-      where: { is_active: true },
+      where: {
+        is_active: true,
+        ...(isSummer !== undefined ? { is_summer: isSummer } : {}),
+      },
       orderBy: [{ start_time: "asc" }, { end_time: "asc" }, { slot_id: "asc" }],
       include: {
         lecturer_preferences: {

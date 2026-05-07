@@ -26,7 +26,7 @@ function decodeSemesterType(type) {
     return map[type] ?? `Semester ${type}`;
 }
 function formatTimeHHmm(d) {
-    return d.toISOString().slice(11, 16);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 const dayByBit = {
     0: "Sunday",
@@ -404,7 +404,16 @@ let TimetablesService = class TimetablesService {
         if (!timetable) {
             throw new common_1.NotFoundException(`Timetable with ID ${timetableId} not found`);
         }
-        const isSummer = timetable.semester?.semester_type === 3;
+        let isSummer = timetable.semester?.semester_type === 3;
+        if (timetable.semester_id == null) {
+            const sampleEntry = await this.prisma.sectionScheduleEntry.findFirst({
+                where: { timetable_id: timetableId },
+                select: { timeslot: { select: { is_summer: true } } },
+            });
+            if (sampleEntry?.timeslot != null) {
+                isSummer = sampleEntry.timeslot.is_summer;
+            }
+        }
         const [entries, allLecturers, allRooms, allTimeslots, conflicts, preferences,] = await Promise.all([
             this.prisma.sectionScheduleEntry.findMany({
                 where: { timetable_id: timetableId },

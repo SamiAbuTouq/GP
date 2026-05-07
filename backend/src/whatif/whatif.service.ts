@@ -1542,7 +1542,17 @@ export class WhatIfService {
     if (!timetable)
       throw new NotFoundException(`Timetable ${timetableId} not found.`);
 
-    const isSummer = timetable.semester?.semester_type === 3;
+    // For published timetables use the semester type directly.
+    // For drafts infer isSummer from the timeslots already in the timetable's entries.
+    let isSummer = timetable.semester?.semester_type === 3;
+    if (timetable.semester_id == null) {
+      const sampleEntry = timetable.section_schedule_entries.find(
+        (e) => e.timeslot != null,
+      );
+      if (sampleEntry?.timeslot != null) {
+        isSummer = sampleEntry.timeslot.is_summer;
+      }
+    }
 
     const { courseIds, sectionCountByCourseId } =
       this._timetableCourseSectionStats(
@@ -1711,8 +1721,12 @@ export class WhatIfService {
         }),
         timeslots: timeslots.map((t) => ({
           slot_id: t.slot_id,
-          start_time: t.start_time.toISOString().slice(11, 16),
-          end_time: t.end_time.toISOString().slice(11, 16),
+          start_time: `${String(t.start_time.getHours()).padStart(2, "0")}:${String(
+            t.start_time.getMinutes(),
+          ).padStart(2, "0")}`,
+          end_time: `${String(t.end_time.getHours()).padStart(2, "0")}:${String(
+            t.end_time.getMinutes(),
+          ).padStart(2, "0")}`,
           days_mask: t.days_mask,
           slot_type: t.slot_type,
           is_summer: t.is_summer,
@@ -1948,9 +1962,7 @@ export class WhatIfService {
   }
 
   private _timeToMinutes(d: Date): number {
-    const hhmm = d.toISOString().slice(11, 16);
-    const [h, m] = hhmm.split(":").map((x) => Number(x));
-    return h * 60 + m;
+    return d.getHours() * 60 + d.getMinutes();
   }
 
   private _expandAtomicSlots(

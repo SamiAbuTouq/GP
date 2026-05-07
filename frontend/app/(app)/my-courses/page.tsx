@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Minus, Plus, X } from "lucide-react";
+import { AlertTriangle, Loader2, Minus, Plus, X } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +54,44 @@ export default function MyCoursesPage() {
   const [selectedAddIds, setSelectedAddIds] = useState<number[]>([]);
   const [selectedRemoveIds, setSelectedRemoveIds] = useState<number[]>([]);
   const [note, setNote] = useState("");
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+  const [initialFormState, setInitialFormState] = useState<{
+    catalogQuery: string;
+    selectedAddIds: number[];
+    selectedRemoveIds: number[];
+    note: string;
+  }>({
+    catalogQuery: "",
+    selectedAddIds: [],
+    selectedRemoveIds: [],
+    note: "",
+  });
+
+  const resetRequestForm = () => {
+    setSelectedAddIds([]);
+    setSelectedRemoveIds([]);
+    setNote("");
+    setCatalogQuery("");
+  };
+
+  const isDirty = useMemo(() => {
+    const current = JSON.stringify({
+      catalogQuery,
+      selectedAddIds,
+      selectedRemoveIds,
+      note,
+    });
+    const initial = JSON.stringify(initialFormState);
+    return current !== initial;
+  }, [catalogQuery, selectedAddIds, selectedRemoveIds, note, initialFormState]);
+
+  const requestCloseRequestPanel = () => {
+    if (isDirty) {
+      setDiscardConfirmOpen(true);
+      return;
+    }
+    setDialogOpen(false);
+  };
 
   const refreshAll = async () => {
     setLoading(true);
@@ -148,10 +187,13 @@ export default function MyCoursesPage() {
       if (!res.ok) throw new Error(data.error || "Failed to submit request.");
       setRequests((prev) => [data as CourseRequest, ...prev]);
       setDialogOpen(false);
-      setSelectedAddIds([]);
-      setSelectedRemoveIds([]);
-      setNote("");
-      setCatalogQuery("");
+      resetRequestForm();
+      setInitialFormState({
+        catalogQuery: "",
+        selectedAddIds: [],
+        selectedRemoveIds: [],
+        note: "",
+      });
       toast({ title: "Request submitted", description: "Your course modification request is now pending review." });
     } catch (e) {
       toast({
@@ -193,7 +235,7 @@ export default function MyCoursesPage() {
         <main className="flex-1 overflow-auto p-4 lg:p-6">
           <div className="mx-auto w-full max-w-[1680px] space-y-6">
             <div className="space-y-1">
-              <h1 className="text-xl font-bold text-foreground">My Courses</h1>
+              <h1 className="text-2xl font-bold text-foreground">My Courses</h1>
               <p className="text-sm text-muted-foreground">
                 View your authorized courses and submit course modification requests.
               </p>
@@ -230,20 +272,41 @@ export default function MyCoursesPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-3">
                 <CardTitle>Course Modification Requests</CardTitle>
-                <Sheet open={dialogOpen} onOpenChange={setDialogOpen}>
+                <Sheet
+                  open={dialogOpen}
+                  onOpenChange={(open) => {
+                    if (open) {
+                      resetRequestForm();
+                      setInitialFormState({
+                        catalogQuery: "",
+                        selectedAddIds: [],
+                        selectedRemoveIds: [],
+                        note: "",
+                      });
+                      setDialogOpen(true);
+                      return;
+                    }
+                    requestCloseRequestPanel();
+                  }}
+                >
                   <SheetTrigger asChild>
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />
                       New Request
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="right" className="w-full overflow-y-auto p-6 sm:max-w-2xl">
-                    <SheetHeader>
-                      <SheetTitle>Submit Course Modification Request</SheetTitle>
-                    </SheetHeader>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Courses to Add</p>
+                  <SheetContent side="right" className="w-full p-0 sm:max-w-2xl">
+                    <DialogHeader className="space-y-1 border-b px-6 py-4 pr-14 text-left">
+                      <DialogTitle className="text-xl">Submit Course Modification Request</DialogTitle>
+                      <DialogDescription>
+                        Define which courses to add or remove, then submit for review.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-6 overflow-y-auto px-6 py-5">
+                      <div className="space-y-3">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-sky-600/80 dark:text-sky-400/80">
+                          Courses to add
+                        </p>
                         <Input
                           value={catalogQuery}
                           onChange={(e) => setCatalogQuery(e.target.value)}
@@ -276,8 +339,10 @@ export default function MyCoursesPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Courses to Remove</p>
+                      <div className="space-y-3">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-sky-600/80 dark:text-sky-400/80">
+                          Courses to remove
+                        </p>
                         <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-2">
                           {authorizedCourses.length === 0 ? (
                             <p className="text-sm text-muted-foreground">No authorized courses available.</p>
@@ -317,8 +382,10 @@ export default function MyCoursesPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Note (optional)</p>
+                      <div className="space-y-3">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-sky-600/80 dark:text-sky-400/80">
+                          Note
+                        </p>
                         <Textarea
                           value={note}
                           onChange={(e) => setNote(e.target.value)}
@@ -328,12 +395,15 @@ export default function MyCoursesPage() {
                         />
                       </div>
 
-                      <div className="flex justify-end">
-                        <Button onClick={submitRequest} disabled={submitting}>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 border-t bg-background px-6 py-4">
+                      <Button type="button" variant="outline" onClick={requestCloseRequestPanel}>
+                        Cancel
+                      </Button>
+                      <Button onClick={submitRequest} disabled={submitting}>
                           {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                           Submit Request
-                        </Button>
-                      </div>
+                      </Button>
                     </div>
                   </SheetContent>
                 </Sheet>
@@ -424,6 +494,44 @@ export default function MyCoursesPage() {
           </div>
         </main>
       </div>
+      <Dialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
+        <DialogContent className="z-[220] border-2 border-border/90 bg-popover shadow-2xl ring-1 ring-black/10 sm:max-w-lg">
+          <DialogHeader className="gap-3 text-left">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <AlertTriangle className="h-4.5 w-4.5" />
+              </div>
+              <div className="space-y-1.5">
+                <DialogTitle className="text-xl font-semibold">Discard unsaved changes?</DialogTitle>
+                <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+                  Your edits to this request will be permanently lost. This cannot be undone.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setDiscardConfirmOpen(false)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setDiscardConfirmOpen(false);
+                setDialogOpen(false);
+                resetRequestForm();
+                setInitialFormState({
+                  catalogQuery: "",
+                  selectedAddIds: [],
+                  selectedRemoveIds: [],
+                  note: "",
+                });
+              }}
+            >
+              Discard changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

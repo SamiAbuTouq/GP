@@ -4,7 +4,7 @@ import type { User } from "@prisma/client";
 export declare class TimeslotsController {
     private readonly timeslotsService;
     constructor(timeslotsService: TimeslotsService);
-    getLecturerPreferences(user: User): Promise<{
+    getLecturerPreferences(user: User, isSummerStr?: string): Promise<{
         slotId: number;
         days: string[];
         start: string;
@@ -16,7 +16,7 @@ export declare class TimeslotsController {
     updateLecturerPreferences(user: User, dto: UpdateLecturerPreferencesDto): Promise<{
         success: boolean;
     }>;
-    getLecturerPreferencesForAdmin(userId: number): Promise<{
+    getLecturerPreferencesForAdmin(userId: number, isSummerStr?: string): Promise<{
         slotId: number;
         days: string[];
         start: string;

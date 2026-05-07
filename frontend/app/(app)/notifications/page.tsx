@@ -254,7 +254,7 @@ export default function NotificationsPage() {
           <div className="mx-auto w-full max-w-3xl space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-xl font-bold tracking-tight text-foreground">Notifications</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-foreground">Notifications</h1>
                 <p className="text-sm text-muted-foreground">Updates from timetabling, publishing, and your account.</p>
               </div>
               {showMarkAll ? (

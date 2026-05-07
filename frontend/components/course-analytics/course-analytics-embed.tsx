@@ -1,16 +1,13 @@
 'use client'
 
 import { useRef } from 'react'
+import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
-import {
-  CourseAnalyticsThemeProvider,
-  useCourseAnalyticsTheme,
-} from '@/lib/course-analytics/analytics-theme-context'
 import { PaletteProvider } from '@/components/course-analytics/palette-provider'
 import CourseAnalyticsApp from '@/components/course-analytics/course-analytics-app'
 
 function CourseAnalyticsThemedSurface({ children }: { children: React.ReactNode }) {
-  const { resolvedTheme } = useCourseAnalyticsTheme()
+  const { resolvedTheme } = useTheme()
   const containerRef = useRef<HTMLDivElement>(null)
 
   return (
@@ -32,10 +29,8 @@ export function CourseAnalyticsEmbed({
   onInitialLoadComplete?: () => void
 }) {
   return (
-    <CourseAnalyticsThemeProvider>
-      <CourseAnalyticsThemedSurface>
-        <CourseAnalyticsApp onInitialLoadComplete={onInitialLoadComplete} />
-      </CourseAnalyticsThemedSurface>
-    </CourseAnalyticsThemeProvider>
+    <CourseAnalyticsThemedSurface>
+      <CourseAnalyticsApp onInitialLoadComplete={onInitialLoadComplete} />
+    </CourseAnalyticsThemedSurface>
   )
 }

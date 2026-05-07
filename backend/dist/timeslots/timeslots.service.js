@@ -15,13 +15,23 @@ const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const notifications_service_1 = require("../notifications/notifications.service");
 const notification_prefs_1 = require("../notifications/notification-prefs");
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
+const DAYS = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+];
 const DAY_VALUES = {
     Sunday: 1,
     Monday: 2,
     Tuesday: 4,
     Wednesday: 8,
     Thursday: 16,
+    Friday: 32,
+    Saturday: 64,
 };
 let TimeslotsService = class TimeslotsService {
     constructor(prisma, notifications) {
@@ -75,10 +85,23 @@ let TimeslotsService = class TimeslotsService {
     }
     daysArrayToMask(days) {
         let mask = 0;
-        for (const day of days) {
-            if (DAY_VALUES[day]) {
-                mask |= DAY_VALUES[day];
+        const invalid = [];
+        for (const raw of days) {
+            const day = String(raw).trim();
+            if (!day)
+                continue;
+            const value = DAY_VALUES[day];
+            if (value) {
+                mask |= value;
             }
+            else {
+                invalid.push(day);
+            }
+        }
+        if (invalid.length > 0) {
+            const uniqueInvalid = Array.from(new Set(invalid));
+            throw new common_1.BadRequestException(`Invalid day name${uniqueInvalid.length > 1 ? "s" : ""}: ${uniqueInvalid.join(", ")}. ` +
+                `Valid values are: ${Object.keys(DAY_VALUES).join(", ")}.`);
         }
         return mask;
     }
@@ -182,15 +205,18 @@ let TimeslotsService = class TimeslotsService {
         });
         return { message: "Timeslot archived successfully", archived: true };
     }
-    async getLecturerPreferences(userId) {
-        return this.getPreferencesByUserId(userId);
+    async getLecturerPreferences(userId, isSummer) {
+        return this.getPreferencesByUserId(userId, isSummer);
     }
-    async getLecturerPreferencesForAdmin(userId) {
-        return this.getPreferencesByUserId(userId);
+    async getLecturerPreferencesForAdmin(userId, isSummer) {
+        return this.getPreferencesByUserId(userId, isSummer);
     }
-    async getPreferencesByUserId(userId) {
+    async getPreferencesByUserId(userId, isSummer) {
         const slots = await this.prisma.timeslot.findMany({
-            where: { is_active: true },
+            where: {
+                is_active: true,
+                ...(isSummer !== undefined ? { is_summer: isSummer } : {}),
+            },
             orderBy: [{ start_time: "asc" }, { end_time: "asc" }, { slot_id: "asc" }],
             include: {
                 lecturer_preferences: {

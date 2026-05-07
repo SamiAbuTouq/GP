@@ -50,11 +50,6 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // If authenticated user tries to access login page directly, redirect to dashboard.
-  if (pathname === '/login' && hasRefreshToken) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
-
   return NextResponse.next();
 }
 

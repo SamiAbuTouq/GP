@@ -54,6 +54,18 @@ export function ProtectedRoute({
 
   // Role check
   const hasAccess = allowedRoles.includes(user.role);
+  const lecturerRedirectPending = user.role === "LECTURER" && !hasAccess;
+  if (lecturerRedirectPending) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2
+          className="h-8 w-8 animate-spin text-muted-foreground"
+          aria-label="Loading"
+        />
+      </div>
+    );
+  }
+
   if (!hasAccess) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background p-6 text-center">

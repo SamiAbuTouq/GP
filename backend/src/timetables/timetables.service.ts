@@ -18,8 +18,7 @@ export function decodeSemesterType(type: number): string {
 }
 
 function formatTimeHHmm(d: Date): string {
-  // Prisma maps Postgres TIME to Date; use ISO (UTC) to avoid locale surprises.
-  return d.toISOString().slice(11, 16);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 const dayByBit: Record<number, string> = {
@@ -514,7 +513,19 @@ export class TimetablesService {
       throw new NotFoundException(`Timetable with ID ${timetableId} not found`);
     }
 
-    const isSummer = timetable.semester?.semester_type === 3;
+    // For published timetables use the semester type directly.
+    // For drafts (semester_id = null) infer from the timeslots already assigned
+    // to the timetable's schedule entries.
+    let isSummer = timetable.semester?.semester_type === 3;
+    if (timetable.semester_id == null) {
+      const sampleEntry = await this.prisma.sectionScheduleEntry.findFirst({
+        where: { timetable_id: timetableId },
+        select: { timeslot: { select: { is_summer: true } } },
+      });
+      if (sampleEntry?.timeslot != null) {
+        isSummer = sampleEntry.timeslot.is_summer;
+      }
+    }
     const [
       entries,
       allLecturers,

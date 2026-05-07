@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { ApiClient } from "./api-client";
@@ -223,7 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []); // Only run on mount
 
   // Handle route protection after auth state is determined
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!authLoading) {
       const isPublicRoute = isAuthPublicPath(pathname);
       // #region agent log

@@ -28,8 +28,17 @@ export class TimeslotsController {
 
   @Get("lecturer/preferences")
   @Roles(Role.LECTURER)
-  getLecturerPreferences(@CurrentUser() user: User) {
-    return this.timeslotsService.getLecturerPreferences(user.user_id);
+  getLecturerPreferences(
+    @CurrentUser() user: User,
+    @Query("isSummer") isSummerStr?: string,
+  ) {
+    const isSummer =
+      isSummerStr === "true"
+        ? true
+        : isSummerStr === "false"
+          ? false
+          : undefined;
+    return this.timeslotsService.getLecturerPreferences(user.user_id, isSummer);
   }
 
   @Put("lecturer/preferences")
@@ -47,8 +56,18 @@ export class TimeslotsController {
   @Get("lecturer/preferences/:userId")
   getLecturerPreferencesForAdmin(
     @Param("userId", ParseIntPipe) userId: number,
+    @Query("isSummer") isSummerStr?: string,
   ) {
-    return this.timeslotsService.getLecturerPreferencesForAdmin(userId);
+    const isSummer =
+      isSummerStr === "true"
+        ? true
+        : isSummerStr === "false"
+          ? false
+          : undefined;
+    return this.timeslotsService.getLecturerPreferencesForAdmin(
+      userId,
+      isSummer,
+    );
   }
 
   @Get()

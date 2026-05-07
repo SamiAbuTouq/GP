@@ -2,7 +2,7 @@
  
 import { formatName } from '@/lib/utils'
 import { useEffect, useState } from 'react'
-import { useCourseAnalyticsTheme } from '@/lib/course-analytics/analytics-theme-context'
+import { useTheme } from 'next-themes'
 import { usePalette } from '@/components/course-analytics/palette-provider'
 import {
   BarChart,
@@ -56,7 +56,7 @@ const AXIS_TICK_LIGHT = { fill: 'var(--color-muted-foreground)', opacity: 0.85 }
 /** Hook that returns the 5 chart colors strictly driven by React context. */
 function useChartColors() {
   const { activePalette } = usePalette()
-  const { resolvedTheme } = useCourseAnalyticsTheme()
+  const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
