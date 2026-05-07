@@ -1490,12 +1490,27 @@ export class WhatIfService {
       })),
     );
 
-    // Load the full pools (conditions can add/remove from these).
+    // Load pools from the base timetable snapshot.
+    // Lecturers are intentionally scoped to those already used in the base
+    // timetable so the optimizer starts from a realistic assignment pool.
+    // Scenario conditions (add/delete/amend lecturer) are the intended way to
+    // change that pool during the run.
+    const usedLecturerIds = Array.from(
+      new Set(
+        timetable.section_schedule_entries
+          .map((e) => e.user_id)
+          .filter((id): id is number => typeof id === 'number' && Number.isFinite(id)),
+      ),
+    );
+
     // Courses: only those that appear on the base timetable, with section counts
     // derived from that timetable (not the global catalog).
     const [lecturers, rooms, courses, timeslots] = await Promise.all([
       this.prisma.lecturer.findMany({
-        where: { is_available: true },
+        where: {
+          is_available: true,
+          ...(usedLecturerIds.length > 0 ? { user_id: { in: usedLecturerIds } } : {}),
+        },
         include: {
           user: { select: { user_id: true, first_name: true, last_name: true } },
           lecturer_can_teach_course: { select: { course_id: true } },

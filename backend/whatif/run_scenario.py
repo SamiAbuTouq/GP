@@ -129,6 +129,22 @@ def _delivery_mode_name(mode: Any) -> str:
         return "blended"
     return "inperson"
 
+
+def _normalize_section_number(value: Any) -> str:
+    """
+    Normalize section labels to a stable key, e.g. S01 / 1 / s1 -> S1.
+    """
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    m = re.match(r"^(?:s)?\s*0*(\d+)$", raw, flags=re.IGNORECASE)
+    if m:
+        try:
+            return f"S{int(m.group(1))}"
+        except Exception:
+            return f"S{m.group(1)}"
+    return raw.upper()
+
 def _build_legacy_gwo_config(
     config: Dict[str, Any],
     sandbox: Dict[str, Any],
@@ -146,11 +162,28 @@ def _build_legacy_gwo_config(
     courses = sandbox.get("courses", []) or []
     existing_entries = sandbox.get("existing_entries", []) or []
 
+    # Build course_id -> metadata lookup (stable base timetable mapping)
+    course_meta_by_id: Dict[int, Dict[str, Any]] = {}
+    for c in courses:
+        try:
+            cid = int(c.get("course_id"))
+        except Exception:
+            continue
+        course_meta_by_id[cid] = c
+
     lecturer_names: List[str] = []
     lecturer_index_by_user_id: Dict[int, int] = {}
+    lecturer_max_workload_by_name: Dict[str, int] = {}
     for idx, l in enumerate(lecturers):
         name = f"{l.get('first_name', '')} {l.get('last_name', '')}".strip() or f"Lecturer {idx+1}"
         lecturer_names.append(name)
+        try:
+            mw_raw = l.get("max_workload")
+            mw = int(mw_raw) if mw_raw is not None and str(mw_raw).strip() != "" else None
+        except Exception:
+            mw = None
+        if mw is not None and mw > 0:
+            lecturer_max_workload_by_name[name] = mw
         try:
             uid = int(l.get("user_id"))
             lecturer_index_by_user_id[uid] = idx
@@ -216,39 +249,54 @@ def _build_legacy_gwo_config(
             break
 
     seeded_sizes: Dict[tuple, int] = {}
+    # Base timetable assignment lookups used for lecturer fallback and warm-start seeding.
+    base_entry_by_course_section: Dict[tuple, Dict[str, Any]] = {}
+    # Preserve the original section label identity/order per course from the base timetable.
+    base_section_labels_by_course: Dict[int, List[str]] = {}
+    # If base timetable has blank section labels, synthesize stable per-course labels
+    # so the scenario run always keeps the same number of lectures/sections.
+    per_course_blank_counter: Dict[int, int] = {}
     for e in existing_entries:
         try:
-            key = (int(e.get("course_id")), str(e.get("section_number") or "").strip())
+            course_id_int = int(e.get("course_id"))
+            raw_section = e.get("section_number")
+            normalized = _normalize_section_number(raw_section)
+            if not normalized:
+                per_course_blank_counter[course_id_int] = per_course_blank_counter.get(course_id_int, 0) + 1
+                normalized = f"S{per_course_blank_counter[course_id_int]}"
+            key = (course_id_int, normalized)
             size = int(e.get("registered_students") or 0)
         except Exception:
             continue
         if key[1]:
             seeded_sizes[key] = size
+            if key not in base_entry_by_course_section:
+                base_entry_by_course_section[key] = e
+            labels = base_section_labels_by_course.setdefault(key[0], [])
+            if key[1] not in labels:
+                labels.append(key[1])
 
     lectures_data: List[Dict[str, Any]] = []
     lecture_id = 1
-    for c in courses:
-        try:
-            course_id = int(c.get("course_id"))
-        except Exception:
-            continue
-        course_code = str(c.get("course_code") or "").strip()
-        if not course_code:
-            continue
+    # IMPORTANT: Scenario runs must keep the same number of scheduled sections
+    # as the base timetable. We therefore build the lecture list strictly from
+    # the base timetable's (course_id, section_number) keys, not from mutated
+    # course section counts in the sandbox.
+    base_course_ids_sorted = sorted(base_section_labels_by_course.keys())
+    for course_id in base_course_ids_sorted:
+        c = course_meta_by_id.get(course_id, {})
+        course_code = str(c.get("course_code") or f"COURSE_{course_id}").strip()
         course_name = str(c.get("course_name") or course_code)
-        sections_count = int(c.get("sections_summer" if is_summer else "sections_normal") or 0)
-        if sections_count <= 0:
+        section_labels = list(base_section_labels_by_course.get(course_id, []))
+        if not section_labels:
             continue
 
         allowed_lecturer_indices: List[int] = []
         for uid, idx in lecturer_index_by_user_id.items():
             if course_id in teachable_by_user.get(uid, set()):
                 allowed_lecturer_indices.append(idx)
-        if not allowed_lecturer_indices and sandbox_teachability_empty:
-            allowed_lecturer_indices = list(range(len(lecturer_names)))
 
-        for s in range(1, sections_count + 1):
-            section_number = f"S{s}"
+        for section_number in section_labels:
             size = seeded_sizes.get((course_id, section_number), 30)
             try:
                 academic_level = int(c.get("academic_level") or 0)
@@ -273,18 +321,101 @@ def _build_legacy_gwo_config(
             })
             lecture_id += 1
 
+    # Warm-start seed: map base timetable assignments to the lecture list indices.
+    room_index_by_room_id: Dict[int, int] = {}
+    for idx, r in enumerate(rooms):
+        try:
+            room_index_by_room_id[int(r.get("room_id"))] = idx
+        except Exception:
+            continue
+
+    timeslot_index_by_slot_id: Dict[int, int] = {}
+    for idx, t in enumerate(timeslots_data):
+        slot_text = str(t.get("id") or "")
+        m = re.match(r"^slot_(\d+)$", slot_text, flags=re.IGNORECASE)
+        if not m:
+            continue
+        try:
+            timeslot_index_by_slot_id[int(m.group(1))] = idx
+        except Exception:
+            continue
+
+    seed_assignments: List[Optional[List[int]]] = [None] * len(lectures_data)
+    course_code_to_id: Dict[str, int] = {}
+    for c in courses:
+        try:
+            cid = int(c.get("course_id"))
+        except Exception:
+            continue
+        cc = str(c.get("course_code") or "").strip()
+        if cc:
+            course_code_to_id[cc] = cid
+
+    seed_lookup_misses = 0
+    seed_missing_slot_or_room = 0
+    for lecture_idx, lec in enumerate(lectures_data):
+        course_id = course_code_to_id.get(str(lec.get("course") or "").strip())
+        section_number = _normalize_section_number(lec.get("section_number"))
+        if course_id is None or not section_number:
+            continue
+
+        base_entry = base_entry_by_course_section.get((course_id, section_number))
+        if not base_entry:
+            seed_lookup_misses += 1
+            continue
+
+        lecturer_idx = None
+        try:
+            uid = int(base_entry.get("user_id"))
+            lecturer_idx = lecturer_index_by_user_id.get(uid)
+        except Exception:
+            lecturer_idx = None
+        if lecturer_idx is None:
+            continue
+
+        # Per-course fallback when teachability data exists globally but this
+        # specific course resolves to no explicit allowed lecturers.
+        if not lec.get("allowed_lecturers"):
+            lec["allowed_lecturers"] = [lecturer_idx]
+        elif lecturer_idx not in lec["allowed_lecturers"]:
+            lec["allowed_lecturers"] = [lecturer_idx] + list(lec["allowed_lecturers"])
+
+        slot_idx = None
+        room_idx = None
+        try:
+            slot_idx = timeslot_index_by_slot_id.get(int(base_entry.get("slot_id")))
+        except Exception:
+            slot_idx = None
+        try:
+            room_idx = room_index_by_room_id.get(int(base_entry.get("room_id")))
+        except Exception:
+            room_idx = None
+
+        if slot_idx is None:
+            seed_missing_slot_or_room += 1
+            continue
+        if lec.get("delivery_mode") != "online" and room_idx is None:
+            seed_missing_slot_or_room += 1
+            continue
+
+        seed_assignments[lecture_idx] = [0 if room_idx is None else room_idx, slot_idx, lecturer_idx]
+
+    # Last-resort fallback for courses that still have no lecturer candidates.
+    for lec in lectures_data:
+        if lec.get("allowed_lecturers"):
+            continue
+        if sandbox_teachability_empty:
+            lec["allowed_lecturers"] = list(range(len(lecturer_names)))
+        elif lecturer_names:
+            # Keep schedules runnable even with partial/dirty teachability data.
+            lec["allowed_lecturers"] = list(range(len(lecturer_names)))
+
     existing = existing_config or {}
     existing_gwo_params = existing.get("gwo_params", {}) if isinstance(existing, dict) else {}
     existing_soft_weights = existing.get("soft_weights", {}) if isinstance(existing, dict) else {}
 
-    return {
-        "rooms": rooms_dict,
-        "timeslots": timeslots_data,
-        "lecturers": lecturer_names,
-        "lecturer_preferences": {},
-        "lectures": lectures_data,
-        # Preserve user-tuned optimizer settings from the existing UI config.
-        "gwo_params": existing_gwo_params
+    gwo_params = (
+        existing_gwo_params.copy()
         if isinstance(existing_gwo_params, dict) and existing_gwo_params
         else {
             "num_wolves": 30,
@@ -296,8 +427,52 @@ def _build_legacy_gwo_config(
             "stagnation_limit": 10,
             "num_runs": 5,
             "max_classes_per_lecturer": 5,
-        },
+        }
+    )
+    # Scenario what-if runs are warm-started from a known-good timetable.
+    # Keep a small fresh fraction to recover when conditions invalidate parts
+    # of the base assignment (removed room/slot/lecturer).
+    gwo_params["random_fresh_fraction"] = 0.05
+
+    return {
+        "rooms": rooms_dict,
+        "timeslots": timeslots_data,
+        "lecturers": lecturer_names,
+        "lecturer_preferences": {},
+        # Per-lecturer ceilings from DB (GWO-v6.py reads this via get_lecturer_max_workload()).
+        # Keys must match the `lecturers` name list exactly.
+        "lecturer_max_workload": lecturer_max_workload_by_name,
+        "lectures": lectures_data,
+        # Preserve user-tuned optimizer settings from the existing UI config.
+        "seed_assignments": seed_assignments,
+        "_seed_lookup_misses": seed_lookup_misses,
+        "_seed_missing_slot_or_room": seed_missing_slot_or_room,
+        "_seed_total_lectures": len(lectures_data),
+        "gwo_params": gwo_params,
         "soft_weights": existing_soft_weights if isinstance(existing_soft_weights, dict) else {},
+    }
+
+def _build_mapper_context(
+    base_timetable_data: Dict[str, Any],
+    sandbox: Dict[str, Any],
+    legacy_cfg: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Build the entity lookup context used by fallback row->entry mapping.
+    Must include sandbox entities (with IDs) plus any effective legacy timeslot
+    metadata that GWO consumed.
+    """
+    base = base_timetable_data if isinstance(base_timetable_data, dict) else {}
+    sb = sandbox if isinstance(sandbox, dict) else {}
+    legacy = legacy_cfg if isinstance(legacy_cfg, dict) else {}
+
+    return {
+        "courses": sb.get("courses", base.get("courses", [])) or [],
+        "rooms": sb.get("rooms", base.get("rooms", [])) or [],
+        "lecturers": sb.get("lecturers", base.get("lecturers", [])) or [],
+        "timeslots": sb.get("timeslots", base.get("timeslots", [])) or [],
+        # Optional helper data for downstream mapping/persistence heuristics.
+        "_legacy_timeslots": legacy.get("timeslots", []) if isinstance(legacy.get("timeslots", []), list) else [],
     }
 
 def _map_schedule_rows_to_entries(
@@ -481,7 +656,7 @@ def _normalize_gwo_result_shape(gwo_result: Dict[str, Any], tt: Dict[str, Any]) 
         "iterations_run": iterations_run,
     }
 
-def _load_schedule_output_result(gwo_script: str, gwo_config_path: str) -> Optional[Dict[str, Any]]:
+def _load_schedule_output_result(gwo_script: str, mapper_tt: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Last-resort fallback for legacy scripts that only write schedule_output.txt.
     Parses human-readable rows and maps them to DB IDs via timetable_data.
@@ -495,11 +670,6 @@ def _load_schedule_output_result(gwo_script: str, gwo_config_path: str) -> Optio
     output_path = next((p for p in candidates if os.path.exists(p)), None)
     if not output_path:
         return None
-
-    with open(gwo_config_path, "r", encoding="utf-8") as f:
-        cfg = json.load(f)
-    # GWO input config already contains the resolved entity arrays at top-level.
-    tt = cfg or {}
 
     with open(output_path, "r", encoding="utf-8", errors="replace") as f:
         lines = f.readlines()
@@ -542,7 +712,7 @@ def _load_schedule_output_result(gwo_script: str, gwo_config_path: str) -> Optio
     if not schedule_rows:
         return None
 
-    entries = _map_schedule_rows_to_entries(schedule_rows, tt)
+    entries = _map_schedule_rows_to_entries(schedule_rows, mapper_tt)
     metrics = {
         "roomUtilizationRate": 0.0,
         "softConstraintsScore": 0.0,
@@ -569,7 +739,7 @@ def _load_schedule_output_result(gwo_script: str, gwo_config_path: str) -> Optio
         "iterations_run": 0,
     }
 
-def _load_ui_schedule_result(gwo_script: str, gwo_config_path: str) -> Optional[Dict]:
+def _load_ui_schedule_result(gwo_script: str, mapper_tt: Dict[str, Any]) -> Optional[Dict]:
     """
     Compatibility fallback for GWO scripts that do not emit --output JSON.
     Reads frontend/data/schedule.json (written by send_schedule.py) and converts
@@ -591,18 +761,119 @@ def _load_ui_schedule_result(gwo_script: str, gwo_config_path: str) -> Optional[
 
     with open(ui_schedule_path, "r", encoding="utf-8") as f:
         ui_payload = json.load(f)
-    with open(gwo_config_path, "r", encoding="utf-8") as f:
-        cfg = json.load(f)
 
     schedule_rows = ui_payload.get("schedule", []) or []
     metadata = ui_payload.get("metadata", {}) or {}
-    # GWO input config already contains the resolved entity arrays at top-level.
-    tt = cfg or {}
 
     entries = _map_schedule_rows_to_entries(
         [r for r in schedule_rows if isinstance(r, dict)],
-        tt,
+        mapper_tt,
     )
+
+    def _ui_hard_conflicts(payload: Dict[str, Any], hard_total: int) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+
+        lecturer_conflicts = payload.get("lecturer_conflicts", [])
+        if isinstance(lecturer_conflicts, list):
+            for c in lecturer_conflicts:
+                if not isinstance(c, dict):
+                    continue
+                courses = c.get("courses") if isinstance(c.get("courses"), list) else []
+                detail = "Lecturer double-booked"
+                if courses:
+                    detail = f"Lecturer double-booked across courses: {', '.join([str(x) for x in courses if x is not None])}"
+                out.append({
+                    "conflict_type": "lecturer_conflict",
+                    "severity": "hard",
+                    "course_code": str(courses[0]) if courses else "",
+                    "section_number": "",
+                    "lecturer_name": c.get("lecturer"),
+                    "room_number": None,
+                    "timeslot_label": c.get("timeslot"),
+                    "detail": detail,
+                })
+
+        room_conflicts = payload.get("room_conflicts", [])
+        if isinstance(room_conflicts, list):
+            for c in room_conflicts:
+                if not isinstance(c, dict):
+                    continue
+                out.append({
+                    "conflict_type": "room_conflict",
+                    "severity": "hard",
+                    "course_code": str(c.get("course") or ""),
+                    "section_number": "",
+                    "lecturer_name": None,
+                    "room_number": c.get("room"),
+                    "timeslot_label": c.get("timeslot"),
+                    "detail": "Room double-booked in overlapping timeslots",
+                })
+
+        wrong_slots = payload.get("wrong_slot_type_violations", [])
+        if isinstance(wrong_slots, list):
+            for c in wrong_slots:
+                if not isinstance(c, dict):
+                    continue
+                out.append({
+                    "conflict_type": "wrong_slot_type",
+                    "severity": "hard",
+                    "course_code": str(c.get("lecture") or ""),
+                    "section_number": "",
+                    "lecturer_name": None,
+                    "room_number": None,
+                    "timeslot_label": None,
+                    "detail": (
+                        f"Assigned slot type '{c.get('assigned_type')}' is invalid for "
+                        f"{c.get('delivery_mode')}/{c.get('session_type')}"
+                    ),
+                })
+
+        overloads = payload.get("overload_violations", [])
+        if isinstance(overloads, list):
+            for c in overloads:
+                if not isinstance(c, dict):
+                    continue
+                load = c.get("credit_hour_load", c.get("classes"))
+                limit = c.get("max_workload", c.get("max"))
+                out.append({
+                    "conflict_type": "lecturer_overload",
+                    "severity": "hard",
+                    "course_code": "",
+                    "section_number": "",
+                    "lecturer_name": c.get("lecturer"),
+                    "room_number": None,
+                    "timeslot_label": None,
+                    "detail": f"Lecturer load exceeds max ({load} > {limit})",
+                })
+
+        unit_conflicts = payload.get("unit_conflict_violations", [])
+        if isinstance(unit_conflicts, list):
+            for c in unit_conflicts:
+                if not isinstance(c, dict):
+                    continue
+                out.append({
+                    "conflict_type": "unit_conflict",
+                    "severity": "hard",
+                    "course_code": str(c.get("course_a") or ""),
+                    "section_number": "",
+                    "lecturer_name": None,
+                    "room_number": None,
+                    "timeslot_label": c.get("timeslot_a"),
+                    "detail": f"Unit '{c.get('unit')}' conflict between {c.get('course_a')} and {c.get('course_b')}",
+                })
+
+        if not out and hard_total > 0:
+            out.append({
+                "conflict_type": "hard_conflicts",
+                "severity": "warning",
+                "course_code": "",
+                "section_number": "",
+                "lecturer_name": None,
+                "room_number": None,
+                "timeslot_label": None,
+                "detail": f"Total hard conflicts reported by GWO UI payload: {hard_total}",
+            })
+        return out
 
     # Build minimal metrics payload expected by downstream.
     hard_conflicts = int(metadata.get("conflicts", 0) or 0)
@@ -612,18 +883,7 @@ def _load_ui_schedule_result(gwo_script: str, gwo_config_path: str) -> Optional[
         "fitnessScore": float(metadata.get("best_fitness", 0) or 0),
         "isValid": hard_conflicts == 0,
     }
-    conflicts = [
-        {
-            "conflict_type": "hard_conflicts",
-            "severity": "warning",
-            "course_code": "",
-            "section_number": "",
-            "lecturer_name": None,
-            "room_number": None,
-            "timeslot_label": None,
-            "detail": f"Total hard conflicts reported by GWO UI payload: {hard_conflicts}",
-        }
-    ] if hard_conflicts > 0 else []
+    conflicts = _ui_hard_conflicts(ui_payload, hard_conflicts)
 
     return {
         "schedule_entries": entries,
@@ -889,6 +1149,7 @@ def run_gwo(
     gwo_config_path: str,
     gwo_output_path: str,
     run_id: int,
+    mapper_tt: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict]:
     """
     Spawn GWO-v6.py, forward its progress lines (phases 40–92%), then return
@@ -970,7 +1231,7 @@ def run_gwo(
     if not os.path.exists(gwo_output_path):
         # Compatibility path for current GWO script variants that write only
         # frontend/data/schedule.json via send_schedule.py.
-        fallback_result = _load_ui_schedule_result(gwo_script, gwo_config_path)
+        fallback_result = _load_ui_schedule_result(gwo_script, mapper_tt or {})
         if fallback_result is not None:
             emit(
                 "progress",
@@ -1000,6 +1261,7 @@ def save_result_timetable(
     gwo_result: Dict,
     *,
     scenario_id: Optional[int] = None,
+    mapper_tt: Optional[Dict[str, Any]] = None,
 ) -> int:
     """
     Create a new timetable row and populate it with schedule entries produced
@@ -1015,23 +1277,24 @@ def save_result_timetable(
 
     try:
         with conn.cursor() as cur:
-            # Resolve a "virtual" room for simulated / online sessions.
-            # The DB schema requires a non-null room_id; when the scenario introduces
-            # simulated rooms, we map them to a real fallback room instead of
-            # dropping the session row on save.
+            tt = mapper_tt if isinstance(mapper_tt, dict) else {}
+            tt_rooms = tt.get("rooms", []) if isinstance(tt.get("rooms", []), list) else []
+
+            # Load real available rooms once; used to map simulated/missing room IDs.
             cur.execute(
                 """
-                SELECT room_id
+                SELECT room_id, room_type, capacity
                 FROM room
                 WHERE COALESCE(is_available, TRUE) = TRUE
                 ORDER BY
-                  CASE WHEN room_type = 3 THEN 0 ELSE 1 END,
                   room_id ASC
-                LIMIT 1
                 """,
             )
-            virtual_room_row = cur.fetchone()
-            virtual_room_id = virtual_room_row[0] if virtual_room_row else None
+            real_rooms = cur.fetchall() or []
+            real_room_ids = [int(r[0]) for r in real_rooms if r and r[0] is not None]
+
+            # Keep one "virtual/default" fallback only as last resort.
+            virtual_room_id = real_room_ids[0] if real_room_ids else None
 
             # Resolve a "virtual" slot for unassigned or simulated sessions.
             # The DB schema requires a non-null slot_id.
@@ -1046,6 +1309,149 @@ def save_result_timetable(
             )
             virtual_slot_row = cur.fetchone()
             virtual_slot_id = virtual_slot_row[0] if virtual_slot_row else None
+
+            # Precompute simulated room metadata from sandbox/mapper context.
+            sim_room_meta: Dict[int, Dict[str, Any]] = {}
+            for room in tt_rooms:
+                try:
+                    rid = int(room.get("room_id"))
+                except Exception:
+                    continue
+                if rid <= 0:
+                    sim_room_meta[rid] = {
+                        "room_type": int(room.get("room_type") or 0),
+                        "capacity": int(room.get("capacity") or 0),
+                    }
+
+            # Assign each simulated room to a distinct best-fit real room when possible.
+            # Note: a fixed simulated->real mapping can still induce artificial clashes
+            # when the chosen real room is already used at the same slot by non-sim rows.
+            # We therefore keep this as a preference only; final assignment is slot-aware.
+            simulated_to_real_room: Dict[int, int] = {}
+            used_real_room_ids: set = set()
+
+            def _resolve_simulated_room_id(sim_room_id: int) -> Optional[int]:
+                mapped = simulated_to_real_room.get(sim_room_id)
+                if mapped is not None:
+                    return mapped
+                if not real_rooms:
+                    return None
+
+                meta = sim_room_meta.get(sim_room_id, {})
+                want_type = int(meta.get("room_type") or 0)
+                want_cap = int(meta.get("capacity") or 0)
+
+                def _score(rr: Any) -> tuple:
+                    rid = int(rr[0])
+                    rtype = int(rr[1] or 0)
+                    rcap = int(rr[2] or 0)
+                    type_penalty = 0 if (want_type <= 0 or rtype == want_type) else 1
+                    cap_penalty = 0 if (want_cap <= 0 or rcap >= want_cap) else 1
+                    cap_gap = abs(rcap - want_cap) if want_cap > 0 else 0
+                    reuse_penalty = 1 if rid in used_real_room_ids else 0
+                    return (reuse_penalty, type_penalty, cap_penalty, cap_gap, rid)
+
+                best = sorted(real_rooms, key=_score)[0]
+                best_id = int(best[0])
+                simulated_to_real_room[sim_room_id] = best_id
+                used_real_room_ids.add(best_id)
+                return best_id
+
+            # Track room occupancy as rows are materialized to avoid persisting
+            # avoidable room-slot collisions introduced by ID remapping.
+            #
+            # IMPORTANT:
+            # We must treat *overlapping* slots as collisions, not only equal slot_id.
+            # Legacy/GWO configs can contain multiple slot IDs that overlap in time; using
+            # exact slot-id checks can create artificial hard conflicts after remapping
+            # simulated rooms back onto real DB rooms.
+            cur.execute(
+                """
+                SELECT slot_id, days_mask, start_time, end_time
+                FROM timeslot
+                WHERE is_active = TRUE
+                """
+            )
+            slot_rows = cur.fetchall() or []
+            slot_meta: Dict[int, Dict[str, int]] = {}
+            for row in slot_rows:
+                try:
+                    sid = int(row[0])
+                except Exception:
+                    continue
+                try:
+                    days_mask = int(row[1] or 0)
+                except Exception:
+                    days_mask = 0
+                st = row[2]
+                et = row[3]
+                start_min = (int(st.hour) * 60) + int(st.minute) if st is not None else 0
+                end_min = (int(et.hour) * 60) + int(et.minute) if et is not None else 0
+                if end_min <= start_min:
+                    end_min += 24 * 60
+                slot_meta[sid] = {
+                    "days_mask": days_mask,
+                    "start_min": start_min,
+                    "end_min": end_min,
+                }
+
+            def _slots_overlap(slot_a: int, slot_b: int) -> bool:
+                a = slot_meta.get(int(slot_a))
+                b = slot_meta.get(int(slot_b))
+                if not a or not b:
+                    # Unknown slot metadata: be conservative and treat as overlap.
+                    return True
+                same_day = (a["days_mask"] & b["days_mask"]) != 0
+                if not same_day:
+                    return False
+                return a["start_min"] < b["end_min"] and b["start_min"] < a["end_min"]
+
+            occupied_room_slots: Dict[int, List[int]] = {}
+
+            def _room_candidates_for_entry(
+                *,
+                preferred_room_id: Optional[int],
+                required_room_type: int,
+                required_capacity: int,
+            ) -> List[int]:
+                if not real_rooms:
+                    return []
+
+                def _score(rr: Any) -> tuple:
+                    rid = int(rr[0])
+                    rtype = int(rr[1] or 0)
+                    rcap = int(rr[2] or 0)
+                    preferred_penalty = 0 if (preferred_room_id is not None and rid == preferred_room_id) else 1
+                    type_penalty = 0 if (required_room_type <= 0 or rtype == required_room_type) else 1
+                    cap_penalty = 0 if (required_capacity <= 0 or rcap >= required_capacity) else 1
+                    cap_gap = abs(rcap - required_capacity) if required_capacity > 0 else 0
+                    return (preferred_penalty, type_penalty, cap_penalty, cap_gap, rid)
+
+                return [int(rr[0]) for rr in sorted(real_rooms, key=_score)]
+
+            def _assign_room_without_slot_collision(
+                *,
+                slot_id: int,
+                preferred_room_id: Optional[int],
+                required_room_type: int,
+                required_capacity: int,
+            ) -> Optional[int]:
+                candidates = _room_candidates_for_entry(
+                    preferred_room_id=preferred_room_id,
+                    required_room_type=required_room_type,
+                    required_capacity=required_capacity,
+                )
+                if not candidates:
+                    return None
+
+                # First pass: avoid room+slot-time collision entirely.
+                for rid in candidates:
+                    assigned_slots = occupied_room_slots.get(int(rid), [])
+                    if all(not _slots_overlap(slot_id, existing_slot) for existing_slot in assigned_slots):
+                        return rid
+
+                # Second pass: no collision-free option; keep best candidate.
+                return candidates[0]
 
             # ── 1. Determine next version number ──
             if semester_id is None:
@@ -1086,6 +1492,24 @@ def save_result_timetable(
                     room_id = e.get("room_id")
                     slot_id = e.get("slot_id")
                     course_id = e.get("course_id")
+                    registered_students = int(e.get("registered_students", 0) or 0)
+                    required_room_type = 0
+                    required_capacity = max(0, registered_students)
+
+                    # Prefer course/session room type when available in mapper context.
+                    try:
+                        course_meta = next(
+                            (c for c in (tt.get("courses", []) or []) if int(c.get("course_id")) == int(course_id)),
+                            None,
+                        )
+                        if course_meta is not None:
+                            if bool(course_meta.get("is_lab")):
+                                required_room_type = 2
+                            # Online delivery does not require a physical room type.
+                            if str(course_meta.get("delivery_mode") or "").strip().upper() == "ONLINE":
+                                required_room_type = 0
+                    except Exception:
+                        pass
 
                     # Always skip invalid core FKs.
                     if course_id is None or (course_id is not None and course_id <= 0):
@@ -1103,14 +1527,27 @@ def save_result_timetable(
                     if user_id is not None and user_id < 0:
                         user_id = None
 
-                    # Simulated rooms (negative room_id) or missing (ONLINE) must be mapped to a real DB room.
-                    if room_id is None or (room_id is not None and room_id <= 0):
+                    # Map simulated room IDs to resolved real room IDs.
+                    if room_id is not None and room_id <= 0:
+                        room_id = _resolve_simulated_room_id(int(room_id))
+                    elif room_id is None:
                         room_id = virtual_room_id
+
+                    # Final room assignment is slot-aware to prevent persistence-time
+                    # collisions caused by simulated-room remapping.
+                    room_id = _assign_room_without_slot_collision(
+                        slot_id=int(slot_id),
+                        preferred_room_id=int(room_id) if room_id is not None else None,
+                        required_room_type=required_room_type,
+                        required_capacity=required_capacity,
+                    )
 
                     # If room is still unknown, we cannot persist this row reliably.
                     if room_id is None:
                         skipped_missing_room += 1
                         continue
+
+                    occupied_room_slots.setdefault(int(room_id), []).append(int(slot_id))
 
                     rows.append((
                         user_id,
@@ -1119,7 +1556,7 @@ def save_result_timetable(
                         course_id,
                         result_timetable_id,
                         room_id,
-                        e.get("registered_students", 0),
+                        registered_students,
                         str(e.get("section_number", "1")),
                     ))
 
@@ -1275,32 +1712,11 @@ def main() -> int:
          message="All conditions applied. Building GWO input config...")
 
     # ── Phase 3: Write mutated config for GWO ───────────────────────────────
-    # Build the config structure that GWO-v6.py expects.
-    # Adjust the keys below if your GWO script uses different field names.
-    gwo_input_config = {
-        "run_id": run_id,
-        "scenario_id": scenario_id,
-        "base_timetable_id": base_tt_id,
-        "semester_id": semester_id,
-        "is_summer": config.get("is_summer", False),
-        "lecturers": sandbox.get("lecturers", []),
-        "rooms": sandbox.get("rooms", []),
-        "courses": sandbox.get("courses", []),
-        "timeslots": sandbox.get("timeslots", []),
-        # Seed GWO with the existing entries — unassigned ones have no slot_id/room_id
-        "existing_assignments": sandbox.get("existing_entries", []),
-        "mode": "what_if",
-    }
-
     tmp_dir = tempfile.mkdtemp(prefix=f"whatif_{run_id}_")
-    gwo_config_path = os.path.join(tmp_dir, "gwo_input.json")
     gwo_output_path = os.path.join(tmp_dir, "gwo_output.json")
 
-    with open(gwo_config_path, "w", encoding="utf-8") as f:
-        json.dump(gwo_input_config, f, ensure_ascii=False)
-
     emit("progress", phase="gwo", pct=38,
-         message="GWO input config written. Launching optimizer...")
+         message="Launching optimizer with scenario sandbox config...")
 
     # ── Phase 4: Run GWO ─────────────────────────────────────────────────────
     # Legacy GWO-v6.py reads frontend/data/config.json and ignores --config.
@@ -1310,6 +1726,8 @@ def main() -> int:
     )
     legacy_backup: Optional[str] = None
     legacy_existing_config: Optional[Dict[str, Any]] = None
+    legacy_cfg: Dict[str, Any] = {}
+    mapper_tt: Dict[str, Any] = {}
     try:
         if os.path.exists(legacy_config_path):
             with open(legacy_config_path, "r", encoding="utf-8") as f:
@@ -1319,15 +1737,45 @@ def main() -> int:
             except Exception:
                 legacy_existing_config = None
         os.makedirs(os.path.dirname(legacy_config_path), exist_ok=True)
+        legacy_cfg = _build_legacy_gwo_config(config, sandbox, legacy_existing_config)
+        mapper_tt = _build_mapper_context(
+            config.get("timetable_data", {}) or {},
+            sandbox,
+            legacy_cfg,
+        )
         with open(legacy_config_path, "w", encoding="utf-8") as f:
             json.dump(
-                _build_legacy_gwo_config(config, sandbox, legacy_existing_config),
+                legacy_cfg,
                 f,
                 ensure_ascii=False,
                 indent=2,
             )
 
-        gwo_result = run_gwo(gwo_script, gwo_config_path, gwo_output_path, run_id)
+        seed_lookup_misses = int(legacy_cfg.get("_seed_lookup_misses", 0) or 0)
+        seed_missing_slot_or_room = int(legacy_cfg.get("_seed_missing_slot_or_room", 0) or 0)
+        seed_total = int(legacy_cfg.get("_seed_total_lectures", 0) or 0)
+        if seed_lookup_misses > 0 or seed_missing_slot_or_room > 0:
+            emit(
+                "progress",
+                phase="gwo",
+                pct=39,
+                message=(
+                    "Warm-start seed warnings: "
+                    f"{seed_lookup_misses} section lookup miss(es), "
+                    f"{seed_missing_slot_or_room} invalidated by missing room/slot "
+                    f"(total lectures: {seed_total})."
+                ),
+            )
+
+        # Pass legacy_config_path as the effective config file path. This is the
+        # config GWO-v6.py actually reads today.
+        gwo_result = run_gwo(
+            gwo_script,
+            legacy_config_path,
+            gwo_output_path,
+            run_id,
+            mapper_tt=mapper_tt,
+        )
     finally:
         try:
             if legacy_backup is None:
@@ -1360,22 +1808,26 @@ def main() -> int:
         )
         return 1
 
-    normalized_direct = _normalize_gwo_result_shape(
-        gwo_result,
-        config.get("timetable_data", {}) or {},
-    )
+    if not mapper_tt:
+        mapper_tt = _build_mapper_context(
+            config.get("timetable_data", {}) or {},
+            sandbox,
+            legacy_cfg if isinstance(legacy_cfg, dict) else None,
+        )
+
+    normalized_direct = _normalize_gwo_result_shape(gwo_result, mapper_tt)
     direct_entries = normalized_direct.get("schedule_entries", []) or []
 
     # Legacy GWO variants often emit useful schedule rows via send_schedule.py
     # even when their direct JSON output is missing/partial. Prefer non-empty data.
-    fallback_ui = _load_ui_schedule_result(gwo_script, gwo_config_path)
+    fallback_ui = _load_ui_schedule_result(gwo_script, mapper_tt)
     fallback_entries = (
         (fallback_ui or {}).get("schedule_entries", [])
         if isinstance(fallback_ui, dict)
         else []
     ) or []
 
-    fallback_text = _load_schedule_output_result(gwo_script, gwo_config_path)
+    fallback_text = _load_schedule_output_result(gwo_script, mapper_tt)
     fallback_text_entries = (
         (fallback_text or {}).get("schedule_entries", [])
         if isinstance(fallback_text, dict)
@@ -1399,6 +1851,7 @@ def main() -> int:
             semester_id=None,
             gwo_result=result_for_persistence,
             scenario_id=scenario_id,
+            mapper_tt=mapper_tt,
         )
     except Exception as exc:
         # Last-chance recovery: if the selected payload couldn't be persisted,
@@ -1417,6 +1870,7 @@ def main() -> int:
                     semester_id=None,
                     gwo_result=candidate,
                     scenario_id=scenario_id,
+                    mapper_tt=mapper_tt,
                 )
                 gwo_result = candidate
                 recovered_ok = True

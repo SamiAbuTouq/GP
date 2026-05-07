@@ -835,9 +835,9 @@ function SettingsContent() {
 
           <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
             {/* Left Sidebar Navigation */}
-            <Card className="shrink-0 border shadow-sm lg:sticky lg:top-6 lg:h-fit lg:w-64">
+            <Card className="shrink-0 border shadow-sm lg:sticky lg:top-6 lg:h-fit lg:w-64 py-0 gap-0">
               <CardContent className="p-2">
-                <nav className="flex flex-row lg:flex-col gap-1">
+                <nav className="flex flex-row lg:flex-col gap-2 py-1">
                   {settingsTabs.map((tab) => {
                     const Icon = tab.icon;
                     return (

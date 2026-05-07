@@ -337,6 +337,11 @@ def send_to_ui(
         "invalid_timeslot_types",
         validation_result.get("wrong_slot_type_violations", []),
     )
+    lecturer_conflicts = validation_result.get("lecturer_conflicts", [])
+    room_conflicts = validation_result.get("room_conflicts", [])
+    invalid_room_types = validation_result.get("invalid_room_types", [])
+    capacity_violations = validation_result.get("capacity_violations", [])
+    overload_violations = validation_result.get("overload_violations", [])
     utilization_info     = validation_result.get("utilization_info", [])
     workload_info        = validation_result.get("workload_info", [])
     distribution_info    = validation_result.get("distribution_info", [])
@@ -429,6 +434,12 @@ def send_to_ui(
         "room_types_map":           {r: rt for r, rt in zip(rooms, room_types)},
         "session_counts":           session_counts,
         "wrong_slot_type_violations": wrong_slot_type_violations,
+        # NEW: hard-constraint detail lists for downstream (what-if runner persistence, UI banner, reports)
+        "lecturer_conflicts":       lecturer_conflicts,
+        "room_conflicts":           room_conflicts,
+        "invalid_room_types":       invalid_room_types,
+        "capacity_violations":      capacity_violations,
+        "overload_violations":      overload_violations,
         # NEW: study plan / student constraint data
         "study_plan_units":         study_plan_units,
         "study_plan_summary":       study_plan_summary,

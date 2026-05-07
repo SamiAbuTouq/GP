@@ -247,3 +247,10 @@ input[type="range"].soft-weight-range::-moz-range-thumb {
   background: var(--soft-weight-thumb, #2563eb);
   cursor: pointer;
 }
+
+/* Sonner fullscreen shell uses pointer-events:none so taps pass through to Radix; restore hits on toast UI only */
+[data-surface='toast-hit-layer'] [data-sonner-toaster],
+[data-surface='toast-hit-layer'] [data-sonner-toast],
+[data-surface='toast-hit-layer'] [data-close-button] {
+  pointer-events: auto !important;
+}

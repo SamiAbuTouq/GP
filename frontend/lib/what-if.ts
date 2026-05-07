@@ -307,6 +307,14 @@ export function normalizeRun(row: any): WhatIfRun {
   const resultRaw = row.metricsResult ?? row.resultMetrics ?? row.result_metrics ?? null;
   const baseline = normalizeMetricSnapshot(baselineRaw);
   const result = normalizeMetricSnapshot(resultRaw);
+  const coerceIsoDate = (v: unknown): string => {
+    if (v == null) return "";
+    if (v instanceof Date) return Number.isFinite(v.getTime()) ? v.toISOString() : "";
+    const s = String(v).trim();
+    if (!s || s.toLowerCase() === "null" || s.toLowerCase() === "undefined") return "";
+    const ms = Date.parse(s);
+    return Number.isFinite(ms) ? new Date(ms).toISOString() : "";
+  };
   return {
     id: Number(row.id ?? row.runId ?? row.run_id),
     scenarioName:
@@ -316,7 +324,8 @@ export function normalizeRun(row: any): WhatIfRun {
           ? String(row.scenario_name)
           : undefined,
     status: String(row.status ?? "pending") as RunStatus,
-    startedAt: String(row.startedAt ?? row.started_at ?? new Date().toISOString()),
+    // Keep empty string when missing/invalid so date sorts can safely fall back.
+    startedAt: coerceIsoDate(row.startedAt ?? row.started_at),
     completedAt: row.completedAt ?? row.completed_at ?? null,
     durationSeconds:
       row.durationSeconds ??

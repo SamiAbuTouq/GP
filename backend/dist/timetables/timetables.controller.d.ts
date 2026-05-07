@@ -43,6 +43,7 @@ export declare class TimetablesController {
         days: string[];
         startTime: string;
         endTime: string;
+        isSummerTimeslot: boolean;
         sectionNumber: string;
         isLab: boolean;
         registeredStudents: number;

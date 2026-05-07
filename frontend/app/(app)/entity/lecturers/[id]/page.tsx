@@ -184,8 +184,17 @@ export default function LecturerDetailsPage() {
     [preferences],
   )
 
+  const pageTitle = useMemo(() => {
+    const trimmed = lecturer?.name?.trim()
+    if (trimmed) return `${trimmed} details`
+    return "Lecturer details"
+  }, [lecturer])
+
   return (
-    <EntityLayout title="Lecturer Details">
+    <EntityLayout
+      title={pageTitle}
+      description="Profile, assigned courses, and time preferences."
+    >
       <div className="mb-4">
         <Button variant="outline" size="sm" asChild>
           <Link href="/entity/lecturers">

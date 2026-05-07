@@ -172,7 +172,7 @@ function NavButton({
           `relative mx-auto ${navActivePillRadiusClass} border-0 outline-none ring-0 focus:ring-0 focus-visible:ring-0 focus-visible:outline-none`,
           "transition-colors duration-200 ease-in-out",
           collapsed
-            ? "h-9 w-9 justify-center px-0 py-0"
+            ? "h-9 w-9 justify-center px-0 py-0 my-0.5"
             : cn(
                 "w-full min-w-0 justify-start overflow-hidden",
                 isSubItem ? "gap-2 py-1 pl-8" : "gap-2.5 px-2 py-1.5",
@@ -262,7 +262,7 @@ function SidebarNavigation({
     <ScrollArea className="min-w-0 flex-1 py-2">
       <div
         className={cn(
-          "flex min-w-0 flex-col space-y-0 transition-all duration-200 ease-in-out",
+          "flex min-w-0 flex-col space-y-1 transition-all duration-200 ease-in-out",
           collapsed ? "w-full items-center px-0" : "px-3",
         )}
       >
@@ -328,7 +328,7 @@ function SidebarNavigation({
                   />
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-0 pt-0">
+              <CollapsibleContent className="space-y-1 pt-0">
                 {entityNavItems.map((item) => (
                   <NavButton
                     key={item.href}
@@ -480,7 +480,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         {/* Bottom Navigation */}
         <div
           className={cn(
-            "space-y-0 border-t border-sidebar-border py-2 transition-all duration-200 ease-in-out",
+            "space-y-1 border-t border-sidebar-border py-2 transition-all duration-200 ease-in-out",
             collapsed ? "flex flex-col items-center px-0" : "px-3",
           )}
         >
@@ -662,7 +662,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <ScrollArea className="flex-1 py-2">
-        <div className="space-y-0 px-3">
+        <div className="space-y-1 px-3">
           {!showRestrictedNavigation && mainNavItems.map((item) => (
             <NavButton
               key={item.href}
@@ -704,7 +704,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   />
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-0 pt-0">
+              <CollapsibleContent className="space-y-1 pt-0">
                 {entityNavItems.map((item) => (
                   <NavButton
                     key={item.href}
@@ -762,7 +762,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </ScrollArea>
 
-      <div className="border-t border-sidebar-border space-y-0 px-3 py-2">
+      <div className="border-t border-sidebar-border space-y-1 px-3 py-2">
         {!showRestrictedNavigation && (
           <NavButton
             href={accessRequestsNavItem.href}

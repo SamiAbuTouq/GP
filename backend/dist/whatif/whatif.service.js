@@ -1105,9 +1105,15 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
             section_number: e.section_number,
             entry_id: e.entry_id,
         })));
+        const usedLecturerIds = Array.from(new Set(timetable.section_schedule_entries
+            .map((e) => e.user_id)
+            .filter((id) => typeof id === 'number' && Number.isFinite(id))));
         const [lecturers, rooms, courses, timeslots] = await Promise.all([
             this.prisma.lecturer.findMany({
-                where: { is_available: true },
+                where: {
+                    is_available: true,
+                    ...(usedLecturerIds.length > 0 ? { user_id: { in: usedLecturerIds } } : {}),
+                },
                 include: {
                     user: { select: { user_id: true, first_name: true, last_name: true } },
                     lecturer_can_teach_course: { select: { course_id: true } },

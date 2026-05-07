@@ -24,9 +24,10 @@ const actionTypes = {
 
 let count = 0
 
+/** Stable string ids shared by legacy reducer state and Sonner (avoid collisions with Sonner’s numeric ids). */
 function genId() {
   count = (count + 1) % Number.MAX_SAFE_INTEGER
-  return count.toString()
+  return `client-toast-${count}`
 }
 
 type ActionType = typeof actionTypes
@@ -156,7 +157,9 @@ function toast({ title, description, variant, ...props }: Toast) {
       type: 'UPDATE_TOAST',
       toast: { ...p, id },
     })
-  const dismiss = () => dispatch({ type: 'DISMISS_TOAST', toastId: id })
+
+  /** Keep legacy reducer in sync whenever this Sonner toast is closed (X, swipe, programmatic dismiss). */
+  const dismissLegacyForThisToast = () => dispatch({ type: 'DISMISS_TOAST', toastId: id })
 
   dispatch({
     type: 'ADD_TOAST',
@@ -167,19 +170,26 @@ function toast({ title, description, variant, ...props }: Toast) {
       id,
       open: true,
       onOpenChange: (open) => {
-        if (!open) dismiss()
+        if (!open) dismissLegacyForThisToast()
       },
     },
   })
 
+  const sonnerBase = {
+    id,
+    description: descText,
+    closeButton: true,
+    onDismiss: dismissLegacyForThisToast,
+  } satisfies Parameters<typeof sonnerToast.success>[1]
+
   if (variant === 'destructive') {
     sonnerToast.error(titleText, {
-      description: descText,
+      ...sonnerBase,
       duration: Number.POSITIVE_INFINITY,
     })
   } else {
     sonnerToast.success(titleText, {
-      description: descText,
+      ...sonnerBase,
       duration: 3000,
     })
   }
@@ -187,8 +197,8 @@ function toast({ title, description, variant, ...props }: Toast) {
   return {
     id,
     dismiss: () => {
-      sonnerToast.dismiss()
-      dismiss()
+      sonnerToast.dismiss(id)
+      dismissLegacyForThisToast()
     },
     update,
   }
@@ -210,7 +220,14 @@ function useToast() {
   return {
     ...state,
     toast,
-    dismiss: (toastId?: string) => dispatch({ type: 'DISMISS_TOAST', toastId }),
+    dismiss: (toastId?: string) => {
+      if (toastId === undefined) {
+        sonnerToast.dismiss()
+      } else {
+        sonnerToast.dismiss(toastId)
+      }
+      dispatch({ type: 'DISMISS_TOAST', toastId })
+    },
   }
 }
 

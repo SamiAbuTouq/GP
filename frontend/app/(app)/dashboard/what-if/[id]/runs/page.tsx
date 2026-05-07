@@ -63,14 +63,6 @@ function formatDurationSeconds(value: number | null | undefined): string {
   })} s`;
 }
 
-function formatOptimizerScore(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "-";
-  return value.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
 /** "Summer Semester" → "Summer"; "First Semester" → "First" */
 function shortSemesterLabel(semester: string): string {
   const s = semester.trim();
@@ -321,11 +313,6 @@ export default function WhatIfRunsPage() {
                       <th className="p-2 text-left">Started</th>
                       <th className="p-2 text-left">Duration</th>
                       <th className="p-2 text-left">Status</th>
-                      <th className="p-2 text-center">
-                        Hard conflicts
-                        <span className="block text-[10px] font-normal text-muted-foreground">(result)</span>
-                      </th>
-                      <th className="p-2 text-center">Optimizer Score</th>
                       <th className="p-2 text-left">Actions</th>
                     </tr>
                   </thead>
@@ -340,31 +327,6 @@ export default function WhatIfRunsPage() {
                         <td className="p-2">{formatDateTime(run.startedAt)}</td>
                         <td className="p-2">{formatDurationSeconds(run.durationSeconds)}</td>
                         <td className="p-2">{run.status}</td>
-                        <td className="p-2 text-center">
-                          {(() => {
-                            const primary = resolveHardConflictCount(
-                              run.resultTimetableId,
-                              run.metricsResult?.conflicts ?? null,
-                              hardConflictByTimetableId,
-                            );
-                            const metrics = run.metricsResult?.conflicts ?? null;
-                            const showDebug =
-                              primary != null &&
-                              metrics != null &&
-                              Math.round(primary) !== Math.round(metrics);
-                            return (
-                              <div className="flex flex-col items-center gap-0.5">
-                                <span className="tabular-nums">{primary == null ? "—" : primary}</span>
-                                {showDebug ? (
-                                  <span className="max-w-[8rem] text-center text-[10px] leading-tight text-muted-foreground">
-                                    Run metrics: {metrics}
-                                  </span>
-                                ) : null}
-                              </div>
-                            );
-                          })()}
-                        </td>
-                        <td className="p-2 text-center">{formatOptimizerScore(run.metricsResult?.fitnessScore)}</td>
                         <td className="p-2">
                           <div className="flex flex-wrap gap-1">
                             <Button size="sm" variant="outline" onClick={() => setSelectedRun(run)}>View Results</Button>

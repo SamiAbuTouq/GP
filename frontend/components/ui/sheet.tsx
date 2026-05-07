@@ -6,6 +6,18 @@ import { XIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
+/** Clicks/focus here must not dismiss sheets — Sonner is portaled outside Radix Dialog content (same portal target as overlays). */
+function isToastPortalTarget(target: EventTarget | null) {
+  return (
+    target instanceof Element &&
+    Boolean(
+      target.closest('[data-surface="toast-hit-layer"]') ||
+        target.closest('[data-sonner-toaster]') ||
+        target.closest('[data-sonner-toast]'),
+    )
+  )
+}
+
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
 }
@@ -48,6 +60,9 @@ function SheetContent({
   className,
   children,
   side = 'right',
+  onPointerDownOutside,
+  onFocusOutside,
+  onEscapeKeyDown,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: 'top' | 'right' | 'bottom' | 'left'
@@ -58,6 +73,25 @@ function SheetContent({
       <SheetPrimitive.Content
         aria-describedby={undefined}
         data-slot="sheet-content"
+        onPointerDownOutside={(e) => {
+          if (isToastPortalTarget(e.target)) {
+            e.preventDefault()
+          }
+          onPointerDownOutside?.(e)
+        }}
+        onFocusOutside={(e) => {
+          if (isToastPortalTarget(e.target)) {
+            e.preventDefault()
+          }
+          onFocusOutside?.(e)
+        }}
+        onEscapeKeyDown={(e) => {
+          const ae = document.activeElement
+          if (ae instanceof Element && isToastPortalTarget(ae)) {
+            e.preventDefault()
+          }
+          onEscapeKeyDown?.(e)
+        }}
         className={cn(
           'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-[110] flex min-h-0 flex-col gap-4 overflow-hidden shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
           side === 'right' &&

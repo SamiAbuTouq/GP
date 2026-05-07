@@ -40,6 +40,7 @@ import {
   GripVertical,
   Layers,
   Maximize2,
+  Minus,
   MonitorPlay,
   Eye,
   Copy,
@@ -60,6 +61,314 @@ import { slotTypes } from "@/lib/data";
 const WHAT_IF_DRAFT_KEY = "whatif_builder_draft_v1";
 const TIMESLOT_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"] as const;
 const DELIVERY_MODES = ["FACE_TO_FACE", "ONLINE", "BLENDED"] as const;
+const TIME_RANGE_SEP = "::";
+
+type TimeslotPickRow = {
+  value: string;
+  start: string;
+  end: string;
+  days: string[];
+  slotType: string;
+  isSummer: boolean;
+  label: string;
+};
+
+type CourseCatalogDetail = {
+  sectionsNormal: number;
+  sectionsSummer: number;
+  deliveryMode: string;
+};
+
+function normalizeDeliveryModeKey(mode: string): (typeof DELIVERY_MODES)[number] {
+  const raw = mode.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (raw === "FACE_TO_FACE" || raw === "F2F") return "FACE_TO_FACE";
+  const hit = DELIVERY_MODES.find((d) => d === raw);
+  return hit ?? "FACE_TO_FACE";
+}
+
+function encodeTimeRange(start: string, end: string) {
+  return `${start}${TIME_RANGE_SEP}${end}`;
+}
+
+function decodeTimeRange(key: string): { start: string; end: string } | null {
+  const i = key.indexOf(TIME_RANGE_SEP);
+  if (i < 0) return null;
+  return { start: key.slice(0, i), end: key.slice(i + TIME_RANGE_SEP.length) };
+}
+
+/** Collapse whitespace + lowercase — stable key for filtering session types (API strings vary). */
+function sessionTypeKey(raw: string): string {
+  return String(raw ?? "")
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function displaySessionType(raw: string): string {
+  return String(raw ?? "")
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+/** HH:MM for matching API times that may omit leading zeros. */
+function normalizeClock(t: unknown): string {
+  const raw = String(t ?? "").trim();
+  if (!raw) return "";
+  const parts = raw.split(":");
+  if (parts.length < 2) return raw.replace(/\s/g, "");
+  const h = Number.parseInt(parts[0], 10);
+  const m = Number.parseInt(parts[1], 10);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return raw.replace(/\s/g, "");
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function DeleteTimeslotCascade({
+  rows,
+  value,
+  onChange,
+}: {
+  rows: TimeslotPickRow[];
+  value: string;
+  onChange: (slotId: string) => void;
+}) {
+  const [day, setDay] = useState("");
+  const [rangeKey, setRangeKey] = useState("");
+  const [sessionTypeFilterKey, setSessionTypeFilterKey] = useState("");
+  const [summerPick, setSummerPick] = useState<"" | "summer" | "regular">("");
+
+  // Hydrate filters only when a slot is chosen (saved draft / restoring). Clearing slotId ("") happens
+  // whenever the user adjusts steps 1–4 and must NOT reset those steps or Radix Select can drift from filter logic.
+  useEffect(() => {
+    const slotId = typeof value === "string" ? value.trim() : String(value ?? "").trim();
+    if (!slotId) return;
+    const r = rows.find((x) => x.value === slotId);
+    if (!r) return;
+    const d0 = r.days[0] ?? "";
+    const ns = normalizeClock(r.start);
+    const ne = normalizeClock(r.end);
+    setDay(d0);
+    setRangeKey(ns && ne ? encodeTimeRange(ns, ne) : encodeTimeRange(r.start, r.end));
+    setSessionTypeFilterKey(sessionTypeKey(r.slotType));
+    setSummerPick(r.isSummer ? "summer" : "regular");
+  }, [value, rows]);
+
+  const daysAvailable = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) for (const d of r.days) set.add(d);
+    return TIMESLOT_DAYS.filter((d) => set.has(d));
+  }, [rows]);
+
+  const rowsForDay = useMemo(() => {
+    if (!day) return [];
+    return rows.filter((r) => r.days.includes(day));
+  }, [rows, day]);
+
+  const rangeOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const r of rowsForDay) {
+      const ns = normalizeClock(r.start);
+      const ne = normalizeClock(r.end);
+      const k = ns && ne ? encodeTimeRange(ns, ne) : encodeTimeRange(r.start, r.end);
+      const label = `${r.start} – ${r.end}`.trim();
+      if (!seen.has(k)) seen.set(k, label || `${ns} – ${ne}`);
+    }
+    return [...seen.entries()];
+  }, [rowsForDay]);
+
+  const decodedRange = rangeKey ? decodeTimeRange(rangeKey) : null;
+
+  const rowsForDayTime = useMemo(() => {
+    if (!decodedRange) return [];
+    const ds = normalizeClock(decodedRange.start);
+    const de = normalizeClock(decodedRange.end);
+    return rowsForDay.filter(
+      (r) => normalizeClock(r.start) === ds && normalizeClock(r.end) === de,
+    );
+  }, [rowsForDay, decodedRange]);
+
+  /** Unique session types for this day+time; Select value is normalized key, label is human-readable. */
+  const sessionTypeChoices = useMemo(() => {
+    const byKey = new Map<string, string>();
+    for (const r of rowsForDayTime) {
+      const label = displaySessionType(r.slotType);
+      if (!label) continue;
+      const key = sessionTypeKey(r.slotType);
+      if (!byKey.has(key)) byKey.set(key, label);
+    }
+    return [...byKey.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [rowsForDayTime]);
+
+  const rowsForSessionType = useMemo(() => {
+    if (!sessionTypeFilterKey) return [];
+    return rowsForDayTime.filter((r) => sessionTypeKey(r.slotType) === sessionTypeFilterKey);
+  }, [rowsForDayTime, sessionTypeFilterKey]);
+
+  const needsSummerDisambig =
+    rowsForSessionType.some((r) => r.isSummer) && rowsForSessionType.some((r) => !r.isSummer);
+
+  const finalCandidates = useMemo(() => {
+    if (!sessionTypeFilterKey || rowsForSessionType.length === 0) return [];
+    if (!needsSummerDisambig) return rowsForSessionType;
+    if (summerPick === "summer") return rowsForSessionType.filter((r) => r.isSummer);
+    if (summerPick === "regular") return rowsForSessionType.filter((r) => !r.isSummer);
+    return [];
+  }, [rowsForSessionType, sessionTypeFilterKey, needsSummerDisambig, summerPick]);
+
+  useEffect(() => {
+    if (finalCandidates.length !== 1) return;
+    const pick = finalCandidates[0].value;
+    if (pick !== value) onChange(pick);
+  }, [finalCandidates, value, onChange]);
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label className="font-semibold">1. Day</Label>
+        <Select
+          value={day || "__none__"}
+          onValueChange={(v) => {
+            const next = v === "__none__" ? "" : v;
+            setDay(next);
+            setRangeKey("");
+            setSessionTypeFilterKey("");
+            setSummerPick("");
+            onChange("");
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choose a weekday" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__" disabled>
+              Select day
+            </SelectItem>
+            {daysAvailable.map((d) => (
+              <SelectItem key={d} value={d}>
+                {d}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label className="font-semibold">2. Time</Label>
+        <Select
+          value={rangeKey || "__none__"}
+          onValueChange={(v) => {
+            const next = v === "__none__" ? "" : v;
+            setRangeKey(next);
+            setSessionTypeFilterKey("");
+            setSummerPick("");
+            onChange("");
+          }}
+          disabled={!day}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={day ? "Start – end time" : "Pick a day first"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__" disabled>
+              Select time range
+            </SelectItem>
+            {rangeOptions.map(([k, lab]) => (
+              <SelectItem key={k} value={k}>
+                {lab}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label className="font-semibold">3. Session type</Label>
+        <Select
+          value={sessionTypeFilterKey || "__none__"}
+          onValueChange={(v) => {
+            const next = v === "__none__" ? "" : v;
+            setSessionTypeFilterKey(next);
+            setSummerPick("");
+            onChange("");
+          }}
+          disabled={!rangeKey}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={rangeKey ? "Lecture, lab…" : "Pick a time range first"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__" disabled>
+              Select type
+            </SelectItem>
+            {sessionTypeChoices.map(([key, label]) => (
+              <SelectItem key={key} value={key}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {needsSummerDisambig ? (
+        <div className="space-y-2">
+          <Label className="font-semibold">4. Term</Label>
+          <Select
+            value={summerPick || "__none__"}
+            onValueChange={(v) => {
+              const next = v === "__none__" ? "" : (v as "summer" | "regular");
+              setSummerPick(next);
+              onChange("");
+            }}
+            disabled={!sessionTypeFilterKey}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Regular or summer slot" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__" disabled>
+                Select term
+              </SelectItem>
+              {rowsForSessionType.some((r) => !r.isSummer) ? (
+                <SelectItem value="regular">Regular (Fall/Spring)</SelectItem>
+              ) : null}
+              {rowsForSessionType.some((r) => r.isSummer) ? (
+                <SelectItem value="summer">Summer</SelectItem>
+              ) : null}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+      {finalCandidates.length > 1 ? (
+        <div className="space-y-2">
+          <Label className="font-semibold">{needsSummerDisambig ? "5." : "4."} Choose slot</Label>
+          <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border p-2">
+            {finalCandidates.map((r) => (
+              <label key={r.value} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1.5 hover:bg-muted/60">
+                <input
+                  type="radio"
+                  className="h-4 w-4 accent-primary"
+                  checked={value === r.value}
+                  onChange={() => onChange(r.value)}
+                />
+                <span className="text-sm">
+                  {`${r.start} – ${r.end} | ${r.days.join(" ")} | ${displaySessionType(r.slotType)}`}
+                  {r.isSummer ? " · Summer" : ""}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {sessionTypeFilterKey && finalCandidates.length === 1 ? (
+        <p className="text-xs text-muted-foreground">
+          Selected: {finalCandidates[0].start} – {finalCandidates[0].end} |{" "}
+          {finalCandidates[0].days.join(" ")} | {displaySessionType(finalCandidates[0].slotType)}
+          {finalCandidates[0].isSummer ? " · Summer" : ""}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 const INITIAL_DRAFT_PARAMS: Record<string, unknown> = {
   firstName: "",
@@ -113,6 +422,14 @@ function relativeTime(value?: string | null): string {
   return `${days}d ago`;
 }
 
+function safeDateMs(value: unknown): number {
+  if (value == null) return 0;
+  const s = String(value).trim();
+  if (!s || s.toLowerCase() === "null" || s.toLowerCase() === "undefined") return 0;
+  const ms = Date.parse(s);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 type WhatIfConditionType =
   | "add_lecturer"
   | "delete_lecturer"
@@ -132,7 +449,7 @@ const CONDITION_CATALOG: Array<{
   description: string;
   icon: LucideIcon;
 }> = [
-  { value: "add_lecturer", label: "Add Lecturer", description: "Add a new lecturer to the department", icon: UserPlus },
+  { value: "add_lecturer", label: "Add Lecturer", description: "Add a new lecturer", icon: UserPlus },
   { value: "delete_lecturer", label: "Remove Lecturer", description: "Remove an existing lecturer", icon: UserMinus },
   { value: "amend_lecturer", label: "Amend Lecturer", description: "Update a lecturer's workload or courses", icon: UserRoundCog },
   { value: "add_room", label: "Add Room", description: "Add a new room to the university", icon: SquarePlus },
@@ -293,6 +610,74 @@ function MultiSelectChecklist({
   );
 }
 
+function AmendLecturerCourseList({
+  courseOptions,
+  selectedIds,
+  onChangeIds,
+}: {
+  courseOptions: WhatIfLookupOption[];
+  selectedIds: string[];
+  onChangeIds: (next: string[]) => void;
+}) {
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const addOptions = useMemo(
+    () => courseOptions.filter((o) => !selectedSet.has(o.value)),
+    [courseOptions, selectedSet],
+  );
+
+  const rows = useMemo(() => {
+    const byId = new Map(courseOptions.map((o) => [o.value, o.label]));
+    return selectedIds.map((id) => ({ id, label: byId.get(id) ?? `Course #${id}` }));
+  }, [selectedIds, courseOptions]);
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label className="font-semibold">Courses Can Teach</Label>
+        <div className="max-h-52 space-y-1 overflow-y-auto rounded-md border p-2">
+          {rows.length === 0 ? (
+            <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+              No courses listed yet. Choose a lecturer above or add courses below.
+            </p>
+          ) : (
+            rows.map(({ id, label }) => (
+              <div
+                key={id}
+                className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/25 px-2 py-2"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => onChangeIds(selectedIds.filter((x) => x !== id))}
+                  aria-label={`Remove ${label}`}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label className="font-semibold">Add course</Label>
+        <SearchableSelect
+          value=""
+          onChange={(v) => {
+            if (v && !selectedSet.has(v)) onChangeIds([...selectedIds, v]);
+          }}
+          placeholder={
+            addOptions.length ? "Search and select a course to add…" : "Every catalog course is already listed"
+          }
+          options={addOptions}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function WhatIfScenariosPage() {
   const { toast } = useToast();
   const router = useRouter();
@@ -314,6 +699,10 @@ export default function WhatIfScenariosPage() {
   const [courseOptions, setCourseOptions] = useState<WhatIfLookupOption[]>([]);
   const [timeslotOptions, setTimeslotOptions] = useState<WhatIfLookupOption[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<WhatIfLookupOption[]>([]);
+  const [courseDetailById, setCourseDetailById] = useState<Record<string, CourseCatalogDetail>>({});
+  const [courseIdByCode, setCourseIdByCode] = useState<Record<string, string>>({});
+  const [lecturerTeachableCodesByUserId, setLecturerTeachableCodesByUserId] = useState<Record<string, string[]>>({});
+  const [timeslotStructured, setTimeslotStructured] = useState<TimeslotPickRow[]>([]);
   const [loadingLookups, setLoadingLookups] = useState(false);
   const [draftParams, setDraftParams] = useState<Record<string, unknown>>(() => ({ ...INITIAL_DRAFT_PARAMS }));
   type BuilderStep = "scenario" | "chooseCondition" | "conditionForm";
@@ -419,17 +808,19 @@ export default function WhatIfScenariosPage() {
     ])
       .then(([lecturers, rooms, coursesRes, timeslots, departments]) => {
         const nextDepartments: WhatIfLookupOption[] = firstArray(departments)
-          .map((d: Record<string, unknown>) => {
-            const value = numericString(d.id ?? d.dept_id ?? d.deptId);
+          .map((d: unknown) => {
+            const row = d as Record<string, unknown>;
+            const value = numericString(row.id ?? row.dept_id ?? row.deptId);
             if (!value) return null;
             return {
               value,
-              label: String(d.name ?? d.dept_name ?? d.deptName ?? `Department ${value}`),
+              label: String(row.name ?? row.dept_name ?? row.deptName ?? `Department ${value}`),
             };
           })
           .filter((x): x is WhatIfLookupOption => x !== null);
         setDepartmentOptions(nextDepartments);
 
+        const teachCodesByUser: Record<string, string[]> = {};
         const nextLecturers: WhatIfLookupOption[] = firstArray(lecturers)
           .map((l: any) => {
             const value = numericString(
@@ -442,12 +833,17 @@ export default function WhatIfScenariosPage() {
               l.id,
             );
             if (!value) return null;
+            const rawCourses = (l as { courses?: unknown }).courses;
+            teachCodesByUser[value] = Array.isArray(rawCourses)
+              ? rawCourses.map((c) => String(c).trim()).filter(Boolean)
+              : [];
             return {
               value,
               label: String(l.name ?? l.email ?? l.id ?? "Lecturer"),
             };
           })
           .filter((x): x is WhatIfLookupOption => x !== null);
+        setLecturerTeachableCodesByUserId(teachCodesByUser);
         const nextRooms: WhatIfLookupOption[] = firstArray(rooms)
           .map((r: any) => {
             const value = numericString(
@@ -467,6 +863,8 @@ export default function WhatIfScenariosPage() {
           })
           .filter((x): x is WhatIfLookupOption => x !== null);
         const courses = firstArray(coursesRes.courses ?? []);
+        const codeToId: Record<string, string> = {};
+        const detailById: Record<string, CourseCatalogDetail> = {};
         const nextCourses: WhatIfLookupOption[] = courses
           .map((c: any) => {
             const value = numericString(c.id ?? c.course_id ?? c.courseId);
@@ -474,12 +872,22 @@ export default function WhatIfScenariosPage() {
             const code = String(c.code ?? c.course_code ?? c.courseCode ?? "").trim();
             const name = String(c.name ?? c.course_name ?? c.courseName ?? "").trim();
             const label = [code, name].filter(Boolean).join(" - ");
+            if (code) codeToId[code.toUpperCase()] = value;
+            const sn = Number(c.sectionsNormal ?? c.sections_normal ?? 1);
+            const ss = Number(c.sectionsSummer ?? c.sections_summer ?? 0);
+            detailById[value] = {
+              sectionsNormal: Number.isFinite(sn) ? sn : 1,
+              sectionsSummer: Number.isFinite(ss) ? ss : 0,
+              deliveryMode: String(c.deliveryMode ?? c.delivery_mode ?? "FACE_TO_FACE"),
+            };
             return {
               value,
               label: label || `Course ${value}`,
             };
           })
           .filter((x): x is WhatIfLookupOption => x !== null);
+        setCourseIdByCode(codeToId);
+        setCourseDetailById(detailById);
         const nextSlots: WhatIfLookupOption[] = firstArray(timeslots)
           .map((t: any) => {
             const value = numericString(t.id ?? t.slotId ?? t.slot_id);
@@ -491,14 +899,44 @@ export default function WhatIfScenariosPage() {
               : Array.isArray(t.dayNames)
                 ? t.dayNames
                 : [];
-            const days = daysRaw.map((d: unknown) => String(d)).join(" ");
-            const slotType = String(t.slotType ?? t.slot_type ?? t.type ?? "");
+            const dayList = daysRaw.map((d: unknown) => String(d));
+            const days = dayList.join(" ");
+            const slotType = displaySessionType(String(t.slotType ?? t.slot_type ?? t.type ?? ""));
             return {
               value,
               label: `${start} - ${end} | ${days} | ${slotType}`,
             };
           })
           .filter((x): x is WhatIfLookupOption => x !== null);
+        const structuredSlots: TimeslotPickRow[] = firstArray(timeslots)
+          .map((t: any) => {
+            const value = numericString(t.id ?? t.slotId ?? t.slot_id);
+            if (!value) return null;
+            const rawStart = String(t.start ?? t.startTime ?? t.start_time ?? "").trim();
+            const rawEnd = String(t.end ?? t.endTime ?? t.end_time ?? "").trim();
+            const start = normalizeClock(rawStart) || rawStart;
+            const end = normalizeClock(rawEnd) || rawEnd;
+            const daysRaw = Array.isArray(t.days)
+              ? t.days
+              : Array.isArray(t.dayNames)
+                ? t.dayNames
+                : [];
+            const dayList = daysRaw.map((d: unknown) => String(d));
+            const slotType = displaySessionType(String(t.slotType ?? t.slot_type ?? t.type ?? ""));
+            const isSummer = Boolean(t.isSummer ?? t.is_summer);
+            const days = dayList.join(" ");
+            return {
+              value,
+              start,
+              end,
+              days: dayList,
+              slotType,
+              isSummer,
+              label: `${start} – ${end} | ${days} | ${slotType}${isSummer ? " · Summer" : ""}`,
+            };
+          })
+          .filter((x): x is TimeslotPickRow => x !== null);
+        setTimeslotStructured(structuredSlots);
         setLecturerOptions(nextLecturers);
         setRoomOptions(nextRooms);
         setCourseOptions(nextCourses);
@@ -585,6 +1023,13 @@ export default function WhatIfScenariosPage() {
   function getParamStringArray(key: string): string[] {
     const v = draftParams[key];
     return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  }
+
+  function defaultDepartmentIdForPayload(): number {
+    const raw = departmentOptions[0]?.value;
+    if (!raw) return 0;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
   function loadConditionIntoDraft(c: Condition) {
@@ -691,13 +1136,18 @@ export default function WhatIfScenariosPage() {
       case "add_lecturer": {
         const firstName = getParamString("firstName").trim();
         const lastName = getParamString("lastName").trim();
-        const deptId = getParamNumber("deptId", 0);
+        let deptId = getParamNumber("deptId", 0);
+        if (deptId < 1) deptId = defaultDepartmentIdForPayload();
         if (!firstName || !lastName) {
           toast({ title: "Add lecturer", description: "Enter first and last name.", variant: "destructive" });
           return null;
         }
         if (deptId < 1) {
-          toast({ title: "Add lecturer", description: "Select a department.", variant: "destructive" });
+          toast({
+            title: "Add lecturer",
+            description: "Department data is still loading. Wait a moment and try again.",
+            variant: "destructive",
+          });
           return null;
         }
         parameters = {
@@ -756,22 +1206,25 @@ export default function WhatIfScenariosPage() {
           newCapacity: getParamNumber("newCapacity", 30),
         };
         break;
-      case "add_course":
+      case "add_course": {
         if (!getParamString("courseCode").trim() || !getParamString("courseName").trim()) {
           toast({ title: "Add course", description: "Enter course code and name.", variant: "destructive" });
           return null;
         }
-        {
-          const courseDeptId = getParamNumber("deptId", 0);
-          if (courseDeptId < 1) {
-            toast({ title: "Add course", description: "Select a department.", variant: "destructive" });
-            return null;
-          }
+        let courseDeptId = getParamNumber("deptId", 0);
+        if (courseDeptId < 1) courseDeptId = defaultDepartmentIdForPayload();
+        if (courseDeptId < 1) {
+          toast({
+            title: "Add course",
+            description: "Department data is still loading. Wait a moment and try again.",
+            variant: "destructive",
+          });
+          return null;
         }
         parameters = {
           courseCode: getParamString("courseCode").trim(),
           courseName: getParamString("courseName").trim(),
-          deptId: getParamNumber("deptId", 0),
+          deptId: courseDeptId,
           academicLevel: academicLevelFromCourseCode(getParamString("courseCode")),
           isLab: Boolean(p.isLab),
           creditHours: getParamNumber("creditHours", 3),
@@ -781,6 +1234,7 @@ export default function WhatIfScenariosPage() {
           assignableLecturerIds: getParamStringArray("assignableLecturerIds").map(Number).filter((n) => n > 0),
         };
         break;
+      }
       case "change_section_count":
         if (!getParamString("courseId") || getParamNumber("courseId", 0) < 1) {
           toast({ title: "Section count", description: "Select a course.", variant: "destructive" });
@@ -995,9 +1449,10 @@ export default function WhatIfScenariosPage() {
     () => roomOptions.filter((option) => !deletedRoomIds.has(option.value)),
     [roomOptions, deletedRoomIds],
   );
-  const selectableDeleteTimeslotOptions = useMemo(
-    () => timeslotOptions.filter((option) => !deletedTimeslotIds.has(option.value)),
-    [timeslotOptions, deletedTimeslotIds],
+
+  const deleteTimeslotPickerRows = useMemo(
+    () => timeslotStructured.filter((r) => !deletedTimeslotIds.has(r.value)),
+    [timeslotStructured, deletedTimeslotIds],
   );
 
   const visibleScenarios = useMemo(() => {
@@ -1008,12 +1463,9 @@ export default function WhatIfScenariosPage() {
     });
     rows = [...rows].sort((a, b) => {
       if (sortBy === "name") return a.name.localeCompare(b.name);
-
-      const aStartedAt = a.latestRun?.startedAt ? new Date(a.latestRun.startedAt).getTime() : 0;
-      const bStartedAt = b.latestRun?.startedAt ? new Date(b.latestRun.startedAt).getTime() : 0;
-      if (aStartedAt !== bStartedAt) return bStartedAt - aStartedAt;
-
-      // When scenarios have no runs (or same run timestamp), use newest scenario first.
+      // "Latest" means newest created scenario (highest scenario id).
+      // We intentionally do NOT sort by latest run time here, because users expect
+      // a newly created scenario (even never-run) to appear at the top.
       return b.id - a.id;
     });
     return rows;
@@ -1333,19 +1785,32 @@ export default function WhatIfScenariosPage() {
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   {CONDITION_CATALOG.map((item) => {
                     const Icon = item.icon;
+                    const comingSoon = item.value === "adjust_room_capacity";
                     return (
                       <button
                         key={item.value}
                         type="button"
+                        disabled={comingSoon}
                         onClick={() => {
+                          if (comingSoon) return;
                           setConditionType(item.value);
                           setDraftParams({ ...INITIAL_DRAFT_PARAMS });
                           setConditionFormSource("picker");
                           setEditingConditionIndex(null);
                           setBuilderStep("conditionForm");
                         }}
-                        className="flex flex-col items-center gap-2 rounded-xl border bg-card p-4 text-center shadow-sm transition-colors hover:border-sky-300/60 hover:bg-sky-50/50 dark:hover:border-sky-700 dark:hover:bg-sky-950/30"
+                        className={cn(
+                          "relative flex flex-col items-center gap-2 rounded-xl border bg-card p-4 text-center shadow-sm transition-colors",
+                          comingSoon
+                            ? "cursor-not-allowed opacity-60"
+                            : "hover:border-sky-300/60 hover:bg-sky-50/50 dark:hover:border-sky-700 dark:hover:bg-sky-950/30",
+                        )}
                       >
+                        {comingSoon ? (
+                          <Badge variant="secondary" className="absolute right-2 top-2 text-[10px] font-medium">
+                            Coming soon
+                          </Badge>
+                        ) : null}
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400">
                           <Icon className="h-6 w-6" />
                         </div>
@@ -1397,39 +1862,53 @@ export default function WhatIfScenariosPage() {
                 })()}
                 {loadingLookups ? <p className="mb-4 text-xs text-muted-foreground">Loading searchable data…</p> : null}
 
-              {conditionType === "delete_lecturer" || conditionType === "amend_lecturer" ? (
+              {conditionType === "delete_lecturer" ? (
                   <div className="mb-4 space-y-2">
                     <Label className="font-semibold">Lecturer</Label>
-                  <SearchableSelect
-                    value={getParamString("lecturerUserId")}
-                    onChange={(v) => setParam("lecturerUserId", v)}
-                    placeholder="Select lecturer"
-                    options={conditionType === "delete_lecturer" ? selectableDeleteLecturerOptions : selectableAmendLecturerOptions}
-                  />
-                </div>
+                    <SearchableSelect
+                      value={getParamString("lecturerUserId")}
+                      onChange={(v) => setParam("lecturerUserId", v)}
+                      placeholder="Select lecturer"
+                      options={selectableDeleteLecturerOptions}
+                    />
+                  </div>
               ) : null}
 
                 {conditionType === "amend_lecturer" ? (
                   <div className="mb-4 space-y-4">
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
+                      <div className="space-y-2">
+                        <Label className="font-semibold">Lecturer</Label>
+                        <SearchableSelect
+                          value={getParamString("lecturerUserId")}
+                          onChange={(v) => {
+                            setParam("lecturerUserId", v);
+                            const codes = lecturerTeachableCodesByUserId[v] ?? [];
+                            const ids = codes
+                              .map((code) => courseIdByCode[code.toUpperCase()] ?? courseIdByCode[code])
+                              .filter((x): x is string => Boolean(x));
+                            setParam("teachableCourseIds", ids);
+                          }}
+                          placeholder="Select lecturer"
+                          options={selectableAmendLecturerOptions}
+                        />
+                      </div>
+                      <div className="space-y-2">
                         <Label className="font-semibold">Max Workload</Label>
-                        <Input className="mt-1.5" type="number" min={1} max={30} value={getParamNumber("maxWorkload", 15)} onChange={(e) => setParam("maxWorkload", Number(e.target.value))} />
+                        <Input type="number" min={1} max={30} value={getParamNumber("maxWorkload", 15)} onChange={(e) => setParam("maxWorkload", Number(e.target.value))} />
                       </div>
                     </div>
-                    <MultiSelectChecklist
-                      title="Teachable Courses"
-                      options={courseOptions}
-                      values={getParamStringArray("teachableCourseIds")}
-                      onChange={(next) => setParam("teachableCourseIds", next)}
-                      placeholder="Search courses by code/name..."
+                    <AmendLecturerCourseList
+                      courseOptions={courseOptions}
+                      selectedIds={getParamStringArray("teachableCourseIds")}
+                      onChangeIds={(next) => setParam("teachableCourseIds", next)}
                     />
                   </div>
                 ) : null}
 
               {conditionType === "add_lecturer" ? (
                   <div className="mb-4 space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                         <Label className="font-semibold">First Name</Label>
                         <Input className="mt-1.5" value={getParamString("firstName")} onChange={(e) => setParam("firstName", e.target.value)} />
@@ -1438,34 +1917,13 @@ export default function WhatIfScenariosPage() {
                         <Label className="font-semibold">Last Name</Label>
                         <Input className="mt-1.5" value={getParamString("lastName")} onChange={(e) => setParam("lastName", e.target.value)} />
                       </div>
-                      <div>
-                        <Label className="font-semibold">Department</Label>
-                        <Select
-                          value={getParamString("deptId") || "__none__"}
-                          onValueChange={(v) => setParam("deptId", v === "__none__" ? "" : v)}
-                        >
-                          <SelectTrigger className="mt-1.5">
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__" disabled>
-                              {departmentOptions.length ? "Select department" : "Loading departments…"}
-                            </SelectItem>
-                            {departmentOptions.map((d) => (
-                              <SelectItem key={d.value} value={d.value}>
-                                {d.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
+                      <div className="sm:col-span-2">
                         <Label className="font-semibold">Max Workload</Label>
                         <Input className="mt-1.5" type="number" min={1} max={30} value={getParamNumber("maxWorkload", 15)} onChange={(e) => setParam("maxWorkload", Number(e.target.value))} />
                       </div>
                     </div>
                     <MultiSelectChecklist
-                      title="Teachable Courses"
+                      title="Courses Can Teach"
                       options={courseOptions}
                       values={getParamStringArray("teachableCourseIds")}
                       onChange={(next) => setParam("teachableCourseIds", next)}
@@ -1474,14 +1932,26 @@ export default function WhatIfScenariosPage() {
                 </div>
               ) : null}
 
-              {conditionType === "delete_room" || conditionType === "adjust_room_capacity" ? (
+              {conditionType === "delete_room" ? (
                   <div className="mb-4 space-y-2">
                     <Label className="font-semibold">Room</Label>
                   <SearchableSelect
                     value={getParamString("roomId")}
                     onChange={(v) => setParam("roomId", v)}
                     placeholder="Select room"
-                    options={conditionType === "delete_room" ? selectableDeleteRoomOptions : selectableAdjustRoomOptions}
+                    options={selectableDeleteRoomOptions}
+                  />
+                </div>
+              ) : null}
+
+              {conditionType === "adjust_room_capacity" && editingConditionIndex !== null ? (
+                  <div className="mb-4 space-y-2">
+                    <Label className="font-semibold">Room</Label>
+                  <SearchableSelect
+                    value={getParamString("roomId")}
+                    onChange={(v) => setParam("roomId", v)}
+                    placeholder="Select room"
+                    options={selectableAdjustRoomOptions}
                   />
                 </div>
               ) : null}
@@ -1514,17 +1984,49 @@ export default function WhatIfScenariosPage() {
                 </div>
               ) : null}
 
-              {conditionType === "adjust_room_capacity" ? (
+              {conditionType === "adjust_room_capacity" && editingConditionIndex !== null ? (
                   <div className="mb-4">
                     <Label className="font-semibold">New Capacity</Label>
                     <Input className="mt-1.5" type="number" min={1} value={getParamNumber("newCapacity", 30)} onChange={(e) => setParam("newCapacity", Number(e.target.value))} />
                   </div>
               ) : null}
 
-              {conditionType === "change_section_count" || conditionType === "change_delivery_mode" ? (
+              {conditionType === "change_section_count" ? (
                   <div className="mb-4 space-y-2">
                     <Label className="font-semibold">Course</Label>
-                  <SearchableSelect value={getParamString("courseId")} onChange={(v) => setParam("courseId", v)} placeholder="Select course" options={courseOptions} />
+                  <SearchableSelect
+                    value={getParamString("courseId")}
+                    onChange={(v) => {
+                      setParam("courseId", v);
+                      const d = courseDetailById[v];
+                      if (d) {
+                        setParam("newSectionsNormal", d.sectionsNormal);
+                        setParam("newSectionsSummer", d.sectionsSummer);
+                      }
+                    }}
+                    placeholder="Select course"
+                    options={courseOptions}
+                  />
+                </div>
+              ) : null}
+
+              {conditionType === "change_delivery_mode" ? (
+                  <div className="mb-4 space-y-2">
+                    <Label className="font-semibold">Course</Label>
+                  <SearchableSelect
+                    value={getParamString("courseId")}
+                    onChange={(v) => {
+                      setParam("courseId", v);
+                      const d = courseDetailById[v];
+                      if (d) {
+                        const cur = normalizeDeliveryModeKey(d.deliveryMode);
+                        const alt = DELIVERY_MODES.find((m) => m !== cur) ?? DELIVERY_MODES[0];
+                        setParam("newDeliveryMode", alt);
+                      }
+                    }}
+                    placeholder="Select course"
+                    options={courseOptions}
+                  />
                 </div>
               ) : null}
 
@@ -1549,11 +2051,20 @@ export default function WhatIfScenariosPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {DELIVERY_MODES.map((mode) => (
-                          <SelectItem key={mode} value={mode}>
-                            {deliveryModeLabel(mode)}
-                          </SelectItem>
-                        ))}
+                        {DELIVERY_MODES.map((mode) => {
+                          const cid = getParamString("courseId");
+                          const cur =
+                            cid && courseDetailById[cid]
+                              ? normalizeDeliveryModeKey(courseDetailById[cid].deliveryMode)
+                              : null;
+                          const disabled = cur != null && mode === cur;
+                          return (
+                            <SelectItem key={mode} value={mode} disabled={disabled}>
+                              {deliveryModeLabel(mode)}
+                              {disabled ? " (current)" : ""}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1568,27 +2079,6 @@ export default function WhatIfScenariosPage() {
                     <div>
                       <Label className="font-semibold">Course Name</Label>
                       <Input className="mt-1.5" value={getParamString("courseName")} onChange={(e) => setParam("courseName", e.target.value)} />
-                    </div>
-                    <div>
-                      <Label className="font-semibold">Department</Label>
-                      <Select
-                        value={getParamString("deptId") || "__none__"}
-                        onValueChange={(v) => setParam("deptId", v === "__none__" ? "" : v)}
-                      >
-                        <SelectTrigger className="mt-1.5">
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__" disabled>
-                            {departmentOptions.length ? "Select department" : "Loading departments…"}
-                          </SelectItem>
-                          {departmentOptions.map((d) => (
-                            <SelectItem key={d.value} value={d.value}>
-                              {d.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                     </div>
                     <div>
                       <Label className="font-semibold">Academic Level (Auto)</Label>
@@ -1695,13 +2185,17 @@ export default function WhatIfScenariosPage() {
               ) : null}
 
               {conditionType === "delete_timeslot" ? (
-                  <div className="mb-4 space-y-2">
-                    <Label className="font-semibold">Timeslot</Label>
-                  <SearchableSelect
+                  <div className="mb-4 space-y-3">
+                    <div>
+                      <Label className="font-semibold">Timeslot</Label>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Narrow down by day, time, and session type, then confirm the slot to remove.
+                      </p>
+                    </div>
+                  <DeleteTimeslotCascade
+                    rows={deleteTimeslotPickerRows}
                     value={getParamString("slotId")}
-                    onChange={(v) => setParam("slotId", v)}
-                    placeholder="Select timeslot"
-                    options={selectableDeleteTimeslotOptions}
+                    onChange={(id) => setParam("slotId", id)}
                   />
                 </div>
               ) : null}

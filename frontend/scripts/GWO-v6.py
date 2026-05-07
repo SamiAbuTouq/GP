@@ -268,6 +268,7 @@ for _idx, _ts in enumerate(TIMESLOTS_DATA):
 LECTURERS            = CONFIG["lecturers"]
 LECTURER_PREFERENCES = CONFIG["lecturer_preferences"]
 LECTURES             = CONFIG["lectures"]
+SEED_ASSIGNMENTS     = CONFIG.get("seed_assignments", [])
 
 # BUG 2 FIX: per-timeslot lecturer availability (constraint 4).
 # Key = lecturer name, value = list of allowed timeslot IDs (e.g. "slot_3",
@@ -887,9 +888,53 @@ def random_init_wolf_vector() -> List[float]:
     return wolf
 
 
+def _seeded_init_wolf_vector() -> Optional[List[float]]:
+    """
+    Build a warm-start wolf from base timetable assignments when provided.
+    Missing/invalid entries are left random but then repaired.
+    """
+    if not isinstance(SEED_ASSIGNMENTS, list) or len(SEED_ASSIGNMENTS) != len(LECTURES):
+        return None
+    wolf = random_init_wolf_vector()
+    for i, seed in enumerate(SEED_ASSIGNMENTS):
+        if not isinstance(seed, list) or len(seed) != 3:
+            continue
+        try:
+            r_idx = int(seed[0])
+            t_idx = int(seed[1])
+            l_idx = int(seed[2])
+        except Exception:
+            continue
+
+        allowed_ts = LECTURE_ALLOWED_TS[i]
+        allowed_r = LECTURE_ALLOWED_ROOMS[i]
+        allowed_l = LECTURES[i]["allowed_lecturers"]
+        requires_room = LECTURE_NEEDS_ROOM[i]
+
+        if l_idx in allowed_l:
+            wolf[i * 3 + 2] = l_idx
+        if t_idx in allowed_ts:
+            wolf[i * 3 + 1] = t_idx
+        if requires_room and r_idx in allowed_r:
+            wolf[i * 3] = r_idx
+        if not requires_room:
+            wolf[i * 3] = 0
+    return wolf
+
+
 def init_population() -> np.ndarray:
     population = []
-    for k in range(NUM_WOLVES):
+    seeded = _seeded_init_wolf_vector()
+    if seeded is not None:
+        population.append(seeded)
+        # Keep most of the population close to the seeded baseline so what-if
+        # scenarios preserve base timetable quality and only adapt changed parts.
+        warm_count = max(1, int(NUM_WOLVES * 0.8))
+        for _ in range(1, min(NUM_WOLVES, warm_count)):
+            population.append(mutate(np.array(seeded, dtype=float), mutation_rate=0.03).tolist())
+
+    while len(population) < NUM_WOLVES:
+        k = len(population)
         if k < max(1, NUM_WOLVES // 3):
             population.append(greedy_init_wolf())
         else:

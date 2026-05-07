@@ -50,6 +50,7 @@ export declare class TimetablesService {
         }[];
     }>;
     ensureHardConflictsAcknowledged(timetableId: number, acknowledgedHardConflicts: boolean | undefined): Promise<void>;
+    private resolveAllowedPublishSemesterTypes;
     publishDraftTimetable(timetableId: number, params: {
         academicYear?: string;
         semesterType?: number;
@@ -102,6 +103,7 @@ export declare class TimetablesService {
         days: string[];
         startTime: string;
         endTime: string;
+        isSummerTimeslot: boolean;
         sectionNumber: string;
         isLab: boolean;
         registeredStudents: number;

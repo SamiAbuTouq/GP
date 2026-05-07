@@ -161,6 +161,7 @@ type TimetableEntryDto = {
   days: string[]
   startTime: string
   endTime: string
+  isSummerTimeslot?: boolean
   sectionNumber: string
   isLab: boolean
   registeredStudents: number
@@ -1101,13 +1102,56 @@ export function ScheduleViewerPage({
 
   const isSelectedTimetableDraft = timetable?.timetableKind === "draft"
   const isSelectedTimetableScenarioDraft = timetable?.draftOrigin === "scenario"
+  const hasHardConstraintViolations = timetable?.metrics?.isValid === false
+  const publishSemesterRule = useMemo(() => {
+    if (!timetable || timetable.timetableKind !== "draft") return null
+    const hasSummer = allEntries.some((entry) => entry.isSummerTimeslot === true)
+    const hasRegular = allEntries.some((entry) => entry.isSummerTimeslot === false)
+
+    if (hasSummer && !hasRegular) {
+      return {
+        allowedSemesterTypes: [3] as number[],
+        reason:
+          "This timetable was generated from a summer-semester base, so it can only be published to a summer semester.",
+      }
+    }
+    if (hasRegular && !hasSummer) {
+      return {
+        allowedSemesterTypes: [1, 2] as number[],
+        reason:
+          "This timetable was generated from a first/second-semester base, so it can only be published to First or Second Semester.",
+      }
+    }
+    if (hasSummer && hasRegular) {
+      return {
+        allowedSemesterTypes: [] as number[],
+        reason:
+          "This timetable mixes summer and non-summer timeslots, so publishing is blocked until the draft is regenerated from a single base semester type.",
+      }
+    }
+    return {
+      allowedSemesterTypes: [] as number[],
+      reason:
+        "This draft has no scheduled entries yet, so the allowed publish semester type cannot be determined.",
+    }
+  }, [timetable, allEntries])
+  const allowedPublishSemesterTypes = publishSemesterRule?.allowedSemesterTypes ?? []
   const canPublishSelectedDraft =
     Boolean(timetable) &&
     isSelectedTimetableDraft &&
     !isSelectedTimetableScenarioDraft &&
+    !hasHardConstraintViolations &&
     isAdmin &&
     !loadingTimetables &&
     !loadingEntries
+
+  useEffect(() => {
+    if (!publishDialogOpen) return
+    if (allowedPublishSemesterTypes.length === 0) return
+    if (!allowedPublishSemesterTypes.includes(publishedSemesterType)) {
+      setPublishedSemesterType(allowedPublishSemesterTypes[0]!)
+    }
+  }, [publishDialogOpen, allowedPublishSemesterTypes, publishedSemesterType])
 
   const scheduleTitle = useMemo(() => {
     if (!timetable) return "Schedule Viewer"
@@ -1426,6 +1470,17 @@ export function ScheduleViewerPage({
   async function publishCurrentDraft() {
     if (!timetableId || !timetable) return
     if (timetable.timetableKind !== "draft" || timetable.draftOrigin === "scenario") return
+    if (
+      allowedPublishSemesterTypes.length > 0 &&
+      !allowedPublishSemesterTypes.includes(publishedSemesterType)
+    ) {
+      toast({
+        title: "Invalid semester type",
+        description: publishSemesterRule?.reason ?? "Selected semester type is not allowed for this timetable.",
+        variant: "destructive",
+      })
+      return
+    }
     const needConflictAck = publishConflictSummary?.requiresConflictAcknowledgment === true
     if (needConflictAck && !publishConflictAcknowledged) {
       toast({
@@ -1483,10 +1538,12 @@ export function ScheduleViewerPage({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {canPublishSelectedDraft ? (
+              {isAdmin ? (
                 <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="default">Publish</Button>
+                    <Button variant="default" disabled={!canPublishSelectedDraft}>
+                      Publish
+                    </Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
@@ -1496,6 +1553,11 @@ export function ScheduleViewerPage({
                         results cannot be published (run scenarios from an optimizer draft or published timetable only).
                       </DialogDescription>
                     </DialogHeader>
+                    {hasHardConstraintViolations ? (
+                      <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+                        This timetable has hard constraint violations. Publishing is disabled until those violations are resolved.
+                      </p>
+                    ) : null}
                     <div className="grid gap-3 py-1">
                       <div className="space-y-1">
                         <Label className="text-xs font-medium text-muted-foreground">Academic year</Label>
@@ -1522,13 +1584,36 @@ export function ScheduleViewerPage({
                             <SelectValue placeholder="Select semester" />
                           </SelectTrigger>
                           <SelectContent>
-                            {PUBLISHED_SEMESTER_TYPES.map((opt) => (
-                              <SelectItem key={opt.value} value={String(opt.value)}>
+                            {PUBLISHED_SEMESTER_TYPES.map((opt) => {
+                              const isAllowed =
+                                allowedPublishSemesterTypes.length === 0
+                                  ? false
+                                  : allowedPublishSemesterTypes.includes(opt.value)
+                              return (
+                                <SelectItem
+                                  key={opt.value}
+                                  value={String(opt.value)}
+                                  disabled={!isAllowed}
+                                >
                                 {opt.label}
-                              </SelectItem>
-                            ))}
+                                  {!isAllowed ? " (Not allowed for this draft base)" : ""}
+                                </SelectItem>
+                              )
+                            })}
                           </SelectContent>
                         </Select>
+                        {publishSemesterRule ? (
+                          <p
+                            className={cn(
+                              "text-xs",
+                              allowedPublishSemesterTypes.length > 0
+                                ? "text-muted-foreground"
+                                : "text-amber-700 dark:text-amber-300",
+                            )}
+                          >
+                            {publishSemesterRule.reason}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                     <HardConflictsAcknowledgmentFields
@@ -1547,6 +1632,8 @@ export function ScheduleViewerPage({
                         disabled={
                           publishSubmitting ||
                           !publishedYear ||
+                          allowedPublishSemesterTypes.length === 0 ||
+                          !allowedPublishSemesterTypes.includes(publishedSemesterType) ||
                           publishConflictLoading ||
                           (publishConflictSummary?.requiresConflictAcknowledgment === true &&
                             !publishConflictAcknowledged)

@@ -357,6 +357,13 @@ export async function POST(req: NextRequest) {
       room_types_map:        body.room_types_map        ?? {},
       session_counts:        body.session_counts        ?? undefined,
       wrong_slot_type_violations: body.wrong_slot_type_violations ?? [],
+      // Hard-constraint detail lists (used by what-if runner & UI conflict views)
+      lecturer_conflicts:    body.lecturer_conflicts    ?? [],
+      room_conflicts:        body.room_conflicts        ?? [],
+      invalid_room_types:    body.invalid_room_types    ?? [],
+      capacity_violations:   body.capacity_violations   ?? [],
+      overload_violations:   body.overload_violations   ?? [],
+      invalid_timeslot_types: body.invalid_timeslot_types ?? [],
       // NEW: study plan / student constraint data
       study_plan_units:         body.study_plan_units         ?? {},
       study_plan_summary:       studyPlanSummaryIn.length ? studyPlanSummaryIn : body.study_plan_summary ?? [],

@@ -1238,16 +1238,16 @@ export function TeachingLoadPanel() {
         {/* Sticky header + scrollable body */}
         <div className="max-h-[32rem] overflow-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-muted/40 shadow-[0_1px_0_0_#e2e8f0]">
+            <thead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_#e2e8f0]">
               <tr className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-2.5 text-left">Lecturer</th>
-                <th className="px-4 py-2.5 text-left">Workload</th>
-                <th className="px-4 py-2.5 text-left">Status</th>
-                <th className="px-4 py-2.5 text-left">Courses</th>
+                <th className="px-4 py-2.5 text-left">LECTURER</th>
+                <th className="px-4 py-2.5 text-left">WORKLOAD</th>
+                <th className="px-4 py-2.5 text-left">STATUS</th>
+                <th className="px-4 py-2.5 text-left">COURSES</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((l) => {
+              {rows.map((l, rowIdx) => {
                 const pct = Math.min(100, ((l.assigned || 0) / Math.max(l.maxLoad || 1, 1)) * 100);
                 const utilColor = l.overloaded
                   ? "bg-rose-500"
@@ -1257,7 +1257,7 @@ export function TeachingLoadPanel() {
                       ? "bg-emerald-500"
                       : "bg-muted/80";
                 return (
-                  <tr key={l.name} className="border-b border-border/60 last:border-0 transition-colors hover:bg-muted/70">
+                  <tr key={`${l.name}-${rowIdx}`} className="border-b border-border/60 last:border-0 transition-colors hover:bg-muted/70">
                     <td className="px-4 py-2.5 font-medium text-foreground/90">{l.name}</td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-3">
@@ -1443,12 +1443,12 @@ export function RoomUtilizationPanel() {
         </div>
         <div className="max-h-[32rem] flex-1 overflow-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-muted/40 shadow-[0_1px_0_0_#e2e8f0]">
+            <thead className="sticky top-0 z-20 bg-card shadow-[0_1px_0_0_#e2e8f0]">
               <tr className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-2.5 text-left">Room</th>
-                <th className="px-4 py-2.5 text-right">Cap.</th>
-                <th className="px-4 py-2.5 text-right">Slots</th>
-                <th className="px-4 py-2.5 text-right">Slot Utilization %</th>
+                <th className="px-4 py-2.5 text-left">ROOM</th>
+                <th className="px-4 py-2.5 text-right">CAP.</th>
+                <th className="px-4 py-2.5 text-right">SLOTS</th>
+                <th className="px-4 py-2.5 text-right">SLOT UTILIZATION %</th>
               </tr>
             </thead>
             <tbody>
