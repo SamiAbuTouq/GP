@@ -2,6 +2,7 @@
 
 import { type ReactNode, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -50,7 +51,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils"
 import { cn } from "@/lib/utils"
-import { ArrowDown, ArrowUp, ArrowUpDown, Calendar, Check, ChevronsUpDown, Grid3X3, List, Loader2, Printer, Upload, X } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, Calendar, Check, ChevronsUpDown, ExternalLink, Grid3X3, List, Loader2, Printer, Upload, X } from "lucide-react"
 import { ChevronDownIcon } from "@/components/ui/chevron-down-icon"
 
 type ViewType = "grid" | "list" | "calendar"
@@ -90,6 +91,8 @@ type TimetableDto = {
   isPublished?: boolean
   isScenarioResult?: boolean
   draftOrigin?: "optimizer" | "scenario" | "other" | null
+  /** When this timetable is a scenario run result, the scenario that produced it. */
+  sourceScenarioId?: number | null
   canUseAsScenarioBase?: boolean
   timetableKind?: "draft" | "published"
   metrics: null | {
@@ -1956,12 +1959,23 @@ export function ScheduleViewerPage({
                           <span>No schedule selected.</span>
                         )}
                         {timetable ? (
-                          <span className="flex flex-wrap gap-1">
+                          <span className="flex flex-wrap items-center gap-2">
                             {timetableStatusBadges(timetable).map((b) => (
                               <Badge key={b.key} variant={b.variant} className="text-[11px] font-normal">
                                 {b.label}
                               </Badge>
                             ))}
+                            {timetable.sourceScenarioId != null &&
+                            timetable.sourceScenarioId > 0 &&
+                            (timetable.draftOrigin === "scenario" ||
+                              timetable.generationType?.toLowerCase() === "what_if") ? (
+                              <Button variant="outline" size="sm" className="h-7 shrink-0 gap-1 px-2 text-[11px]" asChild>
+                                <Link href={`/dashboard/what-if/${timetable.sourceScenarioId}`}>
+                                  Open scenario
+                                  <ExternalLink className="h-3 w-3 opacity-70" aria-hidden />
+                                </Link>
+                              </Button>
+                            ) : null}
                           </span>
                         ) : null}
                       </CardDescription>

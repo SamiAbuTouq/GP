@@ -144,7 +144,7 @@ export class MailService {
 
     const fromName = this.configService.get<string>(
       "EMAIL_FROM_NAME",
-      "Smart University Timetable System",
+      "Smart University Timetabling System",
     );
     const fromAddress = this.configService.get<string>(
       "SMTP_FROM",
@@ -180,7 +180,7 @@ export class MailService {
       <div style="font-family: Arial, sans-serif; background-color: #f4f5f7; padding: 40px 20px; min-height: 100%;">
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
           <div style="background-color: #1a365d; padding: 30px; text-align: left;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: bold;">Smart University Timetable System</h1>
+            <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: bold;">Smart University Timetabling System</h1>
             <p style="color: #cbd5e1; margin: 8px 0 0 0; font-size: 14px;">Account Access Details</p>
           </div>
 
@@ -261,7 +261,7 @@ export class MailService {
 
     const fromName = this.configService.get<string>(
       "EMAIL_FROM_NAME",
-      "Smart University Timetable System",
+      "Smart University Timetabling System",
     );
     const fromAddress = this.configService.get<string>(
       "SMTP_FROM",
@@ -290,7 +290,7 @@ export class MailService {
       <div style="font-family: Arial, sans-serif; background-color: #f4f5f7; padding: 40px 20px;">
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
           <div style="background-color: #1a365d; padding: 30px;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 22px;">Smart University Timetable System</h1>
+            <h1 style="color: #ffffff; margin: 0; font-size: 22px;">Smart University Timetabling System</h1>
             <p style="color: #cbd5e1; margin: 8px 0 0 0; font-size: 14px;">Access Request Update</p>
           </div>
           <div style="padding: 30px;">
@@ -338,7 +338,7 @@ export class MailService {
 
     const fromName = this.configService.get<string>(
       "EMAIL_FROM_NAME",
-      "Smart University Timetable System",
+      "Smart University Timetabling System",
     );
     const fromAddress = this.configService.get<string>(
       "SMTP_FROM",
@@ -393,7 +393,7 @@ export class MailService {
       <div style="font-family: Arial, sans-serif; background-color: #f4f5f7; padding: 40px 20px;">
         <div style="max-width: 640px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">
           <div style="background-color: #1a365d; padding: 30px;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 22px;">Smart University Timetable System</h1>
+            <h1 style="color: #ffffff; margin: 0; font-size: 22px;">Smart University Timetabling System</h1>
             <p style="color: #cbd5e1; margin: 8px 0 0 0; font-size: 14px;">Lecturer Access Request</p>
           </div>
           <div style="padding: 30px;">

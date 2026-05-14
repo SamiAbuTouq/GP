@@ -15,8 +15,6 @@ import {
 import { ChartPieIcon } from "@/components/ui/chart-pie-icon"
 import { UserRoundIcon } from "@/components/ui/user-round-icon"
 import { TriangleAlertIcon } from "@/components/ui/triangle-alert-icon"
-import { GraduationCapIcon } from "@/components/ui/graduation-cap"
-import { ActivityIcon } from "@/components/ui/activity"
 import { SparklesIcon } from "@/components/ui/sparkles-icon"
 import { FileTextIcon } from "@/components/ui/file-text-icon"
 import { Sidebar } from "@/components/sidebar"
@@ -80,9 +78,6 @@ const REPORT_ICONS: Record<ReportTypeId, any> = {
   "lecturer-workload": UserRoundIcon,
   "course-distribution": ChartPieIcon,
   "conflict-analysis": TriangleAlertIcon,
-  "optimization-summary": ActivityIcon,
-  "lecturer-preference-compliance": GraduationCapIcon,
-  "room-type-matching": TriangleAlertIcon,
 }
 
 const ZIP_CSV_REPORT_TYPES = new Set<ReportTypeId>([
@@ -90,9 +85,6 @@ const ZIP_CSV_REPORT_TYPES = new Set<ReportTypeId>([
   "lecturer-workload",
   "course-distribution",
   "conflict-analysis",
-  "optimization-summary",
-  "lecturer-preference-compliance",
-  "room-type-matching",
 ])
 
 function formatBytes(bytes: number): string {

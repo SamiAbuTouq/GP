@@ -376,11 +376,12 @@ export class WhatIfService {
           `Timetable IDs not found: ${missing.join(", ")}`,
         );
       }
+      // Block raw scenario drafts (what_if) and timetables that are still linked as a
+      // prior run's result — not what_if_applied (committed improvements are valid bases).
       const disallowedScenarioResult = timetables
         .filter(
           (t) =>
             t.generation_type === "what_if" ||
-            t.generation_type === "what_if_applied" ||
             t._count.scenario_runs_as_result > 0,
         )
         .map((t) => t.timetable_id);
@@ -710,6 +711,8 @@ export class WhatIfService {
           select: {
             timetable_id: true,
             status: true,
+            generated_at: true,
+            version_number: true,
             semester: { select: { academic_year: true, semester_type: true } },
           },
         },
@@ -722,12 +725,19 @@ export class WhatIfService {
       scenarioId: r.scenario_id,
       baseTimetableId: r.base_timetable_id,
       baseTimetableName: (() => {
-        const sem = r.base_timetable.semester;
+        const tt = r.base_timetable;
+        const sem = tt.semester;
         if (sem) {
           const parts = [sem.academic_year, sem.semester_type].filter(Boolean);
           if (parts.length) return parts.join(" · ");
         }
-        return `Timetable ${r.base_timetable_id}`;
+        const v = tt.version_number ?? 0;
+        const gen = tt.generated_at;
+        const genLabel =
+          gen instanceof Date
+            ? `${gen.toISOString().replace("T", " ").slice(0, 19)} UTC`
+            : "unknown time";
+        return `Timetable ${tt.timetable_id} · v${v} · ${genLabel}`;
       })(),
       resultTimetableId: r.result_timetable_id,
       status: r.status,
@@ -948,7 +958,7 @@ export class WhatIfService {
 
   /**
    * Promote a scenario result timetable to production by replacing the base
-   * timetable's schedule entries and metrics with those from the result.
+   * timetable's schedule entries, metrics, and conflict rows with those from the result.
    *
    * This is the ONLY moment simulation data touches production data.
    * The result timetable is deleted after promotion (it has been merged into
@@ -962,6 +972,7 @@ export class WhatIfService {
           include: {
             section_schedule_entries: true,
             timetable_metrics: true,
+            timetable_conflicts: true,
           },
         },
       },
@@ -1030,10 +1041,28 @@ export class WhatIfService {
         });
       }
 
-      // 3. Delete all conflict records for the base timetable (result is cleaner)
+      // 3. Replace base conflict rows with the result's (DB summaries match applied schedule)
       await tx.timetableConflict.deleteMany({
         where: { timetable_id: baseTimetableId },
       });
+      if (
+        resultTimetable.timetable_conflicts &&
+        resultTimetable.timetable_conflicts.length > 0
+      ) {
+        await tx.timetableConflict.createMany({
+          data: resultTimetable.timetable_conflicts.map((c) => ({
+            timetable_id: baseTimetableId,
+            conflict_type: c.conflict_type,
+            severity: c.severity,
+            course_code: c.course_code,
+            section_number: c.section_number,
+            lecturer_name: c.lecturer_name,
+            room_number: c.room_number,
+            timeslot_label: c.timeslot_label,
+            detail: c.detail,
+          })),
+        });
+      }
 
       // 4. Delete scenario → result timetable link so cascade doesn't block deletion
       await tx.scenarioProducesTimetable.deleteMany({

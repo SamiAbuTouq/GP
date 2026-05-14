@@ -267,7 +267,6 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
             }
             const disallowedScenarioResult = timetables
                 .filter((t) => t.generation_type === "what_if" ||
-                t.generation_type === "what_if_applied" ||
                 t._count.scenario_runs_as_result > 0)
                 .map((t) => t.timetable_id);
             if (disallowedScenarioResult.length > 0) {
@@ -538,6 +537,8 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
                     select: {
                         timetable_id: true,
                         status: true,
+                        generated_at: true,
+                        version_number: true,
                         semester: { select: { academic_year: true, semester_type: true } },
                     },
                 },
@@ -549,13 +550,19 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
             scenarioId: r.scenario_id,
             baseTimetableId: r.base_timetable_id,
             baseTimetableName: (() => {
-                const sem = r.base_timetable.semester;
+                const tt = r.base_timetable;
+                const sem = tt.semester;
                 if (sem) {
                     const parts = [sem.academic_year, sem.semester_type].filter(Boolean);
                     if (parts.length)
                         return parts.join(" · ");
                 }
-                return `Timetable ${r.base_timetable_id}`;
+                const v = tt.version_number ?? 0;
+                const gen = tt.generated_at;
+                const genLabel = gen instanceof Date
+                    ? `${gen.toISOString().replace("T", " ").slice(0, 19)} UTC`
+                    : "unknown time";
+                return `Timetable ${tt.timetable_id} · v${v} · ${genLabel}`;
             })(),
             resultTimetableId: r.result_timetable_id,
             status: r.status,
@@ -719,6 +726,7 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
                     include: {
                         section_schedule_entries: true,
                         timetable_metrics: true,
+                        timetable_conflicts: true,
                     },
                 },
             },
@@ -773,6 +781,22 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
             await tx.timetableConflict.deleteMany({
                 where: { timetable_id: baseTimetableId },
             });
+            if (resultTimetable.timetable_conflicts &&
+                resultTimetable.timetable_conflicts.length > 0) {
+                await tx.timetableConflict.createMany({
+                    data: resultTimetable.timetable_conflicts.map((c) => ({
+                        timetable_id: baseTimetableId,
+                        conflict_type: c.conflict_type,
+                        severity: c.severity,
+                        course_code: c.course_code,
+                        section_number: c.section_number,
+                        lecturer_name: c.lecturer_name,
+                        room_number: c.room_number,
+                        timeslot_label: c.timeslot_label,
+                        detail: c.detail,
+                    })),
+                });
+            }
             await tx.scenarioProducesTimetable.deleteMany({
                 where: { timetable_id: resultTimetable.timetable_id },
             });

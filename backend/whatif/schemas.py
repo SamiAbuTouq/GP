@@ -40,10 +40,6 @@ class AddRoomParams(BaseModel):
 class DeleteRoomParams(BaseModel):
     roomId: int
 
-class AdjustRoomCapacityParams(BaseModel):
-    roomId: int
-    newCapacity: int = Field(..., ge=1)
-
 class AddCourseParams(BaseModel):
     courseCode: str
     courseName: str
@@ -91,7 +87,6 @@ CONDITION_PARAMS_MAP: Dict[ConditionType, type] = {
     ConditionType.AMEND_LECTURER:       AmendLecturerParams,
     ConditionType.ADD_ROOM:             AddRoomParams,
     ConditionType.DELETE_ROOM:          DeleteRoomParams,
-    ConditionType.ADJUST_ROOM_CAPACITY: AdjustRoomCapacityParams,
     ConditionType.ADD_COURSE:           AddCourseParams,
     ConditionType.CHANGE_SECTION_COUNT: ChangeSectionCountParams,
     ConditionType.CHANGE_DELIVERY_MODE: ChangeDeliveryModeParams,

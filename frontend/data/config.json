@@ -1,19 +1,19 @@
 {
   "rooms": {
     "201": {
-      "capacity": 55,
+      "capacity": 49,
       "room_type": "lecture_hall"
     },
     "202": {
-      "capacity": 60,
+      "capacity": 56,
       "room_type": "lecture_hall"
     },
     "203": {
-      "capacity": 46,
+      "capacity": 48,
       "room_type": "lecture_hall"
     },
     "204": {
-      "capacity": 52,
+      "capacity": 50,
       "room_type": "lecture_hall"
     },
     "205": {
@@ -25,19 +25,19 @@
       "room_type": "lecture_hall"
     },
     "207": {
-      "capacity": 52,
-      "room_type": "lecture_hall"
-    },
-    "208": {
       "capacity": 46,
       "room_type": "lecture_hall"
     },
+    "208": {
+      "capacity": 42,
+      "room_type": "lecture_hall"
+    },
     "301": {
-      "capacity": 51,
+      "capacity": 44,
       "room_type": "lecture_hall"
     },
     "302": {
-      "capacity": 50,
+      "capacity": 45,
       "room_type": "lecture_hall"
     },
     "303": {
@@ -45,27 +45,27 @@
       "room_type": "lecture_hall"
     },
     "304": {
-      "capacity": 48,
-      "room_type": "lecture_hall"
+      "capacity": 40,
+      "room_type": "lab_room"
     },
     "305": {
-      "capacity": 44,
-      "room_type": "lecture_hall"
+      "capacity": 40,
+      "room_type": "lab_room"
     },
     "306": {
-      "capacity": 48,
-      "room_type": "lecture_hall"
+      "capacity": 40,
+      "room_type": "lab_room"
     },
     "307": {
-      "capacity": 48,
+      "capacity": 60,
       "room_type": "lecture_hall"
     },
     "308": {
-      "capacity": 50,
+      "capacity": 48,
       "room_type": "lecture_hall"
     },
     "341": {
-      "capacity": 50,
+      "capacity": 58,
       "room_type": "lecture_hall"
     },
     "342": {
@@ -73,11 +73,11 @@
       "room_type": "lecture_hall"
     },
     "343": {
-      "capacity": 62,
+      "capacity": 61,
       "room_type": "lecture_hall"
     },
     "701": {
-      "capacity": 48,
+      "capacity": 50,
       "room_type": "lecture_hall"
     },
     "702": {
@@ -85,96 +85,96 @@
       "room_type": "lecture_hall"
     },
     "703": {
-      "capacity": 60,
+      "capacity": 50,
       "room_type": "lecture_hall"
     },
     "704": {
-      "capacity": 59,
+      "capacity": 49,
       "room_type": "lecture_hall"
     },
     "811": {
-      "capacity": 49,
+      "capacity": 26,
       "room_type": "lab_room"
     },
     "821": {
-      "capacity": 47,
+      "capacity": 37,
       "room_type": "lecture_hall"
     },
     "822": {
-      "capacity": 48,
+      "capacity": 38,
       "room_type": "lecture_hall"
     },
     "831": {
-      "capacity": 49,
+      "capacity": 37,
       "room_type": "lecture_hall"
     },
     "832": {
-      "capacity": 56,
+      "capacity": 37,
       "room_type": "lecture_hall"
     },
     "921": {
-      "capacity": 60,
+      "capacity": 50,
       "room_type": "lecture_hall"
     },
     "922": {
-      "capacity": 49,
+      "capacity": 45,
       "room_type": "lecture_hall"
     },
     "online": {
       "capacity": 379,
       "room_type": "lab_room"
     },
-    "it102": {
-      "capacity": 45,
-      "room_type": "lab_room"
-    },
     "it104": {
       "capacity": 34,
       "room_type": "lab_room"
     },
-    "it105": {
-      "capacity": 30,
-      "room_type": "lab_room"
-    },
-    "ee241 security": {
-      "capacity": 47,
-      "room_type": "lab_room"
-    },
-    "it301": {
-      "capacity": 40,
-      "room_type": "lab_room"
-    },
-    "it302": {
-      "capacity": 26,
-      "room_type": "lab_room"
-    },
-    "it303": {
-      "capacity": 44,
-      "room_type": "lab_room"
-    },
     "it106": {
-      "capacity": 44,
+      "capacity": 32,
       "room_type": "lab_room"
     },
     "it103": {
-      "capacity": 40,
+      "capacity": 32,
       "room_type": "lab_room"
     },
     "it101": {
       "capacity": 30,
       "room_type": "lab_room"
     },
+    "it102": {
+      "capacity": 31,
+      "room_type": "lab_room"
+    },
+    "it105": {
+      "capacity": 30,
+      "room_type": "lab_room"
+    },
+    "it301": {
+      "capacity": 27,
+      "room_type": "lab_room"
+    },
     "it107": {
-      "capacity": 44,
+      "capacity": 32,
+      "room_type": "lab_room"
+    },
+    "it302": {
+      "capacity": 27,
+      "room_type": "lab_room"
+    },
+    "atelier ُee309": {
+      "capacity": 54,
+      "room_type": "lecture_hall"
+    },
+    "ee205 circuits": {
+      "capacity": 22,
+      "room_type": "lab_room"
+    },
+    "ee102 electrical": {
+      "capacity": 22,
       "room_type": "lab_room"
     },
     "ee103physicsee": {
       "capacity": 23,
       "room_type": "lab_room"
-    },
-    "atelier ُee309": {
-      "capacity": 50,
-      "room_type": "lecture_hall"
     },
     "lb706": {
       "capacity": 50,
@@ -184,12 +184,8 @@
       "capacity": 20,
       "room_type": "lecture_hall"
     },
-    "ee205 circuits": {
-      "capacity": 42,
-      "room_type": "lab_room"
-    },
-    "ee102 electrical": {
-      "capacity": 44,
+    "ee203 digital electronics": {
+      "capacity": 18,
       "room_type": "lab_room"
     },
     "ee207 electrical": {
@@ -209,15 +205,23 @@
       "room_type": "lab_room"
     },
     "ee344 networks": {
-      "capacity": 49,
+      "capacity": 29,
+      "room_type": "lab_room"
+    },
+    "ee241 security": {
+      "capacity": 44,
+      "room_type": "lab_room"
+    },
+    "ee221 programing": {
+      "capacity": 21,
       "room_type": "lab_room"
     },
     "ee243 cellular": {
-      "capacity": 34,
+      "capacity": 26,
       "room_type": "lab_room"
     },
     "ee242 communications": {
-      "capacity": 42,
+      "capacity": 25,
       "room_type": "lab_room"
     },
     "ee206 projects": {
@@ -232,14 +236,26 @@
       "capacity": 14,
       "room_type": "lab_room"
     },
+    "tba": {
+      "capacity": 23,
+      "room_type": "lab_room"
+    },
     "lb705": {
       "capacity": 51,
       "room_type": "lab_room"
+    },
+    "it303": {
+      "capacity": 36,
+      "room_type": "lab_room"
+    },
+    "modaraj al-sadaqa": {
+      "capacity": 213,
+      "room_type": "lecture_hall"
     }
   },
   "timeslots": [
     {
-      "id": "slot_173",
+      "id": "slot_149",
       "days": [
         "Sunday",
         "Monday",
@@ -248,6 +264,271 @@
         "Thursday"
       ],
       "start_hour": 16.75,
+      "duration": 1.25,
+      "slot_type": "lecture_generic"
+    },
+    {
+      "id": "slot_150",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday"
+      ],
+      "start_hour": 9.416666666666666,
+      "duration": 1.25,
+      "slot_type": "lecture_generic"
+    },
+    {
+      "id": "slot_151",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday"
+      ],
+      "start_hour": 12.25,
+      "duration": 1.25,
+      "slot_type": "lecture_generic"
+    },
+    {
+      "id": "slot_152",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday"
+      ],
+      "start_hour": 10.833333333333334,
+      "duration": 1.25,
+      "slot_type": "lecture_generic"
+    },
+    {
+      "id": "slot_153",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday"
+      ],
+      "start_hour": 8,
+      "duration": 1.25,
+      "slot_type": "lecture_generic"
+    },
+    {
+      "id": "slot_154",
+      "days": [
+        "Sunday",
+        "Tuesday"
+      ],
+      "start_hour": 9.25,
+      "duration": 3,
+      "slot_type": "lab"
+    },
+    {
+      "id": "slot_155",
+      "days": [
+        "Sunday",
+        "Tuesday"
+      ],
+      "start_hour": 12.25,
+      "duration": 3,
+      "slot_type": "lab"
+    },
+    {
+      "id": "slot_156",
+      "days": [
+        "Sunday",
+        "Tuesday"
+      ],
+      "start_hour": 15.333333333333334,
+      "duration": 2.9999999999999982,
+      "slot_type": "lab"
+    },
+    {
+      "id": "slot_157",
+      "days": [
+        "Monday",
+        "Wednesday"
+      ],
+      "start_hour": 12.25,
+      "duration": 3,
+      "slot_type": "lab"
+    },
+    {
+      "id": "slot_158",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday"
+      ],
+      "start_hour": 13.666666666666666,
+      "duration": 1.25,
+      "slot_type": "lecture_generic"
+    },
+    {
+      "id": "slot_159",
+      "days": [
+        "Monday",
+        "Wednesday"
+      ],
+      "start_hour": 15.333333333333334,
+      "duration": 2.9999999999999982,
+      "slot_type": "lab"
+    },
+    {
+      "id": "slot_160",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday"
+      ],
+      "start_hour": 9.416666666666666,
+      "duration": 1.25,
+      "slot_type": "blended_st"
+    },
+    {
+      "id": "slot_161",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday"
+      ],
+      "start_hour": 10.833333333333334,
+      "duration": 1.25,
+      "slot_type": "blended_st"
+    },
+    {
+      "id": "slot_162",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday"
+      ],
+      "start_hour": 13.666666666666666,
+      "duration": 1.25,
+      "slot_type": "blended_st"
+    },
+    {
+      "id": "slot_163",
+      "days": [
+        "Monday",
+        "Wednesday"
+      ],
+      "start_hour": 13.666666666666666,
+      "duration": 3.0000000000000018,
+      "slot_type": "lab"
+    },
+    {
+      "id": "slot_164",
+      "days": [
+        "Sunday",
+        "Tuesday"
+      ],
+      "start_hour": 13.666666666666666,
+      "duration": 3.0000000000000018,
+      "slot_type": "lab"
+    },
+    {
+      "id": "slot_165",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday"
+      ],
+      "start_hour": 12.25,
+      "duration": 1.25,
+      "slot_type": "lecture_generic"
+    },
+    {
+      "id": "slot_166",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday"
+      ],
+      "start_hour": 12.25,
+      "duration": 1.25,
+      "slot_type": "blended_st"
+    },
+    {
+      "id": "slot_167",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday"
+      ],
+      "start_hour": 15.333333333333334,
+      "duration": 1.2499999999999982,
+      "slot_type": "lecture_generic"
+    },
+    {
+      "id": "slot_168",
+      "days": [
+        "Sunday",
+        "Tuesday"
+      ],
+      "start_hour": 16.75,
+      "duration": 1.25,
+      "slot_type": "lecture_generic"
+    },
+    {
+      "id": "slot_169",
+      "days": [
+        "Sunday",
+        "Tuesday"
+      ],
+      "start_hour": 9.25,
+      "duration": 2,
+      "slot_type": "lab"
+    },
+    {
+      "id": "slot_170",
+      "days": [
+        "Monday",
+        "Wednesday"
+      ],
+      "start_hour": 13.666666666666666,
+      "duration": 2,
+      "slot_type": "lab"
+    },
+    {
+      "id": "slot_171",
+      "days": [
+        "Monday",
+        "Wednesday"
+      ],
+      "start_hour": 9.25,
+      "duration": 3,
+      "slot_type": "lab"
+    },
+    {
+      "id": "slot_172",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday"
+      ],
+      "start_hour": 8,
+      "duration": 1.25,
+      "slot_type": "blended_st"
+    },
+    {
+      "id": "slot_173",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday"
+      ],
+      "start_hour": 13.666666666666666,
       "duration": 1.25,
       "slot_type": "lecture_generic"
     },
@@ -255,373 +536,34 @@
       "id": "slot_174",
       "days": [
         "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday"
+        "Tuesday"
       ],
-      "start_hour": 9.416666666666666,
-      "duration": 1.25,
-      "slot_type": "lecture_generic"
+      "start_hour": 13.666666666666666,
+      "duration": 3.0000000000000018,
+      "slot_type": "lab"
     },
     {
       "id": "slot_175",
       "days": [
-        "Sunday",
         "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday"
+        "Wednesday"
       ],
-      "start_hour": 12.25,
-      "duration": 1.25,
+      "start_hour": 15.333333333333334,
+      "duration": 1.2499999999999982,
       "slot_type": "lecture_generic"
     },
     {
       "id": "slot_176",
       "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday",
         "Wednesday",
         "Thursday"
       ],
-      "start_hour": 10.833333333333334,
+      "start_hour": 13.666666666666666,
       "duration": 1.25,
       "slot_type": "lecture_generic"
     },
     {
       "id": "slot_177",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday"
-      ],
-      "start_hour": 8,
-      "duration": 1.25,
-      "slot_type": "lecture_generic"
-    },
-    {
-      "id": "slot_178",
-      "days": [
-        "Sunday",
-        "Tuesday"
-      ],
-      "start_hour": 9.25,
-      "duration": 3,
-      "slot_type": "lab"
-    },
-    {
-      "id": "slot_179",
-      "days": [
-        "Sunday",
-        "Tuesday"
-      ],
-      "start_hour": 12.25,
-      "duration": 3,
-      "slot_type": "lab"
-    },
-    {
-      "id": "slot_180",
-      "days": [
-        "Sunday",
-        "Tuesday"
-      ],
-      "start_hour": 15.333333333333334,
-      "duration": 2.9999999999999982,
-      "slot_type": "lab"
-    },
-    {
-      "id": "slot_181",
-      "days": [
-        "Monday",
-        "Wednesday"
-      ],
-      "start_hour": 12.25,
-      "duration": 3,
-      "slot_type": "lab"
-    },
-    {
-      "id": "slot_182",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday"
-      ],
-      "start_hour": 13.666666666666666,
-      "duration": 1.25,
-      "slot_type": "lecture_generic"
-    },
-    {
-      "id": "slot_183",
-      "days": [
-        "Monday",
-        "Wednesday"
-      ],
-      "start_hour": 15.333333333333334,
-      "duration": 2.9999999999999982,
-      "slot_type": "lab"
-    },
-    {
-      "id": "slot_184",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday"
-      ],
-      "start_hour": 9.416666666666666,
-      "duration": 1.25,
-      "slot_type": "lecture_generic"
-    },
-    {
-      "id": "slot_185",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday"
-      ],
-      "start_hour": 10.833333333333334,
-      "duration": 1.25,
-      "slot_type": "lecture_generic"
-    },
-    {
-      "id": "slot_186",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday"
-      ],
-      "start_hour": 13.666666666666666,
-      "duration": 1.25,
-      "slot_type": "lecture_generic"
-    },
-    {
-      "id": "slot_187",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday"
-      ],
-      "start_hour": 10.833333333333334,
-      "duration": 1.25,
-      "slot_type": "blended_st"
-    },
-    {
-      "id": "slot_188",
-      "days": [
-        "Monday",
-        "Wednesday"
-      ],
-      "start_hour": 13.666666666666666,
-      "duration": 3.0000000000000018,
-      "slot_type": "lab"
-    },
-    {
-      "id": "slot_189",
-      "days": [
-        "Sunday",
-        "Tuesday"
-      ],
-      "start_hour": 13.666666666666666,
-      "duration": 3.0000000000000018,
-      "slot_type": "lab"
-    },
-    {
-      "id": "slot_190",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday"
-      ],
-      "start_hour": 10.833333333333334,
-      "duration": 1.25,
-      "slot_type": "blended_generic"
-    },
-    {
-      "id": "slot_191",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday"
-      ],
-      "start_hour": 12.25,
-      "duration": 1.25,
-      "slot_type": "lecture_generic"
-    },
-    {
-      "id": "slot_192",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday"
-      ],
-      "start_hour": 12.25,
-      "duration": 1.25,
-      "slot_type": "blended_st"
-    },
-    {
-      "id": "slot_193",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday"
-      ],
-      "start_hour": 9.416666666666666,
-      "duration": 1.25,
-      "slot_type": "blended_generic"
-    },
-    {
-      "id": "slot_194",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday"
-      ],
-      "start_hour": 15.333333333333334,
-      "duration": 1.2499999999999982,
-      "slot_type": "blended_generic"
-    },
-    {
-      "id": "slot_195",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday"
-      ],
-      "start_hour": 16.75,
-      "duration": 1.25,
-      "slot_type": "blended_generic"
-    },
-    {
-      "id": "slot_196",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday"
-      ],
-      "start_hour": 9.416666666666666,
-      "duration": 1.25,
-      "slot_type": "blended_st"
-    },
-    {
-      "id": "slot_197",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday"
-      ],
-      "start_hour": 13.666666666666666,
-      "duration": 1.25,
-      "slot_type": "blended_st"
-    },
-    {
-      "id": "slot_198",
-      "days": [
-        "Sunday",
-        "Tuesday"
-      ],
-      "start_hour": 16.75,
-      "duration": 1.25,
-      "slot_type": "lecture_generic"
-    },
-    {
-      "id": "slot_199",
-      "days": [
-        "Sunday",
-        "Tuesday"
-      ],
-      "start_hour": 9.25,
-      "duration": 2,
-      "slot_type": "lab"
-    },
-    {
-      "id": "slot_200",
-      "days": [
-        "Monday",
-        "Wednesday"
-      ],
-      "start_hour": 13.666666666666666,
-      "duration": 2,
-      "slot_type": "lab"
-    },
-    {
-      "id": "slot_201",
-      "days": [
-        "Monday",
-        "Wednesday"
-      ],
-      "start_hour": 9.25,
-      "duration": 3,
-      "slot_type": "lab"
-    },
-    {
-      "id": "slot_202",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday"
-      ],
-      "start_hour": 8,
-      "duration": 1.25,
-      "slot_type": "blended_st"
-    },
-    {
-      "id": "slot_203",
-      "days": [
-        "Sunday",
-        "Tuesday"
-      ],
-      "start_hour": 13.666666666666666,
-      "duration": 3.0000000000000018,
-      "slot_type": "lab"
-    },
-    {
-      "id": "slot_204",
-      "days": [
-        "Monday",
-        "Wednesday"
-      ],
-      "start_hour": 15.333333333333334,
-      "duration": 1.2499999999999982,
-      "slot_type": "blended_generic"
-    },
-    {
-      "id": "slot_205",
-      "days": [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday"
-      ],
-      "start_hour": 15.333333333333334,
-      "duration": 1.2499999999999982,
-      "slot_type": "lecture_generic"
-    },
-    {
-      "id": "slot_206",
-      "days": [
-        "Wednesday",
-        "Thursday"
-      ],
-      "start_hour": 13.666666666666666,
-      "duration": 1.25,
-      "slot_type": "lecture_generic"
-    },
-    {
-      "id": "slot_207",
       "days": [
         "Sunday",
         "Monday",
@@ -632,7 +574,7 @@
       "slot_type": "blended_st"
     },
     {
-      "id": "slot_208",
+      "id": "slot_178",
       "days": [
         "Monday",
         "Wednesday"
@@ -642,7 +584,40 @@
       "slot_type": "lab"
     },
     {
-      "id": "slot_221",
+      "id": "slot_179",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday"
+      ],
+      "start_hour": 10.833333333333334,
+      "duration": 1.25,
+      "slot_type": "lecture_generic"
+    },
+    {
+      "id": "slot_180",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday"
+      ],
+      "start_hour": 8,
+      "duration": 1.25,
+      "slot_type": "lecture_generic"
+    },
+    {
+      "id": "slot_181",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday"
+      ],
+      "start_hour": 9.416666666666666,
+      "duration": 1.25,
+      "slot_type": "lecture_generic"
+    },
+    {
+      "id": "slot_199",
       "days": [
         "Monday",
         "Wednesday"
@@ -652,7 +627,18 @@
       "slot_type": "lecture_generic"
     },
     {
-      "id": "slot_228",
+      "id": "slot_200",
+      "days": [
+        "Sunday",
+        "Monday",
+        "Tuesday"
+      ],
+      "start_hour": 15.083333333333334,
+      "duration": 1.2499999999999982,
+      "slot_type": "lecture_generic"
+    },
+    {
+      "id": "slot_209",
       "days": [
         "Monday",
         "Wednesday"
@@ -662,7 +648,7 @@
       "slot_type": "lecture_generic"
     },
     {
-      "id": "slot_229",
+      "id": "slot_210",
       "days": [
         "Monday",
         "Wednesday"
@@ -672,7 +658,7 @@
       "slot_type": "lab"
     },
     {
-      "id": "slot_230",
+      "id": "slot_211",
       "days": [
         "Monday",
         "Wednesday"
@@ -682,7 +668,7 @@
       "slot_type": "lab"
     },
     {
-      "id": "slot_231",
+      "id": "slot_212",
       "days": [
         "Sunday",
         "Monday",
@@ -1095,11 +1081,13 @@
     "Dr. George Sammour",
     "Rana Maali",
     "Eng. Mohamed Ibrahim",
-    "bate5",
+    "das",
+    "dsad",
+    "dsad",
+    "dsddf",
+    "fsdf",
     "sami",
-    "sami",
-    "yazan",
-    "hamada"
+    "sami"
   ],
   "lecturer_preferences": {
     "Sami Abu Touq": {
@@ -2706,19 +2694,23 @@
       "preferred": [],
       "unpreferred": []
     },
-    "bate5": {
+    "das": {
+      "preferred": [],
+      "unpreferred": []
+    },
+    "dsad": {
+      "preferred": [],
+      "unpreferred": []
+    },
+    "dsddf": {
+      "preferred": [],
+      "unpreferred": []
+    },
+    "fsdf": {
       "preferred": [],
       "unpreferred": []
     },
     "sami": {
-      "preferred": [],
-      "unpreferred": []
-    },
-    "yazan": {
-      "preferred": [],
-      "unpreferred": []
-    },
-    "hamada": {
       "preferred": [],
       "unpreferred": []
     }
@@ -2745,8 +2737,7 @@
         210,
         272,
         359,
-        360,
-        405
+        360
       ],
       "size": 38,
       "credit_hours": 3,
@@ -2759,6 +2750,7 @@
       "course": "11103",
       "course_name": "structured programming",
       "allowed_lecturers": [
+        0,
         2,
         3,
         7,
@@ -2780,11 +2772,7 @@
         324,
         359,
         360,
-        362,
-        401,
-        403,
-        404,
-        405
+        362
       ],
       "size": 36,
       "credit_hours": 3,
@@ -2797,6 +2785,7 @@
       "course": "11103",
       "course_name": "structured programming",
       "allowed_lecturers": [
+        0,
         2,
         3,
         7,
@@ -2818,11 +2807,7 @@
         324,
         359,
         360,
-        362,
-        401,
-        403,
-        404,
-        405
+        362
       ],
       "size": 36,
       "credit_hours": 3,
@@ -2835,6 +2820,7 @@
       "course": "11103",
       "course_name": "structured programming",
       "allowed_lecturers": [
+        0,
         2,
         3,
         7,
@@ -2856,11 +2842,7 @@
         324,
         359,
         360,
-        362,
-        401,
-        403,
-        404,
-        405
+        362
       ],
       "size": 36,
       "credit_hours": 3,
@@ -2873,6 +2855,7 @@
       "course": "11103",
       "course_name": "structured programming",
       "allowed_lecturers": [
+        0,
         2,
         3,
         7,
@@ -2894,11 +2877,7 @@
         324,
         359,
         360,
-        362,
-        401,
-        403,
-        404,
-        405
+        362
       ],
       "size": 36,
       "credit_hours": 3,
@@ -2942,9 +2921,7 @@
         360,
         361,
         362,
-        364,
-        403,
-        404
+        364
       ],
       "size": 19,
       "credit_hours": 1,
@@ -2988,9 +2965,7 @@
         360,
         361,
         362,
-        364,
-        403,
-        404
+        364
       ],
       "size": 19,
       "credit_hours": 1,
@@ -3034,9 +3009,7 @@
         360,
         361,
         362,
-        364,
-        403,
-        404
+        364
       ],
       "size": 19,
       "credit_hours": 1,
@@ -3080,9 +3053,7 @@
         360,
         361,
         362,
-        364,
-        403,
-        404
+        364
       ],
       "size": 19,
       "credit_hours": 1,
@@ -3126,9 +3097,7 @@
         360,
         361,
         362,
-        364,
-        403,
-        404
+        364
       ],
       "size": 19,
       "credit_hours": 1,
@@ -3152,8 +3121,7 @@
         29,
         245,
         272,
-        363,
-        404
+        363
       ],
       "size": 41,
       "credit_hours": 3,
@@ -3177,8 +3145,7 @@
         29,
         245,
         272,
-        363,
-        404
+        363
       ],
       "size": 41,
       "credit_hours": 3,
@@ -3242,8 +3209,7 @@
         361,
         363,
         364,
-        365,
-        401
+        365
       ],
       "size": 22,
       "credit_hours": 1,
@@ -3275,8 +3241,7 @@
         361,
         363,
         364,
-        365,
-        401
+        365
       ],
       "size": 22,
       "credit_hours": 1,
@@ -3308,8 +3273,7 @@
         361,
         363,
         364,
-        365,
-        401
+        365
       ],
       "size": 22,
       "credit_hours": 1,
@@ -3341,8 +3305,7 @@
         361,
         363,
         364,
-        365,
-        401
+        365
       ],
       "size": 22,
       "credit_hours": 1,
@@ -3355,6 +3318,7 @@
       "course": "11323",
       "course_name": "database systems",
       "allowed_lecturers": [
+        0,
         9,
         17,
         20,
@@ -3377,6 +3341,7 @@
       "course": "11323",
       "course_name": "database systems",
       "allowed_lecturers": [
+        0,
         9,
         17,
         20,
@@ -3426,8 +3391,7 @@
         245,
         276,
         360,
-        362,
-        405
+        362
       ],
       "size": 30,
       "credit_hours": 1,
@@ -3444,8 +3408,7 @@
         34,
         245,
         278,
-        279,
-        405
+        279
       ],
       "size": 18,
       "credit_hours": 1,
@@ -3460,8 +3423,7 @@
       "allowed_lecturers": [
         1,
         9,
-        36,
-        401
+        36
       ],
       "size": 17,
       "credit_hours": 1,
@@ -3528,7 +3490,7 @@
       "size": 34,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -3902,7 +3864,6 @@
       "course": "20134",
       "course_name": "discrete mathematics (1)",
       "allowed_lecturers": [
-        0,
         57,
         58,
         60,
@@ -3922,7 +3883,6 @@
       "course": "20134",
       "course_name": "discrete mathematics (1)",
       "allowed_lecturers": [
-        0,
         57,
         58,
         60,
@@ -3942,7 +3902,6 @@
       "course": "20134",
       "course_name": "discrete mathematics (1)",
       "allowed_lecturers": [
-        0,
         57,
         58,
         60,
@@ -3962,7 +3921,6 @@
       "course": "20134",
       "course_name": "discrete mathematics (1)",
       "allowed_lecturers": [
-        0,
         57,
         58,
         60,
@@ -4117,7 +4075,7 @@
       "size": 42,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -4140,7 +4098,7 @@
       "size": 42,
       "credit_hours": 3,
       "section_number": "S2",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -4163,7 +4121,7 @@
       "size": 42,
       "credit_hours": 3,
       "section_number": "S3",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -4186,7 +4144,7 @@
       "size": 42,
       "credit_hours": 3,
       "section_number": "S4",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -4851,7 +4809,7 @@
       "size": 33,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -5442,7 +5400,7 @@
       "size": 12,
       "credit_hours": 0,
       "section_number": "S1",
-      "delivery_mode": "online",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -5609,7 +5567,7 @@
       "size": 34,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -5624,7 +5582,7 @@
       "size": 41,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -5639,7 +5597,7 @@
       "size": 41,
       "credit_hours": 3,
       "section_number": "S2",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -5935,7 +5893,7 @@
       "size": 41,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -6072,7 +6030,7 @@
       "size": 10,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -6191,7 +6149,7 @@
       "size": 42,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -6221,7 +6179,7 @@
       "size": 31,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -6642,7 +6600,7 @@
       "size": 25,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -6719,7 +6677,7 @@
       "size": 40,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -7000,8 +6958,7 @@
         29,
         55,
         210,
-        373,
-        401
+        373
       ],
       "size": 16,
       "credit_hours": 3,
@@ -7067,7 +7024,7 @@
       "size": 18,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "inperson",
+      "delivery_mode": "blended",
       "session_type": "lecture"
     },
     {
@@ -7097,7 +7054,7 @@
       "size": 7,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "blended",
+      "delivery_mode": "inperson",
       "session_type": "lecture"
     },
     {
@@ -7198,7 +7155,7 @@
       "size": 22,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "inperson",
+      "delivery_mode": "blended",
       "session_type": "lecture"
     },
     {
@@ -7307,7 +7264,7 @@
       "size": 11,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "inperson",
+      "delivery_mode": "blended",
       "session_type": "lecture"
     },
     {
@@ -7320,7 +7277,7 @@
       "size": 21,
       "credit_hours": 3,
       "section_number": "S1",
-      "delivery_mode": "inperson",
+      "delivery_mode": "blended",
       "session_type": "lecture"
     },
     {
@@ -7825,10 +7782,11 @@
     "Dr. George Sammour": [],
     "Rana Maali": [],
     "Eng. Mohamed Ibrahim": [],
-    "bate5": [],
-    "sami": [],
-    "yazan": [],
-    "hamada": []
+    "das": [],
+    "dsad": [],
+    "dsddf": [],
+    "fsdf": [],
+    "sami": []
   },
   "lecturer_max_workload": {
     "Sami Abu Touq": 15,
@@ -8232,10 +8190,11 @@
     "Dr. George Sammour": 15,
     "Rana Maali": 15,
     "Eng. Mohamed Ibrahim": 15,
-    "bate5": 15,
-    "sami": 15,
-    "yazan": 15,
-    "hamada": 15
+    "das": 15,
+    "dsad": 15,
+    "dsddf": 15,
+    "fsdf": 15,
+    "sami": 15
   },
   "semester_mode": "summer"
 }

@@ -39,7 +39,6 @@ import {
   DoorOpen,
   GripVertical,
   Layers,
-  Maximize2,
   Minus,
   MonitorPlay,
   Eye,
@@ -59,6 +58,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { slotTypes } from "@/lib/data";
 
 const WHAT_IF_DRAFT_KEY = "whatif_builder_draft_v1";
+/** Condition types removed from the product; dropped when loading/saving scenarios. */
+const REMOVED_WHAT_IF_CONDITION_TYPES = new Set(["adjust_room_capacity"]);
+function withoutRemovedWhatIfConditions(conditions: Condition[]): Condition[] {
+  return conditions.filter((c) => !REMOVED_WHAT_IF_CONDITION_TYPES.has(c.type));
+}
 const TIMESLOT_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"] as const;
 const DELIVERY_MODES = ["FACE_TO_FACE", "ONLINE", "BLENDED"] as const;
 const TIME_RANGE_SEP = "::";
@@ -436,7 +440,6 @@ type WhatIfConditionType =
   | "amend_lecturer"
   | "add_room"
   | "delete_room"
-  | "adjust_room_capacity"
   | "add_course"
   | "change_section_count"
   | "change_delivery_mode"
@@ -454,7 +457,6 @@ const CONDITION_CATALOG: Array<{
   { value: "amend_lecturer", label: "Amend Lecturer", description: "Update a lecturer's workload or courses", icon: UserRoundCog },
   { value: "add_room", label: "Add Room", description: "Add a new room to the university", icon: SquarePlus },
   { value: "delete_room", label: "Remove Room", description: "Remove an existing room", icon: SquareMinus },
-  { value: "adjust_room_capacity", label: "Adjust Room Capacity", description: "Change the capacity of a room", icon: Maximize2 },
   { value: "add_course", label: "Add Course", description: "Add a new course offering", icon: BookMarked },
   { value: "change_section_count", label: "Change Section Count", description: "Change how many sections a course runs", icon: Layers },
   { value: "change_delivery_mode", label: "Change Delivery Mode", description: "Switch online, face-to-face, or blended", icon: MonitorPlay },
@@ -961,7 +963,11 @@ export default function WhatIfScenariosPage() {
   }
 
   function openEdit(s: Scenario) {
-    const baseline = { name: s.name, description: s.description ?? "", conditions: s.conditions ?? [] };
+    const baseline = {
+      name: s.name,
+      description: s.description ?? "",
+      conditions: withoutRemovedWhatIfConditions(s.conditions ?? []),
+    };
     setEditingId(s.id);
     setName(baseline.name);
     setDescription(baseline.description);
@@ -1071,11 +1077,9 @@ export default function WhatIfScenariosPage() {
         });
         break;
       case "delete_room":
-      case "adjust_room_capacity":
         setDraftParams({
           ...base,
           roomId: str(p.roomId),
-          newCapacity: num(p.newCapacity, 30),
         });
         break;
       case "add_course":
@@ -1196,16 +1200,6 @@ export default function WhatIfScenariosPage() {
         }
         parameters = { roomId: getParamNumber("roomId") };
         break;
-      case "adjust_room_capacity":
-        if (!getParamString("roomId") || getParamNumber("roomId", 0) < 1) {
-          toast({ title: "Adjust capacity", description: "Select a room.", variant: "destructive" });
-          return null;
-        }
-        parameters = {
-          roomId: getParamNumber("roomId"),
-          newCapacity: getParamNumber("newCapacity", 30),
-        };
-        break;
       case "add_course": {
         if (!getParamString("courseCode").trim() || !getParamString("courseName").trim()) {
           toast({ title: "Add course", description: "Enter course code and name.", variant: "destructive" });
@@ -1319,7 +1313,11 @@ export default function WhatIfScenariosPage() {
       return null;
     }
     const closeModal = opts?.closeModal !== false;
-    const body = { name: name.trim(), description: description.trim(), conditions };
+    const body = {
+      name: name.trim(),
+      description: description.trim(),
+      conditions: withoutRemovedWhatIfConditions(conditions),
+    };
     const endpoint = editingId ? `/what-if/scenarios/${editingId}` : "/what-if/scenarios";
     const method = editingId ? "PATCH" : "POST";
     try {
@@ -1386,17 +1384,12 @@ export default function WhatIfScenariosPage() {
     }
     const deletedLecturers = new Set<number>();
     const amendedLecturers = new Set<number>();
-    const deletedRooms = new Set<number>();
-    const adjustedRooms = new Set<number>();
     for (const c of conditions) {
       const p = c.parameters as Record<string, unknown>;
       if (c.type === "delete_lecturer" && typeof p.lecturerUserId === "number") deletedLecturers.add(p.lecturerUserId);
       if (c.type === "amend_lecturer" && typeof p.lecturerUserId === "number") amendedLecturers.add(p.lecturerUserId);
-      if (c.type === "delete_room" && typeof p.roomId === "number") deletedRooms.add(p.roomId);
-      if (c.type === "adjust_room_capacity" && typeof p.roomId === "number") adjustedRooms.add(p.roomId);
     }
     for (const id of deletedLecturers) if (amendedLecturers.has(id)) issues.push(`Lecturer ${id} is both deleted and amended.`);
-    for (const id of deletedRooms) if (adjustedRooms.has(id)) issues.push(`Room ${id} is both deleted and capacity-adjusted.`);
     return issues;
   }, [conditions]);
 
@@ -1442,10 +1435,6 @@ export default function WhatIfScenariosPage() {
     [lecturerOptions, deletedLecturerIds],
   );
   const selectableDeleteRoomOptions = useMemo(
-    () => roomOptions.filter((option) => !deletedRoomIds.has(option.value)),
-    [roomOptions, deletedRoomIds],
-  );
-  const selectableAdjustRoomOptions = useMemo(
     () => roomOptions.filter((option) => !deletedRoomIds.has(option.value)),
     [roomOptions, deletedRoomIds],
   );
@@ -1785,32 +1774,19 @@ export default function WhatIfScenariosPage() {
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   {CONDITION_CATALOG.map((item) => {
                     const Icon = item.icon;
-                    const comingSoon = item.value === "adjust_room_capacity";
                     return (
                       <button
                         key={item.value}
                         type="button"
-                        disabled={comingSoon}
                         onClick={() => {
-                          if (comingSoon) return;
                           setConditionType(item.value);
                           setDraftParams({ ...INITIAL_DRAFT_PARAMS });
                           setConditionFormSource("picker");
                           setEditingConditionIndex(null);
                           setBuilderStep("conditionForm");
                         }}
-                        className={cn(
-                          "relative flex flex-col items-center gap-2 rounded-xl border bg-card p-4 text-center shadow-sm transition-colors",
-                          comingSoon
-                            ? "cursor-not-allowed opacity-60"
-                            : "hover:border-sky-300/60 hover:bg-sky-50/50 dark:hover:border-sky-700 dark:hover:bg-sky-950/30",
-                        )}
+                        className="relative flex flex-col items-center gap-2 rounded-xl border bg-card p-4 text-center shadow-sm transition-colors hover:border-sky-300/60 hover:bg-sky-50/50 dark:hover:border-sky-700 dark:hover:bg-sky-950/30"
                       >
-                        {comingSoon ? (
-                          <Badge variant="secondary" className="absolute right-2 top-2 text-[10px] font-medium">
-                            Coming soon
-                          </Badge>
-                        ) : null}
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400">
                           <Icon className="h-6 w-6" />
                         </div>
@@ -1944,18 +1920,6 @@ export default function WhatIfScenariosPage() {
                 </div>
               ) : null}
 
-              {conditionType === "adjust_room_capacity" && editingConditionIndex !== null ? (
-                  <div className="mb-4 space-y-2">
-                    <Label className="font-semibold">Room</Label>
-                  <SearchableSelect
-                    value={getParamString("roomId")}
-                    onChange={(v) => setParam("roomId", v)}
-                    placeholder="Select room"
-                    options={selectableAdjustRoomOptions}
-                  />
-                </div>
-              ) : null}
-
               {conditionType === "add_room" ? (
                   <div className="mb-4 space-y-4">
                     <div>
@@ -1982,13 +1946,6 @@ export default function WhatIfScenariosPage() {
                       </div>
                     </div>
                 </div>
-              ) : null}
-
-              {conditionType === "adjust_room_capacity" && editingConditionIndex !== null ? (
-                  <div className="mb-4">
-                    <Label className="font-semibold">New Capacity</Label>
-                    <Input className="mt-1.5" type="number" min={1} value={getParamNumber("newCapacity", 30)} onChange={(e) => setParam("newCapacity", Number(e.target.value))} />
-                  </div>
               ) : null}
 
               {conditionType === "change_section_count" ? (

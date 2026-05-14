@@ -271,12 +271,12 @@ function ResetPasswordForm() {
           )}
         </Button>
 
-        <div className="text-center">
+        <div className="scroll-mt-6 pt-2 text-center">
           <Link
             href="/login"
-            className="inline-flex items-center gap-2 text-sm font-medium text-[#48CAE4] transition-colors hover:text-[#90E0EF]"
+            className="group inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-[#48CAE4] transition-[color,transform,background-color] duration-200 ease-out hover:-translate-y-px hover:bg-white/[0.06] hover:text-[#90E0EF] active:translate-y-0"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:-translate-x-0.5" />
             Back to Sign In
           </Link>
         </div>

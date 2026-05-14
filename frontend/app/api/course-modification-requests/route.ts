@@ -1,4 +1,7 @@
-import { proxyToBackend } from "@/lib/proxy-backend";
+import {
+  forwardedAuthorizationHeaders,
+  proxyToBackend,
+} from "@/lib/proxy-backend";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -6,5 +9,6 @@ export async function GET(request: Request) {
   const suffix = status ? `?status=${encodeURIComponent(status)}` : "";
   return proxyToBackend(`/course-modification-requests${suffix}`, {
     method: "GET",
+    headers: forwardedAuthorizationHeaders(request),
   });
 }

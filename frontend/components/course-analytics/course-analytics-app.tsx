@@ -359,9 +359,9 @@ export default function CourseAnalyticsApp({
                 icon={BarChart3}
               />
               <MiniStat label="Online" value={stats.onlineSections} icon={Laptop} />
-              {/* Bug 4 fix: inPersonSections = total - online - blended, so label clearly covers both on-campus and blended */}
+              {/* Bug 4 fix: inPersonSections = total - online - blended, so label clearly covers both face-to-face and blended */}
               <MiniStat
-                label="On-Campus / Blended"
+                label="Face To Face / Blended"
                 value={stats.inPersonSections + stats.blendedSections}
                 subValue={stats.blendedSections > 0 ? `incl. ${stats.blendedSections} blended` : undefined}
                 icon={Building2}

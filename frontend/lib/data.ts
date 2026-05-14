@@ -27,7 +27,7 @@ export type DeliveryMode = (typeof DELIVERY_MODE_VALUES)[number]
 export const deliveryModeOptions: readonly { value: DeliveryMode; label: string }[] = [
   { value: "ONLINE", label: "Online" },
   { value: "BLENDED", label: "Blended" },
-  { value: "FACE_TO_FACE", label: "On-Campus" },
+  { value: "FACE_TO_FACE", label: "Face To Face" },
 ]
 
 export function formatDeliveryModeLabel(mode: DeliveryMode): string {

@@ -25,8 +25,6 @@ const access_requests_module_1 = require("./access-requests/access-requests.modu
 const course_modification_requests_module_1 = require("./course-modification-requests/course-modification-requests.module");
 const jwt_auth_guard_1 = require("./common/guards/jwt-auth.guard");
 const roles_guard_1 = require("./common/guards/roles.guard");
-const app_controller_1 = require("./app.controller");
-const app_service_1 = require("./app.service");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -51,9 +49,8 @@ exports.AppModule = AppModule = __decorate([
             access_requests_module_1.AccessRequestsModule,
             course_modification_requests_module_1.CourseModificationRequestsModule,
         ],
-        controllers: [app_controller_1.AppController],
+        controllers: [],
         providers: [
-            app_service_1.AppService,
             {
                 provide: core_1.APP_GUARD,
                 useClass: jwt_auth_guard_1.JwtAuthGuard,

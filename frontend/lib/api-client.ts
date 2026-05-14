@@ -358,6 +358,14 @@ export class ApiClient {
   }
 
   /**
+   * Headers for same-origin `/api/*` routes that proxy to Nest; avoids server-side refresh when possible.
+   */
+  static proxyAuthorizationHeaders(): Record<string, string> {
+    const token = accessToken;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  /**
    * Check if authenticated (has access token in memory)
    */
   static isAuthenticated(): boolean {

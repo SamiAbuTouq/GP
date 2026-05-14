@@ -127,7 +127,7 @@ export async function GET(request: Request) {
               ? 'Online'
               : entry.course.delivery_mode === 'BLENDED'
                 ? 'Blended'
-                : 'On-Campus',
+                : 'Face To Face',
           Start_Time: formatTime(entry.timeslot.start_time),
           End_Time: formatTime(entry.timeslot.end_time),
           islab: entry.course.is_lab,

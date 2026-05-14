@@ -145,6 +145,101 @@ def _normalize_section_number(value: Any) -> str:
             return f"S{m.group(1)}"
     return raw.upper()
 
+
+def _max_numeric_section_index(labels: List[str]) -> int:
+    """Largest N from labels that normalize to S{N}; 0 if none."""
+    best = 0
+    for lab in labels:
+        n = _normalize_section_number(lab)
+        m = re.match(r"^S(\d+)$", n, flags=re.IGNORECASE)
+        if not m:
+            continue
+        try:
+            best = max(best, int(m.group(1)))
+        except Exception:
+            continue
+    return best
+
+
+def _nonneg_int_field(value: Any) -> int:
+    try:
+        if value is None or (isinstance(value, str) and str(value).strip() == ""):
+            return 0
+        return max(0, int(value))
+    except Exception:
+        return 0
+
+
+def _synthesize_section_labels(want: int) -> List[str]:
+    """Build S1..S{{want}} with normalized keys unique within the list."""
+    labels: List[str] = []
+    used: set = set()
+    n = 0
+    for _ in range(want):
+        while True:
+            n += 1
+            cand = f"S{n}"
+            key = _normalize_section_number(cand)
+            if key and key not in used:
+                used.add(key)
+                labels.append(cand)
+                break
+    return labels
+
+
+def _effective_section_labels_by_course(
+    base_section_labels_by_course: Dict[int, List[str]],
+    course_meta_by_id: Dict[int, Dict[str, Any]],
+    is_summer: bool,
+) -> Dict[int, List[str]]:
+    """
+    For courses that already have base timetable rows, align section labels with
+    sandbox sections_normal / sections_summer (after apply_conditions).
+
+    - Fewer target sections than base: keep the first N base labels (order preserved).
+    - More target sections: append S{{k}} labels not colliding with existing keys.
+
+    Courses with no base rows (e.g. add_course) are handled separately in
+    ``_build_legacy_gwo_config`` so injected offerings always get a lecture list.
+    """
+    out: Dict[int, List[str]] = {}
+    for course_id in sorted(base_section_labels_by_course.keys()):
+        c = course_meta_by_id.get(course_id, {})
+        base_labels = list(base_section_labels_by_course.get(course_id, []))
+        default_want = len(base_labels)
+        if is_summer:
+            raw_want = c.get("sections_summer")
+        else:
+            raw_want = c.get("sections_normal")
+        try:
+            if raw_want is None or (isinstance(raw_want, str) and str(raw_want).strip() == ""):
+                want = default_want
+            else:
+                want = max(0, int(raw_want))
+        except Exception:
+            want = default_want
+        if want <= 0:
+            continue
+        labels = list(base_labels)
+        if len(labels) > want:
+            labels = labels[:want]
+        elif len(labels) < want:
+            need = want - len(labels)
+            used = {_normalize_section_number(x) for x in labels}
+            n = _max_numeric_section_index(labels)
+            for _ in range(need):
+                while True:
+                    n += 1
+                    cand = f"S{n}"
+                    key = _normalize_section_number(cand)
+                    if key and key not in used:
+                        used.add(key)
+                        labels.append(cand)
+                        break
+        out[course_id] = labels
+    return out
+
+
 def _build_legacy_gwo_config(
     config: Dict[str, Any],
     sandbox: Dict[str, Any],
@@ -276,18 +371,41 @@ def _build_legacy_gwo_config(
             if key[1] not in labels:
                 labels.append(key[1])
 
+    # After conditions: (1) courses with base entries — align counts to sandbox fields;
+    # (2) courses with no base rows — second loop below (add_course / negative IDs).
+    effective_section_labels_by_course = _effective_section_labels_by_course(
+        base_section_labels_by_course,
+        course_meta_by_id,
+        is_summer,
+    )
+
+    # add_course (and similar): no existing_entries → not in base_section_labels_by_course.
+    # Use max(sections_normal, sections_summer) so defaults work when the off-season field is 0.
+    for c in courses:
+        try:
+            inj_id = int(c.get("course_id"))
+        except Exception:
+            continue
+        if inj_id in base_section_labels_by_course:
+            continue
+        if inj_id in effective_section_labels_by_course:
+            continue
+        inj_want = max(
+            _nonneg_int_field(c.get("sections_normal")),
+            _nonneg_int_field(c.get("sections_summer")),
+        )
+        if inj_want <= 0:
+            continue
+        effective_section_labels_by_course[inj_id] = _synthesize_section_labels(inj_want)
+
     lectures_data: List[Dict[str, Any]] = []
     lecture_id = 1
-    # IMPORTANT: Scenario runs must keep the same number of scheduled sections
-    # as the base timetable. We therefore build the lecture list strictly from
-    # the base timetable's (course_id, section_number) keys, not from mutated
-    # course section counts in the sandbox.
-    base_course_ids_sorted = sorted(base_section_labels_by_course.keys())
-    for course_id in base_course_ids_sorted:
+    gwo_course_ids_sorted = sorted(effective_section_labels_by_course.keys())
+    for course_id in gwo_course_ids_sorted:
         c = course_meta_by_id.get(course_id, {})
         course_code = str(c.get("course_code") or f"COURSE_{course_id}").strip()
         course_name = str(c.get("course_name") or course_code)
-        section_labels = list(base_section_labels_by_course.get(course_id, []))
+        section_labels = list(effective_section_labels_by_course.get(course_id, []))
         if not section_labels:
             continue
 
@@ -1000,16 +1118,6 @@ def _apply_delete_room(sandbox: Dict, params: Dict) -> None:
             entry["room_id"] = None
 
 
-def _apply_adjust_room_capacity(sandbox: Dict, params: Dict) -> None:
-    """Change the capacity of an existing room."""
-    rid = params["roomId"]
-    new_cap = params["newCapacity"]
-    for room in sandbox["rooms"]:
-        if room["room_id"] == rid:
-            room["capacity"] = new_cap
-            break
-
-
 def _apply_add_course(sandbox: Dict, params: Dict) -> None:
     """Add a new course offering to be scheduled."""
     existing_ids = [c["course_id"] for c in sandbox["courses"]]
@@ -1131,7 +1239,6 @@ _APPLIERS = {
     "amend_lecturer":        _apply_amend_lecturer,
     "add_room":              _apply_add_room,
     "delete_room":           _apply_delete_room,
-    "adjust_room_capacity":  _apply_adjust_room_capacity,
     "add_course":            _apply_add_course,
     "change_section_count":  _apply_change_section_count,
     "change_delivery_mode":  _apply_change_delivery_mode,

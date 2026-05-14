@@ -19,6 +19,11 @@ import {
 /** Policy max workload (hours) shown and stored for all lecturers. */
 const STANDARD_MAX_WORKLOAD_HOURS = 15;
 
+export type CreateLecturerOptions = {
+  /** Default 10; lower values speed up creation (e.g. access-request approval). */
+  bcryptRounds?: number;
+};
+
 @Injectable()
 export class LecturersService {
   private readonly logger = new Logger(LecturersService.name);
@@ -197,8 +202,9 @@ export class LecturersService {
     };
   }
 
-  async create(dto: CreateLecturerDto) {
+  async create(dto: CreateLecturerDto, options?: CreateLecturerOptions) {
     const email = dto.email.trim().toLowerCase();
+    const bcryptRounds = options?.bcryptRounds ?? 10;
 
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
@@ -220,23 +226,25 @@ export class LecturersService {
       );
     }
 
-    // Find or create department
-    let department = await this.prisma.department.findFirst({
-      where: { dept_name: dto.department },
-    });
-
-    if (!department) {
-      department = await this.prisma.department.create({
-        data: { dept_name: dto.department },
-      });
-    }
-
-    // Create user first
     const temporaryPassword = this.generateTemporaryPassword();
-    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
     const nameParts = dto.name.split(" ");
     const firstName = nameParts[0] || "";
     const lastName = nameParts.slice(1).join(" ") || "";
+
+    const [department, hashedPassword] = await Promise.all([
+      (async () => {
+        let d = await this.prisma.department.findFirst({
+          where: { dept_name: dto.department },
+        });
+        if (!d) {
+          d = await this.prisma.department.create({
+            data: { dept_name: dto.department },
+          });
+        }
+        return d;
+      })(),
+      bcrypt.hash(temporaryPassword, bcryptRounds),
+    ]);
 
     let user: { user_id: number };
     try {
@@ -291,21 +299,20 @@ export class LecturersService {
       });
     }
 
-    try {
-      await this.mailService.sendLecturerWelcomeEmail({
+    void this.mailService
+      .sendLecturerWelcomeEmail({
         to: email,
         fullName: dto.name,
         temporaryPassword,
+      })
+      .catch((error: unknown) => {
+        this.logger.warn(
+          `Lecturer ${user.user_id} was created but welcome email failed for ${email}.`,
+        );
+        this.logger.debug(
+          error instanceof Error ? error.stack : JSON.stringify(error),
+        );
       });
-    } catch (error) {
-      // Email delivery should not block successful lecturer creation.
-      this.logger.warn(
-        `Lecturer ${user.user_id} was created but welcome email failed for ${email}.`,
-      );
-      this.logger.debug(
-        error instanceof Error ? error.stack : JSON.stringify(error),
-      );
-    }
 
     return {
       id: `LEC${String(lecturer.user_id).padStart(3, "0")}`,

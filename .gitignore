@@ -15,6 +15,9 @@ pnpm-debug.log*
 out/
 build/
 
+# Backend build output
+backend/dist/
+
 # Vercel
 .vercel
 
@@ -44,6 +47,14 @@ Desktop.ini
 
 # Testing
 coverage/
+
+# Python
+__pycache__/
+*.pyc
+
+# Optimizer generated artifacts
+schedule_output.txt
+.gwo_run_control
 
 # Misc
 *.log

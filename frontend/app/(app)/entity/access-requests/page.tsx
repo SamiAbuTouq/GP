@@ -26,6 +26,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
+import { ApiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 type TabKey = "PENDING" | "APPROVED" | "REJECTED";
@@ -170,9 +171,11 @@ function AccessRequestRow({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:shrink-0">
-            <Badge variant={badge.variant} className={cn("shrink-0", badge.className)}>
-              {badge.label}
-            </Badge>
+            {r.status !== "PENDING" ? (
+              <Badge variant={badge.variant} className={cn("shrink-0", badge.className)}>
+                {badge.label}
+              </Badge>
+            ) : null}
             {r.status === "PENDING" ? (
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" disabled={busy} onClick={() => void approve(r.requestId)}>
@@ -279,7 +282,6 @@ function AccessRequestsPanel({
   byTabRef.current = byTab;
 
   const [listRefreshing, setListRefreshing] = useState(false);
-  const [refetchTick, setRefetchTick] = useState(0);
   const [rejectReasonById, setRejectReasonById] = useState<Record<number, string>>({});
   const [actingId, setActingId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -301,7 +303,11 @@ function AccessRequestsPanel({
 
   const fetchTab = useCallback(
     async (tab: TabKey, signal?: AbortSignal): Promise<AccessRequest[]> => {
-      const res = await fetch(`/api/access-requests?status=${tab}`, { cache: "no-store", signal });
+      const res = await fetch(`/api/access-requests?status=${tab}`, {
+        cache: "no-store",
+        signal,
+        headers: ApiClient.proxyAuthorizationHeaders(),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load access requests.");
       const list = Array.isArray(data) ? data : [];
@@ -341,7 +347,7 @@ function AccessRequestsPanel({
     };
     // toast is stable from useToast; omit from deps to avoid extra refetches
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, refetchTick, fetchTab]);
+  }, [status, fetchTab]);
 
   useEffect(() => {
     setSearchQuery("");
@@ -351,19 +357,21 @@ function AccessRequestsPanel({
     onPendingCountChange(byTab.PENDING ? byTab.PENDING.length : null);
   }, [byTab.PENDING, onPendingCountChange]);
 
-  const bumpRefetch = useCallback(() => {
-    setRefetchTick((n) => n + 1);
-  }, []);
-
   const approve = async (id: number) => {
     setActingId(id);
     try {
-      const res = await fetch(`/api/access-requests/${id}/approve`, { method: "PATCH" });
+      const res = await fetch(`/api/access-requests/${id}/approve`, {
+        method: "PATCH",
+        headers: ApiClient.proxyAuthorizationHeaders(),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to approve request.");
       toast({ title: "Success", description: "Access request approved." });
-      setByTab((prev) => ({ ...prev, PENDING: undefined, APPROVED: undefined }));
-      if (status === "PENDING" || status === "APPROVED") bumpRefetch();
+      setByTab((prev) => ({
+        ...prev,
+        PENDING: prev.PENDING?.filter((r) => r.requestId !== id),
+        APPROVED: undefined,
+      }));
     } catch (e) {
       toast({
         title: "Error",
@@ -380,14 +388,20 @@ function AccessRequestsPanel({
     try {
       const res = await fetch(`/api/access-requests/${id}/reject`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          ...ApiClient.proxyAuthorizationHeaders(),
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ reason: rejectReasonById[id] || "" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to reject request.");
       toast({ title: "Success", description: "Access request rejected." });
-      setByTab((prev) => ({ ...prev, PENDING: undefined, REJECTED: undefined }));
-      if (status === "PENDING" || status === "REJECTED") bumpRefetch();
+      setByTab((prev) => ({
+        ...prev,
+        PENDING: prev.PENDING?.filter((r) => r.requestId !== id),
+        REJECTED: undefined,
+      }));
     } catch (e) {
       toast({
         title: "Error",
@@ -613,9 +627,11 @@ function CourseModificationRequestRow({
             </CollapsibleTrigger>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:shrink-0">
-            <Badge variant={badge.variant} className={cn("shrink-0", badge.className)}>
-              {badge.label}
-            </Badge>
+            {r.status !== "PENDING" ? (
+              <Badge variant={badge.variant} className={cn("shrink-0", badge.className)}>
+                {badge.label}
+              </Badge>
+            ) : null}
             {r.status === "PENDING" ? (
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" disabled={busy} onClick={() => void approve(r.requestId)}>
@@ -756,7 +772,6 @@ function CourseModificationRequestsPanel({
   byTabRef.current = byTab;
 
   const [listRefreshing, setListRefreshing] = useState(false);
-  const [refetchTick, setRefetchTick] = useState(0);
   const [rejectReasonById, setRejectReasonById] = useState<Record<number, string>>({});
   const [actingId, setActingId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -781,6 +796,7 @@ function CourseModificationRequestsPanel({
       const res = await fetch(`/api/course-modification-requests?status=${tab}`, {
         cache: "no-store",
         signal,
+        headers: ApiClient.proxyAuthorizationHeaders(),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load course modification requests.");
@@ -819,7 +835,7 @@ function CourseModificationRequestsPanel({
       setListRefreshing(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, refetchTick, fetchTab]);
+  }, [status, fetchTab]);
 
   useEffect(() => {
     setSearchQuery("");
@@ -829,19 +845,21 @@ function CourseModificationRequestsPanel({
     onPendingCountChange(byTab.PENDING ? byTab.PENDING.length : null);
   }, [byTab.PENDING, onPendingCountChange]);
 
-  const bumpRefetch = useCallback(() => {
-    setRefetchTick((n) => n + 1);
-  }, []);
-
   const approve = async (id: number) => {
     setActingId(id);
     try {
-      const res = await fetch(`/api/course-modification-requests/${id}/approve`, { method: "PATCH" });
+      const res = await fetch(`/api/course-modification-requests/${id}/approve`, {
+        method: "PATCH",
+        headers: ApiClient.proxyAuthorizationHeaders(),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to approve request.");
       toast({ title: "Success", description: "Course modification request approved." });
-      setByTab((prev) => ({ ...prev, PENDING: undefined, APPROVED: undefined }));
-      if (status === "PENDING" || status === "APPROVED") bumpRefetch();
+      setByTab((prev) => ({
+        ...prev,
+        PENDING: prev.PENDING?.filter((r) => r.requestId !== id),
+        APPROVED: undefined,
+      }));
     } catch (e) {
       toast({
         title: "Error",
@@ -858,14 +876,20 @@ function CourseModificationRequestsPanel({
     try {
       const res = await fetch(`/api/course-modification-requests/${id}/reject`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          ...ApiClient.proxyAuthorizationHeaders(),
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ reason: rejectReasonById[id] || "" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to reject request.");
       toast({ title: "Success", description: "Course modification request rejected." });
-      setByTab((prev) => ({ ...prev, PENDING: undefined, REJECTED: undefined }));
-      if (status === "PENDING" || status === "REJECTED") bumpRefetch();
+      setByTab((prev) => ({
+        ...prev,
+        PENDING: prev.PENDING?.filter((r) => r.requestId !== id),
+        REJECTED: undefined,
+      }));
     } catch (e) {
       toast({
         title: "Error",

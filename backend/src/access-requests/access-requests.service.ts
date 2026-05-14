@@ -14,8 +14,10 @@ import { ADMIN_NOTIFICATION_PREF_KEYS } from "../notifications/notification-pref
 import { MailService } from "../mail/mail.service";
 
 const EXPIRY_DAYS = 14;
-/** Avoid running the expiry sweep on every list request (tab switches); submit/approve still run it. */
+/** Avoid running the expiry sweep on every list or mutation within a short window. */
 const EXPIRE_SWEEP_MIN_INTERVAL_MS = 45_000;
+/** Faster bcrypt for auto-created accounts from access approval (still strong enough for temporary passwords). */
+const ACCESS_APPROVAL_BCRYPT_ROUNDS = 8;
 const GENERIC_ELIGIBILITY_MESSAGE =
   "If this email is eligible for access, you will be contacted with further instructions.";
 
@@ -206,7 +208,7 @@ export class AccessRequestsService {
   }
 
   async approve(requestId: number) {
-    await this.expirePendingRequests();
+    await this.expirePendingRequestsThrottled();
     const request = await this.prisma.lecturerAccessRequest.findUnique({
       where: { request_id: requestId },
     });
@@ -215,15 +217,18 @@ export class AccessRequestsService {
       throw new BadRequestException("Only pending requests can be approved.");
     }
 
-    await this.lecturersService.create({
-      name: request.full_name,
-      email: request.email,
-      department: request.department,
-      maxWorkload: request.max_workload,
-      courses: Array.isArray(request.courses)
-        ? request.courses.filter((c): c is string => typeof c === "string")
-        : [],
-    });
+    await this.lecturersService.create(
+      {
+        name: request.full_name,
+        email: request.email,
+        department: request.department,
+        maxWorkload: request.max_workload,
+        courses: Array.isArray(request.courses)
+          ? request.courses.filter((c): c is string => typeof c === "string")
+          : [],
+      },
+      { bcryptRounds: ACCESS_APPROVAL_BCRYPT_ROUNDS },
+    );
 
     const updated = await this.prisma.lecturerAccessRequest.update({
       where: { request_id: requestId },
@@ -237,7 +242,7 @@ export class AccessRequestsService {
   }
 
   async reject(requestId: number, dto: RejectAccessRequestDto) {
-    await this.expirePendingRequests();
+    await this.expirePendingRequestsThrottled();
     const request = await this.prisma.lecturerAccessRequest.findUnique({
       where: { request_id: requestId },
     });

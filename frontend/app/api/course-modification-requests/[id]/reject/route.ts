@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { proxyToBackend } from "@/lib/proxy-backend";
+import {
+  forwardedAuthorizationHeaders,
+  proxyToBackend,
+} from "@/lib/proxy-backend";
 
 export async function PATCH(
   request: Request,
@@ -15,6 +18,7 @@ export async function PATCH(
         body: JSON.stringify({
           reason: String(body.reason ?? "").trim() || undefined,
         }),
+        headers: forwardedAuthorizationHeaders(request),
       },
     );
   } catch {

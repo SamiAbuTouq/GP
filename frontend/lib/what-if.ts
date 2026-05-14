@@ -101,7 +101,6 @@ export const CONDITION_LABELS: Record<string, string> = {
   amend_lecturer: "Amend Lecturer",
   add_room: "Add Room",
   delete_room: "Remove Room",
-  adjust_room_capacity: "Adjust Room Capacity",
   add_course: "Add Course",
   change_section_count: "Change Section Count",
   change_delivery_mode: "Change Delivery Mode",
@@ -231,11 +230,7 @@ export function conditionParameterSummary(
       return full ? `${full} · max workload ${mw}` : `New lecturer · max workload ${mw}`;
     }
     case "delete_room":
-    case "adjust_room_capacity": {
-      const room = L(ctx.roomOptions, p.roomId) ?? `Room #${p.roomId ?? "?"}`;
-      if (c.type === "adjust_room_capacity") return `${room} → capacity ${p.newCapacity ?? "?"}`;
-      return room;
-    }
+      return L(ctx.roomOptions, p.roomId) ?? `Room #${p.roomId ?? "?"}`;
     case "add_room":
       return `Room ${p.roomNumber ?? "?"} · capacity ${p.capacity ?? "?"} · type ${p.roomType ?? "?"}`;
     case "add_course":
@@ -403,4 +398,11 @@ export function buildWhatIfCompareHref(opts: {
   if (opts.timetableId != null && opts.timetableId > 0) params.set("timetableId", String(opts.timetableId));
   const qs = params.toString();
   return qs ? `${WHAT_IF_COMPARE_PATH}?${qs}` : WHAT_IF_COMPARE_PATH;
+}
+
+/** Schedule Viewer with the base timetable pre-selected (after applying a scenario run). */
+export function scheduleHrefAfterScenarioApply(baseTimetableId: number | null | undefined): string {
+  const id = Number(baseTimetableId ?? 0);
+  if (Number.isFinite(id) && id > 0) return `/schedule?timetableId=${id}`;
+  return "/schedule";
 }

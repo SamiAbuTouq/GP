@@ -22,6 +22,7 @@ export declare class TimetablesService {
         isPublished: boolean;
         isScenarioResult: boolean;
         draftOrigin: "scenario" | "optimizer" | "other" | null;
+        sourceScenarioId: number | null;
         canUseAsScenarioBase: boolean;
         timetableKind: string;
         metrics: {
@@ -74,6 +75,7 @@ export declare class TimetablesService {
         isPublished: boolean;
         isScenarioResult: boolean;
         draftOrigin: "scenario" | "optimizer" | "other" | null;
+        sourceScenarioId: number | null;
         canUseAsScenarioBase: boolean;
         timetableKind: string;
         metrics: {

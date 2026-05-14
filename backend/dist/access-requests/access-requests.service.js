@@ -19,6 +19,7 @@ const notification_prefs_1 = require("../notifications/notification-prefs");
 const mail_service_1 = require("../mail/mail.service");
 const EXPIRY_DAYS = 14;
 const EXPIRE_SWEEP_MIN_INTERVAL_MS = 45_000;
+const ACCESS_APPROVAL_BCRYPT_ROUNDS = 8;
 const GENERIC_ELIGIBILITY_MESSAGE = "If this email is eligible for access, you will be contacted with further instructions.";
 let AccessRequestsService = class AccessRequestsService {
     constructor(prisma, lecturersService, notifications, mailService) {
@@ -168,7 +169,7 @@ let AccessRequestsService = class AccessRequestsService {
         }));
     }
     async approve(requestId) {
-        await this.expirePendingRequests();
+        await this.expirePendingRequestsThrottled();
         const request = await this.prisma.lecturerAccessRequest.findUnique({
             where: { request_id: requestId },
         });
@@ -185,7 +186,7 @@ let AccessRequestsService = class AccessRequestsService {
             courses: Array.isArray(request.courses)
                 ? request.courses.filter((c) => typeof c === "string")
                 : [],
-        });
+        }, { bcryptRounds: ACCESS_APPROVAL_BCRYPT_ROUNDS });
         const updated = await this.prisma.lecturerAccessRequest.update({
             where: { request_id: requestId },
             data: {
@@ -197,7 +198,7 @@ let AccessRequestsService = class AccessRequestsService {
         return this.mapRow(updated);
     }
     async reject(requestId, dto) {
-        await this.expirePendingRequests();
+        await this.expirePendingRequestsThrottled();
         const request = await this.prisma.lecturerAccessRequest.findUnique({
             where: { request_id: requestId },
         });

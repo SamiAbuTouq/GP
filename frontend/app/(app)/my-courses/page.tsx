@@ -344,10 +344,12 @@ export default function MyCoursesPage() {
                           Courses to remove
                         </p>
                         <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-2">
-                          {authorizedCourses.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No authorized courses available.</p>
-                          ) : removableCourses.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">All courses are marked for removal.</p>
+                          {removableCourses.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                              {authorizedCourses.length === 0
+                                ? "No authorized courses to remove yet. Courses you select to add will appear here so you can undo them."
+                                : "All courses are marked for removal."}
+                            </p>
                           ) : (
                             removableCourses.map((course) => (
                               <div

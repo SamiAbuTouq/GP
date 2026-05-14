@@ -75,7 +75,7 @@ function filterSlotsBySemester(slots: TimeSlot[], filter: TimeslotListFilter): T
 }
 
 const allDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"]
-type SortField = "days" | "duration"
+type SortField = "days" | "duration" | "type"
 type SortDirection = "asc" | "desc"
 type WeeklyOverviewGroupBy = "days" | "type"
 
@@ -623,6 +623,12 @@ export default function TimeSlotsPage() {
     return endH * 60 + endM - (startH * 60 + startM)
   }
 
+  const getSlotTypeSortValue = (slotType: SlotType) => {
+    const canonical = getCanonicalSlotType(slotType)
+    const idx = slotTypes.findIndex((t) => t === canonical)
+    return idx === -1 ? Number.MAX_SAFE_INTEGER : idx
+  }
+
   const getDaySortValue = (days: string[]) => {
     const dayIndexes = days.map((d) => allDays.indexOf(d)).filter((i) => i >= 0)
     const firstIndex = dayIndexes.length > 0 ? Math.min(...dayIndexes) : Number.MAX_SAFE_INTEGER
@@ -654,6 +660,24 @@ export default function TimeSlotsPage() {
 
       if (sortField === "duration") {
         comparison = getDurationMinutes(a.start, a.end) - getDurationMinutes(b.start, b.end)
+        if (comparison === 0) {
+          const aDays = getDaySortValue(a.days)
+          const bDays = getDaySortValue(b.days)
+          comparison = aDays.firstIndex - bDays.firstIndex
+          if (comparison === 0) comparison = aDays.count - bDays.count
+          if (comparison === 0) comparison = aDays.label.localeCompare(bDays.label)
+        }
+        if (comparison === 0) comparison = a.start.localeCompare(b.start)
+        if (comparison === 0) comparison = a.id - b.id
+      } else if (sortField === "type") {
+        comparison = getSlotTypeSortValue(a.slotType) - getSlotTypeSortValue(b.slotType)
+        if (comparison === 0) {
+          const aLabel = getCanonicalSlotType(a.slotType)
+          const bLabel = getCanonicalSlotType(b.slotType)
+          comparison = aLabel.localeCompare(bLabel)
+        }
+        if (comparison === 0)
+          comparison = getDurationMinutes(a.start, a.end) - getDurationMinutes(b.start, b.end)
         if (comparison === 0) {
           const aDays = getDaySortValue(a.days)
           const bDays = getDaySortValue(b.days)
@@ -1036,7 +1060,27 @@ export default function TimeSlotsPage() {
                         )}
                       </button>
                     </TableHead>
-                    <TableHead>Type</TableHead>
+                    <TableHead>
+                      <button
+                        type="button"
+                        className={cn(
+                          "inline-flex items-center gap-1 font-medium hover:text-foreground",
+                          sortField === "type" ? "text-foreground" : "text-muted-foreground",
+                        )}
+                        onClick={() => handleSort("type")}
+                      >
+                        Type
+                        {sortField === "type" ? (
+                          sortDirection === "asc" ? (
+                            <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          ) : (
+                            <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+                        )}
+                      </button>
+                    </TableHead>
                     <TableHead>Semester</TableHead>
                     <TableHead className="w-[70px]">Actions</TableHead>
                   </TableRow>

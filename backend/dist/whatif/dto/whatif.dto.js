@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DeleteScenarioQueryDto = exports.ApplyScenarioRunDto = exports.CompareDto = exports.CompareMode = exports.ControlRunDto = exports.RunScenarioDto = exports.UpdateScenarioDto = exports.CreateScenarioDto = exports.ConditionDto = exports.DeleteTimeslotParams = exports.AddTimeslotParams = exports.ChangeDeliveryModeParams = exports.ChangeSectionCountParams = exports.AddCourseParams = exports.AdjustRoomCapacityParams = exports.DeleteRoomParams = exports.AddRoomParams = exports.AmendLecturerParams = exports.DeleteLecturerParams = exports.AddLecturerParams = exports.ConditionType = void 0;
+exports.DeleteScenarioQueryDto = exports.ApplyScenarioRunDto = exports.CompareDto = exports.CompareMode = exports.ControlRunDto = exports.RunScenarioDto = exports.UpdateScenarioDto = exports.CreateScenarioDto = exports.ConditionDto = exports.DeleteTimeslotParams = exports.AddTimeslotParams = exports.ChangeDeliveryModeParams = exports.ChangeSectionCountParams = exports.AddCourseParams = exports.DeleteRoomParams = exports.AddRoomParams = exports.AmendLecturerParams = exports.DeleteLecturerParams = exports.AddLecturerParams = exports.ConditionType = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 var ConditionType;
@@ -19,7 +19,6 @@ var ConditionType;
     ConditionType["AMEND_LECTURER"] = "amend_lecturer";
     ConditionType["ADD_ROOM"] = "add_room";
     ConditionType["DELETE_ROOM"] = "delete_room";
-    ConditionType["ADJUST_ROOM_CAPACITY"] = "adjust_room_capacity";
     ConditionType["ADD_COURSE"] = "add_course";
     ConditionType["CHANGE_SECTION_COUNT"] = "change_section_count";
     ConditionType["CHANGE_DELIVERY_MODE"] = "change_delivery_mode";
@@ -112,19 +111,6 @@ __decorate([
     (0, class_validator_1.Min)(1),
     __metadata("design:type", Number)
 ], DeleteRoomParams.prototype, "roomId", void 0);
-class AdjustRoomCapacityParams {
-}
-exports.AdjustRoomCapacityParams = AdjustRoomCapacityParams;
-__decorate([
-    (0, class_validator_1.IsInt)(),
-    (0, class_validator_1.Min)(1),
-    __metadata("design:type", Number)
-], AdjustRoomCapacityParams.prototype, "roomId", void 0);
-__decorate([
-    (0, class_validator_1.IsInt)(),
-    (0, class_validator_1.Min)(1),
-    __metadata("design:type", Number)
-], AdjustRoomCapacityParams.prototype, "newCapacity", void 0);
 class AddCourseParams {
 }
 exports.AddCourseParams = AddCourseParams;

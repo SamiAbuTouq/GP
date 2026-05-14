@@ -18,6 +18,10 @@ const ELIGIBILITY_MESSAGE =
 const INPUT_BASE_CLASSES =
   "h-12 rounded-[10px] border px-4 text-white placeholder:text-white/45 backdrop-blur-[4px] transition-all duration-300 ease-out focus:outline-none focus:bg-white/[0.14] focus:border-[#48CAE4] focus:shadow-[0_0_0_3px_rgba(72,202,228,0.18)] bg-white/[0.08] border-white/[0.18]";
 
+// hover:!bg keeps the gradient instead of the default `Button` hover:bg-primary/90.
+const PRIMARY_ACTION_CLASSES =
+  "rounded-xl bg-[linear-gradient(135deg,#2563EB_0%,#1E54B7_100%)] text-base font-semibold text-white shadow-none transition-[transform,box-shadow,filter] duration-200 ease-out hover:-translate-y-px hover:shadow-[0_8px_28px_rgba(37,99,235,0.45)] hover:brightness-110 hover:!bg-[linear-gradient(135deg,#2563EB_0%,#1E54B7_100%)] active:translate-y-0 active:shadow-none active:brightness-100 disabled:pointer-events-none disabled:opacity-70 disabled:hover:translate-y-0 disabled:hover:shadow-none disabled:hover:brightness-100";
+
 export default function LecturerAccessRequestPage() {
   const [step, setStep] = useState<1 | 2>(1);
   const [fullName, setFullName] = useState("");
@@ -155,8 +159,8 @@ export default function LecturerAccessRequestPage() {
   };
 
   return (
-    <div className="forgot-theme min-h-screen overflow-hidden lg:h-screen lg:grid lg:grid-cols-[42%_58%]">
-      <div className="relative hidden lg:flex overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)]">
+    <div className="forgot-theme min-h-screen overflow-x-hidden lg:grid lg:h-screen lg:max-h-screen lg:grid-cols-[42%_58%]">
+      <div className="relative hidden min-h-0 lg:flex lg:h-full overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)]">
         <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col items-center justify-start px-12 pt-20 pb-16 text-center">
           <Image src="/images/logo.png" alt="PSUT Logo" width={180} height={180} className="object-contain" priority />
           <h1 className="mt-8 text-5xl font-bold leading-tight text-[var(--text-primary)]">
@@ -181,8 +185,8 @@ export default function LecturerAccessRequestPage() {
           }}
         />
       </div>
-      <div className="relative overflow-hidden p-6 lg:h-screen lg:p-10 [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)]">
-        <div className="relative mx-auto flex min-h-screen w-full max-w-md items-start py-6 lg:h-full lg:min-h-0 lg:items-start lg:pt-10">
+      <div className="relative min-h-0 overflow-x-hidden overflow-y-auto p-6 lg:h-full lg:p-10 [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)]">
+        <div className="relative mx-auto flex min-h-min w-full max-w-md items-start py-6 pb-12 lg:min-h-full lg:items-start lg:pt-10 lg:pb-16">
           <div className="w-full py-2 lg:py-0">
             {submitted ? (
               <div className="text-center space-y-6">
@@ -193,7 +197,7 @@ export default function LecturerAccessRequestPage() {
                 <p className="text-[0.95rem] text-white/70">
                   Your request is now pending review. You will receive an email after it is reviewed.
                 </p>
-                <Button asChild className="h-12 w-full rounded-xl bg-[linear-gradient(135deg,#2563EB_0%,#1E54B7_100%)]">
+                <Button asChild className={`h-12 w-full ${PRIMARY_ACTION_CLASSES}`}>
                   <Link href="/login" className="flex items-center justify-center gap-2">
                     <ArrowLeft className="w-5 h-5" />
                     Back to Sign In
@@ -222,6 +226,7 @@ export default function LecturerAccessRequestPage() {
                         <Label className="text-white/85">Full name</Label>
                         <Input
                           className={INPUT_BASE_CLASSES}
+                          placeholder="Enter your full name"
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
                         />
@@ -232,6 +237,7 @@ export default function LecturerAccessRequestPage() {
                           <Input
                             className={`${INPUT_BASE_CLASSES} pr-12`}
                             type="email"
+                            placeholder="you@example.com"
                             value={email}
                             onBlur={() => void checkEmail(email)}
                             onChange={(e) => {
@@ -328,7 +334,7 @@ export default function LecturerAccessRequestPage() {
                     <Button
                       type="button"
                       onClick={() => void goToStepTwo()}
-                      className="h-12 w-full rounded-xl bg-[linear-gradient(135deg,#2563EB_0%,#1E54B7_100%)] text-base font-semibold text-white"
+                      className={`h-12 w-full ${PRIMARY_ACTION_CLASSES}`}
                     >
                       Next
                     </Button>
@@ -338,22 +344,25 @@ export default function LecturerAccessRequestPage() {
                         type="button"
                         variant="outline"
                         onClick={() => setStep(1)}
-                        className="h-12 flex-1 border-white/20 bg-white/5 text-white hover:bg-white/10"
+                        className="h-12 flex-1 rounded-xl border-white/20 bg-white/5 text-white shadow-none transition-[transform,box-shadow,background-color,border-color] duration-200 ease-out hover:-translate-y-px hover:border-[#48CAE4]/45 hover:bg-white/[0.14] hover:!text-white hover:shadow-[0_0_0_3px_rgba(72,202,228,0.14)] active:translate-y-0 active:shadow-none"
                       >
                         Back
                       </Button>
                       <Button
                         type="submit"
                         disabled={submitting}
-                        className="h-12 flex-1 rounded-xl bg-[linear-gradient(135deg,#2563EB_0%,#1E54B7_100%)] text-base font-semibold text-white"
+                        className={`h-12 flex-1 ${PRIMARY_ACTION_CLASSES}`}
                       >
                         {submitting ? "Submitting..." : "Submit Request"}
                       </Button>
                     </div>
                   )}
-                  <div className="text-center">
-                    <Link href="/login" className="inline-flex items-center gap-2 text-sm font-medium text-[#48CAE4] hover:text-[#90E0EF]">
-                      <ArrowLeft className="w-4 h-4" />
+                  <div className="scroll-mt-6 pt-2 text-center">
+                    <Link
+                      href="/login"
+                      className="group inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-[#48CAE4] transition-[color,transform,background-color] duration-200 ease-out hover:-translate-y-px hover:bg-white/[0.06] hover:text-[#90E0EF] active:translate-y-0"
+                    >
+                      <ArrowLeft className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:-translate-x-0.5" />
                       Back to Sign In
                     </Link>
                   </div>

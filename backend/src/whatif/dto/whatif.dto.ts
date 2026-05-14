@@ -1,7 +1,7 @@
 // src/whatif/dto/whatif.dto.ts
 // =============================================================================
 // All DTOs for the What-If Scenario system.
-// Covers the 11 condition types mandated by the spec.
+// Covers the supported what-if condition types.
 // =============================================================================
 
 import {
@@ -33,7 +33,6 @@ export enum ConditionType {
   // Room mutations
   ADD_ROOM = "add_room",
   DELETE_ROOM = "delete_room",
-  ADJUST_ROOM_CAPACITY = "adjust_room_capacity",
   // Course / section mutations
   ADD_COURSE = "add_course",
   CHANGE_SECTION_COUNT = "change_section_count",
@@ -83,12 +82,6 @@ export class AddRoomParams {
 /** delete_room: remove room; sections using it become unassigned */
 export class DeleteRoomParams {
   @IsInt() @Min(1) roomId!: number;
-}
-
-/** adjust_room_capacity: change capacity of existing room */
-export class AdjustRoomCapacityParams {
-  @IsInt() @Min(1) roomId!: number;
-  @IsInt() @Min(1) newCapacity!: number;
 }
 
 /** add_course: add a new course offering to be scheduled */

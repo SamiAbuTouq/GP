@@ -259,7 +259,7 @@ model ScenarioCondition {
   condition_id   Int    @id @default(autoincrement())
   scenario_id    Int
   /// One of: add_lecturer | delete_lecturer | amend_lecturer |
-  ///         add_room | delete_room | adjust_room_capacity |
+  ///         add_room | delete_room |
   ///         add_course | change_section_count |
   ///         add_timeslot | delete_timeslot | change_delivery_mode
   condition_type String @db.VarChar(50)

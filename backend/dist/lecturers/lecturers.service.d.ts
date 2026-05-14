@@ -2,6 +2,9 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateLecturerDto, UpdateLecturerDto } from "./dto/lecturer.dto";
 import { MailService } from "../mail/mail.service";
 import { NotificationsService } from "../notifications/notifications.service";
+export type CreateLecturerOptions = {
+    bcryptRounds?: number;
+};
 export declare class LecturersService {
     private prisma;
     private readonly mailService;
@@ -36,7 +39,7 @@ export declare class LecturersService {
         courses: string[];
         isAvailable: boolean;
     }>;
-    create(dto: CreateLecturerDto): Promise<{
+    create(dto: CreateLecturerDto, options?: CreateLecturerOptions): Promise<{
         id: string;
         databaseId: number;
         name: string;

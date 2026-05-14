@@ -4,7 +4,6 @@ export declare enum ConditionType {
     AMEND_LECTURER = "amend_lecturer",
     ADD_ROOM = "add_room",
     DELETE_ROOM = "delete_room",
-    ADJUST_ROOM_CAPACITY = "adjust_room_capacity",
     ADD_COURSE = "add_course",
     CHANGE_SECTION_COUNT = "change_section_count",
     CHANGE_DELIVERY_MODE = "change_delivery_mode",
@@ -34,10 +33,6 @@ export declare class AddRoomParams {
 }
 export declare class DeleteRoomParams {
     roomId: number;
-}
-export declare class AdjustRoomCapacityParams {
-    roomId: number;
-    newCapacity: number;
 }
 export declare class AddCourseParams {
     courseCode: string;

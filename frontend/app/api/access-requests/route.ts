@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
-import { proxyToBackend } from '@/lib/proxy-backend';
+import { forwardedAuthorizationHeaders, proxyToBackend } from '@/lib/proxy-backend';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status');
   const suffix = status ? `?status=${encodeURIComponent(status)}` : '';
-  return proxyToBackend(`/access-requests${suffix}`, { method: 'GET' });
+  return proxyToBackend(`/access-requests${suffix}`, {
+    method: 'GET',
+    headers: forwardedAuthorizationHeaders(request),
+  });
 }
 
 export async function POST(request: Request) {
@@ -21,6 +24,7 @@ export async function POST(request: Request) {
     return proxyToBackend('/access-requests', {
       method: 'POST',
       body: JSON.stringify(payload),
+      headers: forwardedAuthorizationHeaders(request),
     });
   } catch {
     return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });

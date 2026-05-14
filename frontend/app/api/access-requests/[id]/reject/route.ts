@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { proxyToBackend } from '@/lib/proxy-backend';
+import { forwardedAuthorizationHeaders, proxyToBackend } from '@/lib/proxy-backend';
 
 export async function PATCH(
   request: Request,
@@ -11,6 +11,7 @@ export async function PATCH(
     return proxyToBackend(`/access-requests/${encodeURIComponent(id)}/reject`, {
       method: 'PATCH',
       body: JSON.stringify({ reason: String(body.reason ?? '').trim() || undefined }),
+      headers: forwardedAuthorizationHeaders(request),
     });
   } catch {
     return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });

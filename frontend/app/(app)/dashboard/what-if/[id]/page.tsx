@@ -29,6 +29,7 @@ import {
   getScenario,
   getScenarios,
   getTimetables,
+  scheduleHrefAfterScenarioApply,
   type Scenario,
   type TimetableOption,
   type WhatIfLookupOption,
@@ -1073,7 +1074,7 @@ export default function WhatIfScenarioDetailPage() {
                 });
                 setApplySuccess("Scenario applied successfully.");
                 toast({ title: "Scenario applied" });
-                router.push("/timetable-generation");
+                router.push(scheduleHrefAfterScenarioApply(scenario.latestRun.baseTimetableId));
               } catch (error: unknown) {
                 toast({
                   title: "Apply failed",

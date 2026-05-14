@@ -1,7 +1,10 @@
-import { proxyToBackend } from "@/lib/proxy-backend";
+import {
+  forwardedAuthorizationHeaders,
+  proxyToBackend,
+} from "@/lib/proxy-backend";
 
 export async function PATCH(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -9,6 +12,7 @@ export async function PATCH(
     `/course-modification-requests/${encodeURIComponent(id)}/approve`,
     {
       method: "PATCH",
+      headers: forwardedAuthorizationHeaders(request),
     },
   );
 }

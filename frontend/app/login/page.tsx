@@ -13,6 +13,7 @@ import {
   WifiOff,
   ServerCrash,
   Mail,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -166,8 +167,8 @@ function LoginPageContent() {
       : "";
 
   return (
-    <div className="login-theme min-h-screen lg:grid lg:grid-cols-[42%_58%]">
-      <div className="relative hidden lg:flex overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)]">
+    <div className="login-theme min-h-dvh lg:grid lg:h-dvh lg:max-h-dvh lg:grid-cols-[42%_58%]">
+      <div className="relative hidden lg:flex lg:h-full lg:min-h-0 overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)]">
         <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col items-center justify-start px-12 pt-20 pb-16 text-center">
           <Image
             src="/images/logo.png"
@@ -181,7 +182,7 @@ function LoginPageContent() {
             <span>Smart University</span>
             <br />
             <span className="bg-gradient-to-r from-[#1E54B7] via-[#2563EB] to-[#48CAE4] bg-clip-text text-transparent">
-              Timetable
+              Timetabling
             </span>
             <br />
             <span>System</span>
@@ -202,12 +203,12 @@ function LoginPageContent() {
         />
       </div>
 
-      <div className="relative overflow-hidden p-6 lg:p-12 [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)]">
+      <div className="relative overflow-hidden p-6 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:p-12 [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)]">
         <div className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_70%_80%,rgba(0,180,216,0.12)_0%,transparent_60%),radial-gradient(circle_at_20%_60%,rgba(37,99,235,0.15)_0%,transparent_50%)]" />
-        <div className="relative mx-auto flex min-h-screen w-full max-w-md items-center py-10 lg:min-h-0">
-          <div className="w-full py-4 lg:py-8">
-            <div className="mb-8">
-              <h2 className="mb-2 text-[2rem] font-bold tracking-[-0.02em] text-white">
+        <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-1 items-center py-8 lg:min-h-0 lg:py-6">
+          <div className="w-full py-3 lg:py-6">
+            <div className="mb-4 lg:mb-3">
+              <h2 className="mb-1.5 text-[2rem] font-bold tracking-[-0.02em] text-white lg:mb-2">
                 Welcome back
               </h2>
               <p className="text-[0.95rem] text-white/60">
@@ -215,19 +216,20 @@ function LoginPageContent() {
               </p>
             </div>
 
-            <form noValidate onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <div
-              className="error-banner flex items-start gap-3 rounded-[10px] border border-red-400/40 bg-red-500/12 p-4 text-[0.9rem] text-[#FCA5A5] animate-[fadeIn_0.3s_ease]"
-            >
-              {getErrorIcon()}
-              <div className="flex-1">
-                <p className="font-medium">{error.message}</p>
-              </div>
-            </div>
-          )}
+            <form noValidate onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <div
+                  role="alert"
+                  className="error-banner flex w-full items-start gap-2.5 rounded-[10px] border border-red-400/40 bg-red-500/12 px-3 py-2 text-[0.875rem] text-[#FCA5A5] animate-[fadeIn_0.3s_ease] sm:gap-3 sm:px-3.5 sm:py-2.5 sm:text-[0.9rem]"
+                >
+                  <span className="mt-0.5 flex-shrink-0">{getErrorIcon()}</span>
+                  <div className="min-w-0 flex-1 pt-0.5 sm:pt-0">
+                    <p className="font-medium leading-snug">{error.message}</p>
+                  </div>
+                </div>
+              )}
 
-          <div className="form-field space-y-2">
+              <div className="form-field space-y-2">
             <Label
               htmlFor="email"
               className="text-[0.875rem] font-medium tracking-[0.01em] text-white/85"
@@ -366,9 +368,10 @@ function LoginPageContent() {
               <span>Are you a lecturer? </span>
               <Link
                 href="/lecturer-access-request"
-                className="font-medium text-[#48CAE4] transition-colors hover:text-[#90E0EF]"
+                className="group inline-flex items-center gap-1.5 font-medium text-[#48CAE4] transition-[color,transform] duration-200 ease-out hover:text-[#90E0EF]"
               >
-                Request access →
+                Request access
+                <ArrowRight className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" />
               </Link>
             </p>
 

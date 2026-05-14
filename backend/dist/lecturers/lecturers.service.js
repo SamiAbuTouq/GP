@@ -187,8 +187,9 @@ let LecturersService = LecturersService_1 = class LecturersService {
             isAvailable: lecturer.is_available,
         };
     }
-    async create(dto) {
+    async create(dto, options) {
         const email = dto.email.trim().toLowerCase();
+        const bcryptRounds = options?.bcryptRounds ?? 10;
         const existingUser = await this.prisma.user.findUnique({
             where: { email },
             select: { user_id: true, role_name: true },
@@ -203,19 +204,24 @@ let LecturersService = LecturersService_1 = class LecturersService {
             }
             throw new common_1.ConflictException("This email is already registered to another account. Use a different email or update the existing user.");
         }
-        let department = await this.prisma.department.findFirst({
-            where: { dept_name: dto.department },
-        });
-        if (!department) {
-            department = await this.prisma.department.create({
-                data: { dept_name: dto.department },
-            });
-        }
         const temporaryPassword = this.generateTemporaryPassword();
-        const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
         const nameParts = dto.name.split(" ");
         const firstName = nameParts[0] || "";
         const lastName = nameParts.slice(1).join(" ") || "";
+        const [department, hashedPassword] = await Promise.all([
+            (async () => {
+                let d = await this.prisma.department.findFirst({
+                    where: { dept_name: dto.department },
+                });
+                if (!d) {
+                    d = await this.prisma.department.create({
+                        data: { dept_name: dto.department },
+                    });
+                }
+                return d;
+            })(),
+            bcrypt.hash(temporaryPassword, bcryptRounds),
+        ]);
         let user;
         try {
             user = await this.prisma.user.create({
@@ -260,17 +266,16 @@ let LecturersService = LecturersService_1 = class LecturersService {
                 })),
             });
         }
-        try {
-            await this.mailService.sendLecturerWelcomeEmail({
-                to: email,
-                fullName: dto.name,
-                temporaryPassword,
-            });
-        }
-        catch (error) {
+        void this.mailService
+            .sendLecturerWelcomeEmail({
+            to: email,
+            fullName: dto.name,
+            temporaryPassword,
+        })
+            .catch((error) => {
             this.logger.warn(`Lecturer ${user.user_id} was created but welcome email failed for ${email}.`);
             this.logger.debug(error instanceof Error ? error.stack : JSON.stringify(error));
-        }
+        });
         return {
             id: `LEC${String(lecturer.user_id).padStart(3, "0")}`,
             databaseId: lecturer.user_id,

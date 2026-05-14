@@ -465,28 +465,52 @@ async function main() {
   console.log(`   Rooms done\n`);
 
   // ── 5. COURSES ───────────────────────────────────
-  // Group by course_code and pick the most common delivery mode
+  // Group by course_code and pick delivery mode from the latest semester present in the CSV.
   const courseSet = new Map<
     string,
-    { name: string; deptId: number; modes: DeliveryMode[]; isLab: boolean; creditSamples: number[] }
+    {
+      name: string;
+      deptId: number;
+      mode: DeliveryMode;
+      latestSemKey: string | null;
+      latestRowIndex: number;
+      isLab: boolean;
+      creditSamples: number[];
+    }
   >();
-  for (const r of rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
     const code = r.Course_Number;
     const rowIsLab = parseIsLab(r.islab);
     const creditCell = parseCreditHoursCell(r);
+    const rowSemKey = r.Year && r.Semester ? `${r.Year}|${r.Semester}` : null;
+    const rowMode = deliveryMode(r.Online);
     if (!courseSet.has(code)) {
       courseSet.set(code, {
         name: r.English_Name,
         deptId: parseInt(r.Department_ID, 10),
-        modes: [deliveryMode(r.Online)],
+        mode: rowMode,
+        latestSemKey: rowSemKey,
+        latestRowIndex: i,
         isLab: rowIsLab,
         creditSamples: creditCell != null ? [creditCell] : [],
       });
     } else {
       const cur = courseSet.get(code)!;
-      cur.modes.push(deliveryMode(r.Online));
       if (rowIsLab) cur.isLab = true;
       if (creditCell != null) cur.creditSamples.push(creditCell);
+
+      // Update delivery mode if this row is in a later semester, or later in the file within the same semester.
+      if (rowSemKey != null) {
+        const curKey = cur.latestSemKey;
+        const isNewerSemester = curKey == null || compareSemesterKeys(curKey, rowSemKey) < 0;
+        const isSameSemesterLaterRow = curKey === rowSemKey && i > cur.latestRowIndex;
+        if (isNewerSemester || isSameSemesterLaterRow) {
+          cur.latestSemKey = rowSemKey;
+          cur.latestRowIndex = i;
+          cur.mode = rowMode;
+        }
+      }
     }
   }
   const semesterKeysFromRows = new Set<string>();
@@ -512,14 +536,7 @@ async function main() {
   console.log(`Seeding ${courseSet.size} courses...`);
   const courseIdMap = new Map<string, number>(); // course_code → course_id
   for (const [code, info] of courseSet) {
-    // Pick most frequent delivery mode
-    const mc = new Map<DeliveryMode, number>();
-    for (const m of info.modes) mc.set(m, (mc.get(m) ?? 0) + 1);
-    let mode: DeliveryMode = "FACE_TO_FACE";
-    let maxCount = 0;
-    for (const [m, c] of mc) {
-      if (c > maxCount) { maxCount = c; mode = m; }
-    }
+    const mode = info.mode;
 
     const level = academicLevel(code);
     const creditHours = mostFrequentInt(info.creditSamples, 3);

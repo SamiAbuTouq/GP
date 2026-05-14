@@ -74,6 +74,14 @@ let TimetablesService = class TimetablesService {
         const resultRunCount = typeof t._count?.scenario_runs_as_result === "number"
             ? t._count.scenario_runs_as_result
             : 0;
+        const runsAsResult = Array.isArray(t.scenario_runs_as_result)
+            ? t.scenario_runs_as_result
+            : [];
+        const primaryResultRun = runsAsResult[0];
+        const sourceScenarioId = typeof primaryResultRun?.scenario_id === "number" &&
+            Number.isFinite(primaryResultRun.scenario_id)
+            ? primaryResultRun.scenario_id
+            : null;
         const isScenarioResult = t.generation_type === "what_if" || resultRunCount > 0;
         const canUseAsScenarioBase = !isScenarioResult;
         const draftOrigin = isDraft
@@ -100,6 +108,7 @@ let TimetablesService = class TimetablesService {
             isPublished: !isDraft,
             isScenarioResult,
             draftOrigin,
+            sourceScenarioId,
             canUseAsScenarioBase,
             timetableKind: isDraft ? "draft" : "published",
             metrics: t.timetable_metrics
@@ -139,6 +148,11 @@ let TimetablesService = class TimetablesService {
                 semester: true,
                 timetable_metrics: true,
                 _count: { select: { scenario_runs_as_result: true } },
+                scenario_runs_as_result: {
+                    select: { scenario_id: true, run_id: true },
+                    orderBy: { run_id: "desc" },
+                    take: 1,
+                },
             },
             orderBy: [{ generated_at: "desc" }, { timetable_id: "desc" }],
         });
@@ -305,6 +319,11 @@ let TimetablesService = class TimetablesService {
                 semester: true,
                 timetable_metrics: true,
                 _count: { select: { scenario_runs_as_result: true } },
+                scenario_runs_as_result: {
+                    select: { scenario_id: true, run_id: true },
+                    orderBy: { run_id: "desc" },
+                    take: 1,
+                },
             },
         });
         const semesterLabel = `${academicYear} (${decodeSemesterType(semesterType)})`;

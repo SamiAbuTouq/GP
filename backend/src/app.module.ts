@@ -17,8 +17,6 @@ import { AccessRequestsModule } from "./access-requests/access-requests.module";
 import { CourseModificationRequestsModule } from "./course-modification-requests/course-modification-requests.module";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 import { RolesGuard } from "./common/guards/roles.guard";
-import { AppController } from "./app.controller";
-import { AppService } from "./app.service";
 
 @Module({
   imports: [
@@ -42,9 +40,8 @@ import { AppService } from "./app.service";
     AccessRequestsModule,
     CourseModificationRequestsModule,
   ],
-  controllers: [AppController],
+  controllers: [],
   providers: [
-    AppService,
     // Apply JwtAuthGuard globally — use @Public() to opt out per route
     {
       provide: APP_GUARD,

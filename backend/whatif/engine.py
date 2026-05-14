@@ -33,7 +33,7 @@ from .models import (
 from .schemas import (
     MetricsSnapshot, ProgressEvent,
     AddLecturerParams, DeleteLecturerParams, AmendLecturerParams,
-    AddRoomParams, DeleteRoomParams, AdjustRoomCapacityParams,
+    AddRoomParams, DeleteRoomParams,
     AddCourseParams, ChangeSectionCountParams, ChangeDeliveryModeParams,
     AddTimeslotParams, DeleteTimeslotParams,
     CONDITION_PARAMS_MAP
@@ -249,7 +249,6 @@ def apply_condition(sandbox: Dict[str, Any], condition: ScenarioCondition) -> No
         ConditionType.AMEND_LECTURER:       _apply_amend_lecturer,
         ConditionType.ADD_ROOM:             _apply_add_room,
         ConditionType.DELETE_ROOM:          _apply_delete_room,
-        ConditionType.ADJUST_ROOM_CAPACITY: _apply_adjust_room_capacity,
         ConditionType.ADD_COURSE:           _apply_add_course,
         ConditionType.CHANGE_SECTION_COUNT: _apply_change_section_count,
         ConditionType.CHANGE_DELIVERY_MODE: _apply_change_delivery_mode,
@@ -316,13 +315,6 @@ def _apply_delete_room(sandbox: Dict, params: DeleteRoomParams) -> None:
         e for e in sandbox.get("schedule_entries", [])
         if e.get("room_id") != params.roomId
     ]
-
-
-def _apply_adjust_room_capacity(sandbox: Dict, params: AdjustRoomCapacityParams) -> None:
-    for room in sandbox.get("rooms", []):
-        if room.get("room_id") == params.roomId:
-            room["capacity"] = params.newCapacity
-            break
 
 
 def _apply_add_course(sandbox: Dict, params: AddCourseParams) -> None:

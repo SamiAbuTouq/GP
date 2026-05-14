@@ -45,6 +45,17 @@ async function getAccessTokenFromRefreshCookie(
   }
 }
 
+/**
+ * Forward `Authorization` from the browser request so `proxyToBackend` can skip
+ * the extra `/auth/refresh` round-trip when the client already has a bearer token.
+ */
+export function forwardedAuthorizationHeaders(request: Request): Record<string, string> {
+  const raw =
+    request.headers.get('authorization') ?? request.headers.get('Authorization')
+  const trimmed = raw?.trim()
+  return trimmed ? { Authorization: trimmed } : {}
+}
+
 function mergeBackendError<T extends Record<string, unknown>>(obj: T): T {
   if (obj.error !== undefined) return obj
   const m = obj.message
