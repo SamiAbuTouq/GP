@@ -21,16 +21,27 @@ function formatSemesterLabel(academicYear: string, semesterType: number): string
   return `${academicYear.replace(/-/g, "–")} ${decodeSemesterType(semesterType)}`
 }
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Sat"] as const
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const
+
+const REPORT_TYPE_PARAMS = [
+  "room-utilization",
+  "lecturer-workload",
+  "course-distribution",
+  "conflict-analysis",
+  "timeslot-demand",
+] as const
+
+type ReportTypeParam = (typeof REPORT_TYPE_PARAMS)[number] | "all"
+
+function normalizeReportType(raw: string | null): ReportTypeParam {
+  if (raw && (REPORT_TYPE_PARAMS as readonly string[]).includes(raw)) {
+    return raw as ReportTypeParam
+  }
+  return "all"
+}
 
 function daysFromMask(mask: number): string[] {
   return DAY_NAMES.filter((_, i) => (mask >> i) & 1)
-}
-
-/** Weekly recurrence: number of weekdays this slot meets (at least 1). */
-function dayMultiplicity(mask: number): number {
-  const n = daysFromMask(mask).length
-  return n > 0 ? n : 1
 }
 
 function slotDurationHours(start: Date, end: Date): number {
@@ -45,10 +56,6 @@ function formatUtcHm(d: Date): string {
   const h = d.getUTCHours().toString().padStart(2, "0")
   const m = d.getUTCMinutes().toString().padStart(2, "0")
   return `${h}:${m}`
-}
-
-function weeklyHoursForEntry(daysMask: number, start: Date, end: Date): number {
-  return slotDurationHours(start, end) * dayMultiplicity(daysMask)
 }
 
 function decodeRoomType(code: number): string {
@@ -101,6 +108,7 @@ export async function GET(request: Request) {
 
   try {
     const url = new URL(request.url)
+    const reportType = normalizeReportType(url.searchParams.get("reportType"))
     const explicitTimetableId = Number(url.searchParams.get("timetableId"))
     const semesterIdParam = Number(url.searchParams.get("semesterId"))
     const useExplicitTimetable =
@@ -181,25 +189,32 @@ export async function GET(request: Request) {
       sectionCounts.map((r) => [r.timetable_id, r._count._all]),
     )
 
+    const fetchCatalog = reportType === "all" || reportType === "course-distribution"
+    const fetchLecturers = reportType === "all" || reportType === "lecturer-workload"
+
     const [allRooms, catalogCourses, activeLecturers] = await Promise.all([
       prisma.room.findMany({ orderBy: { room_number: "asc" } }),
-      prisma.course.findMany({
-        select: {
-          course_id: true,
-          dept_id: true,
-          academic_level: true,
-          delivery_mode: true,
-          department: { select: { dept_name: true } },
-        },
-      }),
-      prisma.lecturer.findMany({
-        where: { user: { is_active: true } },
-        include: {
-          user: { select: { first_name: true, last_name: true } },
-          department: { select: { dept_name: true } },
-        },
-        orderBy: [{ user: { first_name: "asc" } }, { user: { last_name: "asc" } }],
-      }),
+      fetchCatalog
+        ? prisma.course.findMany({
+            select: {
+              course_id: true,
+              dept_id: true,
+              academic_level: true,
+              delivery_mode: true,
+              department: { select: { dept_name: true } },
+            },
+          })
+        : Promise.resolve([]),
+      fetchLecturers
+        ? prisma.lecturer.findMany({
+            where: { user: { is_active: true } },
+            include: {
+              user: { select: { first_name: true, last_name: true } },
+              department: { select: { dept_name: true } },
+            },
+            orderBy: [{ user: { first_name: "asc" } }, { user: { last_name: "asc" } }],
+          })
+        : Promise.resolve([]),
     ])
 
     const catalogByDept = new Map<string, { total: number; ug: number; grad: number }>()
@@ -223,6 +238,7 @@ export async function GET(request: Request) {
         timetable: null,
         insights: {
           totalScheduleEntries: 0,
+          invalidTimeslotEntries: 0,
           totalRoomsInCatalog: allRooms.length,
           roomsWithSchedule: 0,
           totalWeeklyScheduledHours: 0,
@@ -230,7 +246,7 @@ export async function GET(request: Request) {
           avgWeeklyHoursPerUsedRoom: 0,
           totalSeatFillWeightedPct: null,
           lecturerCountScheduled: 0,
-          lecturersWithNoAssignments: activeLecturers.length,
+          lecturersWithNoAssignments: fetchLecturers ? activeLecturers.length : 0,
           distinctCoursesScheduled: 0,
           departmentsScheduled: 0,
         },
@@ -247,18 +263,20 @@ export async function GET(request: Request) {
           peakDay: "—",
           onlineOrBlendedSessions: 0,
         })),
-        lecturerRows: activeLecturers.map((l) => ({
-          userId: l.user_id,
-          lecturerName: `${l.user.first_name} ${l.user.last_name}`.trim(),
-          department: l.department.dept_name,
-          maxWorkloadHours: l.max_workload,
-          sectionsScheduled: 0,
-          distinctCourses: 0,
-          labSections: 0,
-          weeklyContactHours: 0,
-          loadIndex: 0,
-          loadPctOfMax: 0,
-        })),
+        lecturerRows: fetchLecturers
+          ? activeLecturers.map((l) => ({
+              userId: l.user_id,
+              lecturerName: `${l.user.first_name} ${l.user.last_name}`.trim(),
+              department: l.department.dept_name,
+              maxWorkloadHours: l.max_workload,
+              sectionsScheduled: 0,
+              distinctCourses: 0,
+              labSections: 0,
+              weeklyContactHours: 0,
+              loadIndex: l.max_workload == null || l.max_workload <= 0 ? null : 0,
+              loadPctOfMax: l.max_workload == null || l.max_workload <= 0 ? null : 0,
+            }))
+          : [],
         courseDistributionRows: Array.from(catalogByDept.entries())
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([department, counts]) => ({
@@ -296,6 +314,7 @@ export async function GET(request: Request) {
       })
     }
 
+    const needConflicts = reportType === "all" || reportType === "conflict-analysis"
     const [entries, conflicts] = await Promise.all([
       prisma.sectionScheduleEntry.findMany({
         where: { timetable_id: selectedTimetable.timetable_id },
@@ -306,18 +325,26 @@ export async function GET(request: Request) {
           room: true,
         },
       }),
-      prisma.timetableConflict.findMany({
-        where: { timetable_id: selectedTimetable.timetable_id },
-        orderBy: [{ severity: "asc" }, { conflict_type: "asc" }, { conflict_id: "asc" }],
-      }),
+      needConflicts
+        ? prisma.timetableConflict.findMany({
+            where: { timetable_id: selectedTimetable.timetable_id },
+            orderBy: [{ severity: "asc" }, { conflict_type: "asc" }, { conflict_id: "asc" }],
+          })
+        : Promise.resolve([]),
     ])
+
+    const aggRoom = reportType === "all" || reportType === "room-utilization"
+    const aggLecturer = reportType === "all" || reportType === "lecturer-workload"
+    const aggCourse = reportType === "all" || reportType === "course-distribution"
+    const aggSlot = reportType === "all" || reportType === "timeslot-demand"
+    const needRoomType = reportType === "all" || reportType === "conflict-analysis"
 
     type RoomAgg = {
       sessions: number
       weeklyHours: number
       dayCounts: Map<string, number>
-      seatFillSum: number
-      seatFillN: number
+      seatFillWeightedSum: number
+      seatFillWeightedHours: number
       onlineBlend: number
     }
 
@@ -352,88 +379,8 @@ export async function GET(request: Request) {
     let totalWeeklyHoursAllEntries = 0
     let seatFillWeighted = 0
     let seatFillWeight = 0
-
-    for (const e of entries) {
-      const wh = weeklyHoursForEntry(
-        e.timeslot.days_mask,
-        e.timeslot.start_time,
-        e.timeslot.end_time,
-      )
-      totalWeeklyHoursAllEntries += wh
-
-      const roomId = e.room_id
-      if (!byRoom.has(roomId)) {
-        byRoom.set(roomId, {
-          sessions: 0,
-          weeklyHours: 0,
-          dayCounts: new Map(),
-          seatFillSum: 0,
-          seatFillN: 0,
-          onlineBlend: 0,
-        })
-      }
-      const ra = byRoom.get(roomId)!
-      ra.sessions++
-      ra.weeklyHours += wh
-      for (const d of daysFromMask(e.timeslot.days_mask)) {
-        ra.dayCounts.set(d, (ra.dayCounts.get(d) ?? 0) + 1)
-      }
-      if (e.course.delivery_mode === "ONLINE" || e.course.delivery_mode === "BLENDED") {
-        ra.onlineBlend++
-      }
-      if (e.course.delivery_mode === "FACE_TO_FACE" || e.course.delivery_mode === "BLENDED") {
-        const cap = Math.max(1, sectionCapacityForEntry(e))
-        const fill = Math.min(100, (e.registered_students / cap) * 100)
-        ra.seatFillSum += fill
-        ra.seatFillN++
-        seatFillWeighted += fill * wh
-        seatFillWeight += wh
-      }
-
-      const uid = e.user_id
-      if (uid != null && e.lecturer) {
-        if (!byLecturer.has(uid)) {
-          const u = e.lecturer.user
-          byLecturer.set(uid, {
-            sections: 0,
-            courses: new Set(),
-            weeklyHours: 0,
-            labs: 0,
-            name: `${u.first_name} ${u.last_name}`,
-            department: e.lecturer.department.dept_name,
-            maxWorkload: e.lecturer.max_workload,
-          })
-        }
-        const la = byLecturer.get(uid)!
-        la.sections++
-        la.courses.add(e.course_id)
-        la.weeklyHours += wh
-        if (e.course.is_lab) la.labs++
-      }
-
-      const dname = e.course.department.dept_name
-      if (!deptSchedule.has(dname)) {
-        deptSchedule.set(dname, {
-          courseIds: new Set(),
-          sections: 0,
-          enrollment: 0,
-          ugCourses: new Set(),
-          gradCourses: new Set(),
-          online: 0,
-          blended: 0,
-          f2f: 0,
-        })
-      }
-      const ds = deptSchedule.get(dname)!
-      ds.courseIds.add(e.course_id)
-      ds.sections++
-      ds.enrollment += e.registered_students
-      if (isUndergraduateLevel(e.course.academic_level)) ds.ugCourses.add(e.course_id)
-      else ds.gradCourses.add(e.course_id)
-      if (e.course.delivery_mode === "ONLINE") ds.online++
-      else if (e.course.delivery_mode === "BLENDED") ds.blended++
-      else ds.f2f++
-    }
+    let invalidTimeslotEntries = 0
+    const distinctValidCourseIds = new Set<number>()
 
     type SlotAgg = {
       slotId: number
@@ -446,41 +393,134 @@ export async function GET(request: Request) {
     }
 
     const bySlot = new Map<number, SlotAgg>()
+
     for (const e of entries) {
-      const sid = e.slot_id
-      if (!bySlot.has(sid)) {
-        bySlot.set(sid, {
-          slotId: sid,
-          days: daysFromMask(e.timeslot.days_mask),
-          startTime: e.timeslot.start_time,
-          endTime: e.timeslot.end_time,
-          sections: 0,
-          roomsUsed: new Set(),
-          totalEnrollment: 0,
-        })
+      const dayList = daysFromMask(e.timeslot.days_mask)
+      if (dayList.length === 0) {
+        invalidTimeslotEntries++
+        continue
       }
-      const sa = bySlot.get(sid)!
-      sa.sections++
-      sa.roomsUsed.add(e.room_id)
-      sa.totalEnrollment += e.registered_students
+      const wh = slotDurationHours(e.timeslot.start_time, e.timeslot.end_time) * dayList.length
+      totalWeeklyHoursAllEntries += wh
+      distinctValidCourseIds.add(e.course_id)
+
+      if (aggRoom) {
+        const roomId = e.room_id
+        if (!byRoom.has(roomId)) {
+          byRoom.set(roomId, {
+            sessions: 0,
+            weeklyHours: 0,
+            dayCounts: new Map(),
+            seatFillWeightedSum: 0,
+            seatFillWeightedHours: 0,
+            onlineBlend: 0,
+          })
+        }
+        const ra = byRoom.get(roomId)!
+        ra.sessions++
+        ra.weeklyHours += wh
+        for (const d of dayList) {
+          ra.dayCounts.set(d, (ra.dayCounts.get(d) ?? 0) + 1)
+        }
+        if (e.course.delivery_mode === "ONLINE" || e.course.delivery_mode === "BLENDED") {
+          ra.onlineBlend++
+        }
+        if (e.course.delivery_mode === "FACE_TO_FACE" || e.course.delivery_mode === "BLENDED") {
+          const cap = Math.max(1, sectionCapacityForEntry(e))
+          const fill = (e.registered_students / cap) * 100
+          ra.seatFillWeightedSum += fill * wh
+          ra.seatFillWeightedHours += wh
+          seatFillWeighted += fill * wh
+          seatFillWeight += wh
+        }
+      }
+
+      if (aggLecturer) {
+        const uid = e.user_id
+        if (uid != null && e.lecturer) {
+          if (!byLecturer.has(uid)) {
+            const u = e.lecturer.user
+            byLecturer.set(uid, {
+              sections: 0,
+              courses: new Set(),
+              weeklyHours: 0,
+              labs: 0,
+              name: `${u.first_name} ${u.last_name}`,
+              department: e.lecturer.department.dept_name,
+              maxWorkload: e.lecturer.max_workload,
+            })
+          }
+          const la = byLecturer.get(uid)!
+          la.sections++
+          la.courses.add(e.course_id)
+          la.weeklyHours += wh
+          if (e.course.is_lab) la.labs++
+        }
+      }
+
+      if (aggCourse) {
+        const dname = e.course.department.dept_name
+        if (!deptSchedule.has(dname)) {
+          deptSchedule.set(dname, {
+            courseIds: new Set(),
+            sections: 0,
+            enrollment: 0,
+            ugCourses: new Set(),
+            gradCourses: new Set(),
+            online: 0,
+            blended: 0,
+            f2f: 0,
+          })
+        }
+        const ds = deptSchedule.get(dname)!
+        ds.courseIds.add(e.course_id)
+        ds.sections++
+        ds.enrollment += e.registered_students
+        if (isUndergraduateLevel(e.course.academic_level)) ds.ugCourses.add(e.course_id)
+        else ds.gradCourses.add(e.course_id)
+        if (e.course.delivery_mode === "ONLINE") ds.online++
+        else if (e.course.delivery_mode === "BLENDED") ds.blended++
+        else ds.f2f++
+      }
+
+      if (aggSlot) {
+        const sid = e.slot_id
+        if (!bySlot.has(sid)) {
+          bySlot.set(sid, {
+            slotId: sid,
+            days: dayList,
+            startTime: e.timeslot.start_time,
+            endTime: e.timeslot.end_time,
+            sections: 0,
+            roomsUsed: new Set(),
+            totalEnrollment: 0,
+          })
+        }
+        const sa = bySlot.get(sid)!
+        sa.sections++
+        sa.roomsUsed.add(e.room_id)
+        sa.totalEnrollment += e.registered_students
+      }
     }
 
     const availableRoomsCount = allRooms.filter((r) => r.is_available).length
-    const timeslotDemandRows = [...bySlot.values()]
-      .map((sa) => ({
-        slotId: sa.slotId,
-        days: sa.days.join(", "),
-        startTime: formatUtcHm(sa.startTime),
-        endTime: formatUtcHm(sa.endTime),
-        sections: sa.sections,
-        roomsUsed: sa.roomsUsed.size,
-        totalEnrollment: sa.totalEnrollment,
-        slotPressurePct:
-          availableRoomsCount > 0
-            ? Math.round((sa.roomsUsed.size / availableRoomsCount) * 1000) / 10
-            : null,
-      }))
-      .sort((a, b) => b.sections - a.sections)
+    const timeslotDemandRows = aggSlot
+      ? [...bySlot.values()]
+          .map((sa) => ({
+            slotId: sa.slotId,
+            days: sa.days.join(", "),
+            startTime: formatUtcHm(sa.startTime),
+            endTime: formatUtcHm(sa.endTime),
+            sections: sa.sections,
+            roomsUsed: sa.roomsUsed.size,
+            totalEnrollment: sa.totalEnrollment,
+            slotPressurePct:
+              availableRoomsCount > 0
+                ? Math.round((sa.roomsUsed.size / availableRoomsCount) * 1000) / 10
+                : null,
+          }))
+          .sort((a, b) => b.sections - a.sections)
+      : []
 
     const roomWeeklyList = [...byRoom.values()].map((v) => v.weeklyHours)
     const maxWeeklyHoursAnyRoom = roomWeeklyList.length ? Math.max(...roomWeeklyList) : 0
@@ -515,8 +555,8 @@ export async function GET(request: Request) {
           ? Math.round((agg.weeklyHours / maxWeeklyHoursAnyRoom) * 1000) / 10
           : 0
       const avgSeat =
-        agg.seatFillN > 0
-          ? Math.round((agg.seatFillSum / agg.seatFillN) * 10) / 10
+        agg.seatFillWeightedHours > 0
+          ? Math.round((agg.seatFillWeightedSum / agg.seatFillWeightedHours) * 10) / 10
           : null
 
       return {
@@ -534,91 +574,114 @@ export async function GET(request: Request) {
       }
     })
 
-    const scheduledLecturerRows = [...byLecturer.entries()]
-      .map(([userId, v]) => {
-        const mw = Math.max(1, v.maxWorkload)
-        const loadIndex = Math.round((v.weeklyHours / mw) * 1000) / 1000
-        const loadPct = Math.round((v.weeklyHours / mw) * 1000) / 10
-        return {
-          userId,
-          lecturerName: v.name,
-          department: v.department,
-          maxWorkloadHours: v.maxWorkload,
-          sectionsScheduled: v.sections,
-          distinctCourses: v.courses.size,
-          labSections: v.labs,
-          weeklyContactHours: Math.round(v.weeklyHours * 100) / 100,
-          loadIndex,
-          loadPctOfMax: loadPct,
-        }
-      })
-      .sort((a, b) => b.weeklyContactHours - a.weeklyContactHours)
+    const scheduledLecturerRows = aggLecturer
+      ? [...byLecturer.entries()]
+          .map(([userId, v]) => {
+            const mwUnset = v.maxWorkload == null || v.maxWorkload <= 0
+            const loadIndex = mwUnset
+              ? null
+              : Math.round((v.weeklyHours / v.maxWorkload) * 1000) / 1000
+            const loadPct = mwUnset
+              ? null
+              : Math.round((v.weeklyHours / v.maxWorkload) * 1000) / 10
+            return {
+              userId,
+              lecturerName: v.name,
+              department: v.department,
+              maxWorkloadHours: v.maxWorkload,
+              sectionsScheduled: v.sections,
+              distinctCourses: v.courses.size,
+              labSections: v.labs,
+              weeklyContactHours: Math.round(v.weeklyHours * 100) / 100,
+              loadIndex,
+              loadPctOfMax: loadPct,
+            }
+          })
+          .sort((a, b) => b.weeklyContactHours - a.weeklyContactHours)
+      : []
 
     const scheduledLecturerIds = new Set(scheduledLecturerRows.map((r) => r.userId))
-    const zeroLoadLecturerRows = activeLecturers
-      .filter((l) => !scheduledLecturerIds.has(l.user_id))
-      .map((l) => ({
-        userId: l.user_id,
-        lecturerName: `${l.user.first_name} ${l.user.last_name}`.trim(),
-        department: l.department.dept_name,
-        maxWorkloadHours: l.max_workload,
-        sectionsScheduled: 0,
-        distinctCourses: 0,
-        labSections: 0,
-        weeklyContactHours: 0,
-        loadIndex: 0,
-        loadPctOfMax: 0,
-      }))
-      .sort((a, b) => a.lecturerName.localeCompare(b.lecturerName))
+    const zeroLoadLecturerRows = aggLecturer
+      ? activeLecturers
+          .filter((l) => !scheduledLecturerIds.has(l.user_id))
+          .map((l) => {
+            const mwUnset = l.max_workload == null || l.max_workload <= 0
+            return {
+              userId: l.user_id,
+              lecturerName: `${l.user.first_name} ${l.user.last_name}`.trim(),
+              department: l.department.dept_name,
+              maxWorkloadHours: l.max_workload,
+              sectionsScheduled: 0,
+              distinctCourses: 0,
+              labSections: 0,
+              weeklyContactHours: 0,
+              loadIndex: mwUnset ? null : 0,
+              loadPctOfMax: mwUnset ? null : 0,
+            }
+          })
+          .sort((a, b) => a.lecturerName.localeCompare(b.lecturerName))
+      : []
 
     const lecturerRows = [...scheduledLecturerRows, ...zeroLoadLecturerRows]
 
     const allDeptNames = new Set([...catalogByDept.keys(), ...deptSchedule.keys()])
-    const courseDistributionRows = [...allDeptNames]
-      .sort((a, b) => a.localeCompare(b))
-      .map((department) => {
-        const sched = deptSchedule.get(department)
-        const cat = catalogByDept.get(department) ?? { total: 0, ug: 0, grad: 0 }
-        const sectionInstances = sched?.sections ?? 0
-        const totalEnrollment = sched?.enrollment ?? 0
-        const avg =
-          sectionInstances > 0
-            ? Math.round((totalEnrollment / sectionInstances) * 100) / 100
-            : 0
-        return {
-          department,
-          catalogCourseCount: cat.total,
-          scheduledDistinctCourses: sched?.courseIds.size ?? 0,
-          sectionInstances,
-          totalEnrollment,
-          undergraduateCourseCount: sched?.ugCourses.size ?? 0,
-          graduateCourseCount: sched?.gradCourses.size ?? 0,
-          onlineSections: sched?.online ?? 0,
-          blendedSections: sched?.blended ?? 0,
-          faceToFaceSections: sched?.f2f ?? 0,
-          avgSectionEnrollment: avg,
-        }
-      })
+    const courseDistributionRows =
+      aggCourse
+        ? [...allDeptNames]
+            .sort((a, b) => a.localeCompare(b))
+            .map((department) => {
+              const sched = deptSchedule.get(department)
+              const cat = catalogByDept.get(department) ?? { total: 0, ug: 0, grad: 0 }
+              const sectionInstances = sched?.sections ?? 0
+              const totalEnrollment = sched?.enrollment ?? 0
+              const avg =
+                sectionInstances > 0
+                  ? Math.round((totalEnrollment / sectionInstances) * 100) / 100
+                  : 0
+              return {
+                department,
+                catalogCourseCount: cat.total,
+                scheduledDistinctCourses: sched?.courseIds.size ?? 0,
+                sectionInstances,
+                totalEnrollment,
+                undergraduateCourseCount: sched?.ugCourses.size ?? 0,
+                graduateCourseCount: sched?.gradCourses.size ?? 0,
+                onlineSections: sched?.online ?? 0,
+                blendedSections: sched?.blended ?? 0,
+                faceToFaceSections: sched?.f2f ?? 0,
+                avgSectionEnrollment: avg,
+              }
+            })
+        : []
 
     const metrics = selectedTimetable.timetable_metrics
-    const optimizationRuns = timetablesForOptimizationRuns.map((t) => ({
-      timetableId: t.timetable_id,
-      versionNumber: t.version_number,
-      generationType: t.generation_type,
-      generationTypeLabel: generationTypeLabel(t.generation_type),
-      status: t.status,
-      generatedAt: t.generated_at.toISOString(),
-      fitnessScore: t.timetable_metrics ? Number(t.timetable_metrics.fitness_score) : null,
-      softConstraintsScore: t.timetable_metrics ? Number(t.timetable_metrics.soft_constraints_score) : null,
-      roomUtilizationRate: t.timetable_metrics ? Number(t.timetable_metrics.room_utilization_rate) : null,
-      isValid: t.timetable_metrics?.is_valid ?? null,
-      sectionsCount: sectionsByTimetableId.get(t.timetable_id) ?? 0,
-      isActive: t.status.toLowerCase() === "active",
-    }))
+    const optimizationRuns =
+      reportType === "all" || reportType === "conflict-analysis"
+        ? timetablesForOptimizationRuns.map((t) => ({
+            timetableId: t.timetable_id,
+            versionNumber: t.version_number,
+            generationType: t.generation_type,
+            generationTypeLabel: generationTypeLabel(t.generation_type),
+            status: t.status,
+            generatedAt: t.generated_at.toISOString(),
+            fitnessScore: t.timetable_metrics ? Number(t.timetable_metrics.fitness_score) : null,
+            softConstraintsScore: t.timetable_metrics
+              ? Number(t.timetable_metrics.soft_constraints_score)
+              : null,
+            roomUtilizationRate: t.timetable_metrics
+              ? Number(t.timetable_metrics.room_utilization_rate)
+              : null,
+            isValid: t.timetable_metrics?.is_valid ?? null,
+            sectionsCount: sectionsByTimetableId.get(t.timetable_id) ?? 0,
+            isActive: t.status.toLowerCase() === "active",
+          }))
+        : []
 
-    const lecturerIds = [...new Set(entries.map((e) => e.user_id).filter((v): v is number => v != null))]
+    const lecturerIds = aggLecturer
+      ? [...new Set(entries.map((e) => e.user_id).filter((v): v is number => v != null))]
+      : []
     const prefByLecturer = new Map<number, { preferred: Set<number>; avoided: Set<number> }>()
-    if (lecturerIds.length > 0) {
+    if (aggLecturer && lecturerIds.length > 0) {
       const preferences = await prisma.lecturerPreference.findMany({
         where: { user_id: { in: lecturerIds } },
       })
@@ -632,45 +695,50 @@ export async function GET(request: Request) {
       }
     }
 
-    const lecturerPreferenceRows = [...byLecturer.entries()]
-      .map(([userId, v]) => {
-        const assigned = entries.filter((e) => e.user_id === userId)
-        const pref = prefByLecturer.get(userId)
-        let onPreferred = 0
-        let onAvoided = 0
-        let neutral = 0
-        for (const e of assigned) {
-          if (!pref || (pref.preferred.size === 0 && pref.avoided.size === 0)) {
-            neutral++
-            continue
-          }
-          if (pref.preferred.has(e.slot_id)) onPreferred++
-          else if (pref.avoided.has(e.slot_id)) onAvoided++
-          else neutral++
-        }
-        const hasPreferences = !!pref && (pref.preferred.size > 0 || pref.avoided.size > 0)
-        const complianceScore =
-          hasPreferences && assigned.length > 0
-            ? Math.round((((assigned.length - onAvoided) / assigned.length) * 1000)) / 10
-            : null
-        return {
-          userId,
-          lecturerName: v.name,
-          department: v.department,
-          sessionsAssigned: assigned.length,
-          onPreferred,
-          onAvoided,
-          neutral,
-          hasPreferences,
-          complianceScore,
-        }
-      })
-      .sort((a, b) => {
-        if (b.onAvoided !== a.onAvoided) return b.onAvoided - a.onAvoided
-        const as = a.complianceScore ?? Number.POSITIVE_INFINITY
-        const bs = b.complianceScore ?? Number.POSITIVE_INFINITY
-        return as - bs
-      })
+    const lecturerPreferenceRows = aggLecturer
+      ? [...byLecturer.entries()]
+          .map(([userId, v]) => {
+            const assigned = entries.filter(
+              (e) =>
+                e.user_id === userId && daysFromMask(e.timeslot.days_mask).length > 0,
+            )
+            const pref = prefByLecturer.get(userId)
+            let onPreferred = 0
+            let onAvoided = 0
+            let neutral = 0
+            for (const e of assigned) {
+              if (!pref || (pref.preferred.size === 0 && pref.avoided.size === 0)) {
+                neutral++
+                continue
+              }
+              if (pref.preferred.has(e.slot_id)) onPreferred++
+              else if (pref.avoided.has(e.slot_id)) onAvoided++
+              else neutral++
+            }
+            const hasPreferences = !!pref && (pref.preferred.size > 0 || pref.avoided.size > 0)
+            const complianceScore =
+              hasPreferences && assigned.length > 0
+                ? Math.round((((assigned.length - onAvoided) / assigned.length) * 1000)) / 10
+                : null
+            return {
+              userId,
+              lecturerName: v.name,
+              department: v.department,
+              sessionsAssigned: assigned.length,
+              onPreferred,
+              onAvoided,
+              neutral,
+              hasPreferences,
+              complianceScore,
+            }
+          })
+          .sort((a, b) => {
+            if (b.onAvoided !== a.onAvoided) return b.onAvoided - a.onAvoided
+            const as = a.complianceScore ?? Number.POSITIVE_INFINITY
+            const bs = b.complianceScore ?? Number.POSITIVE_INFINITY
+            return as - bs
+          })
+      : []
 
     const lecturerPreferenceSummary = {
       scheduledLecturers: lecturerPreferenceRows.length,
@@ -681,7 +749,10 @@ export async function GET(request: Request) {
       lecturersRequiringAttention: lecturerPreferenceRows.filter((r) => r.onAvoided > 0).length,
     }
 
-    const roomTypeRows = entries.map((e) => {
+    const roomTypeRows = needRoomType
+      ? entries
+          .filter((e) => daysFromMask(e.timeslot.days_mask).length > 0)
+          .map((e) => {
       const roomTypeLabel = decodeRoomType(e.room.room_type)
       const roomIsLabType = roomTypeIsLab(roomTypeLabel)
       let matchStatus: "OK" | "Hard mismatch" | "Soft mismatch" = "OK"
@@ -719,6 +790,7 @@ export async function GET(request: Request) {
         issue,
       }
     })
+      : []
 
     const roomTypeSummary = {
       totalSections: roomTypeRows.length,
@@ -728,6 +800,7 @@ export async function GET(request: Request) {
     }
     const insights = {
       totalScheduleEntries: entries.length,
+      invalidTimeslotEntries,
       totalRoomsInCatalog: allRooms.length,
       roomsWithSchedule: [...byRoom.keys()].length,
       totalWeeklyScheduledHours: Math.round(totalWeeklyHoursAllEntries * 100) / 100,
@@ -742,7 +815,7 @@ export async function GET(request: Request) {
           : null,
       lecturerCountScheduled: byLecturer.size,
       lecturersWithNoAssignments: zeroLoadLecturerRows.length,
-      distinctCoursesScheduled: new Set(entries.map((e) => e.course_id)).size,
+      distinctCoursesScheduled: distinctValidCourseIds.size,
       departmentsScheduled: deptSchedule.size,
     }
 

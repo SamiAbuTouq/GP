@@ -167,18 +167,18 @@ function LoginPageContent() {
       : "";
 
   return (
-    <div className="login-theme min-h-dvh lg:grid lg:h-dvh lg:max-h-dvh lg:grid-cols-[42%_58%]">
-      <div className="relative hidden lg:flex lg:h-full lg:min-h-0 overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)]">
-        <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col items-center justify-start px-12 pt-20 pb-16 text-center">
+    <div className="login-theme flex min-h-dvh flex-col lg:grid lg:h-dvh lg:max-h-dvh lg:grid-cols-[minmax(0,42%)_minmax(0,58%)] lg:overflow-hidden">
+      <div className="relative hidden min-h-0 overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)] lg:flex lg:h-full">
+        <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col items-center justify-start px-8 pt-16 pb-12 text-center xl:px-12 xl:pt-20 xl:pb-16">
           <Image
             src="/images/logo.png"
             alt="PSUT Logo"
             width={180}
             height={180}
-            className="object-contain"
+            className="h-auto w-[min(40vw,9rem)] max-w-[180px] object-contain sm:w-36 lg:w-[180px]"
             priority
           />
-          <h1 className="mt-8 text-5xl font-bold leading-tight text-[var(--text-primary)]">
+          <h1 className="mt-6 text-balance text-3xl font-bold leading-tight text-[var(--text-primary)] sm:text-4xl xl:text-5xl xl:mt-8">
             <span>Smart University</span>
             <br />
             <span className="bg-gradient-to-r from-[#1E54B7] via-[#2563EB] to-[#48CAE4] bg-clip-text text-transparent">
@@ -188,8 +188,8 @@ function LoginPageContent() {
             <span>System</span>
           </h1>
         </div>
-        <div className="absolute inset-x-0 bottom-20 z-10 flex justify-center px-12 text-center">
-          <p className="max-w-sm text-base leading-relaxed text-[var(--text-secondary)]">
+        <div className="absolute inset-x-0 bottom-16 z-10 flex justify-center px-8 text-center xl:bottom-20 xl:px-12">
+          <p className="max-w-sm text-sm leading-relaxed text-[var(--text-secondary)] sm:text-base">
             Intelligent scheduling powered by advanced optimization algorithms for efficient resource management.
           </p>
         </div>
@@ -203,20 +203,20 @@ function LoginPageContent() {
         />
       </div>
 
-      <div className="relative overflow-hidden p-6 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:p-12 [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)]">
+      <div className="relative flex min-h-dvh flex-1 flex-col overflow-x-hidden overflow-y-auto [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)] px-4 py-8 sm:px-6 sm:py-10 lg:min-h-0 lg:h-full lg:overflow-y-auto lg:px-8 lg:py-8 xl:px-12 xl:py-10">
         <div className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_70%_80%,rgba(0,180,216,0.12)_0%,transparent_60%),radial-gradient(circle_at_20%_60%,rgba(37,99,235,0.15)_0%,transparent_50%)]" />
-        <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-1 items-center py-8 lg:min-h-0 lg:py-6">
-          <div className="w-full py-3 lg:py-6">
-            <div className="mb-4 lg:mb-3">
-              <h2 className="mb-1.5 text-[2rem] font-bold tracking-[-0.02em] text-white lg:mb-2">
+        <div className="relative mx-auto flex w-full max-w-md flex-1 flex-col justify-center lg:min-h-0 lg:justify-center">
+          <div className="w-full min-w-0 py-1 sm:py-2 lg:py-4">
+            <div className="mb-4 sm:mb-5 lg:mb-3">
+              <h2 className="mb-1.5 text-2xl font-bold tracking-[-0.02em] text-white sm:text-[1.75rem] lg:mb-2 xl:text-[2rem]">
                 Welcome back
               </h2>
-              <p className="text-[0.95rem] text-white/60">
+              <p className="text-sm text-white/60 sm:text-[0.95rem]">
                 Sign in to your dashboard
               </p>
             </div>
 
-            <form noValidate onSubmit={handleSubmit} className="space-y-5">
+            <form noValidate onSubmit={handleSubmit} className="w-full min-w-0 space-y-4 sm:space-y-5">
               {error && (
                 <div
                   role="alert"
@@ -271,7 +271,7 @@ function LoginPageContent() {
           </div>
 
           <div className="form-field space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <Label
                 htmlFor="password"
                 className="text-[0.875rem] font-medium tracking-[0.01em] text-white/85"
@@ -280,7 +280,7 @@ function LoginPageContent() {
               </Label>
               <Link
                 href="/forgot-password"
-                className="text-sm font-medium text-[#48CAE4] transition-colors hover:text-[#90E0EF]"
+                className="w-full text-left text-sm font-medium text-[#48CAE4] transition-colors hover:text-[#90E0EF] sm:w-auto sm:text-right"
               >
                 Forgot password?
               </Link>
@@ -364,8 +364,8 @@ function LoginPageContent() {
           </Button>
             </form>
 
-            <p className="mt-5 text-center text-[0.9rem] text-white">
-              <span>Are you a lecturer? </span>
+            <p className="mt-5 flex flex-col items-center gap-1.5 text-center text-sm text-white sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-1 sm:text-[0.9rem]">
+              <span>Are you a lecturer?</span>
               <Link
                 href="/lecturer-access-request"
                 className="group inline-flex items-center gap-1.5 font-medium text-[#48CAE4] transition-[color,transform] duration-200 ease-out hover:text-[#90E0EF]"
@@ -485,7 +485,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400">
+        <div className="flex min-h-dvh items-center justify-center bg-white px-4 text-slate-500 dark:bg-slate-900 dark:text-slate-400">
           Loading...
         </div>
       }

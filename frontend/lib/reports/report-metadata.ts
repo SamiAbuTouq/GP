@@ -5,8 +5,11 @@ import {
   type DateTimeFormatPreferences,
 } from "@/lib/datetime-format"
 
-/** Shown in PDF footers and Excel summary sheets for auditability. */
-export const REPORT_EXPORT_VERSION = "1.2"
+export function generationTypeLabel(value: string): string {
+  if (value === "gwo_ui") return "GWO (UI)"
+  if (value === "manual") return "Manual"
+  return value
+}
 
 export function formatExportTimestamp(
   date: Date,
@@ -24,14 +27,14 @@ export function timetableSourceFootnote(
   if (!t) {
     return "No timetable record is on file for this scope; scheduled metrics may be empty."
   }
-  return `Source timetable #${t.timetableId} (${t.status}, v${t.versionNumber}, ${t.generationType}), generated ${formatDateTime(new Date(t.generatedAt), prefs)}.`
+  return `Source timetable (${t.status}, v${t.versionNumber}, ${generationTypeLabel(t.generationType)}), generated ${formatDateTime(new Date(t.generatedAt), prefs)}.`
 }
 
 /** Human-readable timetable line for cover sheets (matches aggregate payload). */
 export function timetableCoverLine(ds: ReportDataset): string {
   const t = ds.timetable
   if (!t) return "Timetable: none on file for this scope."
-  return `Timetable #${t.timetableId} · ${t.status} · v${t.versionNumber} · ${t.generationType}`
+  return `Timetable · ${t.status} · v${t.versionNumber} · ${generationTypeLabel(t.generationType)}`
 }
 
 /**
@@ -45,7 +48,6 @@ export function excelCoverBlock(
   const fmt = (d: Date) => formatExportTimestamp(d, prefs)
   const rows: (string | number)[][] = [
     [reportTitle],
-    ["Export format version", REPORT_EXPORT_VERSION],
     ["Academic period", ds.semesterLabel],
     ["Academic year", ds.academicYear],
     ["Semester type", ds.semesterTypeName],
@@ -75,9 +77,9 @@ export function pdfSubtitleLines(
   return lines
 }
 
-/** Brand + version string for PDF footers. */
+/** Brand string for PDF footers. */
 export function pdfBrandFooterLeft(): string {
-  return `University Timetabling System · Export v${REPORT_EXPORT_VERSION}`
+  return "University Timetabling System"
 }
 
 /** Rows for CSV summary files (after optional [["Metric","Value"]] header). */
@@ -87,7 +89,6 @@ export function csvStandardMetadataRows(
   reportDisplayName: string,
 ): (string | number)[][] {
   return [
-    ["Export format version", REPORT_EXPORT_VERSION],
     ["Report", reportDisplayName],
     ["Academic period", ds.semesterLabel],
     ["Academic year", ds.academicYear],

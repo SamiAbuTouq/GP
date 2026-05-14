@@ -438,19 +438,23 @@ export default function WhatIfRunsPage() {
           if (!open) setApplyRun(null);
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader><DialogTitle>Apply Scenario Result?</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">This will replace the schedule entries in the selected timetable with the simulation result. This action cannot be undone.</p>
-          <Label>Type scenario name to confirm</Label>
-          <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder={scenarioName} />
-          <HardConflictsAcknowledgmentFields
-            summary={applyConflictSummary}
-            loading={applyConflictLoading}
-            acknowledged={applyConflictAcknowledged}
-            onAcknowledgedChange={setApplyConflictAcknowledged}
-            contextLabel="Applying replaces the base timetable’s schedule with this result."
-          />
-          <DialogFooter>
+        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-6 sm:max-w-lg">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden pr-1">
+            <DialogHeader><DialogTitle>Apply Scenario Result?</DialogTitle></DialogHeader>
+            <p className="text-sm text-muted-foreground">This will replace the schedule entries in the selected timetable with the simulation result. This action cannot be undone.</p>
+            <div className="space-y-2">
+              <Label>Type scenario name to confirm</Label>
+              <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder={scenarioName} />
+            </div>
+            <HardConflictsAcknowledgmentFields
+              summary={applyConflictSummary}
+              loading={applyConflictLoading}
+              acknowledged={applyConflictAcknowledged}
+              onAcknowledgedChange={setApplyConflictAcknowledged}
+              contextLabel="Applying replaces the base timetable’s schedule with this result."
+            />
+          </div>
+          <DialogFooter className="mt-4 shrink-0 border-t pt-4">
             <Button variant="outline" onClick={() => setApplyRun(null)}>Cancel</Button>
             <Button
               variant="destructive"

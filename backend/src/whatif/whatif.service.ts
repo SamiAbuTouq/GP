@@ -19,7 +19,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Response } from "express";
-import { spawn, spawnSync, ChildProcess } from "child_process";
+import { spawn, ChildProcess } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -130,6 +130,11 @@ export class WhatIfService {
    * Key = run_id (DB).  Cleared when process exits.
    */
   private readonly activeProcesses = new Map<number, ChildProcess>();
+  /**
+   * Path to the GWO cooperative pause file (same semantics as timetable generation
+   * `scripts/.gwo_run_control`: "pause" / "run"). Passed to run_scenario → GWO-v6.py.
+   */
+  private readonly scenarioGwoControlPaths = new Map<number, string>();
   /**
    * Run IDs for which POST /runs/:id/cancel was invoked before the child exited.
    * Prevents the `close` handler (often code=null after kill) from clobbering the DB with
@@ -1101,38 +1106,29 @@ export class WhatIfService {
     };
   }
 
+  /**
+   * Cooperative pause/resume — same contract as Next.js `POST /api/run/control`:
+   * write `pause` or `run` to the per-run file read by GWO-v6.py (`GWO_CONTROL_FILE`).
+   */
   async controlRun(runId: number, action: "pause" | "resume") {
     const proc = this.activeProcesses.get(runId);
     if (!proc || !proc.pid) {
       throw new BadRequestException("Run is not currently active.");
     }
-
+    const controlPath =
+      this.scenarioGwoControlPaths.get(runId) ??
+      path.join(os.tmpdir(), `whatif_run_${runId}.gwo_control`);
     try {
-      if (process.platform === "win32") {
-        const psCmd =
-          action === "pause"
-            ? `Suspend-Process -Id ${proc.pid} -ErrorAction Stop`
-            : `Resume-Process -Id ${proc.pid} -ErrorAction Stop`;
-        const ps = spawnSync(
-          "powershell",
-          ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psCmd],
-          { encoding: "utf8" },
-        );
-        if (ps.status !== 0) {
-          throw new Error(
-            (ps.stderr || ps.stdout || "").trim() ||
-              "PowerShell control failed.",
-          );
-        }
-      } else {
-        process.kill(proc.pid, action === "pause" ? "SIGSTOP" : "SIGCONT");
-      }
+      fs.writeFileSync(
+        controlPath,
+        action === "pause" ? "pause" : "run",
+        "utf8",
+      );
     } catch (err) {
       throw new BadRequestException(
         err instanceof Error ? err.message : `Failed to ${action} run.`,
       );
     }
-
     return { ok: true, action, runId };
   }
 
@@ -1211,6 +1207,10 @@ export class WhatIfService {
       const configPath = path.join(tmpDir, `whatif_run_${runId}.json`);
       fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
+      const gwoControlPath = path.join(tmpDir, `whatif_run_${runId}.gwo_control`);
+      fs.writeFileSync(gwoControlPath, "run", "utf8");
+      this.scenarioGwoControlPaths.set(runId, gwoControlPath);
+
       // ── 3. Resolve paths ───────────────────────────────────────────────────
       // run_scenario.py lives in the `whatif/` directory at the project root.
       // Adjust this path if your project layout is different.
@@ -1234,6 +1234,7 @@ export class WhatIfService {
         env: {
           ...process.env,
           PYTHONUNBUFFERED: "1", // essential for real-time stdout streaming
+          WHATIF_GWO_CONTROL_FILE: gwoControlPath,
         },
       });
 
@@ -1283,6 +1284,12 @@ export class WhatIfService {
         } catch {
           /* ignore */
         }
+        try {
+          fs.unlinkSync(gwoControlPath);
+        } catch {
+          /* ignore */
+        }
+        this.scenarioGwoControlPaths.delete(runId);
 
         const exitedNonZero = typeof code === "number" && code !== 0;
         const exitedWithNullCode = code === null || code === undefined;
@@ -1345,6 +1352,12 @@ export class WhatIfService {
 
       proc.on("error", async (err) => {
         this.activeProcesses.delete(runId);
+        try {
+          fs.unlinkSync(gwoControlPath);
+        } catch {
+          /* ignore */
+        }
+        this.scenarioGwoControlPaths.delete(runId);
         await this.prisma.scenarioRun.update({
           where: { run_id: runId },
           data: {

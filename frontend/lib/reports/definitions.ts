@@ -24,7 +24,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     name: "Course Distribution Report",
     shortName: "Course distribution",
     description:
-      "By department: catalog vs. scheduled courses, sections, enrollment, modalities, UG vs. grad.",
+      "By department: catalog vs. scheduled courses, coverage gaps, sections, enrollment, modalities, UG vs. grad.",
     formats: ["pdf", "excel"],
     comingSoon: false,
   },
@@ -35,15 +35,6 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     description:
       "Constraint violations, room assignment quality, and optimizer run summary for the selected timetable.",
     formats: ["pdf", "excel", "csv"],
-    comingSoon: false,
-  },
-  {
-    id: "timetable-coverage",
-    name: "Timetable Coverage Report",
-    shortName: "Coverage",
-    description:
-      "Per-department gap between catalog courses and courses actually on the timetable. Flags departments with unscheduled courses.",
-    formats: ["pdf", "excel"],
     comingSoon: false,
   },
   {

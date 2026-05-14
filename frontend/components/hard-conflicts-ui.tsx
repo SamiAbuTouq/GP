@@ -4,7 +4,6 @@ import { AlertTriangle } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import type { TimetableConflictRow, TimetableConflictSummary } from "@/lib/timetable-conflicts"
 import { formatConflictRowSummary } from "@/lib/timetable-conflicts"
 
@@ -46,8 +45,8 @@ export function HardConflictsViewerBanner({
         </p>
         {syntheticNote ? <p className="text-muted-foreground">{syntheticNote}</p> : null}
         {summary.conflicts.length > 0 ? (
-          <ScrollArea className="max-h-52 rounded-md border border-destructive/40 bg-background/80 pr-3 dark:bg-background/40">
-            <ul className="list-disc space-y-2 py-2 pl-5 pr-2 text-left">
+          <div className="max-h-52 min-h-0 overflow-y-auto overflow-x-hidden rounded-md border border-destructive/40 bg-background/80 pr-2 dark:bg-background/40">
+            <ul className="list-disc space-y-2 py-2 pl-5 pr-1 text-left">
               {summary.conflicts.map((c: TimetableConflictRow) => (
                 <li key={c.conflictId} className="text-foreground marker:text-destructive">
                   <span>{formatConflictRowSummary(c)}</span>
@@ -55,7 +54,7 @@ export function HardConflictsViewerBanner({
                 </li>
               ))}
             </ul>
-          </ScrollArea>
+          </div>
         ) : null}
       </AlertDescription>
     </Alert>
@@ -102,8 +101,8 @@ export function HardConflictsAcknowledgmentFields({
         </AlertDescription>
       </Alert>
       {summary.conflicts.length > 0 ? (
-        <ScrollArea className="max-h-48 rounded-md border border-border bg-muted/40 pr-3">
-          <ul className="list-disc space-y-2 py-2 pl-5 pr-2 text-left text-sm">
+        <div className="max-h-48 min-h-0 overflow-y-auto overflow-x-hidden rounded-md border border-border bg-muted/40 pr-2">
+          <ul className="list-disc space-y-2 py-2 pl-5 pr-1 text-left text-sm">
             {summary.conflicts.map((c) => (
               <li key={c.conflictId}>
                 {formatConflictRowSummary(c)}
@@ -111,7 +110,7 @@ export function HardConflictsAcknowledgmentFields({
               </li>
             ))}
           </ul>
-        </ScrollArea>
+        </div>
       ) : null}
       <div className="flex items-start gap-2 rounded-md border border-border p-3">
         <Checkbox

@@ -22,6 +22,7 @@ export const ReportDatasetSchema = z.object({
     .nullable(),
   insights: z.object({
     totalScheduleEntries: z.number(),
+    invalidTimeslotEntries: z.number(),
     totalRoomsInCatalog: z.number(),
     roomsWithSchedule: z.number(),
     totalWeeklyScheduledHours: z.number(),
@@ -58,7 +59,7 @@ export const ReportDatasetSchema = z.object({
       distinctCourses: z.number(),
       labSections: z.number(),
       weeklyContactHours: z.number(),
-      loadIndex: z.number(),
+      loadIndex: z.number().nullable(),
       loadPctOfMax: z.number().nullable(),
     }),
   ),

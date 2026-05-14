@@ -3,20 +3,11 @@ import type { GwoOptimizerProgressPayload } from "@/components/gwo-run-context";
 
 export type ScenarioSseHandlers = {
   updateProgress: (p: GwoOptimizerProgressPayload) => void;
-  setPercent: (pct: number) => void;
   setRunPhase: (phase: string, detail?: string) => void;
 };
 
 export type ScenarioSseOutcome = "continue" | "completed" | "failed";
 type ScenarioRunTerminalState = "cancelled" | "failed" | "completed" | null;
-
-function mapScenarioPreGwoPercent(rawPct: number): number {
-  const n = Number(rawPct);
-  if (!Number.isFinite(n)) return 0;
-  const clamped = Math.max(0, Math.min(100, n));
-  // Compress all setup/condition phases into the first 10% of the bar.
-  return Math.round((clamped / 100) * 10);
-}
 
 function isCancelledMessage(message: unknown): boolean {
   if (typeof message !== "string") return false;
@@ -28,6 +19,13 @@ function isCancelledMessage(message: unknown): boolean {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** One frame so React can paint between progress lines flushed in a single chunk. */
+function yieldToUiFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
 }
 
 async function fetchRunTerminalStateWithRetry(
@@ -118,12 +116,10 @@ function scenarioPhaseTitle(phase: string): string {
   }
 }
 
-function shouldHideScenarioDetailMessage(message: unknown): boolean {
-  if (typeof message !== "string") return true;
-  const trimmed = message.trim();
-  if (!trimmed) return true;
-  // Internal fallback noise from legacy GWO output path; keep UI feedback clean.
-  if (/^\[warn\]\s*repair fallback\b/i.test(trimmed)) return true;
+function looksLikeGwoTextProgressLine(text: string): boolean {
+  if (/\bGWO\b/i.test(text)) return true;
+  if (/best\s*=\s*[+-]?\d/i.test(text)) return true;
+  if (/run\s*=\s*\d+\s*\/\s*\d+/i.test(text)) return true;
   return false;
 }
 
@@ -131,6 +127,7 @@ function parseTextGwoProgress(message: unknown): GwoOptimizerProgressPayload | n
   if (typeof message !== "string") return null;
   const text = message.trim();
   if (!text) return null;
+  if (!looksLikeGwoTextProgressLine(text)) return null;
   // Example:
   // GWO: 50%|█████ | 2/4 [00:13<00:11, 5.77s/iter, best=1215.7643, run=1/2]
   const iterMatch = text.match(/(\d+)\s*\/\s*(\d+)/);
@@ -157,7 +154,7 @@ function parseTextGwoProgress(message: unknown): GwoOptimizerProgressPayload | n
 
 /**
  * Maps one JSON line from GET /what-if/runs/:id/stream into GWO bar state.
- * Handles run_scenario.py phases (pct/phase/message) and GWO iteration lines
+ * Handles run_scenario.py phases (phase/message) and GWO iteration lines
  * ({ type, current, total, best, ... }).
  */
 export function applyScenarioSsePayload(
@@ -192,21 +189,16 @@ export function applyScenarioSsePayload(
       }
     }
 
-    const rawPct = parsed.pct;
-    const phaseKey = typeof parsed.phase === "string" ? parsed.phase.trim().toLowerCase() : "";
-    // During active GWO iteration streaming, prefer iteration-derived percentage.
-    // Mixing both signals causes visible jitter/bounce in some runs.
-    const shouldApplyRawPct = !(hasIterationProgress && phaseKey === "gwo");
-    if (shouldApplyRawPct && typeof rawPct === "number" && Number.isFinite(rawPct)) {
-      const mappedPct = phaseKey === "gwo" ? rawPct : mapScenarioPreGwoPercent(rawPct);
-      handlers.setPercent(mappedPct);
-    }
+    // Bar fill for what-if runs comes only from iteration counts (updateProgress above),
+    // not from phase `pct`, so the bar tracks passed iterations.
 
-    // Non-iteration updates: show run_scenario.py phase + message (not a generic “connected” label).
-    if (!hasIterationProgress && !shouldHideScenarioDetailMessage(parsed.message)) {
+    // Non-iteration updates: refresh the phase title only. Never put raw Python/log lines
+    // into `detail` — that would replace the iteration / fitness line from updateProgress.
+    if (!hasIterationProgress) {
       const phaseTitleKey = typeof parsed.phase === "string" ? parsed.phase.trim() : "";
-      const title = phaseTitleKey ? scenarioPhaseTitle(phaseTitleKey) : "Waiting on server";
-      handlers.setRunPhase(title, (parsed.message as string).trim());
+      if (phaseTitleKey) {
+        handlers.setRunPhase(scenarioPhaseTitle(phaseTitleKey));
+      }
     }
     return "continue";
   }
@@ -254,10 +246,7 @@ export async function streamScenarioRunSse(
     if (!response.ok || !response.body) {
       return { ok: false, errorMessage: "Failed to connect to run stream." };
     }
-    handlers.setRunPhase(
-      "Connected to optimizer",
-      "Waiting for the first iteration — Python startup can take a few seconds",
-    );
+    handlers.setRunPhase("Connected to optimizer");
 
     reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -298,6 +287,9 @@ export async function streamScenarioRunSse(
               ? rawResultId
               : null;
           return { ok: true, resultTimetableId };
+        }
+        if (parsed.type === "progress") {
+          await yieldToUiFrame();
         }
       }
     }

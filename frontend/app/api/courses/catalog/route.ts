@@ -100,6 +100,7 @@ export async function GET() {
       id: c.course_id,
       code: c.course_code,
       name: c.course_name,
+      deptId: c.dept_id,
       creditHours: c.credit_hours,
       academicLevel: academicLevelFromCourseCode(c.course_code),
       deliveryMode: c.delivery_mode,

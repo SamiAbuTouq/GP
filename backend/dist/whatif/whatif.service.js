@@ -70,6 +70,7 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
         this.notifications = notifications;
         this.logger = new common_1.Logger(WhatIfService_1.name);
         this.activeProcesses = new Map();
+        this.scenarioGwoControlPaths = new Map();
         this.userCancelledRunIds = new Set();
         this.holdsGlobalOptimizerLock = false;
         this.pendingProcessStarts = 0;
@@ -827,20 +828,10 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
         if (!proc || !proc.pid) {
             throw new common_1.BadRequestException("Run is not currently active.");
         }
+        const controlPath = this.scenarioGwoControlPaths.get(runId) ??
+            path.join(os.tmpdir(), `whatif_run_${runId}.gwo_control`);
         try {
-            if (process.platform === "win32") {
-                const psCmd = action === "pause"
-                    ? `Suspend-Process -Id ${proc.pid} -ErrorAction Stop`
-                    : `Resume-Process -Id ${proc.pid} -ErrorAction Stop`;
-                const ps = (0, child_process_1.spawnSync)("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psCmd], { encoding: "utf8" });
-                if (ps.status !== 0) {
-                    throw new Error((ps.stderr || ps.stdout || "").trim() ||
-                        "PowerShell control failed.");
-                }
-            }
-            else {
-                process.kill(proc.pid, action === "pause" ? "SIGSTOP" : "SIGCONT");
-            }
+            fs.writeFileSync(controlPath, action === "pause" ? "pause" : "run", "utf8");
         }
         catch (err) {
             throw new common_1.BadRequestException(err instanceof Error ? err.message : `Failed to ${action} run.`);
@@ -891,6 +882,9 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
             const tmpDir = os.tmpdir();
             const configPath = path.join(tmpDir, `whatif_run_${runId}.json`);
             fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+            const gwoControlPath = path.join(tmpDir, `whatif_run_${runId}.gwo_control`);
+            fs.writeFileSync(gwoControlPath, "run", "utf8");
+            this.scenarioGwoControlPaths.set(runId, gwoControlPath);
             const scriptPath = path.resolve(process.cwd(), "whatif", "run_scenario.py");
             const python = process.env.PYTHON_BIN ??
                 process.env.PYTHON ??
@@ -900,6 +894,7 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
                 env: {
                     ...process.env,
                     PYTHONUNBUFFERED: "1",
+                    WHATIF_GWO_CONTROL_FILE: gwoControlPath,
                 },
             });
             this.activeProcesses.set(runId, proc);
@@ -935,6 +930,12 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
                 }
                 catch {
                 }
+                try {
+                    fs.unlinkSync(gwoControlPath);
+                }
+                catch {
+                }
+                this.scenarioGwoControlPaths.delete(runId);
                 const exitedNonZero = typeof code === "number" && code !== 0;
                 const exitedWithNullCode = code === null || code === undefined;
                 const shouldRecordFailure = exitedNonZero || exitedWithNullCode || wasUserCancel;
@@ -985,6 +986,12 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
             });
             proc.on("error", async (err) => {
                 this.activeProcesses.delete(runId);
+                try {
+                    fs.unlinkSync(gwoControlPath);
+                }
+                catch {
+                }
+                this.scenarioGwoControlPaths.delete(runId);
                 await this.prisma.scenarioRun.update({
                     where: { run_id: runId },
                     data: {

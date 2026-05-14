@@ -5,7 +5,6 @@ export type ReportTypeId =
   | "lecturer-workload"
   | "course-distribution"
   | "conflict-analysis"
-  | "timetable-coverage"
   | "timeslot-demand"
 
 export type ReportDefinition = {

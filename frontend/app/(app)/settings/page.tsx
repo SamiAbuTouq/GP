@@ -365,7 +365,7 @@ const ADMIN_NOTIFICATION_PREF_ROWS: NotificationPrefRowDef[] = [
   },
   {
     key: ADMIN_NOTIFICATION_PREF_KEYS.LECTURER_DEACTIVATION_IMPACT,
-    title: "Lecturer deactivation — schedule impact",
+    title: "Lecturer deactivation - schedule impact",
     description:
       "When a lecturer is deactivated and still had sections assigned on timetables (may need rescheduling).",
   },
@@ -1138,7 +1138,7 @@ function SettingsContent() {
                         Choose which events appear in your notification center (bell). Turning a
                         category off stops{" "}
                         <span className="font-medium text-foreground">new</span> notifications of
-                        that type — existing messages stay in your list.
+                        that type - existing messages stay in your list.
                       </>
                     }
                     aside={

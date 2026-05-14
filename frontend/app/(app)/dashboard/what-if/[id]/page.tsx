@@ -128,15 +128,13 @@ export default function WhatIfScenarioDetailPage() {
     beginRun,
     bindRunId,
     updateProgress,
-    setPercent,
     setRunPhase,
     endRun,
     setFinalizing,
     isRunning: gwoIsRunning,
     isPaused: gwoIsPaused,
     runSource: gwoRunSource,
-  } =
-    useGwoRun();
+  } = useGwoRun();
   const recoveringRunIdRef = useRef<number | null>(null);
   const pageMountedRef = useRef(true);
   const streamAbortRef = useRef<AbortController | null>(null);
@@ -173,7 +171,6 @@ export default function WhatIfScenarioDetailPage() {
   const scenarioPaused = gwoRunSource === "scenario" && localScenarioActive && gwoIsPaused;
   const blockedByOtherScenarioRun = blockedByWhatIf && !localScenarioActive;
   const scenarioRunBusy = localScenarioActive;
-  const shouldShowScenarioProgressBar = localScenarioActive;
   const { data: scenariosSnapshot } = useSWR(
     blockedByOtherScenarioRun ? `whatif-scenarios-active:${id}` : null,
     async () => getScenarios(),
@@ -395,17 +392,13 @@ export default function WhatIfScenarioDetailPage() {
     if (recoveringRunIdRef.current === latest.id) return;
     recoveringRunIdRef.current = latest.id;
 
-    const ac = beginRun("scenario", latest.id);
+    const ac = beginRun("scenario", latest.id, { scenarioId: id });
     streamAbortRef.current = ac;
-    setRunPhase(
-      "Connected to optimizer",
-      "Recovered active run after reload. Waiting for progress updates…",
-    );
+    setRunPhase("Connected to optimizer");
     void (async () => {
       try {
         const outcome = await streamScenarioRunSse(latest.id, ac.signal, {
           updateProgress,
-          setPercent,
           setRunPhase,
         });
         if (outcome.ok) {
@@ -451,7 +444,6 @@ export default function WhatIfScenarioDetailPage() {
     simStarting,
     beginRun,
     updateProgress,
-    setPercent,
     setRunPhase,
     setFinalizing,
     load,
@@ -470,10 +462,10 @@ export default function WhatIfScenarioDetailPage() {
     if (!canStartWithSelection || simStarting) return;
     setLauncherOpen(false);
     setSimStarting(true);
-    const ac = beginRun("scenario");
+    const ac = beginRun("scenario", null, { scenarioId: id });
     streamAbortRef.current = ac;
     const signal = ac.signal;
-    setRunPhase("Starting what-if run", "Posting scenario to the server…");
+    setRunPhase("Starting what-if run");
     try {
       const timetableId = runSelection[0];
       const selectedTimetable = selectableBaseTimetables.find(
@@ -498,7 +490,6 @@ export default function WhatIfScenarioDetailPage() {
       const run = runs[0];
       const outcome = await streamScenarioRunSse(run.runId, signal, {
         updateProgress,
-        setPercent,
         setRunPhase,
       });
       if (!outcome.ok) {
@@ -638,7 +629,7 @@ export default function WhatIfScenarioDetailPage() {
                   <BreadcrumbItem><BreadcrumbPage>{scenario?.name ?? "Scenario"}</BreadcrumbPage></BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
-              {shouldShowScenarioProgressBar ? <GwoTopProgressBar sources={["scenario"]} /> : null}
+              <GwoTopProgressBar sources={["scenario"]} />
             </div>
             {!idValid ? (
               <Alert>
@@ -757,9 +748,9 @@ export default function WhatIfScenarioDetailPage() {
                         {blockedByOtherScenarioRun
                           ? "Only one What-If simulation can run at a time. Wait for the active run to finish."
                           : scenarioPaused
-                            ? "The run is paused. Use Resume in the progress bar above to continue."
+                            ? "The run is paused. Use Resume in the status card above to continue."
                             : scenarioRunBusy
-                              ? "Live progress is shown in the bar above."
+                              ? "Live status is shown in the card above."
                               : runWasCancelledByUser
                                 ? "This run was cancelled by you. You can start another simulation at any time."
                                 : scenario?.latestRun?.status === "failed"
@@ -915,11 +906,6 @@ export default function WhatIfScenarioDetailPage() {
                         </div>
                       </>
                     ) : null}
-                    {scenarioPaused ? (
-                      <p className="text-xs text-muted-foreground">
-                        Simulation is paused. Use Resume in the progress bar above.
-                      </p>
-                    ) : null}
                   </CardContent>
                 </Card>
                 <Button asChild variant="outline" className="w-full"><Link href={`/dashboard/what-if/${id}/runs`}>Run history & apply</Link></Button>
@@ -1034,33 +1020,37 @@ export default function WhatIfScenarioDetailPage() {
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader><DialogTitle>Apply Scenario Result?</DialogTitle></DialogHeader>
-          {applyTargetsPublishedTimetable ? (
-            <Alert variant="destructive" className="border-2 shadow-sm">
-              <AlertTriangle className="h-4 w-4" aria-hidden />
-              <AlertTitle>Warning: base timetable is published</AlertTitle>
-              <AlertDescription>
-                Applying this scenario will overwrite the currently published live schedule.
-                This change is immediately visible to everyone using the live timetable.
-              </AlertDescription>
-            </Alert>
-          ) : null}
-          <p className="text-sm text-muted-foreground">
-            This promotes the sandbox result onto the base timetable: schedule entries and metrics are replaced. Works for draft or published timetables.
-            Production was not modified during the simulation; this is the only step that writes live data.
-          </p>
-          <Label>Type scenario name to confirm</Label>
-          <Input value={applyText} onChange={(e) => setApplyText(e.target.value)} placeholder={scenario?.name ?? ""} />
-          <HardConflictsAcknowledgmentFields
-            summary={applyConflictSummary}
-            loading={applyConflictLoading}
-            acknowledged={applyConflictAcknowledged}
-            onAcknowledgedChange={setApplyConflictAcknowledged}
-            contextLabel="Applying replaces the base timetable’s schedule with this result."
-          />
-          {applySuccess ? <p className="text-sm text-emerald-600">{applySuccess}</p> : null}
-          <DialogFooter>
+        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-6 sm:max-w-lg">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden pr-1">
+            <DialogHeader><DialogTitle>Apply Scenario Result?</DialogTitle></DialogHeader>
+            {applyTargetsPublishedTimetable ? (
+              <Alert variant="destructive" className="border-2 shadow-sm">
+                <AlertTriangle className="h-4 w-4" aria-hidden />
+                <AlertTitle>Warning: base timetable is published</AlertTitle>
+                <AlertDescription>
+                  Applying this scenario will overwrite the currently published live schedule.
+                  This change is immediately visible to everyone using the live timetable.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            <p className="text-sm text-muted-foreground">
+              This promotes the sandbox result onto the base timetable: schedule entries and metrics are replaced. Works for draft or published timetables.
+              Production was not modified during the simulation; this is the only step that writes live data.
+            </p>
+            <div className="space-y-2">
+              <Label>Type scenario name to confirm</Label>
+              <Input value={applyText} onChange={(e) => setApplyText(e.target.value)} placeholder={scenario?.name ?? ""} />
+            </div>
+            <HardConflictsAcknowledgmentFields
+              summary={applyConflictSummary}
+              loading={applyConflictLoading}
+              acknowledged={applyConflictAcknowledged}
+              onAcknowledgedChange={setApplyConflictAcknowledged}
+              contextLabel="Applying replaces the base timetable’s schedule with this result."
+            />
+            {applySuccess ? <p className="text-sm text-emerald-600">{applySuccess}</p> : null}
+          </div>
+          <DialogFooter className="mt-4 shrink-0 border-t pt-4">
             <Button variant="outline" onClick={() => setApplyOpen(false)} disabled={applySubmitting}>Cancel</Button>
             <Button variant="destructive" disabled={!canApply || applySubmitting} onClick={async () => {
               if (!scenario?.latestRun) return;

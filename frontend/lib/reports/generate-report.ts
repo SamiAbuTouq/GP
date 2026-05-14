@@ -235,185 +235,15 @@ function buildRoomExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
     Capacity: r.capacity,
     "In service": r.isAvailable ? "Yes" : "No",
     "Sessions scheduled": r.sessionsCount,
+    "Online/blended sessions": r.onlineOrBlendedSessions,
     "Weekly instructional hours": r.weeklyInstructionalHours,
-    "Load % (vs. busiest room)": r.relativeLoadPct,
+    "Share of peak room load (%)": r.relativeLoadPct,
     "Avg seat fill — F2F/blended (%)": xlOptNum(r.avgSeatFillPct),
     "Busiest weekday (by session count)": r.peakDay,
   }))
   const detailWs = XLSX.utils.json_to_sheet(detail)
   applyDetailSheetLayout(detailWs)
   XLSX.utils.book_append_sheet(wb, detailWs, "Room detail")
-  return wb
-}
-
-function buildLecturerExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
-  const { lecturerRows: rows, insights: ins, lecturerPreferenceSummary: prefSummary } = ds
-  const wb = XLSX.utils.book_new()
-  const avgLoad =
-    rows.length > 0
-      ? Math.round((rows.reduce((s, r) => s + r.loadIndex, 0) / rows.length) * 1000) /
-        1000
-      : 0
-  const highLoad = rows.filter((r) => r.loadIndex >= 1.2).length
-  const totalHrs = Math.round(rows.reduce((s, r) => s + r.weeklyContactHours, 0) * 100) / 100
-
-  const summaryData: (string | number)[][] = [
-    ...excelCoverBlock("Lecturer Workload Report", ds, prefs),
-    ["Metric", "Value"],
-    ["Lecturers with assignments", ins.lecturerCountScheduled],
-    ["Lecturers with no assignments", ins.lecturersWithNoAssignments],
-    ["Average load index (hours / max_workload)", avgLoad],
-    ["Total scheduled weekly contact hours", totalHrs],
-    ["Faculty at or above 1.20 load index", highLoad],
-    [],
-    ["Preference compliance", ""],
-    ["Lecturers with preferences defined", prefSummary.lecturersWithPreferences],
-    ["Lecturers with no preferences", prefSummary.lecturersWithoutPreferences],
-    ["Total avoided-slot violations", prefSummary.totalAvoidedViolations],
-    ["Lecturers requiring attention (≥1 avoided violation)", prefSummary.lecturersRequiringAttention],
-  ]
-  const summaryWs = XLSX.utils.aoa_to_sheet(summaryData)
-  applyTwoColumnKeyValueWidths(summaryWs)
-  XLSX.utils.book_append_sheet(wb, summaryWs, "Summary")
-
-  const detail = rows.map((r) => ({
-    Lecturer: r.lecturerName,
-    Department: r.department,
-    "Max workload (DB)": r.maxWorkloadHours,
-    Sections: r.sectionsScheduled,
-    "Distinct courses": r.distinctCourses,
-    "Lab sections": r.labSections,
-    "Weekly contact hours": r.weeklyContactHours,
-    "Load index": r.loadIndex,
-    "% of personal max": xlOptNum(r.loadPctOfMax),
-  }))
-  const totalsRow = {
-    Lecturer: "TOTAL",
-    Department: "",
-    "Max workload (DB)": "",
-    Sections: rows.reduce((s, r) => s + r.sectionsScheduled, 0),
-    "Distinct courses": rows.reduce((s, r) => s + r.distinctCourses, 0),
-    "Lab sections": rows.reduce((s, r) => s + r.labSections, 0),
-    "Weekly contact hours": Math.round(rows.reduce((s, r) => s + r.weeklyContactHours, 0) * 100) / 100,
-    "Load index": "",
-    "% of personal max": "",
-  }
-  const detailSheet = XLSX.utils.json_to_sheet([...detail, totalsRow])
-  const totalRowNum = detail.length + 2
-  for (const col of ["A", "B", "C", "D", "E", "F", "G", "H", "I"] as const) {
-    const cell = detailSheet[`${col}${totalRowNum}`]
-    if (cell) cell.s = { font: { bold: true } }
-  }
-  applyDetailSheetLayout(detailSheet)
-  XLSX.utils.book_append_sheet(wb, detailSheet, "Workload detail")
-
-  const rollup = lecturerDepartmentRollups(rows)
-  const rollupWs = XLSX.utils.json_to_sheet(
-    rollup.map((r) => ({
-      Department: r.department,
-      "Lecturers (scheduled)": r.lecturers,
-      Sections: r.sections,
-      "Weekly contact hours": r.weeklyContactHours,
-    })),
-  )
-  applyDetailSheetLayout(rollupWs)
-  XLSX.utils.book_append_sheet(wb, rollupWs, "By department")
-
-  const prefWs = XLSX.utils.json_to_sheet(
-    ds.lecturerPreferenceRows.map((r) => ({
-      Lecturer: r.lecturerName,
-      Department: r.department,
-      "Sessions assigned": r.sessionsAssigned,
-      "On preferred": r.onPreferred,
-      "On avoided": r.onAvoided,
-      Neutral: r.neutral,
-      "Compliance score": r.hasPreferences ? xlOptNum(r.complianceScore) : "",
-      "Has preferences": r.hasPreferences ? "Yes" : "No",
-    })),
-  )
-  applyDetailSheetLayout(prefWs)
-  XLSX.utils.book_append_sheet(wb, prefWs, "Preference detail")
-
-  return wb
-}
-
-function lecturerWorkloadPdfAvoidedViolations(
-  workloadRow: ReportDataset["lecturerRows"][number],
-  prefByUserId: Map<number, ReportDataset["lecturerPreferenceRows"][number]>,
-): string | number {
-  const pref = prefByUserId.get(workloadRow.userId)
-  if (!pref) return "—"
-  if (!pref.hasPreferences) return "—"
-  return pref.onAvoided
-}
-
-function buildCourseExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
-  const { courseDistributionRows: rows, insights: ins } = ds
-  const wb = XLSX.utils.book_new()
-  const mod = modalitySplitFromCourseRows(rows)
-
-  const summaryData: (string | number)[][] = [
-    ...excelCoverBlock("Course Distribution Report", ds, prefs),
-    ["Metric", "Value"],
-    ["Departments listed", rows.length],
-    ["Distinct courses on timetable", ins.distinctCoursesScheduled],
-    ["Section instances", ins.totalScheduleEntries],
-    ["Total registered students (sum of sections)", rows.reduce((s, r) => s + r.totalEnrollment, 0)],
-    ["Departments with ≥1 section", ins.departmentsScheduled],
-    [],
-    ["Modality (section instances)", "Count"],
-    ["Online", mod.online],
-    ["Blended", mod.blended],
-    ["Face-to-face", mod.faceToFace],
-    ["% of section instances — online", xlOptNum(mod.pctOnline)],
-    ["% of section instances — blended", xlOptNum(mod.pctBlended)],
-    ["% of section instances — face-to-face", xlOptNum(mod.pctFaceToFace)],
-  ]
-  const summaryWs = XLSX.utils.aoa_to_sheet(summaryData)
-  applyTwoColumnKeyValueWidths(summaryWs)
-  XLSX.utils.book_append_sheet(wb, summaryWs, "Summary")
-
-  const detail = rows.map((r) => ({
-    Department: r.department,
-    "Courses in catalog": r.catalogCourseCount,
-    "Courses on timetable": r.scheduledDistinctCourses,
-    "Section instances": r.sectionInstances,
-    "Total enrollment": r.totalEnrollment,
-    "UG course titles (scheduled)": r.undergraduateCourseCount,
-    "Grad course titles (scheduled)": r.graduateCourseCount,
-    "Online sections": r.onlineSections,
-    "Blended sections": r.blendedSections,
-    "Face-to-face sections": r.faceToFaceSections,
-    "Avg enrollment / section": r.avgSectionEnrollment,
-    "% sections online (dept)":
-      r.sectionInstances > 0
-        ? Math.round((r.onlineSections / r.sectionInstances) * 1000) / 10
-        : "",
-  }))
-  const totalSections = rows.reduce((s, r) => s + r.sectionInstances, 0)
-  const totalEnrollment = rows.reduce((s, r) => s + r.totalEnrollment, 0)
-  const totalsRow = {
-    Department: "TOTAL",
-    "Courses in catalog": rows.reduce((s, r) => s + r.catalogCourseCount, 0),
-    "Courses on timetable": rows.reduce((s, r) => s + r.scheduledDistinctCourses, 0),
-    "Section instances": totalSections,
-    "Total enrollment": totalEnrollment,
-    "UG course titles (scheduled)": "",
-    "Grad course titles (scheduled)": "",
-    "Online sections": rows.reduce((s, r) => s + r.onlineSections, 0),
-    "Blended sections": rows.reduce((s, r) => s + r.blendedSections, 0),
-    "Face-to-face sections": rows.reduce((s, r) => s + r.faceToFaceSections, 0),
-    "Avg enrollment / section": totalSections > 0 ? Math.round((totalEnrollment / totalSections) * 100) / 100 : 0,
-    "% sections online (dept)": "",
-  }
-  const detailSheet = XLSX.utils.json_to_sheet([...detail, totalsRow])
-  const totalRowNum = detail.length + 2
-  for (const col of ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"] as const) {
-    const cell = detailSheet[`${col}${totalRowNum}`]
-    if (cell) cell.s = { font: { bold: true } }
-  }
-  applyDetailSheetLayout(detailSheet)
-  XLSX.utils.book_append_sheet(wb, detailSheet, "By department")
   return wb
 }
 
@@ -464,48 +294,206 @@ function computeTimetableCoverage(ds: ReportDataset): {
   }
 }
 
-function buildTimetableCoverageExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
-  const {
-    coverageRows,
-    totalCatalog,
-    totalScheduled,
-    totalGap,
-    depsWithGaps,
-    depsFullCoverage,
-    institutionCoveragePct,
-  } = computeTimetableCoverage(ds)
+function buildLecturerExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
+  const { lecturerRows: rows, insights: ins, lecturerPreferenceSummary: prefSummary } = ds
   const wb = XLSX.utils.book_new()
+  const avgLoad =
+    rows.length > 0
+      ? (() => {
+          const withIdx = rows.filter((r) => r.loadIndex != null)
+          if (withIdx.length === 0) return null
+          return (
+            Math.round(
+              (withIdx.reduce((s, r) => s + (r.loadIndex as number), 0) / withIdx.length) * 1000,
+            ) / 1000
+          )
+        })()
+      : null
+  const highLoad = rows.filter((r) => r.loadIndex != null && r.loadIndex >= 1.2).length
+  const totalHrs = Math.round(rows.reduce((s, r) => s + r.weeklyContactHours, 0) * 100) / 100
+
   const summaryData: (string | number)[][] = [
-    ...excelCoverBlock("Timetable Coverage Report", ds, prefs),
+    ...excelCoverBlock("Lecturer Workload Report", ds, prefs),
     ["Metric", "Value"],
-    ["Total catalog courses", totalCatalog],
-    ["Courses on timetable", totalScheduled],
-    ["Institution coverage %", institutionCoveragePct],
-    ["Departments with ≥1 unscheduled catalog course", depsWithGaps],
-    ["Departments with full coverage", depsFullCoverage],
-    ["Total unscheduled course titles (all departments)", totalGap],
+    ["Lecturers with assignments", ins.lecturerCountScheduled],
+    ["Lecturers with no assignments", ins.lecturersWithNoAssignments],
+    ["Average load index (hours / max_workload)", xlOptNum(avgLoad)],
+    ["Total scheduled weekly contact hours", totalHrs],
+    ["Faculty at or above 1.20 load index", highLoad],
+    [],
+    ["Preference compliance", ""],
+    ["Lecturers with preferences defined", prefSummary.lecturersWithPreferences],
+    ["Lecturers with no preferences", prefSummary.lecturersWithoutPreferences],
+    ["Total avoided-slot violations", prefSummary.totalAvoidedViolations],
+    ["Lecturers requiring attention (≥1 avoided violation)", prefSummary.lecturersRequiringAttention],
   ]
   const summaryWs = XLSX.utils.aoa_to_sheet(summaryData)
   applyTwoColumnKeyValueWidths(summaryWs)
   XLSX.utils.book_append_sheet(wb, summaryWs, "Summary")
 
-  const detail = coverageRows.map((r) => ({
+  const detail = rows.map((r) => ({
+    Lecturer: r.lecturerName,
     Department: r.department,
-    "Courses in catalog": r.catalogCount,
-    "On timetable": r.scheduledCount,
-    Gap: r.gap,
-    "Coverage %": r.coveragePct,
+    "Max workload (DB)": r.maxWorkloadHours,
+    Sections: r.sectionsScheduled,
+    "Distinct courses (per lecturer)": r.distinctCourses,
+    "Unique course titles (institution total)": "",
+    "Lab sections": r.labSections,
+    "Weekly contact hours": r.weeklyContactHours,
+    "Load index": xlOptNum(r.loadIndex),
+    "% of personal max": xlOptNum(r.loadPctOfMax),
   }))
   const totalsRow = {
-    Department: "TOTAL",
-    "Courses in catalog": totalCatalog,
-    "On timetable": totalScheduled,
-    Gap: totalGap,
-    "Coverage %": institutionCoveragePct,
+    Lecturer: "TOTAL",
+    Department: "",
+    "Max workload (DB)": "",
+    Sections: rows.reduce((s, r) => s + r.sectionsScheduled, 0),
+    "Distinct courses (per lecturer)": "",
+    "Unique course titles (institution total)": ins.distinctCoursesScheduled,
+    "Lab sections": rows.reduce((s, r) => s + r.labSections, 0),
+    "Weekly contact hours": Math.round(rows.reduce((s, r) => s + r.weeklyContactHours, 0) * 100) / 100,
+    "Load index": "",
+    "% of personal max": "",
   }
   const detailSheet = XLSX.utils.json_to_sheet([...detail, totalsRow])
-  const totalRowNum = coverageRows.length + 2
-  for (const col of ["A", "B", "C", "D", "E"] as const) {
+  const totalRowNum = detail.length + 2
+  for (const col of ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"] as const) {
+    const cell = detailSheet[`${col}${totalRowNum}`]
+    if (cell) cell.s = { font: { bold: true } }
+  }
+  applyDetailSheetLayout(detailSheet)
+  XLSX.utils.book_append_sheet(wb, detailSheet, "Workload detail")
+
+  const rollup = lecturerDepartmentRollups(rows)
+  const rollupWs = XLSX.utils.json_to_sheet(
+    rollup.map((r) => ({
+      Department: r.department,
+      "Lecturers (scheduled)": r.lecturers,
+      Sections: r.sections,
+      "Weekly contact hours": r.weeklyContactHours,
+    })),
+  )
+  applyDetailSheetLayout(rollupWs)
+  XLSX.utils.book_append_sheet(wb, rollupWs, "By department")
+
+  const prefWs = XLSX.utils.json_to_sheet(
+    ds.lecturerPreferenceRows.map((r) => ({
+      Lecturer: r.lecturerName,
+      Department: r.department,
+      "Sessions assigned": r.sessionsAssigned,
+      "On preferred": r.onPreferred,
+      "On avoided": r.onAvoided,
+      Neutral: r.neutral,
+      "Compliance score": r.hasPreferences ? xlOptNum(r.complianceScore) : "",
+      "Has preferences": r.hasPreferences ? "Yes" : "No",
+    })),
+  )
+  applyDetailSheetLayout(prefWs)
+  XLSX.utils.book_append_sheet(wb, prefWs, "Preference detail")
+
+  return wb
+}
+
+function lecturerWorkloadPdfAvoidedViolations(
+  workloadRow: ReportDataset["lecturerRows"][number],
+  prefByUserId: Map<number, ReportDataset["lecturerPreferenceRows"][number]>,
+): string | number {
+  const pref = prefByUserId.get(workloadRow.userId)
+  if (!pref) return "—"
+  if (!pref.hasPreferences) return "—"
+  return pref.onAvoided
+}
+
+function buildCourseExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
+  const { courseDistributionRows: rows, insights: ins } = ds
+  const wb = XLSX.utils.book_new()
+  const mod = modalitySplitFromCourseRows(rows)
+  const coverage = computeTimetableCoverage(ds)
+  const COVERAGE_NOTE =
+    "This report cannot distinguish intentional absences from scheduling errors."
+  const coverLines = excelCoverBlock("Course Distribution Report", ds, prefs)
+
+  const summaryData: (string | number)[][] = [
+    ...coverLines.slice(0, -1),
+    ["⚠ Note:", COVERAGE_NOTE],
+    [],
+    ["Metric", "Value"],
+    ["Departments listed", rows.length],
+    ["Distinct courses on timetable", ins.distinctCoursesScheduled],
+    ["Section instances", ins.totalScheduleEntries],
+    ["Total registered students (sum of sections)", rows.reduce((s, r) => s + r.totalEnrollment, 0)],
+    ["Departments with ≥1 section", ins.departmentsScheduled],
+    [],
+    ["Modality (section instances)", "Count"],
+    ["Online", mod.online],
+    ["Blended", mod.blended],
+    ["Face-to-face", mod.faceToFace],
+    ["% of section instances — online", xlOptNum(mod.pctOnline)],
+    ["% of section instances — blended", xlOptNum(mod.pctBlended)],
+    ["% of section instances — face-to-face", xlOptNum(mod.pctFaceToFace)],
+    [],
+    ["Catalog vs. timetable coverage", ""],
+    ["Total catalog courses", coverage.totalCatalog],
+    ["Courses on timetable", coverage.totalScheduled],
+    ["Institution coverage %", coverage.institutionCoveragePct],
+    ["Departments with ≥1 unscheduled catalog course", coverage.depsWithGaps],
+    ["Departments with full coverage", coverage.depsFullCoverage],
+    ["Total unscheduled course titles (all departments)", coverage.totalGap],
+  ]
+  const summaryWs = XLSX.utils.aoa_to_sheet(summaryData)
+  applyTwoColumnKeyValueWidths(summaryWs)
+  const noteRowNum = coverLines.length
+  const noteA = summaryWs[`A${noteRowNum}`]
+  if (noteA) noteA.s = { font: { bold: true } }
+  XLSX.utils.book_append_sheet(wb, summaryWs, "Summary")
+
+  const detail = rows.map((r) => {
+    const gap = r.catalogCourseCount - r.scheduledDistinctCourses
+    const coveragePct =
+      r.catalogCourseCount > 0
+        ? Math.round((r.scheduledDistinctCourses / r.catalogCourseCount) * 1000) / 10
+        : 100
+    return {
+      Department: r.department,
+      "Courses in catalog": r.catalogCourseCount,
+      "Courses on timetable": r.scheduledDistinctCourses,
+      Gap: gap,
+      "Coverage %": coveragePct,
+      "Section instances": r.sectionInstances,
+      "Total enrollment": r.totalEnrollment,
+      "UG course titles (scheduled)": r.undergraduateCourseCount,
+      "Grad course titles (scheduled)": r.graduateCourseCount,
+      "Online sections": r.onlineSections,
+      "Blended sections": r.blendedSections,
+      "Face-to-face sections": r.faceToFaceSections,
+      "Avg enrollment / section": r.avgSectionEnrollment,
+      "% sections online (dept)":
+        r.sectionInstances > 0
+          ? Math.round((r.onlineSections / r.sectionInstances) * 1000) / 10
+          : "",
+    }
+  })
+  const totalSections = rows.reduce((s, r) => s + r.sectionInstances, 0)
+  const totalEnrollment = rows.reduce((s, r) => s + r.totalEnrollment, 0)
+  const totalsRow = {
+    Department: "TOTAL",
+    "Courses in catalog": rows.reduce((s, r) => s + r.catalogCourseCount, 0),
+    "Courses on timetable": rows.reduce((s, r) => s + r.scheduledDistinctCourses, 0),
+    Gap: coverage.totalGap,
+    "Coverage %": coverage.institutionCoveragePct,
+    "Section instances": totalSections,
+    "Total enrollment": totalEnrollment,
+    "UG course titles (scheduled)": "",
+    "Grad course titles (scheduled)": "",
+    "Online sections": rows.reduce((s, r) => s + r.onlineSections, 0),
+    "Blended sections": rows.reduce((s, r) => s + r.blendedSections, 0),
+    "Face-to-face sections": rows.reduce((s, r) => s + r.faceToFaceSections, 0),
+    "Avg enrollment / section": totalSections > 0 ? Math.round((totalEnrollment / totalSections) * 100) / 100 : 0,
+    "% sections online (dept)": "",
+  }
+  const detailSheet = XLSX.utils.json_to_sheet([...detail, totalsRow])
+  const totalRowNum = detail.length + 2
+  for (const col of ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N"] as const) {
     const cell = detailSheet[`${col}${totalRowNum}`]
     if (cell) cell.s = { font: { bold: true } }
   }
@@ -727,7 +715,10 @@ export async function generateReportBlob(params: {
     "Weekly hours multiply slot length by the number of days in each timeslot’s days mask (recurring meetings per week).",
   ]
 
-  const roomFootnotes = [...footnotes]
+  const roomFootnotes = [
+    ...footnotes,
+    "Share of peak room load (%): Percentage of this room's weekly hours relative to the most-used room. Not a capacity-based utilization rate.",
+  ]
 
   const courseFootnotes = [
     ...footnotes,
@@ -777,8 +768,9 @@ export async function generateReportBlob(params: {
           "Capacity",
           "Active",
           "Sessions",
+          "Online/blended",
           "Hours/week",
-          "Load % (vs. busiest room)",
+          "Share of peak room load (%)",
           "Seat fill %",
         ],
       ],
@@ -788,6 +780,7 @@ export async function generateReportBlob(params: {
         r.capacity,
         r.isAvailable ? "Yes" : "No",
         r.sessionsCount,
+        r.onlineOrBlendedSessions,
         r.weeklyInstructionalHours,
         r.relativeLoadPct,
         r.avgSeatFillPct ?? "—",
@@ -812,10 +805,17 @@ export async function generateReportBlob(params: {
     const ins = ds.insights
     const avgLoad =
       rows.length > 0
-        ? Math.round((rows.reduce((s, r) => s + r.loadIndex, 0) / rows.length) * 1000) /
-          1000
-        : 0
-    const highLoad = rows.filter((r) => r.loadIndex >= 1.2).length
+        ? (() => {
+            const withIdx = rows.filter((r) => r.loadIndex != null)
+            if (withIdx.length === 0) return null
+            return (
+              Math.round(
+                (withIdx.reduce((s, r) => s + (r.loadIndex as number), 0) / withIdx.length) * 1000,
+              ) / 1000
+            )
+          })()
+        : null
+    const highLoad = rows.filter((r) => r.loadIndex != null && r.loadIndex >= 1.2).length
     const totalHrs =
       Math.round(rows.reduce((s, r) => s + r.weeklyContactHours, 0) * 100) / 100
     const noAssignments = ds.insights.lecturersWithNoAssignments
@@ -842,7 +842,9 @@ export async function generateReportBlob(params: {
     }
 
     const summaryLines = [
-      `${ins.lecturerCountScheduled} lecturers appear on the selected timetable, averaging ${avgLoad} load index (weekly hours ÷ personal max_workload from HR records).`,
+      avgLoad != null
+        ? `${ins.lecturerCountScheduled} lecturers appear on the selected timetable, averaging ${avgLoad} load index (weekly hours ÷ personal max_workload from HR records).`
+        : `${ins.lecturerCountScheduled} lecturers appear on the selected timetable; average load index is unavailable because max workload is not set for some or all faculty.`,
       `Collectively they deliver ${totalHrs} weekly contact hours. ${highLoad} faculty meet or exceed a 1.20 load index.`,
       `${noAssignments} active lecturers currently have no scheduled sections this term.`,
       "Labs are counted separately so chairs can see experimental teaching intensity alongside lecture contact hours.",
@@ -876,8 +878,8 @@ export async function generateReportBlob(params: {
         r.sectionsScheduled,
         r.labSections,
         r.weeklyContactHours,
-        r.loadIndex,
-        r.loadPctOfMax ?? "",
+        r.loadIndex != null ? r.loadIndex : "—",
+        r.loadPctOfMax != null ? r.loadPctOfMax : "—",
         lecturerWorkloadPdfAvoidedViolations(r, prefByUserId),
       ]),
       footnotes,
@@ -909,12 +911,17 @@ export async function generateReportBlob(params: {
     }
 
     const modPdf = modalitySplitFromCourseRows(rows)
+    const covPdf = computeTimetableCoverage(ds)
     const summaryLines = [
+      "This report cannot distinguish intentional absences from scheduling errors.",
       `${rows.length} academic units are listed, combining catalog breadth with the live timetable.`,
       `${ins.distinctCoursesScheduled} distinct courses run this term in ${ins.totalScheduleEntries} section instances, enrolling ${totalEnroll.toLocaleString()} student seats in aggregate.`,
       modPdf.total > 0
         ? `Institution-wide delivery split: ${modPdf.pctFaceToFace ?? 0}% face-to-face, ${modPdf.pctOnline ?? 0}% online, ${modPdf.pctBlended ?? 0}% blended (by section count).`
         : "Institution-wide modality split is unavailable (no modality-tagged section instances).",
+      `${covPdf.totalScheduled} of ${covPdf.totalCatalog} catalog courses appear on the timetable (${covPdf.institutionCoveragePct}% coverage).`,
+      `${covPdf.depsWithGaps} department(s) have at least one unscheduled catalog course; ${covPdf.depsFullCoverage} have full coverage.`,
+      `Total unscheduled course titles across all departments: ${covPdf.totalGap}.`,
     ]
 
     const blob = await buildPdf(
@@ -926,6 +933,8 @@ export async function generateReportBlob(params: {
           "Department",
           "Courses in catalog",
           "Courses on timetable",
+          "Gap",
+          "Coverage %",
           "Sections",
           "Total enrollment",
           "Avg enrollment/section",
@@ -941,24 +950,35 @@ export async function generateReportBlob(params: {
         const pctBlendedInst =
           totalSections > 0 && modPdf.pctBlended != null ? modPdf.pctBlended : null
         return [
-          ...rows.map((r) => [
-            r.department,
-            r.catalogCourseCount,
-            r.scheduledDistinctCourses,
-            r.sectionInstances,
-            r.totalEnrollment,
-            r.avgSectionEnrollment,
-            r.sectionInstances === 0
-              ? "—"
-              : Math.round((r.onlineSections / r.sectionInstances) * 1000) / 10,
-            r.sectionInstances === 0
-              ? "—"
-              : Math.round((r.blendedSections / r.sectionInstances) * 1000) / 10,
-          ]),
+          ...rows.map((r) => {
+            const gap = r.catalogCourseCount - r.scheduledDistinctCourses
+            const coveragePct =
+              r.catalogCourseCount > 0
+                ? Math.round((r.scheduledDistinctCourses / r.catalogCourseCount) * 1000) / 10
+                : 100
+            return [
+              r.department,
+              r.catalogCourseCount,
+              r.scheduledDistinctCourses,
+              gap,
+              coveragePct,
+              r.sectionInstances,
+              r.totalEnrollment,
+              r.avgSectionEnrollment,
+              r.sectionInstances === 0
+                ? "—"
+                : Math.round((r.onlineSections / r.sectionInstances) * 1000) / 10,
+              r.sectionInstances === 0
+                ? "—"
+                : Math.round((r.blendedSections / r.sectionInstances) * 1000) / 10,
+            ]
+          }),
           [
             "TOTAL",
             rows.reduce((s, r) => s + r.catalogCourseCount, 0),
             rows.reduce((s, r) => s + r.scheduledDistinctCourses, 0),
+            covPdf.totalGap,
+            covPdf.institutionCoveragePct,
             totalSections,
             totalEnroll,
             weightedAvg,
@@ -968,59 +988,6 @@ export async function generateReportBlob(params: {
         ]
       })(),
       courseFootnotes,
-      undefined,
-      fmtGen,
-    )
-    return { blob, mimeType: "application/pdf", extension: "pdf", baseFilename: base }
-  }
-
-  if (reportTypeId === "timetable-coverage") {
-    const {
-      coverageRows,
-      totalCatalog,
-      totalScheduled,
-      totalGap,
-      depsWithGaps,
-      depsFullCoverage,
-      institutionCoveragePct,
-    } = computeTimetableCoverage(ds)
-
-    if (format === "excel") {
-      const wb = buildTimetableCoverageExcel(ds, dateTimePrefs)
-      const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" })
-      return {
-        blob: new Blob([buf], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        }),
-        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        extension: "xlsx",
-        baseFilename: base,
-      }
-    }
-
-    const coverageFootnotes = [
-      "Gap counts reflect course titles in the catalog with no sections on this timetable version. A course may be intentionally absent (not offered this semester) or missing due to a scheduling gap. This report flags gaps for human review — it cannot distinguish intentional absences from scheduling errors.",
-    ]
-
-    const summaryLines = [
-      `${totalScheduled} of ${totalCatalog} catalog courses appear on the timetable (${institutionCoveragePct}% coverage).`,
-      `${depsWithGaps} department(s) have at least one unscheduled catalog course; ${depsFullCoverage} have full coverage.`,
-      `Total unscheduled course titles across all departments: ${totalGap}.`,
-    ]
-
-    const blob = await buildPdf(
-      "Timetable Coverage Report",
-      pdfSubtitleLines(ds, dateTimePrefs),
-      summaryLines,
-      [["Department", "Courses in catalog", "On timetable", "Gap", "Coverage %"]],
-      coverageRows.map((r) => [
-        r.department,
-        r.catalogCount,
-        r.scheduledCount,
-        r.gap,
-        r.coveragePct,
-      ]),
-      coverageFootnotes,
       undefined,
       fmtGen,
     )

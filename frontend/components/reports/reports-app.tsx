@@ -11,7 +11,6 @@ import {
   Check,
   ChevronRight,
   Search,
-  BookOpen,
   Calendar,
 } from "lucide-react"
 import { ChartPieIcon } from "@/components/ui/chart-pie-icon"
@@ -35,7 +34,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -71,7 +69,7 @@ import { REPORT_DEFINITIONS } from "@/lib/reports/definitions"
 import type { ExportFormat, GeneratedReportRecord, ReportTypeId } from "@/lib/reports/types"
 import { fetchReportDataset } from "@/lib/reports/fetch-dataset"
 import { generateReportBlob, triggerDownload } from "@/lib/reports/generate-report"
-import { deleteRecentReport, loadRecentReports, saveRecentReport } from "@/lib/reports/recent-storage"
+import { deleteRecentReport, loadRecentReports, saveRecentReport, clearRecentReports } from "@/lib/reports/recent-storage"
 import { useDateTimeFormat } from "@/components/datetime-preferences-context"
 import * as XLSX from "xlsx"
 
@@ -80,7 +78,6 @@ const REPORT_ICONS: Record<ReportTypeId, any> = {
   "lecturer-workload": UserRoundIcon,
   "course-distribution": ChartPieIcon,
   "conflict-analysis": TriangleAlertIcon,
-  "timetable-coverage": BookOpen,
   "timeslot-demand": Calendar,
 }
 
@@ -243,7 +240,11 @@ export function ReportsApp() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewTable, setPreviewTable] = useState<string[][] | null>(null)
   const previewUrlRef = useRef<string | null>(null)
+  const previewWorkbookRef = useRef<import("xlsx").WorkBook | null>(null)
+  const [excelPreviewSheetNames, setExcelPreviewSheetNames] = useState<string[]>([])
+  const [excelPreviewSheetIndex, setExcelPreviewSheetIndex] = useState(0)
   const [deleteTarget, setDeleteTarget] = useState<GeneratedReportRecord | null>(null)
+  const [clearAllOpen, setClearAllOpen] = useState(false)
 
   const selectedDef = useMemo(
     () => REPORT_DEFINITIONS.find((r) => r.id === selectedReportId),
@@ -378,27 +379,13 @@ export function ReportsApp() {
     hasChosenTimetablePick,
   ])
 
-  const wizardProgress = useMemo(() => {
-    let p = 0
-    if (selectedReportId) p += 30
-    if (selectedReportId && exportFormat !== "" && hasChosenFormat) p += 25
-    if (selectedReportId && timetableSelectionComplete) p += 25
-    if (
-      selectedReportId &&
-      exportFormat !== "" &&
-      hasChosenFormat &&
-      timetableSelectionComplete &&
-      !selectedDef?.comingSoon
-    )
-      p += 20
-    return Math.min(p, 100)
-  }, [
-    selectedReportId,
-    exportFormat,
-    hasChosenFormat,
-    timetableSelectionComplete,
-    selectedDef?.comingSoon,
-  ])
+  const stepsComplete = useMemo(() => {
+    let n = 0
+    if (selectedReportId) n++
+    if (selectedReportId && exportFormat !== "" && hasChosenFormat) n++
+    if (selectedReportId && timetableSelectionComplete) n++
+    return n
+  }, [selectedReportId, exportFormat, hasChosenFormat, timetableSelectionComplete])
 
   const handleSelectReport = (id: ReportTypeId) => {
     setSelectedReportId(id)
@@ -467,8 +454,11 @@ export function ReportsApp() {
     try {
       const dataset =
         scheduleScope === "timetable"
-          ? await fetchReportDataset({ timetableId: Number(pickedTimetableId) })
-          : await fetchReportDataset({ semesterId: Number(semesterId) })
+          ? await fetchReportDataset({
+              timetableId: Number(pickedTimetableId),
+              reportType: selectedReportId,
+            })
+          : await fetchReportDataset({ semesterId: Number(semesterId), reportType: selectedReportId })
       const { blob, mimeType, extension, baseFilename } = await generateReportBlob({
         reportTypeId: selectedReportId,
         format: exportFormat as ExportFormat,
@@ -512,7 +502,7 @@ export function ReportsApp() {
         title: "Report generated",
         description: opts.download
           ? `${filename} was downloaded and added to Recent Reports.`
-          : "Saved to Recent Reports for this session.",
+          : "Saved to Recent Reports in your browser. Open the Recent Reports tab to download anytime.",
       })
     } catch (e) {
       console.error(e)
@@ -526,70 +516,99 @@ export function ReportsApp() {
     }
   }
 
-  const openPreview = useCallback((r: GeneratedReportRecord) => {
-    if (previewUrlRef.current) {
-      URL.revokeObjectURL(previewUrlRef.current)
-      previewUrlRef.current = null
-    }
-    setPreviewReport(r)
-    setPreviewUrl(null)
-    setPreviewTable(null)
-
-    if (r.extension === "pdf") {
-      const url = URL.createObjectURL(r.blob)
-      previewUrlRef.current = url
-      setPreviewUrl(url)
-      return
-    }
-    if (r.extension === "csv") {
-      r.blob.text().then((text) => {
-        const lines = text.trim().split(/\r?\n/)
-        const rows = lines.map((line) => {
-          const out: string[] = []
-          let cur = ""
-          let q = false
-          for (let i = 0; i < line.length; i++) {
-            const c = line[i]
-            if (c === '"') {
-              q = !q
-            } else if (c === "," && !q) {
-              out.push(cur)
-              cur = ""
-            } else cur += c
-          }
-          out.push(cur)
-          return out
-        })
-        setPreviewTable(rows)
-      })
-      return
-    }
-    if (r.extension === "zip") {
-      setPreviewTable([
-        ["Preview unavailable for ZIP exports"],
-        ["Download the file to inspect the packaged CSV files."],
-      ])
-      return
-    }
-    if (r.extension === "xlsx") {
-      r.blob.arrayBuffer().then((buf) => {
-        const wb = XLSX.read(buf, { type: "array" })
-        const sheet = wb.SheetNames[0]
-        if (!sheet) return
-        const data = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[sheet], {
-          header: 1,
-          defval: "",
-        }) as string[][]
-        setPreviewTable(data)
-      })
-    }
+  const selectExcelPreviewSheet = useCallback((idx: number) => {
+    const wb = previewWorkbookRef.current
+    if (!wb || idx < 0 || idx >= wb.SheetNames.length) return
+    const name = wb.SheetNames[idx]
+    if (!name) return
+    setExcelPreviewSheetIndex(idx)
+    const data = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[name], {
+      header: 1,
+      defval: "",
+    }) as string[][]
+    setPreviewTable(data)
   }, [])
+
+  const openPreview = useCallback(
+    (r: GeneratedReportRecord) => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current)
+        previewUrlRef.current = null
+      }
+      previewWorkbookRef.current = null
+      setExcelPreviewSheetNames([])
+      setExcelPreviewSheetIndex(0)
+      setPreviewReport(r)
+      setPreviewUrl(null)
+      setPreviewTable(null)
+
+      if (r.extension === "pdf") {
+        const url = URL.createObjectURL(r.blob)
+        previewUrlRef.current = url
+        setPreviewUrl(url)
+        return
+      }
+      if (r.extension === "csv") {
+        r.blob.text().then((text) => {
+          const lines = text.trim().split(/\r?\n/)
+          const rows = lines.map((line) => {
+            const out: string[] = []
+            let cur = ""
+            let q = false
+            for (let i = 0; i < line.length; i++) {
+              const c = line[i]
+              if (c === '"') {
+                q = !q
+              } else if (c === "," && !q) {
+                out.push(cur)
+                cur = ""
+              } else cur += c
+            }
+            out.push(cur)
+            return out
+          })
+          setPreviewTable(rows)
+        })
+        return
+      }
+      if (r.extension === "zip") {
+        setPreviewTable([
+          ["Preview unavailable for ZIP exports"],
+          ["Download the file to inspect the packaged CSV files."],
+        ])
+        return
+      }
+      if (r.extension === "xlsx") {
+        r.blob.arrayBuffer().then((buf) => {
+          const wb = XLSX.read(buf, { type: "array" })
+          previewWorkbookRef.current = wb
+          const names = wb.SheetNames
+          setExcelPreviewSheetNames(names)
+          setExcelPreviewSheetIndex(0)
+          const sheet = names[0]
+          if (!sheet) {
+            setPreviewTable([])
+            return
+          }
+          const data = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[sheet], {
+            header: 1,
+            defval: "",
+          }) as string[][]
+          setPreviewTable(data)
+        })
+      }
+    },
+    [],
+  )
 
   const closePreview = () => {
     if (previewUrlRef.current) {
       URL.revokeObjectURL(previewUrlRef.current)
       previewUrlRef.current = null
     }
+    previewWorkbookRef.current = null
+    setExcelPreviewSheetNames([])
+    setExcelPreviewSheetIndex(0)
     setPreviewUrl(null)
     setPreviewTable(null)
     setPreviewReport(null)
@@ -605,7 +624,17 @@ export function ReportsApp() {
     setRecentReports((prev) => prev.filter((x) => x.id !== deleteTarget.id))
     void deleteRecentReport(deleteTarget.id)
     setDeleteTarget(null)
-    toast({ title: "Report removed", description: "The entry was deleted from this session." })
+    toast({ title: "Report removed", description: "The entry was deleted from your browser storage." })
+  }
+
+  const confirmClearAllRecent = async () => {
+    setRecentReports([])
+    await clearRecentReports()
+    setClearAllOpen(false)
+    toast({
+      title: "Recent reports cleared",
+      description: "All stored exports were removed from this browser.",
+    })
   }
 
   const filteredRecent = useMemo(() => {
@@ -638,7 +667,7 @@ export function ReportsApp() {
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <Header />
           <main className="min-h-0 flex-1 overflow-auto">
-            <div className="mx-auto max-w-6xl space-y-8 p-4 lg:p-8">
+            <div className="mx-auto w-full max-w-[min(100%,88rem)] space-y-8 px-4 py-4 sm:px-6 lg:px-8 lg:py-8">
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-3">
                   <h1 className="text-3xl font-semibold tracking-tight text-balance">
@@ -752,6 +781,14 @@ export function ReportsApp() {
                             )
                           })}
                         </RadioGroup>
+                        {exportFormat === "csv" &&
+                        selectedReportId &&
+                        ZIP_CSV_REPORT_TYPES.has(selectedReportId) ? (
+                          <p className="text-muted-foreground rounded-lg border border-border/80 bg-muted/40 px-3 py-2 text-xs leading-snug">
+                            This export produces a ZIP archive with three CSV files: summary, violation detail, and room
+                            assignments. Unzip the file before opening.
+                          </p>
+                        ) : null}
                       </section>
 
                       <Separator />
@@ -984,9 +1021,12 @@ export function ReportsApp() {
                                 disabled={!canGenerate}
                                 onClick={() => handleGenerate({ download: false })}
                               >
-                                Generate
+                                Save without downloading
                               </Button>
                             </div>
+                            <p className="text-muted-foreground max-w-md text-xs leading-snug sm:pt-1">
+                              Save to Recent Reports and download later.
+                            </p>
                           </div>
                         )}
                       </section>
@@ -1000,8 +1040,10 @@ export function ReportsApp() {
                             <CardDescription>Complete each step in order.</CardDescription>
                           </div>
                           <div className="pt-3">
-                            <Progress value={wizardProgress} className="h-1.5" />
-                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <p className="text-muted-foreground mb-3 text-xs">
+                              {stepsComplete} of 3 steps complete
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
                               {stepItems.map((s, i) => (
                                 <div key={s.n} className="flex items-center gap-2">
                                   {s.showCircle ? (
@@ -1083,21 +1125,33 @@ export function ReportsApp() {
                 </TabsContent>
 
                 <TabsContent value="recent" className="mt-0 space-y-6 focus-visible:outline-none">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
                       <h2 className="text-lg font-semibold">Recent Reports</h2>
                       <p className="text-muted-foreground text-sm">
-                        Session-only history. Reloading the page clears this list.
+                        Stored in your browser. Clear individual entries or use the Clear all button.
                       </p>
                     </div>
-                    <div className="relative w-full sm:max-w-xs">
-                      <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        placeholder="Search name, type, semester…"
-                        className="h-10 pl-9"
-                        value={recentFilter}
-                        onChange={(e) => setRecentFilter(e.target.value)}
-                      />
+                    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center lg:w-auto lg:justify-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        disabled={recentReports.length === 0}
+                        onClick={() => setClearAllOpen(true)}
+                      >
+                        Clear all
+                      </Button>
+                      <div className="relative w-full sm:max-w-xs">
+                        <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search name, type, semester…"
+                          className="h-10 pl-9"
+                          value={recentFilter}
+                          onChange={(e) => setRecentFilter(e.target.value)}
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1114,13 +1168,14 @@ export function ReportsApp() {
                       </p>
                     </div>
                   ) : (
-                    <ScrollArea className="h-[min(560px,calc(100vh-280px))] pr-4">
-                      <Table>
+                    <ScrollArea className="h-[min(560px,calc(100vh-260px))] pr-4">
+                      <div className="pb-1 pt-0.5">
+                        <Table>
                         <TableHeader>
                           <TableRow className="hover:bg-transparent">
-                            <TableHead className="min-w-[200px]">Report</TableHead>
+                            <TableHead className="min-w-[280px] w-[40%]">Report</TableHead>
                             <TableHead>Format</TableHead>
-                            <TableHead className="min-w-[160px]">Timetable</TableHead>
+                            <TableHead className="min-w-[200px]">Timetable</TableHead>
                             <TableHead className="text-right">Size</TableHead>
                             <TableHead className="min-w-[140px]">Generated</TableHead>
                             <TableHead className="text-right w-[140px]">Actions</TableHead>
@@ -1129,16 +1184,22 @@ export function ReportsApp() {
                         <TableBody>
                           {filteredRecent.map((r) => (
                             <TableRow key={r.id}>
-                              <TableCell>
-                                <div className="font-medium leading-snug">{r.displayName}</div>
-                                <div className="text-muted-foreground text-xs">{r.reportTypeName}</div>
+                              <TableCell className="max-w-0">
+                                <div className="font-medium leading-snug whitespace-normal break-words">
+                                  {r.displayName}
+                                </div>
+                                <div className="text-muted-foreground text-xs whitespace-normal break-words">
+                                  {r.reportTypeName}
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <Badge variant="secondary" className="font-normal">
                                   {r.format}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="text-muted-foreground text-sm">{r.timetableLabel}</TableCell>
+                              <TableCell className="max-w-0 text-muted-foreground text-sm whitespace-normal break-words">
+                                {r.timetableLabel}
+                              </TableCell>
                               <TableCell className="text-right tabular-nums text-sm">
                                 {formatBytes(r.sizeBytes)}
                               </TableCell>
@@ -1192,6 +1253,7 @@ export function ReportsApp() {
                           ))}
                         </TableBody>
                       </Table>
+                      </div>
                     </ScrollArea>
                   )}
                 </TabsContent>
@@ -1210,6 +1272,22 @@ export function ReportsApp() {
                   : null}
               </DialogDescription>
             </DialogHeader>
+            {previewReport?.extension === "xlsx" && excelPreviewSheetNames.length > 0 ? (
+              <div className="flex flex-wrap gap-1 border-b bg-muted/20 px-4 py-2">
+                {excelPreviewSheetNames.map((name, idx) => (
+                  <Button
+                    key={`${name}-${idx}`}
+                    type="button"
+                    variant={idx === excelPreviewSheetIndex ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-8 shrink-0 text-xs"
+                    onClick={() => selectExcelPreviewSheet(idx)}
+                  >
+                    {name}
+                  </Button>
+                ))}
+              </div>
+            ) : null}
             <div className="min-h-[50vh] max-h-[calc(90vh-120px)]">
               {previewUrl ? (
                 <iframe title="PDF preview" src={previewUrl} className="h-[min(70vh,600px)] w-full border-0" />
@@ -1253,7 +1331,7 @@ export function ReportsApp() {
               <AlertDialogTitle>Delete this report?</AlertDialogTitle>
               <AlertDialogDescription>
                 {deleteTarget
-                  ? `"${deleteTarget.displayName}" will be removed from your session list. The file on disk is unchanged.`
+                  ? `"${deleteTarget.displayName}" will be removed from your browser storage.`
                   : null}
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -1264,6 +1342,27 @@ export function ReportsApp() {
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={clearAllOpen} onOpenChange={setClearAllOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear all recent reports?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This removes every saved export from this browser. Individual downloads on your computer are not
+                affected.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => void confirmClearAllRecent()}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Clear all
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

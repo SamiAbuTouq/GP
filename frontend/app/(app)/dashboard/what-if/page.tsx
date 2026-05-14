@@ -81,6 +81,8 @@ type CourseCatalogDetail = {
   sectionsNormal: number;
   sectionsSummer: number;
   deliveryMode: string;
+  /** Owning department for what-if payloads when no separate department picker is used. */
+  deptId: number;
 };
 
 function normalizeDeliveryModeKey(mode: string): (typeof DELIVERY_MODES)[number] {
@@ -877,10 +879,12 @@ export default function WhatIfScenariosPage() {
             if (code) codeToId[code.toUpperCase()] = value;
             const sn = Number(c.sectionsNormal ?? c.sections_normal ?? 1);
             const ss = Number(c.sectionsSummer ?? c.sections_summer ?? 0);
+            const rawDept = Number(c.deptId ?? c.dept_id ?? 0);
             detailById[value] = {
               sectionsNormal: Number.isFinite(sn) ? sn : 1,
               sectionsSummer: Number.isFinite(ss) ? ss : 0,
               deliveryMode: String(c.deliveryMode ?? c.delivery_mode ?? "FACE_TO_FACE"),
+              deptId: Number.isFinite(rawDept) && rawDept > 0 ? rawDept : 0,
             };
             return {
               value,
@@ -1038,6 +1042,17 @@ export default function WhatIfScenariosPage() {
     return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
+  /** Resolves dept id without requiring a department picker or a successful /departments fetch. */
+  function resolveDeptIdForWhatIf(teachableCourseIdStrs: string[]): number {
+    for (const cid of teachableCourseIdStrs) {
+      const d = courseDetailById[cid]?.deptId;
+      if (d != null && d >= 1) return d;
+    }
+    const fromList = defaultDepartmentIdForPayload();
+    if (fromList >= 1) return fromList;
+    return 1;
+  }
+
   function loadConditionIntoDraft(c: Condition) {
     setConditionType(c.type as WhatIfConditionType);
     const p = c.parameters as Record<string, unknown>;
@@ -1140,18 +1155,11 @@ export default function WhatIfScenariosPage() {
       case "add_lecturer": {
         const firstName = getParamString("firstName").trim();
         const lastName = getParamString("lastName").trim();
+        const teachableIdStrs = getParamStringArray("teachableCourseIds");
         let deptId = getParamNumber("deptId", 0);
-        if (deptId < 1) deptId = defaultDepartmentIdForPayload();
+        if (deptId < 1) deptId = resolveDeptIdForWhatIf(teachableIdStrs);
         if (!firstName || !lastName) {
           toast({ title: "Add lecturer", description: "Enter first and last name.", variant: "destructive" });
-          return null;
-        }
-        if (deptId < 1) {
-          toast({
-            title: "Add lecturer",
-            description: "Department data is still loading. Wait a moment and try again.",
-            variant: "destructive",
-          });
           return null;
         }
         parameters = {
@@ -1159,7 +1167,7 @@ export default function WhatIfScenariosPage() {
           lastName,
           deptId,
           maxWorkload: getParamNumber("maxWorkload", 15),
-          teachableCourseIds: getParamStringArray("teachableCourseIds").map(Number).filter((n) => n > 0),
+          teachableCourseIds: teachableIdStrs.map(Number).filter((n) => n > 0),
         };
         break;
       }

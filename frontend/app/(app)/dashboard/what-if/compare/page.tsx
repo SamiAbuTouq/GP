@@ -2146,38 +2146,42 @@ export default function WhatIfComparePage() {
           if (!open) setApplyRun(null);
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Apply run {applyRun?.id}?</DialogTitle>
-          </DialogHeader>
-          {applyTargetsPublishedTimetable ? (
-            <Alert variant="destructive" className="border-2 shadow-sm">
-              <AlertTriangle className="h-4 w-4" aria-hidden />
-              <AlertTitle>Warning: base timetable is published</AlertTitle>
-              <AlertDescription>
-                Confirming this action will overwrite the currently published live schedule for
-                the selected base timetable.
-              </AlertDescription>
-            </Alert>
-          ) : null}
-          <p className="text-sm text-muted-foreground">
-            Replaces the base timetable’s schedule with this sandbox result. Allowed for draft or published timetables.
-          </p>
-          <Label>Type scenario name to confirm</Label>
-          <Input
-            value={confirmText}
-            onChange={(e) => setConfirmText(e.target.value)}
-            placeholder={applyRun?.scenarioName ?? ""}
-            autoComplete="off"
-          />
-          <HardConflictsAcknowledgmentFields
-            summary={applyConflictSummary}
-            loading={applyConflictLoading}
-            acknowledged={applyConflictAcknowledged}
-            onAcknowledgedChange={setApplyConflictAcknowledged}
-            contextLabel="Applying replaces the base timetable’s schedule with this result."
-          />
-          <DialogFooter>
+        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-6 sm:max-w-lg">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden pr-1">
+            <DialogHeader>
+              <DialogTitle>Apply run {applyRun?.id}?</DialogTitle>
+            </DialogHeader>
+            {applyTargetsPublishedTimetable ? (
+              <Alert variant="destructive" className="border-2 shadow-sm">
+                <AlertTriangle className="h-4 w-4" aria-hidden />
+                <AlertTitle>Warning: base timetable is published</AlertTitle>
+                <AlertDescription>
+                  Confirming this action will overwrite the currently published live schedule for
+                  the selected base timetable.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            <p className="text-sm text-muted-foreground">
+              Replaces the base timetable’s schedule with this sandbox result. Allowed for draft or published timetables.
+            </p>
+            <div className="space-y-2">
+              <Label>Type scenario name to confirm</Label>
+              <Input
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder={applyRun?.scenarioName ?? ""}
+                autoComplete="off"
+              />
+            </div>
+            <HardConflictsAcknowledgmentFields
+              summary={applyConflictSummary}
+              loading={applyConflictLoading}
+              acknowledged={applyConflictAcknowledged}
+              onAcknowledgedChange={setApplyConflictAcknowledged}
+              contextLabel="Applying replaces the base timetable’s schedule with this result."
+            />
+          </div>
+          <DialogFooter className="mt-4 shrink-0 border-t pt-4">
             <Button variant="outline" type="button" onClick={() => setApplyRun(null)}>
               Cancel
             </Button>

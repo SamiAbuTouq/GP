@@ -1274,6 +1274,14 @@ def run_gwo(
     python = os.environ.get("PYTHON_BIN") or os.environ.get("PYTHON") or sys.executable
     gwo_args = [python, gwo_script, "--config", gwo_config_path, "--output", gwo_output_path]
 
+    gwo_env = os.environ.copy()
+    gwo_env["PYTHONUNBUFFERED"] = "1"
+    gwo_env["PYTHONIOENCODING"] = "utf-8"
+    gwo_env["GWO_UI_PROGRESS"] = "1"
+    ctl = os.environ.get("WHATIF_GWO_CONTROL_FILE", "").strip()
+    if ctl:
+        gwo_env["GWO_CONTROL_FILE"] = ctl
+
     emit("progress", phase="gwo", pct=40, message="Starting GWO optimization...")
 
     try:
@@ -1285,11 +1293,7 @@ def run_gwo(
             encoding="utf-8",
             errors="replace",
             bufsize=1,          # line-buffered
-            env={
-                **os.environ,
-                "PYTHONUNBUFFERED": "1",
-                "PYTHONIOENCODING": "utf-8",
-            },
+            env=gwo_env,
         )
     except FileNotFoundError:
         emit_error(
@@ -1416,6 +1420,16 @@ def save_result_timetable(
             )
             virtual_slot_row = cur.fetchone()
             virtual_slot_id = virtual_slot_row[0] if virtual_slot_row else None
+
+            # Valid lecturer user_ids for section_schedule_entry.user_id FK.
+            # Scenario conditions can remove lecturers from the sandbox while the optimizer
+            # still emits their old user_id — never persist those as real FKs.
+            cur.execute("SELECT user_id FROM lecturer")
+            lecturer_user_ids = {
+                int(r[0])
+                for r in (cur.fetchall() or [])
+                if r and r[0] is not None
+            }
 
             # Precompute simulated room metadata from sandbox/mapper context.
             sim_room_meta: Dict[int, Dict[str, Any]] = {}
@@ -1592,10 +1606,18 @@ def save_result_timetable(
             entries = gwo_result.get("schedule_entries", [])
             skipped_missing_core_fk = 0
             skipped_missing_room = 0
+            skipped_invalid_lecturer = 0
             if entries:
                 rows = []
                 for e in entries:
-                    user_id = e.get("user_id")
+                    user_id_raw = e.get("user_id")
+                    user_id: Optional[int] = None
+                    if user_id_raw is not None:
+                        try:
+                            user_id = int(user_id_raw)
+                        except (TypeError, ValueError):
+                            user_id = None
+
                     room_id = e.get("room_id")
                     slot_id = e.get("slot_id")
                     course_id = e.get("course_id")
@@ -1632,6 +1654,10 @@ def save_result_timetable(
 
                     # Simulated lecturers (negative user_id) are persisted as unassigned.
                     if user_id is not None and user_id < 0:
+                        user_id = None
+                    # Positive user_id must exist on lecturer row or FK insert fails.
+                    elif user_id is not None and user_id not in lecturer_user_ids:
+                        skipped_invalid_lecturer += 1
                         user_id = None
 
                     # Map simulated room IDs to resolved real room IDs.
@@ -1683,7 +1709,8 @@ def save_result_timetable(
                         "Scenario run produced 0 persistable schedule rows "
                         f"(input entries={len(entries)}, "
                         f"missing_core_fk={skipped_missing_core_fk}, "
-                        f"missing_room={skipped_missing_room})."
+                        f"missing_room={skipped_missing_room}, "
+                        f"invalid_lecturer_user_id_cleared={skipped_invalid_lecturer})."
                     )
             else:
                 raise ValueError(

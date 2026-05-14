@@ -5,9 +5,7 @@ export type HelpFaqCategory =
   | "entities"
   | "access-roles"
   | "what-if"
-  | "schedule-viewer";
-
-export type AppRole = "ADMIN" | "LECTURER";
+  | "saving-publishing";
 
 export interface HelpFaqItem {
   readonly id: string;
@@ -16,20 +14,14 @@ export interface HelpFaqItem {
   readonly answer: string;
 }
 
-export interface QuickStartArea {
-  readonly id: string;
-  readonly title: string;
-  readonly description: string;
-  readonly href: string;
-  /** Empty means visible to everyone (including signed-out visitors reading Help). */
-  readonly roles: readonly AppRole[];
-}
-
 export interface HostedVideoTutorial {
   readonly id: string;
+  /** Shown on the thumbnail overlay and in the fullscreen player header. */
   readonly title: string;
+  /** Short second line on the thumbnail (e.g. format or focus). */
+  readonly tagline: string;
+  /** Paragraph below the thumbnail. */
   readonly description: string;
-  readonly durationLabel: string;
   readonly mp4Url: string;
   readonly posterUrl: string;
 }
@@ -38,8 +30,10 @@ export interface HelpPdfGuide {
   readonly id: string;
   readonly title: string;
   readonly description: string;
-  /** Served from `frontend/public/help/`. */
-  readonly publicPath: `/help/${string}`;
+  /** Present when the guide is published; omit while `comingSoon` is true. */
+  readonly publicPath?: `/help/${string}`;
+  /** When true, the row is informational only—no download yet. */
+  readonly comingSoon?: boolean;
 }
 
 export const HELP_FAQ_CATEGORY_LABELS: Record<HelpFaqCategory, string> = {
@@ -48,8 +42,8 @@ export const HELP_FAQ_CATEGORY_LABELS: Record<HelpFaqCategory, string> = {
   "reports-exports": "Reports & exports",
   entities: "Master data",
   "access-roles": "Access & roles",
-  "what-if": "What-if",
-  "schedule-viewer": "Schedule viewer",
+  "what-if": "What-if scenarios",
+  "saving-publishing": "Saving & publishing",
 };
 
 export const HELP_FAQ_ITEMS: readonly HelpFaqItem[] = [
@@ -57,196 +51,125 @@ export const HELP_FAQ_ITEMS: readonly HelpFaqItem[] = [
     id: "gen-prereq-data",
     category: "timetable-generation",
     question: "What data must be complete before I run timetable generation?",
-    answer:
-      "Generation needs a coherent academic scope: active study plans or offerings, lecturer assignments where your process requires them, rooms with capacities and tags, and time slots that reflect official teaching windows. Incomplete entities do not always block a run, but they produce misleading soft conflicts or empty sessions. Use Reports to sanity-check row counts before committing wall-clock time to a long optimization.",
+    answer: `You need four things in place: courses with credit hours and delivery mode set, lecturers with max workload configured and courses assigned, rooms with capacities added, and timeslots defined for the correct semester type (regular or summer). Missing any of these won't always stop the run, but it produces empty sessions or misleading conflicts. Check the Courses, Lecturers, Rooms, and Time Slots pages in the sidebar before starting.`,
   },
   {
-    id: "gen-draft-vs-publish",
+    id: "gen-draft-vs-published",
     category: "timetable-generation",
-    question: "How should we treat a “draft” generation versus a timetable we publish?",
-    answer:
-      "Keep draft runs labeled and time-stamped in your team’s process. Compare draft metrics (conflict totals, room utilization, lecturer spread) in Schedule Viewer and Reports before publishing. Publishing should be a deliberate step after academic sign-off, because downstream exports and lecturer views are often interpreted as final unless your communications say otherwise.",
+    question: "How should I treat a draft timetable versus a published one?",
+    answer: `A draft is private - only admins see it and it has no effect on lecturers or exports. After running the optimizer, review the draft in the Schedule Viewer: check conflict counts, room utilization, and lecturer load. When you're satisfied, select the draft in Schedule Viewer, choose the academic year and semester, and click Publish. Publishing makes it the official timetable and triggers lecturer notifications.`,
   },
   {
-    id: "gen-parameters-change-outcomes",
+    id: "gen-parameter-changes",
     category: "timetable-generation",
-    question: "Why do small parameter changes sometimes swing results dramatically?",
-    answer:
-      "Course timetabling is a constrained search problem: tightening one constraint can eliminate large parts of the feasible space. Seeding, iteration budgets, and weighting between soft goals also shift which “good enough” solution the optimizer returns. When a small change surprises you, capture the two runs as what-if scenarios and compare conflict breakdowns rather than chasing a single magic configuration.",
+    question: "Why do small parameter changes sometimes produce very different results?",
+    answer: `Timetabling is a constrained search - tightening one rule can eliminate many valid solutions at once. If a small change surprises you, save both runs as What-If scenarios and compare their conflict breakdowns side by side rather than trying to reason about it from the parameters alone.`,
   },
   {
     id: "conflict-hard-soft",
     category: "conflicts",
-    question: "How do I interpret hard versus soft conflicts in the UI and reports?",
-    answer:
-      "Hard conflicts violate non-negotiable rules—double-booked rooms, overlapping required sessions for the same cohort, or impossible time placement. Soft conflicts are preferences or load-balancing goals you asked the system to minimize. Fix hard issues first; soft issues are triaged by academic priority. If soft noise is overwhelming, your weights may be too aggressive relative to incomplete master data.",
+    question: "What is the difference between hard and soft conflicts?",
+    answer: `Hard conflicts are rule violations the system cannot ignore - a double-booked room, a lecturer assigned to two sessions at the same time, or a cohort with overlapping required courses. Soft conflicts are preferences that weren't fully satisfied - a lecturer scheduled outside their preferred hours, or uneven workload spread. Fix hard conflicts first. If soft conflicts are overwhelming, either your constraint weights are too strict or your master data has gaps (missing room tags, incomplete timeslots).`,
   },
   {
-    id: "conflict-lecturer-load",
+    id: "conflict-lecturer-locations",
     category: "conflicts",
-    question: "A lecturer shows back-to-back sessions across campuses. Where do I start?",
-    answer:
-      "Verify the lecturer’s contracted sites, session binding to room locations, and any missing travel buffers in constraints. Check whether a course should be split across lecturers or sections. If the data is correct but still undesirable, capture a what-if run adjusting weights or room pools, and document the trade-off for the department chair.",
+    question: "A lecturer is showing back-to-back sessions in different locations. Where do I start?",
+    answer: `First check the lecturer's assigned rooms on the Lecturers page and confirm whether those rooms are physically in different locations. Then check whether the two sessions are in the same timeslot or adjacent ones. If the data is correct but the result is still unacceptable, create a What-If scenario with adjusted room pools or constraints for that lecturer and compare the outcome before touching the live timetable.`,
   },
   {
-    id: "conflict-student-overlap",
+    id: "conflict-cohort-overlaps",
     category: "conflicts",
-    question: "We see student cohort overlaps that look impossible on paper. What usually causes this?",
-    answer:
-      "Common causes are mis-linked study plan lines, cross-listed courses represented twice, elective pools modeled too narrowly, or sections that should be mutually exclusive but are not. Start from the cohort’s plan in Study Plans, then trace individual sections in Schedule Viewer. Fix data first; only then re-run generation or apply targeted manual moves.",
+    question: "We see student cohort overlaps that look impossible. What usually causes this?",
+    answer: `The most common causes are a course appearing more than once in a study plan, two courses that should be mutually exclusive sharing the same cohort pool, or elective sections not being properly separated. Start by opening Study Plans in the sidebar and verifying each course appears only once per plan and per year level. Fix the data first, then re-run generation - manual moves on top of bad data will keep recurring.`,
   },
   {
-    id: "reports-audit-trail",
+    id: "reports-before-publish",
     category: "reports-exports",
-    question: "Which reports best support accreditation or internal audit questions?",
-    answer:
-      "Use utilization and workload summaries for space and staffing accountability, conflict summaries for risk disclosure, and change logs if your deployment tracks amendments. Export the same snapshot to PDF or Excel so reviewers can see the exact dataset timestamp you relied on. Keep exports alongside committee minutes when decisions reference a specific build.",
+    question: "Which reports are most useful for reviewing a timetable before publishing?",
+    answer: `Use the utilization summary to check room occupancy rates and spot over- or under-used spaces. Use the workload summary to verify lecturer hours are within contracted limits. Use the conflict summary to confirm no hard violations remain. All three are available from the Reports page in the sidebar. Export them to Excel or PDF to share with department heads before giving final approval.`,
   },
   {
-    id: "exports-consistency",
+    id: "exports-excel-vs-pdf",
     category: "reports-exports",
-    question: "Excel from Schedule Viewer does not exactly match a faculty PDF. Is that a bug?",
-    answer:
-      "Often no—exports can differ by rounding, hidden columns, filters, or which view produced the extract. Align on a single source of truth for each meeting: either a report template or a grid export. If numbers diverge materially, compare generation IDs or timestamps and confirm both exports reference the same published revision.",
+    question: "The Excel export from Schedule Viewer doesn't match the PDF a lecturer is holding. Is that a bug?",
+    answer: `Usually not. The most common cause is that both exports are not from the same published timetable - one may be from a draft or an older version. Confirm both were exported from the same published timetable by checking the academic year and semester shown in the Schedule Viewer filter before exporting. If they still differ, check whether any filters (lecturer, room, or program) were active when one of the exports was made.`,
   },
   {
-    id: "entities-study-plans",
+    id: "entities-study-plans-midcycle",
     category: "entities",
-    question: "Study plans changed mid-cycle. How do we avoid corrupting the live timetable?",
-    answer:
-      "Freeze plan edits during publish windows where possible. When mid-cycle edits are unavoidable, import or adjust plans in a controlled batch, re-run a draft generation, and route changes through a coordinator who understands section linkage. Communicate deltas to departments so manual tweaks in Schedule Viewer are not fighting refreshed machine proposals.",
+    question: "Study plans changed mid-cycle. How do we avoid breaking the live timetable?",
+    answer: `Avoid editing study plans while a published timetable is active if possible. When changes are unavoidable, update the plan, then run a new draft generation and review it fully before publishing. Do not publish the new draft until department coordinators have confirmed the changes are correct - publishing replaces the live schedule immediately and lecturers are notified automatically.`,
   },
   {
-    id: "entities-rooms-tags",
+    id: "entities-room-tags-vs-notes",
     category: "entities",
-    question: "When should we use room tags versus ad-hoc notes?",
-    answer:
-      "Use tags for anything the solver must respect: lab equipment, flat floors, exam capacity, IT lab images, or professional-school accreditation requirements. Ad-hoc notes are invisible to optimization. If a constraint matters to placement, model it explicitly—even if setup takes longer—otherwise you will keep patching the same soft conflicts manually.",
+    question: "When should I use room tags versus just leaving a note on the room?",
+    answer: `Use tags for anything that must influence where a course is placed - lab equipment, flat-floor requirement, IT lab setup, exam capacity, or projector availability. The optimizer reads tags and respects them during placement. Notes are for humans only and are invisible to the optimizer. If a constraint matters to scheduling, model it as a tag or it will keep causing the same soft conflicts every run.`,
   },
   {
-    id: "entities-timeslots-blackouts",
+    id: "entities-timeslot-semester-type",
     category: "entities",
-    question: "How do blackout periods interact with elective-heavy programs?",
-    answer:
-      "Blackouts shrink feasible space. Elective-heavy programs need spare capacity across multiple windows. If blackouts are too tight, you will see artificial hard conflicts or odd section spreads. Validate blackout calendars with the registrar before encoding them, and test elective-rich departments in what-if runs before institution-wide publish.",
+    question: "How do timeslot types affect generation for summer versus regular semesters?",
+    answer: `Timeslots in your system are marked as either regular or summer type. The optimizer only uses timeslots that match the semester mode you select when running generation. If you run in summer mode and have no summer timeslots defined, the run will produce empty or broken results. Verify your timeslots on the Time Slots page and make sure the correct semester type is assigned before running.`,
   },
   {
-    id: "access-roles-lecturer-limits",
+    id: "access-lecturer-vs-admin",
     category: "access-roles",
-    question: "What can lecturers change on their own versus needing an administrator?",
-    answer:
-      "Typically lecturers submit time preferences and view personal schedules or assigned courses, while structural edits—new sections, room changes with policy impact, or plan edits—stay with administrators. Exact permissions depend on your deployment’s guards. If a lecturer cannot access an area they need, verify role, account status, and any pending access request approvals.",
+    question: "What can lecturers do in the system versus administrators?",
+    answer: `Lecturers can set their time preferences, view their personal schedule, view the courses assigned to them, and submit course modification requests. They cannot run generation, publish timetables, edit rooms or courses, manage other users, or access What-If scenarios. If a lecturer cannot reach a page they need, check that their account is active and their role is set correctly on the Lecturers page.`,
   },
   {
-    id: "access-requests-workflow",
+    id: "access-lecturer-request",
     category: "access-roles",
-    question: "How should we process access requests without creating security drift?",
-    answer:
-      "Use a single queue, default-deny posture, and least-privilege templates. Tie approvals to HR or registrar confirmation for elevated roles. Periodically review active accounts against HR lists. Document approvers in your policy so emergency grants are rare, time-bound, and logged.",
+    question: "How does a lecturer request access to the system?",
+    answer: `Lecturers go to the public access request page (linked from the login screen) and submit their details. The request appears in the Access Requests queue in the admin sidebar. An admin reviews it, verifies the details, and approves or rejects it. Once approved, the lecturer receives an email with login instructions. If a request is stuck, check the Access Requests page - it may be waiting for admin action.`,
   },
   {
     id: "what-if-when-to-use",
     category: "what-if",
-    question: "When is a what-if scenario worth the extra effort instead of tweaking the live grid?",
-    answer:
-      "Use what-if when the change touches shared resources—rooms, cohorts, or cross-department chains—or when you need a defensible comparison for leadership. For single-section cosmetic moves with no ripple effects, Schedule Viewer edits may be faster. Name scenarios clearly and attach the metrics snapshot you used to choose a winner.",
+    question: "When should I use a What-If scenario instead of editing the live timetable directly?",
+    answer: `Use What-If when the change touches shared resources - a room used by multiple departments, a lecturer shared across programs, or a cohort with linked required courses. For a single cosmetic move with no ripple effects, a direct edit in Schedule Viewer is faster. Name your scenarios clearly (e.g. "CS dept - move lab sessions to morning") so you can compare results meaningfully and explain the choice to stakeholders.`,
   },
   {
     id: "what-if-compare-runs",
     category: "what-if",
-    question: "How do we compare two solver runs fairly?",
-    answer:
-      "Lock the same dataset version, time slot grid, and constraint profile when possible. Compare total hard conflicts first, then prioritized soft metrics, then qualitative goals like commuter gaps or room churn. If runs use different random seeds, treat large deltas cautiously—rerun with medians across a few seeds if your process requires stability proofs.",
+    question: "How do I compare two What-If runs fairly?",
+    answer: `Use the same base timetable for both runs and change only one variable between them. Then open the Compare view from the What-If page to see a side-by-side breakdown of conflict counts and soft metric scores. If the runs used different random seeds and results vary widely, run each scenario a second time - large swings between seeds usually mean the constraint setup is too tight rather than one configuration being genuinely better.`,
   },
   {
-    id: "schedule-viewer-bulk-edits",
-    category: "schedule-viewer",
-    question: "What is a safe pattern for bulk moves during peak registration?",
-    answer:
-      "Stage changes in small batches with immediate conflict checks after each batch. Avoid mixing machine-proposed moves and manual edits without labeling which is authoritative. Communicate visible changes to affected lecturers the same day. If throughput is high, temporarily add coordinator shifts rather than turning off validation warnings.",
+    id: "what-if-publish-from-scenario",
+    category: "what-if",
+    question: "How do I publish a timetable that came from a What-If scenario?",
+    answer: `You cannot publish a What-If result directly. First, go to the What-If page, open the scenario, and click Apply to timetable - this replaces the base timetable's schedule with the scenario result. If the base timetable is already published, it is now live immediately with no further steps. If the base is a draft, go to Schedule Viewer, select it, and click Publish to make it official.`,
   },
   {
-    id: "schedule-viewer-readonly",
-    category: "schedule-viewer",
-    question: "Some users insist the viewer is “wrong” but conflicts look clean. What should we check?",
-    answer:
-      "Timezone and personal calendar overlays, cached browser tabs, and unpublished versus published revisions are frequent culprits. Confirm they are signed into the correct tenant or term, then compare the session timestamp to the official export PDF they are holding. If everything aligns, the issue is usually interpretation—pair them with a short screen share using the same filter set.",
-  },
-];
-
-export const QUICK_START_AREAS: readonly QuickStartArea[] = [
-  {
-    id: "timetable-generation",
-    title: "Timetable generation",
-    description: "Configure runs, monitor progress, and capture solver output for review.",
-    href: "/timetable-generation",
-    roles: ["ADMIN"],
+    id: "saving-store-database",
+    category: "saving-publishing",
+    question: "Where do I save a generated timetable to the database?",
+    answer: `After the optimizer finishes, go to the Rooms & Timeslots Grid tab on the Timetable Generation page and click "Store in database." This saves the current result as a new draft version. You will see a confirmation with the timetable ID and version number. The draft is then available in Schedule Viewer for review and publishing.`,
   },
   {
-    id: "what-if",
-    title: "What-if scenarios",
-    description: "Branch configurations, compare runs, and document trade-offs before you publish.",
-    href: "/dashboard/what-if",
-    roles: ["ADMIN"],
+    id: "saving-apply-whatif",
+    category: "saving-publishing",
+    question: "What happens to the existing timetable when I apply a What-If result?",
+    answer: `The base timetable's entire schedule is replaced with the scenario result - all session placements, room assignments, and metrics are overwritten. The result timetable is then deleted since its data now lives in the base. This cannot be undone, so open the result in Schedule Viewer and review it carefully before clicking Apply.`,
   },
   {
-    id: "schedule-viewer",
-    title: "Schedule viewer",
-    description: "Inspect sessions, validate conflicts, and perform controlled manual adjustments.",
-    href: "/schedule",
-    roles: ["ADMIN"],
-  },
-  {
-    id: "reports",
-    title: "Reports & exports",
-    description: "Generate evidence packs for committees, auditors, and faculty leadership.",
-    href: "/reports",
-    roles: ["ADMIN"],
-  },
-  {
-    id: "study-plans",
-    title: "Study plans & curricula",
-    description: "Keep cohort pathways accurate so the solver respects real program structure.",
-    href: "/entity/study-plans",
-    roles: ["ADMIN"],
-  },
-  {
-    id: "access-requests",
-    title: "Access requests",
-    description: "Approve least-privilege access aligned with HR and registrar records.",
-    href: "/entity/access-requests",
-    roles: ["ADMIN"],
-  },
-  {
-    id: "lecturer-preferences",
-    title: "Time preferences",
-    description: "Register unavailable windows and standing commitments for fair assignment.",
-    href: "/lecturer-time-preferences",
-    roles: ["LECTURER"],
-  },
-  {
-    id: "lecturer-schedule",
-    title: "My teaching schedule",
-    description: "Review confirmed sessions and raise issues with your coordinator early.",
-    href: "/lecturer-schedule",
-    roles: ["LECTURER"],
-  },
-  {
-    id: "my-courses",
-    title: "My courses",
-    description: "See allocations tied to you and confirm section metadata matches reality.",
-    href: "/my-courses",
-    roles: ["LECTURER"],
+    id: "saving-manual-edit-after-generation",
+    category: "saving-publishing",
+    question: "Can I manually edit a timetable after generation?",
+    answer: `Yes. On the Timetable Generation page, go to the Rooms & Timeslots Grid tab and click "Edit timetable." You can drag sessions to different rooms and timeslots. When done, click "Save to workspace file" to keep your changes, then "Store in database" to save the edited version as a draft. You can also edit directly in Schedule Viewer using the same Edit mode. Manual edits are checked against hard constraints in real time and violations are flagged immediately.`,
   },
 ];
 
 export const HOSTED_VIDEO_TUTORIALS: readonly HostedVideoTutorial[] = [
   {
     id: "quick-start-hosted",
-    title: "Quick start walkthrough",
+    title: "From data to published timetable",
+    tagline: "Full system walkthrough · tap for full screen",
     description:
-      "Orientation to the Smart University Timetabling System—core navigation and the scheduling workflow your team will repeat each term.",
-    durationLabel: "Hosted on Cloudinary",
+      "Covers the dashboard, course and lecturer data, the Grey Wolf Optimizer, scenario planning, and publishing - the end-to-end path a coordinator takes each term.",
     mp4Url:
       "https://res.cloudinary.com/dhiwczysm/video/upload/v1778765331/Quick_Start_Guide_xiquvy.mp4",
     posterUrl:
@@ -256,21 +179,24 @@ export const HOSTED_VIDEO_TUTORIALS: readonly HostedVideoTutorial[] = [
 
 export const HELP_PDF_GUIDES: readonly HelpPdfGuide[] = [
   {
-    id: "administrator-guide",
-    title: "Administrator orientation (PDF)",
-    description: "Printable overview aligned with coordinator workflows before each publish cycle.",
-    publicPath: "/help/administrator-guide.pdf",
+    id: "pdf-timetable-generation",
+    title: "Timetable generation (PDF)",
+    description:
+      "Start and monitor a generation run, read results and conflicts, and know when the timetable is safe to treat as final.",
+    comingSoon: true,
   },
   {
-    id: "lecturer-reference",
-    title: "Lecturer quick reference (PDF)",
-    description: "Short guidance on preferences, schedule review, and how to escalate conflicts responsibly.",
-    publicPath: "/help/lecturer-quick-reference.pdf",
+    id: "pdf-reports",
+    title: "Reports (PDF)",
+    description:
+      "Use the Reports page to pick semester and report type, then export PDF or Excel for committees and audits.",
+    comingSoon: true,
   },
   {
-    id: "data-quality",
-    title: "Data quality checklist (PDF)",
-    description: "A practical pre-flight list to reduce noisy soft conflicts and rework during peak weeks.",
-    publicPath: "/help/data-quality-checklist.pdf",
+    id: "pdf-dashboard-charts",
+    title: "Dashboard & charts (PDF)",
+    description:
+      "Read dashboard summary metrics and course analytics charts to track load and catch problems during the term.",
+    comingSoon: true,
   },
 ];

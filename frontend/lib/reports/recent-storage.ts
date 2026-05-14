@@ -58,12 +58,34 @@ export async function loadRecentReports(): Promise<GeneratedReportRecord[]> {
     .sort((a, b) => b.generatedAt.getTime() - a.generatedAt.getTime())
 }
 
+const MAX_RECENT_REPORTS = 20
+
 export async function saveRecentReport(r: GeneratedReportRecord): Promise<void> {
   const db = await openDb()
   const tx = db.transaction(STORE, "readwrite")
-  tx.objectStore(STORE).put(toStored(r))
+  const store = tx.objectStore(STORE)
+  store.put(toStored(r))
   await txDone(tx)
   db.close()
+
+  const db2 = await openDb()
+  const tx2 = db2.transaction(STORE, "readwrite")
+  const st = tx2.objectStore(STORE)
+  const all: StoredRecord[] = await new Promise((resolve, reject) => {
+    const req = st.getAll()
+    req.onsuccess = () => resolve((req.result ?? []) as StoredRecord[])
+    req.onerror = () => reject(req.error ?? new Error("Failed to list reports"))
+  })
+  if (all.length > MAX_RECENT_REPORTS) {
+    const sorted = [...all].sort(
+      (a, b) => new Date(b.generatedAtIso).getTime() - new Date(a.generatedAtIso).getTime(),
+    )
+    for (const row of sorted.slice(MAX_RECENT_REPORTS)) {
+      st.delete(row.id)
+    }
+  }
+  await txDone(tx2)
+  db2.close()
 }
 
 export async function deleteRecentReport(id: string): Promise<void> {

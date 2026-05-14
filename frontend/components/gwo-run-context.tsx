@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useSWRConfig } from "swr";
 import { ApiClient } from "@/lib/api-client";
 import { dispatchNotificationsRefresh } from "@/lib/notification-bus";
-import { getScenarios } from "@/lib/what-if";
+import { getScenario, getScenarios } from "@/lib/what-if";
 import {
   createContext,
   useCallback,
@@ -84,15 +84,8 @@ const ETA_MAX_MS = 48 * 60 * 60 * 1000;
 const TIMETABLE_ITERATION_PROGRESS_CAP = 97;
 
 /**
- * What-if scenario UX: reserve first 10% for setup/conditions and drive the
- * remaining 90% from optimizer iterations.
- */
-const SCENARIO_GWO_PROGRESS_LO = 10;
-const SCENARIO_GWO_PROGRESS_HI = 100;
-
-/**
- * Scenario runs may restart iteration counters between GWO batches (run 1/N).
- * Aggregate into one 0→1 progression so monotonic smoothing does not stall mid-job.
+ * Scenario GWO: bar fill is strictly the completed-iteration share across batches
+ * (run / numRuns when present). Same 0–97 cap as timetable until finalizing hits 100%.
  */
 function scenarioGwoIterationBarPercent(
   current: number,
@@ -115,8 +108,10 @@ function scenarioGwoIterationBarPercent(
   runIdx = Math.min(runsCount, Math.floor(runIdx));
 
   const globalRatio = (runIdx - 1 + inRunRatio) / runsCount;
-  const span = SCENARIO_GWO_PROGRESS_HI - SCENARIO_GWO_PROGRESS_LO;
-  return Math.round(SCENARIO_GWO_PROGRESS_LO + Math.min(1, Math.max(0, globalRatio)) * span);
+  return Math.min(
+    TIMETABLE_ITERATION_PROGRESS_CAP,
+    Math.round(100 * Math.min(1, Math.max(0, globalRatio))),
+  );
 }
 
 function iterationBarPercent(
@@ -226,7 +221,11 @@ type GwoRunContextValue = {
   /** Snapshot when pausing so the countdown does not drain while work is stopped */
   etaPausedRemainingSec: number | null;
   /** Creates a new AbortController for the current run; returned signal must be passed to fetch. */
-  beginRun: (source?: GwoRunSource, runId?: number | null) => AbortController;
+  beginRun: (
+    source?: GwoRunSource,
+    runId?: number | null,
+    opts?: { scenarioId?: number | null },
+  ) => AbortController;
   bindRunId: (runId: number | null) => void;
   updateProgress: (p: GwoOptimizerProgressPayload) => void;
   /** Server-driven bar fill (0–100); never decreases vs. the current bar. */
@@ -269,9 +268,12 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
    * Run kind + scenario run id for *this tab's* active stream only — updated in beginRun/bindRunId/endRun.
    * Never mirror polling state here; polling could flip React state to scenario while a timetable /api/run fetch is live.
    */
-  const ownedStreamRef = useRef<{ source: GwoRunSource; runId: number | null } | null>(
-    null,
-  );
+  const ownedStreamRef = useRef<{
+    source: GwoRunSource;
+    runId: number | null;
+    /** Page scenario id — used to resolve the correct run for pause/cancel when lists reorder. */
+    scenarioId: number | null;
+  } | null>(null);
   /** Wall time when first iteration sample is taken — origin for active-ms axis */
   const progressEpochWallRef = useRef<number | null>(null);
   const progressSamplesRef = useRef<ProgressSample[]>([]);
@@ -313,9 +315,14 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     setEtaDeadlineMs(ms);
   }, []);
 
-  const beginRun = useCallback((source: GwoRunSource = "timetable", runId: number | null = null): AbortController => {
-    const owned = ownedStreamRef.current;
+  const beginRun = useCallback(
+    (
+      source: GwoRunSource = "timetable",
+      runId: number | null = null,
+      opts?: { scenarioId?: number | null },
+    ): AbortController => {
     const existing = abortRef.current;
+    const owned = ownedStreamRef.current;
     const sameSource = owned?.source === source;
     const sameRun =
       runId != null &&
@@ -333,8 +340,12 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
       /* ignore */
     }
     const ac = new AbortController();
+    const scenarioId =
+      source === "scenario"
+        ? (opts?.scenarioId ?? null)
+        : null;
     abortRef.current = ac;
-    ownedStreamRef.current = { source, runId };
+    ownedStreamRef.current = { source, runId, scenarioId };
     setIsPaused(false);
     setIsRunning(true);
     setRunSource(source);
@@ -363,12 +374,21 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setRunPhase = useCallback((phase: string, detail?: string) => {
-    setBar((b) => ({
-      ...b,
-      visible: true,
-      phase,
-      ...(detail !== undefined ? { detail } : {}),
-    }));
+    setBar((b) => {
+      const paused = b.phase.startsWith("Paused");
+      if (paused && !phase.startsWith("Paused")) {
+        return {
+          ...b,
+          ...(detail !== undefined ? { detail } : {}),
+        };
+      }
+      return {
+        ...b,
+        visible: true,
+        phase,
+        ...(detail !== undefined ? { detail } : {}),
+      };
+    });
   }, []);
 
   const setPercent = useCallback((pct: number) => {
@@ -415,7 +435,8 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
 
   const applyScenarioStatus = useCallback((active: ActiveScenarioSnapshot) => {
     setIsRunning(true);
-    setIsPaused(false);
+    // Do not force isPaused=false here — this runs on a 1.5s poll and would undo a
+    // successful Pause while the scenario stream is still active in this tab.
     setRunSource("scenario");
     // Some scenario list payloads may temporarily omit latestRunId while the run is active.
     // Preserve the previous ID so pause/resume controls keep targeting the live scenario run.
@@ -436,7 +457,11 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     const safeTotal = total > 0 ? total : 1;
     const numRuns = p.numRuns != null ? Number(p.numRuns) : undefined;
     const run = p.run != null ? Number(p.run) : undefined;
-    const iterMode = runSource === "scenario" ? "scenario" : "timetable";
+    // `beginRun("scenario")` sets `ownedStreamRef` synchronously, but `runSource` state
+    // may not have re-rendered yet — using stale "timetable" caps the bar at 97% on
+    // the first GWO iteration events (timetable iteration mapping).
+    const progressSource = ownedStreamRef.current?.source ?? runSource;
+    const iterMode = progressSource === "scenario" ? "scenario" : "timetable";
     const pct = iterationBarPercent(current, safeTotal, iterMode, run, numRuns);
     const best = p.best != null ? Number(p.best) : undefined;
 
@@ -556,14 +581,59 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     }, 450);
   }, [setDeadline]);
 
+  const resolveWhatIfRunIdForControl = useCallback(async (): Promise<number | null> => {
+    if (activeRunId != null && activeRunId > 0) return activeRunId;
+    const owned = ownedStreamRef.current;
+    if (owned != null && owned.source !== "scenario") return null;
+    if (owned?.runId != null && owned.runId > 0) return owned.runId;
+    const sid = owned?.scenarioId;
+    if (sid != null && sid > 0) {
+      try {
+        const s = await getScenario(sid);
+        const lr = s.latestRun;
+        const st = lr?.status;
+        const rid = lr?.id;
+        if (
+          typeof rid === "number" &&
+          rid > 0 &&
+          (Boolean(s.isRunning) || st === "running" || st === "pending")
+        ) {
+          setActiveRunId(rid);
+          return rid;
+        }
+      } catch {
+        return null;
+      }
+    }
+    try {
+      const scenarios = await getScenarios();
+      const active = scenarios.find((s) => {
+        const status = s.latestRun?.status;
+        return Boolean(s.isRunning) || status === "running" || status === "pending";
+      });
+      const rid = active?.latestRun?.id;
+      if (typeof rid === "number" && rid > 0) {
+        setActiveRunId(rid);
+        return rid;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }, [activeRunId]);
+
   const cancelRun = useCallback(() => {
     void (async () => {
       const owned = ownedStreamRef.current;
-      if (owned?.source === "scenario" && owned.runId != null) {
-        try {
-          await ApiClient.request(`/what-if/runs/${owned.runId}/cancel`, { method: "POST" });
-        } catch {
-          /* ignore */
+      const src = owned?.source ?? runSource;
+      if (src === "scenario") {
+        const runId = await resolveWhatIfRunIdForControl();
+        if (runId != null) {
+          try {
+            await ApiClient.request(`/what-if/runs/${runId}/cancel`, { method: "POST" });
+          } catch {
+            /* ignore */
+          }
         }
       } else {
         try {
@@ -579,7 +649,7 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
       }
       abortRef.current?.abort();
     })();
-  }, []);
+  }, [resolveWhatIfRunIdForControl, runSource]);
 
   const runOptimizer = useCallback(async (options?: {
     semesterMode?: GwoSemesterMode;
@@ -761,31 +831,13 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     };
   }, [applyScenarioStatus, applyServerStatus]);
 
-  const resolveScenarioRunId = useCallback(async (): Promise<number | null> => {
-    if (activeRunId != null) return activeRunId;
-    try {
-      const scenarios = await getScenarios();
-      const active = scenarios.find((s) => {
-        const status = s.latestRun?.status;
-        return Boolean(s.isRunning) || status === "running" || status === "pending";
-      });
-      const id =
-        typeof active?.latestRun?.id === "number" && active.latestRun.id > 0
-          ? active.latestRun.id
-          : null;
-      if (id != null) setActiveRunId(id);
-      return id;
-    } catch {
-      return null;
-    }
-  }, [activeRunId]);
-
   const pauseRun = useCallback(async () => {
+    if (isPaused) return;
     const owned = ownedStreamRef.current;
     const src = owned?.source ?? runSource;
     try {
       if (src === "scenario") {
-        const runId = owned?.runId ?? (await resolveScenarioRunId());
+        const runId = await resolveWhatIfRunIdForControl();
         if (runId == null) return;
         await ApiClient.request(`/what-if/runs/${runId}/control`, {
           method: "POST",
@@ -816,14 +868,15 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-  }, [runSource, resolveScenarioRunId, setDeadline]);
+  }, [isPaused, runSource, resolveWhatIfRunIdForControl, setDeadline]);
 
   const resumeRun = useCallback(async () => {
+    if (!isPaused) return;
     const owned = ownedStreamRef.current;
     const src = owned?.source ?? runSource;
     try {
       if (src === "scenario") {
-        const runId = owned?.runId ?? (await resolveScenarioRunId());
+        const runId = await resolveWhatIfRunIdForControl();
         if (runId == null) return;
         await ApiClient.request(`/what-if/runs/${runId}/control`, {
           method: "POST",
@@ -850,7 +903,7 @@ export function GwoRunProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-  }, [runSource, resolveScenarioRunId]);
+  }, [isPaused, runSource, resolveWhatIfRunIdForControl]);
 
   const value = useMemo(
     () => ({
@@ -914,9 +967,20 @@ export function useGwoRun(): GwoRunContextValue {
 
 export function GwoTopProgressBar({
   sources = ["timetable", "scenario"],
+  showPercentBadge,
+  showTrackProgressBar,
 }: {
   sources?: GwoRunSource[];
+  /** When false, hides the N% pill. Omitted on a scenario-only bar defaults to hidden. */
+  showPercentBadge?: boolean;
+  /** When false, hides the gradient bar at the bottom. Omitted on a scenario-only bar defaults to hidden. */
+  showTrackProgressBar?: boolean;
 }) {
+  const scenarioOnly =
+    sources.length > 0 && sources.every((s) => s === "scenario");
+  const effectiveShowPercentBadge = showPercentBadge ?? !scenarioOnly;
+  const effectiveShowTrackProgressBar = showTrackProgressBar ?? !scenarioOnly;
+
   const {
     isRunning,
     isPaused,
@@ -946,9 +1010,12 @@ export function GwoTopProgressBar({
   if (runSource && !sources.includes(runSource)) return null;
 
   const displayPct = Math.min(100, Math.max(0, bar.percent));
+  const ariaBusy = effectiveShowTrackProgressBar
+    ? displayPct < 100
+    : isRunning && !isPaused;
 
   return (
-    <div className="mb-0" aria-live="polite" aria-busy={displayPct < 100}>
+    <div className="mb-0" aria-live="polite" aria-busy={ariaBusy}>
       <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_4px_24px_-4px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/[0.04] dark:border-slate-700 dark:bg-slate-900 dark:ring-white/[0.06] dark:shadow-[0_4px_24px_-4px_rgba(0,0,0,0.4)]">
         <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="flex min-w-0 flex-1 gap-3">
@@ -967,9 +1034,11 @@ export function GwoTopProgressBar({
                 <h3 className="text-sm font-semibold leading-snug text-slate-900 dark:text-slate-100">
                   {bar.phase}
                 </h3>
-                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                  {displayPct}%
-                </span>
+                {effectiveShowPercentBadge ? (
+                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                    {displayPct}%
+                  </span>
+                ) : null}
               </div>
               {bar.detail ? (
                 <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
@@ -1023,17 +1092,19 @@ export function GwoTopProgressBar({
           </div>
         </div>
 
-        <div className="px-4 pb-4 pt-0">
-          <div className="relative h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-600 transition-[width] duration-300 ease-out dark:from-sky-400 dark:via-blue-400 dark:to-indigo-500"
-              style={{
-                width: `${displayPct}%`,
-                boxShadow: "0 0 14px rgba(56, 189, 248, 0.35)",
-              }}
-            />
+        {effectiveShowTrackProgressBar ? (
+          <div className="px-4 pb-4 pt-0">
+            <div className="relative h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-600 transition-[width] duration-300 ease-out dark:from-sky-400 dark:via-blue-400 dark:to-indigo-500"
+                style={{
+                  width: `${displayPct}%`,
+                  boxShadow: "0 0 14px rgba(56, 189, 248, 0.35)",
+                }}
+              />
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 const INPUT_BASE_CLASSES =
-  "h-12 rounded-[10px] border px-4 text-white placeholder:text-white/45 backdrop-blur-[4px] transition-all duration-300 ease-out focus:outline-none focus:bg-white/[0.14] focus:border-[#48CAE4] focus:shadow-[0_0_0_3px_rgba(72,202,228,0.18)] bg-white/[0.08] border-white/[0.18]";
+  "h-12 w-full min-w-0 rounded-[10px] border px-4 text-white placeholder:text-white/45 backdrop-blur-[4px] transition-all duration-300 ease-out focus:outline-none focus:bg-white/[0.14] focus:border-[#48CAE4] focus:shadow-[0_0_0_3px_rgba(72,202,228,0.18)] bg-white/[0.08] border-white/[0.18]";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -70,18 +70,18 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="forgot-theme min-h-screen lg:grid lg:grid-cols-[42%_58%]">
-      <div className="relative hidden lg:flex overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)]">
-        <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col items-center justify-start px-12 pt-20 pb-16 text-center">
+    <div className="forgot-theme flex min-h-dvh flex-col lg:grid lg:h-dvh lg:max-h-dvh lg:grid-cols-[minmax(0,42%)_minmax(0,58%)] lg:overflow-hidden">
+      <div className="relative hidden min-h-0 overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)] lg:flex lg:h-full">
+        <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col items-center justify-start px-8 pt-16 pb-12 text-center xl:px-12 xl:pt-20 xl:pb-16">
           <Image
             src="/images/logo.png"
             alt="PSUT Logo"
             width={180}
             height={180}
-            className="object-contain"
+            className="h-auto w-[min(40vw,9rem)] max-w-[180px] object-contain sm:w-36 lg:w-[180px]"
             priority
           />
-          <h1 className="mt-8 text-5xl font-bold leading-tight text-[var(--text-primary)]">
+          <h1 className="mt-6 text-balance text-3xl font-bold leading-tight text-[var(--text-primary)] sm:text-4xl xl:mt-8 xl:text-5xl">
             <span className="bg-gradient-to-r from-[#1E54B7] via-[#2563EB] to-[#48CAE4] bg-clip-text text-transparent">
               Password
             </span>
@@ -89,8 +89,8 @@ export default function ForgotPasswordPage() {
             Recovery
           </h1>
         </div>
-        <div className="absolute inset-x-0 bottom-20 z-10 flex justify-center px-12 text-center">
-          <p className="max-w-sm text-base leading-relaxed text-[var(--text-secondary)]">
+        <div className="absolute inset-x-0 bottom-16 z-10 flex justify-center px-8 text-center xl:bottom-20 xl:px-12">
+          <p className="max-w-sm text-sm leading-relaxed text-[var(--text-secondary)] sm:text-base">
             Enter your email to receive a secure reset link and quickly restore access.
           </p>
         </div>
@@ -104,27 +104,27 @@ export default function ForgotPasswordPage() {
         />
       </div>
 
-      <div className="relative overflow-hidden p-6 lg:p-12 [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)]">
+      <div className="relative flex min-h-dvh flex-1 flex-col overflow-x-hidden overflow-y-auto [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)] px-4 py-8 sm:px-6 sm:py-10 lg:min-h-0 lg:h-full lg:overflow-y-auto lg:px-8 lg:py-8 xl:px-12 xl:py-10">
         <div className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_70%_80%,rgba(0,180,216,0.12)_0%,transparent_60%),radial-gradient(circle_at_20%_60%,rgba(37,99,235,0.15)_0%,transparent_50%)]" />
-        <div className="relative mx-auto flex min-h-screen w-full max-w-md items-center py-10 lg:min-h-0">
-          <div className="w-full py-4 lg:py-8">
+        <div className="relative mx-auto flex w-full max-w-md flex-1 flex-col justify-center lg:min-h-0 lg:justify-center">
+          <div className="w-full min-w-0 py-1 sm:py-2 lg:py-4">
                     {isSubmitted ? (
                       /* Success State */
-                      <div className="text-center space-y-6">
+                      <div className="w-full min-w-0 space-y-5 text-center sm:space-y-6">
                         <div className="flex justify-center">
-                          <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center ring-8 ring-green-200/20">
-                            <CheckCircle2 className="w-10 h-10 text-green-300" />
+                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20 ring-8 ring-green-200/20 sm:h-20 sm:w-20">
+                            <CheckCircle2 className="h-8 w-8 text-green-300 sm:h-10 sm:w-10" />
                           </div>
                         </div>
                         <div>
-                          <h2 className="mb-2 text-[2rem] font-bold tracking-[-0.02em] text-white">
+                          <h2 className="mb-2 text-2xl font-bold tracking-[-0.02em] text-white sm:text-[1.75rem] xl:text-[2rem]">
                             Check your email
                           </h2>
-                          <p className="text-[0.95rem] text-white/60">
+                          <p className="text-sm text-white/60 sm:text-[0.95rem]">
                             {"We've sent a password reset link to your email address"}
                           </p>
                         </div>
-                        <p className="text-sm text-slate-200 bg-white/10 rounded-2xl p-4 border border-white/20">
+                        <p className="rounded-2xl border border-white/20 bg-white/10 p-3 text-left text-sm text-slate-200 sm:p-4 sm:text-[0.95rem]">
                           If an account exists for{" "}
                           <strong className="text-white">
                             {email}
@@ -160,16 +160,16 @@ export default function ForgotPasswordPage() {
                     ) : (
                       /* Form State */
                       <>
-                        <div className="mb-8">
-                          <h2 className="mb-2 text-[2rem] font-bold tracking-[-0.02em] text-white">
+                        <div className="mb-6 sm:mb-8">
+                          <h2 className="mb-2 text-2xl font-bold tracking-[-0.02em] text-white sm:text-[1.75rem] xl:text-[2rem]">
                             Reset password
                           </h2>
-                          <p className="text-[0.95rem] text-white/60">
+                          <p className="text-sm text-white/60 sm:text-[0.95rem]">
                             Enter your email and {"we'll"} send you a reset link
                           </p>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="space-y-6">
+                        <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-5 sm:space-y-6">
                           <div className="form-field space-y-2">
                             <Label
                               htmlFor="email"
@@ -248,7 +248,7 @@ export default function ForgotPasswordPage() {
                           </div>
                         </form>
 
-                        <p className="mt-8 text-center text-[0.85rem] text-white/50">
+                        <p className="mt-6 text-center text-xs text-white/50 sm:mt-8 sm:text-[0.85rem]">
                           Need help?{" "}
                           <Link
                             href="/help"

@@ -42,6 +42,7 @@ export declare class WhatIfService {
     private readonly notifications;
     private readonly logger;
     private readonly activeProcesses;
+    private readonly scenarioGwoControlPaths;
     private readonly userCancelledRunIds;
     private holdsGlobalOptimizerLock;
     private pendingProcessStarts;

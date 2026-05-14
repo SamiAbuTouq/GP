@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const INPUT_BASE_CLASSES =
-  "h-12 rounded-[10px] border px-4 text-white placeholder:text-white/45 backdrop-blur-[4px] transition-all duration-300 ease-out focus:outline-none focus:bg-white/[0.14] focus:border-[#48CAE4] focus:shadow-[0_0_0_3px_rgba(72,202,228,0.18)] bg-white/[0.08] border-white/[0.18]";
+  "h-12 w-full min-w-0 rounded-[10px] border px-4 text-white placeholder:text-white/45 backdrop-blur-[4px] transition-all duration-300 ease-out focus:outline-none focus:bg-white/[0.14] focus:border-[#48CAE4] focus:shadow-[0_0_0_3px_rgba(72,202,228,0.18)] bg-white/[0.08] border-white/[0.18]";
 
 function ResetPasswordForm() {
   const [password, setPassword] = useState("");
@@ -93,26 +93,26 @@ function ResetPasswordForm() {
 
   if (isSuccess) {
     return (
-      <div className="text-center space-y-6">
+      <div className="w-full min-w-0 space-y-5 text-center sm:space-y-6">
         <div className="flex justify-center">
-          <div className="w-24 h-24 bg-green-100 dark:bg-green-950/50 rounded-full flex items-center justify-center ring-8 ring-green-50 dark:ring-green-950/20">
-            <CheckCircle2 className="w-12 h-12 text-green-600 dark:text-green-400" />
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-100 ring-8 ring-green-50 dark:bg-green-950/50 dark:ring-green-950/20 sm:h-24 sm:w-24">
+            <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400 sm:h-12 sm:w-12" />
           </div>
         </div>
         <div>
-          <h2 className="text-3xl font-bold text-white mb-3">
+          <h2 className="mb-2 text-2xl font-bold text-white sm:mb-3 sm:text-3xl">
             Password Updated!
           </h2>
-          <p className="text-slate-200 leading-relaxed">
+          <p className="text-sm leading-relaxed text-slate-200 sm:text-base">
             Your password has been successfully reset. You can now sign in with your new credentials.
           </p>
-          <p className="text-slate-300 text-sm mt-4">
+          <p className="mt-3 text-xs text-slate-300 sm:mt-4 sm:text-sm">
             Redirecting you to sign in shortly...
           </p>
         </div>
         <Button
           asChild
-          className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-base rounded-xl shadow-lg shadow-blue-600/25 transition-all hover:shadow-xl hover:shadow-blue-600/30"
+          className="h-12 w-full rounded-xl bg-blue-600 text-base font-semibold text-white shadow-lg shadow-blue-600/25 transition-all hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/30"
         >
           <Link href="/login" className="flex items-center justify-center gap-2">
             Go to Sign In Now
@@ -124,21 +124,21 @@ function ResetPasswordForm() {
 
   return (
     <>
-      <div className="mb-8">
-        <h2 className="mb-2 text-[2rem] font-bold tracking-[-0.02em] text-white">
+      <div className="mb-6 sm:mb-8">
+        <h2 className="mb-2 text-2xl font-bold tracking-[-0.02em] text-white sm:text-[1.75rem] xl:text-[2rem]">
           Create new password
         </h2>
-        <p className="text-[0.95rem] text-white/60">
+        <p className="text-sm text-white/60 sm:text-[0.95rem]">
           Choose a strong password to secure your account.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-5 sm:space-y-6">
         {/* API-level error */}
         {apiError && (
-          <div className="flex items-start gap-3 p-4 rounded-xl border bg-red-50 border-red-200 text-red-600 dark:bg-red-950/50 dark:border-red-800 dark:text-red-400 text-sm">
-            <XCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <p className="font-medium">{apiError}</p>
+          <div className="flex w-full min-w-0 items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-950/50 dark:text-red-400 sm:gap-3 sm:p-4">
+            <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+            <p className="min-w-0 font-medium leading-snug">{apiError}</p>
           </div>
         )}
 
@@ -287,20 +287,20 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="reset-theme min-h-screen lg:grid lg:grid-cols-[42%_58%]">
-      <div className="relative hidden lg:flex overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)]">
-        <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col items-center justify-start px-12 pt-20 pb-16 text-center">
+    <div className="reset-theme flex min-h-dvh flex-col lg:grid lg:h-dvh lg:max-h-dvh lg:grid-cols-[minmax(0,42%)_minmax(0,58%)] lg:overflow-hidden">
+      <div className="relative hidden min-h-0 overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)] lg:flex lg:h-full">
+        <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col items-center justify-start px-8 pt-16 pb-12 text-center xl:px-12 xl:pt-20 xl:pb-16">
           <div className="flex justify-center">
             <Image
               src="/images/logo.png"
               alt="PSUT Logo"
               width={180}
               height={180}
-              className="object-contain"
+              className="h-auto w-[min(40vw,9rem)] max-w-[180px] object-contain sm:w-36 lg:w-[180px]"
               priority
             />
           </div>
-          <h1 className="mt-8 text-5xl font-bold leading-tight text-[var(--text-primary)]">
+          <h1 className="mt-6 text-balance text-3xl font-bold leading-tight text-[var(--text-primary)] sm:text-4xl xl:mt-8 xl:text-5xl">
             <span className="bg-gradient-to-r from-[#1E54B7] via-[#2563EB] to-[#48CAE4] bg-clip-text text-transparent">
               Password
             </span>
@@ -308,14 +308,15 @@ export default function ResetPasswordPage() {
             Reset
           </h1>
         </div>
-        <div className="absolute inset-x-0 bottom-20 z-10 flex justify-center px-12 text-center">
+        <div className="absolute inset-x-0 bottom-16 z-10 flex justify-center px-8 text-center xl:bottom-20 xl:px-12">
           <div className="w-full max-w-xl">
-            <p className="text-base leading-relaxed text-[var(--text-secondary)]">
+            <p className="text-sm leading-relaxed text-[var(--text-secondary)] sm:text-base">
               Create a strong new password to keep your account safe and regain access.
             </p>
-            <div className="mt-6 w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left">
-              <p className="whitespace-nowrap text-sm leading-relaxed text-slate-600 dark:text-white/70">
-                <span className="font-medium text-slate-800 dark:text-white">Security tip:</span> Use a unique password that you do not use anywhere else.
+            <div className="mt-4 w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left sm:mt-6 sm:p-4">
+              <p className="text-xs leading-relaxed text-slate-600 sm:text-sm dark:text-white/70">
+                <span className="font-medium text-slate-800 dark:text-white">Security tip:</span>{" "}
+                Use a unique password that you do not use anywhere else.
               </p>
             </div>
           </div>
@@ -330,15 +331,15 @@ export default function ResetPasswordPage() {
         />
       </div>
 
-      <div className="relative overflow-hidden p-6 lg:p-12 [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)]">
+      <div className="relative flex min-h-dvh flex-1 flex-col overflow-x-hidden overflow-y-auto [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)] px-4 py-8 sm:px-6 sm:py-10 lg:min-h-0 lg:h-full lg:overflow-y-auto lg:px-8 lg:py-8 xl:px-12 xl:py-10">
         <div className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_70%_80%,rgba(0,180,216,0.12)_0%,transparent_60%),radial-gradient(circle_at_20%_60%,rgba(37,99,235,0.15)_0%,transparent_50%)]" />
-        <div className="relative mx-auto flex min-h-screen w-full max-w-md items-center py-10 lg:min-h-0">
-          <div className="w-full py-4 lg:py-8">
-            <Suspense fallback={<div className="text-center text-slate-300">Loading...</div>}>
+        <div className="relative mx-auto flex w-full max-w-md flex-1 flex-col justify-center lg:min-h-0 lg:justify-center">
+          <div className="w-full min-w-0 py-1 sm:py-2 lg:py-4">
+            <Suspense fallback={<div className="text-center text-sm text-slate-300 sm:text-base">Loading...</div>}>
               <ResetPasswordForm />
             </Suspense>
 
-            <p className="mt-8 text-center text-[0.85rem] text-white/50">
+            <p className="mt-6 text-center text-xs text-white/50 sm:mt-8 sm:text-[0.85rem]">
               Need help?{" "}
               <Link
                 href="/help"

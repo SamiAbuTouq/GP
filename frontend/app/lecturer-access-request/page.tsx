@@ -16,7 +16,7 @@ const ELIGIBILITY_MESSAGE =
   "If this email is eligible for access, you will be contacted with further instructions.";
 
 const INPUT_BASE_CLASSES =
-  "h-12 rounded-[10px] border px-4 text-white placeholder:text-white/45 backdrop-blur-[4px] transition-all duration-300 ease-out focus:outline-none focus:bg-white/[0.14] focus:border-[#48CAE4] focus:shadow-[0_0_0_3px_rgba(72,202,228,0.18)] bg-white/[0.08] border-white/[0.18]";
+  "h-12 w-full min-w-0 rounded-[10px] border px-4 text-white placeholder:text-white/45 backdrop-blur-[4px] transition-all duration-300 ease-out focus:outline-none focus:bg-white/[0.14] focus:border-[#48CAE4] focus:shadow-[0_0_0_3px_rgba(72,202,228,0.18)] bg-white/[0.08] border-white/[0.18]";
 
 // hover:!bg keeps the gradient instead of the default `Button` hover:bg-primary/90.
 const PRIMARY_ACTION_CLASSES =
@@ -159,11 +159,11 @@ export default function LecturerAccessRequestPage() {
   };
 
   return (
-    <div className="forgot-theme min-h-screen overflow-x-hidden lg:grid lg:h-screen lg:max-h-screen lg:grid-cols-[42%_58%]">
-      <div className="relative hidden min-h-0 lg:flex lg:h-full overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)]">
-        <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col items-center justify-start px-12 pt-20 pb-16 text-center">
-          <Image src="/images/logo.png" alt="PSUT Logo" width={180} height={180} className="object-contain" priority />
-          <h1 className="mt-8 text-5xl font-bold leading-tight text-[var(--text-primary)]">
+    <div className="forgot-theme flex min-h-dvh flex-col overflow-x-hidden lg:grid lg:h-dvh lg:max-h-dvh lg:grid-cols-[minmax(0,42%)_minmax(0,58%)] lg:overflow-hidden">
+      <div className="relative hidden min-h-0 overflow-hidden border-r border-slate-200/20 bg-[var(--bg-left)] lg:flex lg:h-full">
+        <div className="relative z-10 mx-auto flex h-full w-full max-w-xl flex-col items-center justify-start px-8 pt-16 pb-12 text-center xl:px-12 xl:pt-20 xl:pb-16">
+          <Image src="/images/logo.png" alt="PSUT Logo" width={180} height={180} className="h-auto w-[min(40vw,9rem)] max-w-[180px] object-contain sm:w-36 lg:w-[180px]" priority />
+          <h1 className="mt-6 text-balance text-3xl font-bold leading-tight text-[var(--text-primary)] sm:text-4xl xl:mt-8 xl:text-5xl">
             <span>Lecturer</span>
             <br />
             <span className="bg-gradient-to-r from-[#1E54B7] via-[#2563EB] to-[#48CAE4] bg-clip-text text-transparent">
@@ -171,8 +171,8 @@ export default function LecturerAccessRequestPage() {
             </span>
           </h1>
         </div>
-        <div className="absolute inset-x-0 bottom-20 z-10 flex justify-center px-12 text-center">
-          <p className="max-w-sm text-base leading-relaxed text-[var(--text-secondary)]">
+        <div className="absolute inset-x-0 bottom-16 z-10 flex justify-center px-8 text-center xl:bottom-20 xl:px-12">
+          <p className="max-w-sm text-sm leading-relaxed text-[var(--text-secondary)] sm:text-base">
             Intelligent scheduling powered by advanced optimization algorithms for efficient resource management.
           </p>
         </div>
@@ -185,16 +185,17 @@ export default function LecturerAccessRequestPage() {
           }}
         />
       </div>
-      <div className="relative min-h-0 overflow-x-hidden overflow-y-auto p-6 lg:h-full lg:p-10 [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)]">
-        <div className="relative mx-auto flex min-h-min w-full max-w-md items-start py-6 pb-12 lg:min-h-full lg:items-start lg:pt-10 lg:pb-16">
-          <div className="w-full py-2 lg:py-0">
+      <div className="relative flex min-h-dvh min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto [background:radial-gradient(ellipse_at_30%_20%,#1E54B7_0%,#0D1B4B_45%,#091232_100%)] px-4 py-8 sm:px-6 sm:py-10 lg:min-h-0 lg:h-full lg:overflow-y-auto lg:px-8 lg:py-8 xl:px-12 xl:py-10">
+        <div className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_70%_80%,rgba(0,180,216,0.12)_0%,transparent_60%),radial-gradient(circle_at_20%_60%,rgba(37,99,235,0.15)_0%,transparent_50%)]" />
+        <div className="relative mx-auto flex w-full max-w-lg flex-1 flex-col justify-center lg:min-h-0">
+          <div className="w-full min-w-0 py-1 sm:py-2 lg:py-2">
             {submitted ? (
-              <div className="text-center space-y-6">
+              <div className="w-full min-w-0 space-y-5 text-center sm:space-y-6">
                 <div className="flex justify-center">
-                  <CheckCircle2 className="w-14 h-14 text-green-300" />
+                  <CheckCircle2 className="h-12 w-12 text-green-300 sm:h-14 sm:w-14" />
                 </div>
-                <h2 className="text-[2rem] font-bold text-white">Request submitted</h2>
-                <p className="text-[0.95rem] text-white/70">
+                <h2 className="text-2xl font-bold text-white sm:text-[1.75rem] xl:text-[2rem]">Request submitted</h2>
+                <p className="text-sm text-white/70 sm:text-[0.95rem]">
                   Your request is now pending review. You will receive an email after it is reviewed.
                 </p>
                 <Button asChild className={`h-12 w-full ${PRIMARY_ACTION_CLASSES}`}>
@@ -206,13 +207,15 @@ export default function LecturerAccessRequestPage() {
               </div>
             ) : (
               <>
-                <div className="mb-5">
-                  <h2 className="mb-2 text-[2rem] font-bold tracking-[-0.02em] text-white">Request access</h2>
+                <div className="mb-4 sm:mb-5">
+                  <h2 className="text-2xl font-bold tracking-[-0.02em] text-white sm:text-[1.75rem] xl:text-[2rem]">Request access</h2>
                 </div>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-white/60">
+                <form onSubmit={handleSubmit} className="w-full min-w-0 space-y-4">
+                  <div className="flex flex-col gap-1.5 text-xs font-medium uppercase tracking-wide text-white/60 sm:flex-row sm:items-center sm:justify-between">
                     <span>Step {step} of 2</span>
-                    <span>{step === 1 ? "Personal Information" : "Teaching Profile"}</span>
+                    <span className="text-[0.7rem] font-medium normal-case tracking-normal text-white/70 sm:text-xs">
+                      {step === 1 ? "Personal Information" : "Teaching Profile"}
+                    </span>
                   </div>
                   {inlineError ? (
                     <div className="rounded-[10px] border border-red-400/40 bg-red-500/12 p-3 text-sm text-[#FCA5A5]">
@@ -223,7 +226,7 @@ export default function LecturerAccessRequestPage() {
                   {step === 1 ? (
                     <div className="space-y-3">
                       <div className="space-y-2">
-                        <Label className="text-white/85">Full name</Label>
+                        <Label className="text-[0.8125rem] font-medium text-white/85 sm:text-sm">Full name</Label>
                         <Input
                           className={INPUT_BASE_CLASSES}
                           placeholder="Enter your full name"
@@ -232,7 +235,7 @@ export default function LecturerAccessRequestPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-white/85">Email address</Label>
+                        <Label className="text-[0.8125rem] font-medium text-white/85 sm:text-sm">Email address</Label>
                         <div className="relative">
                           <Input
                             className={`${INPUT_BASE_CLASSES} pr-12`}
@@ -253,11 +256,13 @@ export default function LecturerAccessRequestPage() {
 
                   {step === 2 ? (
                     <div className="space-y-3">
-                      <h3 className="text-sm font-semibold tracking-wide text-white/90">Teaching Profile</h3>
+                      <h3 className="text-xs font-semibold tracking-wide text-white/90 sm:text-sm">
+                        Teaching Profile
+                      </h3>
                       <div className="space-y-2">
-                        <Label className="text-white/85">Department</Label>
+                        <Label className="text-[0.8125rem] font-medium text-white/85 sm:text-sm">Department</Label>
                         <Select value={department} onValueChange={(v) => setDepartment(v as Department)}>
-                          <SelectTrigger className={INPUT_BASE_CLASSES}><SelectValue /></SelectTrigger>
+                          <SelectTrigger className={`${INPUT_BASE_CLASSES} w-full justify-between`}><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {departments.map((d) => (
                               <SelectItem key={d} value={d}>{d}</SelectItem>
@@ -266,8 +271,10 @@ export default function LecturerAccessRequestPage() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-white/85">Max workload (hrs) for bachelor&apos;s degree</Label>
-                        <div className="flex items-center gap-2">
+                        <Label className="text-[0.8125rem] font-medium leading-snug text-white/85 sm:text-sm">
+                          Max workload (hrs) for bachelor&apos;s degree
+                        </Label>
+                        <div className="flex min-w-0 items-center gap-2">
                           <button
                             type="button"
                             className="inline-flex h-12 w-12 items-center justify-center rounded-[10px] border border-white/20 bg-white/10 text-white transition-colors hover:bg-white/20"
@@ -277,7 +284,7 @@ export default function LecturerAccessRequestPage() {
                             <Minus className="h-4 w-4" />
                           </button>
                           <Input
-                            className={`${INPUT_BASE_CLASSES} text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                            className={`${INPUT_BASE_CLASSES} min-w-0 flex-1 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
                             type="number"
                             min={1}
                             max={30}
@@ -297,7 +304,7 @@ export default function LecturerAccessRequestPage() {
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-white/85">Courses you can teach</Label>
+                        <Label className="text-[0.8125rem] font-medium text-white/85 sm:text-sm">Courses you can teach</Label>
                         <Input
                           className={INPUT_BASE_CLASSES}
                           placeholder="Search courses..."
@@ -309,7 +316,7 @@ export default function LecturerAccessRequestPage() {
                             <p className="text-sm text-white/60">Loading courses...</p>
                           ) : null}
                           {filteredCourses.map((course) => (
-                            <div key={course.code} className="mb-2 flex items-start gap-2 text-sm">
+                            <div key={course.code} className="mb-2 flex min-w-0 items-start gap-2 text-sm">
                               <Checkbox
                                 checked={courses.includes(course.code)}
                                 onCheckedChange={() =>
@@ -319,8 +326,11 @@ export default function LecturerAccessRequestPage() {
                                       : [...prev, course.code],
                                   )
                                 }
+                                className="mt-0.5 shrink-0"
                               />
-                              <span><b>{course.code}</b> - {course.name}</span>
+                              <span className="min-w-0 break-words leading-snug">
+                                <b>{course.code}</b> - {course.name}
+                              </span>
                             </div>
                           ))}
                           {!coursesLoading && coursesLoaded && filteredCourses.length === 0 ? (
@@ -373,6 +383,20 @@ export default function LecturerAccessRequestPage() {
         </div>
       </div>
       <style jsx global>{`
+        :root {
+          --bg-left: #ffffff;
+          --text-primary: #0d1b4b;
+          --text-secondary: #4b5563;
+          --mosaic-filter: none;
+        }
+        @media (prefers-color-scheme: dark) {
+          :root {
+            --bg-left: #0a1128;
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            --mosaic-filter: invert(1) hue-rotate(180deg) saturate(1.5);
+          }
+        }
         .custom-scrollbar {
           scrollbar-width: thin;
           scrollbar-color: rgba(72, 202, 228, 0.85) rgba(255, 255, 255, 0.12);

@@ -136,21 +136,23 @@ export function SimulationViewBanner() {
           if (!open) setApplyAcknowledged(false);
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Apply timetable with hard conflicts?</DialogTitle>
-            <DialogDescription>
-              This merges the scenario result into the base timetable. Only continue if you understand the issues below.
-            </DialogDescription>
-          </DialogHeader>
-          <HardConflictsAcknowledgmentFields
-            summary={conflictSummary}
-            loading={conflictLoading}
-            acknowledged={applyAcknowledged}
-            onAcknowledgedChange={setApplyAcknowledged}
-            contextLabel="Applying replaces the base timetable’s schedule with this result."
-          />
-          <DialogFooter>
+        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-6 sm:max-w-lg">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden pr-1">
+            <DialogHeader>
+              <DialogTitle>Apply timetable with hard conflicts?</DialogTitle>
+              <DialogDescription>
+                This merges the scenario result into the base timetable. Only continue if you understand the issues below.
+              </DialogDescription>
+            </DialogHeader>
+            <HardConflictsAcknowledgmentFields
+              summary={conflictSummary}
+              loading={conflictLoading}
+              acknowledged={applyAcknowledged}
+              onAcknowledgedChange={setApplyAcknowledged}
+              contextLabel="Applying replaces the base timetable’s schedule with this result."
+            />
+          </div>
+          <DialogFooter className="mt-4 shrink-0 border-t pt-4">
             <Button variant="outline" type="button" onClick={() => setApplyAckOpen(false)}>
               Cancel
             </Button>

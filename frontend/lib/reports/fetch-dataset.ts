@@ -1,8 +1,9 @@
 import { ReportDatasetSchema, type ReportDataset } from "./dataset"
+import type { ReportTypeId } from "./types"
 
 export type FetchReportDatasetParams =
-  | { semesterId: number; timetableId?: undefined }
-  | { timetableId: number; semesterId?: undefined }
+  | { semesterId: number; timetableId?: never; reportType?: ReportTypeId }
+  | { timetableId: number; semesterId?: never; reportType?: ReportTypeId }
 
 export async function fetchReportDataset(params: FetchReportDatasetParams): Promise<ReportDataset> {
   const sp = new URLSearchParams()
@@ -14,6 +15,10 @@ export async function fetchReportDataset(params: FetchReportDatasetParams): Prom
     sp.set("semesterId", String(sid))
   } else {
     throw new Error("Provide semesterId or timetableId.")
+  }
+
+  if (params.reportType) {
+    sp.set("reportType", params.reportType)
   }
 
   const res = await fetch(`/api/reports/aggregates?${sp.toString()}`)
