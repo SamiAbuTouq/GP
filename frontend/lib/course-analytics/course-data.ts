@@ -37,6 +37,14 @@ const CourseSchema = z.object({
 
 export type Course = z.infer<typeof CourseSchema>
 
+export type ActionInsightCategory = 'resource' | 'capacity' | 'hr' | 'scheduling'
+
+export interface ActionInsight {
+  category: ActionInsightCategory
+  title: string
+  message: string
+}
+
 const SemesterTotalSchema = z.object({
   semesterId: z.number().optional(),
   academicYear: z.string(),
@@ -853,8 +861,7 @@ export function getScheduleHeatmap(courses: Course[]): HeatmapData[] {
     if (hourRaw === '') continue
     const hour = hourRaw.padStart(2, '0')
 
-    for (const raw of course.Day.split(/\s+/).filter(Boolean)) {
-      const shortDay = raw.substring(0, 3)
+    for (const shortDay of expandCourseMeetingDays(course.Day)) {
       if (!days.includes(shortDay)) continue
       const key = `${shortDay}-${hour}`
       studentCounts.set(key, (studentCounts.get(key) || 0) + course.Registered_Students)
@@ -1401,6 +1408,46 @@ export function sectionOccupancyPercent(c: Course): number | null {
   return (c.Registered_Students / c.Section_Capacity) * 100
 }
 
+/** Map one day token to canonical Sun|Mon|…|Sat, or null if not a weekday token. */
+function canonicalWeekdayFromToken(token: string): string | null {
+  const t = token.trim().toLowerCase()
+  if (!t || t === 'tba' || t === 'n/a' || t === '—' || t === '-') return null
+  if (t.startsWith('sun')) return 'Sun'
+  if (t.startsWith('mon')) return 'Mon'
+  if (t.startsWith('tue')) return 'Tue'
+  if (t.startsWith('wed')) return 'Wed'
+  if (t.startsWith('thu')) return 'Thu'
+  if (t.startsWith('fri')) return 'Fri'
+  if (t.startsWith('sat')) return 'Sat'
+  return null
+}
+
+/**
+ * Parses `Course.Day`: splits on whitespace and on punctuation (comma, slash, pipe);
+ * case-insensitive; expands `Daily` to Sun–Thu (workweek used elsewhere in this app).
+ * Repeats in the source string are preserved (each counts as one meeting occurrence).
+ */
+export function expandCourseMeetingDays(dayField: string | undefined): string[] {
+  if (!dayField?.trim()) return []
+  const normalized = dayField
+    .replace(/,/g, ' ')
+    .replace(/\//g, ' ')
+    .replace(/\|/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const tokens = normalized.split(' ').filter(Boolean)
+  const out: string[] = []
+  for (const raw of tokens) {
+    if (/^daily$/i.test(raw)) {
+      out.push('Sun', 'Mon', 'Tue', 'Wed', 'Thu')
+      continue
+    }
+    const d = canonicalWeekdayFromToken(raw)
+    if (d) out.push(d)
+  }
+  return out
+}
+
 /** Sum of unused seats across physical sections: Σ max(0, capacity − registered). */
 export function getTotalPhysicalRoomWasteSeats(courses: Course[]): number {
   return courses.reduce((sum, c) => {
@@ -1496,8 +1543,7 @@ export function getSlotDensityClusters(courses: Course[]): {
     const u = sectionOccupancyPercent(c)
     if (u == null || !c.Day) continue
     const util = Math.min(150, Math.round(u * 10) / 10)
-    for (const raw of c.Day.split(/\s+/).filter(Boolean)) {
-      const d = raw.substring(0, 3)
+    for (const d of expandCourseMeetingDays(c.Day)) {
       if (STT.has(d)) sttUtils.push(util)
       if (MW.has(d)) mwUtils.push(util)
     }
@@ -1562,8 +1608,7 @@ export function getRoomOccupancyHeatmap(courses: Course[], roomLimit = 14): Room
     if (u == null || !c.Room || !c.Day) continue
     if (!roomMeetings.has(c.Room)) roomMeetings.set(c.Room, new Map())
     const byDay = roomMeetings.get(c.Room)!
-    for (const raw of c.Day.split(/\s+/).filter(Boolean)) {
-      const d = raw.substring(0, 3)
+    for (const d of expandCourseMeetingDays(c.Day)) {
       if (!HEATMAP_DAYS.includes(d)) continue
       if (!byDay.has(d)) byDay.set(d, [])
       byDay.get(d)!.push(u)

@@ -126,10 +126,6 @@ export function ActionCenterPanel({ items }: { items: ManagementActionItem[] }) 
     <Card className="border-border/60">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg font-semibold">Action Center</CardTitle>
-        <CardDescription>
-          Plain-language items derived from utilization, scheduling density, lab load, and faculty preparation metrics in the
-          current dataset.
-        </CardDescription>
       </CardHeader>
       <CardContent>
         <ul className="space-y-3">

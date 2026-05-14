@@ -22,7 +22,7 @@ export function ActionCenterPanel({ insights }: { insights: ActionInsight[] }) {
       <CardHeader className="pb-3">
         <CardTitle className="text-lg font-semibold tracking-tight">Managerial action center</CardTitle>
         <CardDescription>
-          Plain-language items derived from the same utilization, waste, lab, HR, and timetable metrics shown in the charts
+          -language items derived from the same utilization, waste, lab, HR, and timetable metrics shown in the charts
           (no projected enrollment or synthetic forecasts).
         </CardDescription>
       </CardHeader>
