@@ -16,6 +16,11 @@ interface StaffTabProps {
   studentLecturerRatioValue: number | 'N/A'
 }
 
+/** Shared Recharts height so the two top Staff cards match; fits ~15 vertical bar rows. */
+const STAFF_CHART_HEIGHT = 384
+/** Main body height for bottom row: table scroll area = overview content min-height. */
+const STAFF_BOTTOM_BODY_CLASS = 'min-h-[400px]'
+
 export function StaffTab({
   stats,
   lecturerData,
@@ -25,18 +30,22 @@ export function StaffTab({
 }: StaffTabProps) {
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-2 items-start">
-        <LecturerStressScatterChart data={lecturerStress} />
-        <FacultyCreditHoursBarChart data={facultyCreditTop} />
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+        <LecturerStressScatterChart data={lecturerStress} chartHeight={STAFF_CHART_HEIGHT} />
+        <FacultyCreditHoursBarChart data={facultyCreditTop} chartHeight={STAFF_CHART_HEIGHT} />
       </div>
-      <div className="grid gap-6 lg:grid-cols-2 items-start">
-        <TopLecturersTable data={lecturerData} uniqueSemesters={stats.uniqueSemesters} />
-        <Card>
-          <CardHeader className="pb-3">
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+        <TopLecturersTable
+          data={lecturerData}
+          uniqueSemesters={stats.uniqueSemesters}
+          scrollAreaHeightClass="h-[400px]"
+        />
+        <Card className="flex h-full min-h-0 flex-col">
+          <CardHeader className="shrink-0 pb-4">
             <CardTitle className="text-lg font-semibold">Staff overview</CardTitle>
             <CardDescription>Credit-hour totals and preparation breadth from timetable rows in scope.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className={`flex flex-1 flex-col justify-center ${STAFF_BOTTOM_BODY_CLASS}`}>
             <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
               <div className="text-center">
                 <p className="text-3xl font-bold text-primary">{stats.totalLecturers}</p>

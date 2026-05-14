@@ -1,7 +1,8 @@
 'use client'
 
 import { Gauge } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/course-analytics-ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/course-analytics-ui/card'
+import { MiniStat } from '@/components/course-analytics/dashboard/stat-card'
 import {
   ActionCenterPanel,
   DepartmentalSaturationChart,
@@ -52,41 +53,44 @@ export function OverviewTab({
       {analyticsMode === 'past' ? (
         <>
           <div className="grid gap-6 lg:grid-cols-2">
+            <RoomOccupancyHeatmapChart data={roomOccupancyHeatmap} />
+            <SlotDensityComparisonChart rows={slotDensity.rows} />
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
             <DepartmentalSaturationChart data={departmentData} />
             <DeliveryModeDonutChart data={onlineModeData} />
           </div>
-          <RoomOccupancyHeatmapChart data={roomOccupancyHeatmap} />
-          <div className="grid gap-6 lg:grid-cols-2">
-            <SlotDensityComparisonChart rows={slotDensity.rows} />
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <Gauge className="h-4 w-4 text-primary" />
-                  Capacity snapshot
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Physical utilization (seats)</span>
-                  <span className="font-semibold tabular-nums">{stats.utilizationRate}%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Empty seats (physical)</span>
-                  <span className="font-semibold tabular-nums">{stats.emptySeats.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Full physical sections</span>
-                  <span className="font-semibold tabular-nums">{stats.fullSections}</span>
-                </div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                <Gauge className="h-5 w-5 text-primary" />
+                Capacity snapshot
+              </CardTitle>
+              <CardDescription>
+                Physical sections in scope: utilization is registered students divided by seat capacity; empty seats and
+                full sections summarize headroom and at-capacity offerings (labs shown separately when lab sections are
+                present).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <MiniStat
+                  label="Physical utilization (seats)"
+                  value={`${stats.utilizationRate}%`}
+                  icon={Gauge}
+                />
+                <MiniStat
+                  label="Empty seats (physical)"
+                  value={stats.emptySeats.toLocaleString()}
+                  icon={Gauge}
+                />
+                <MiniStat label="Full physical sections" value={stats.fullSections} icon={Gauge} />
                 {labOccupancyPct != null ? (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Lab seat occupancy (aggregate)</span>
-                    <span className="font-semibold tabular-nums">{labOccupancyPct}%</span>
-                  </div>
+                  <MiniStat label="Lab seat occupancy (aggregate)" value={`${labOccupancyPct}%`} icon={Gauge} />
                 ) : null}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         </>
       ) : (
         <PlanningOverviewSection

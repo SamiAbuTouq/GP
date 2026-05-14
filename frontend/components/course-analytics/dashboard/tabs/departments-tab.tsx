@@ -19,74 +19,72 @@ export function DepartmentsTab({ analyticsMode, departmentData, academicWeight }
       <DepartmentalSaturationChart data={departmentData} />
       <AcademicWeightBarChart data={academicWeight} />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Department roster</CardTitle>
-            <CardDescription>
-              {analyticsMode === 'past'
-                ? 'Operational breakdown: enrollments, section counts, and physical-seat utilization by department.'
-                : 'Same roster — use academic weight chart above for instructional demand intensity.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-0 pb-0">
-            <ScrollArea className="h-[420px]">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-card">
-                  <tr className="border-b text-left">
-                    <th className="px-6 py-3 font-medium text-muted-foreground">Department</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Students</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Sections</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Courses</th>
-                    <th className="px-6 py-3 text-right font-medium text-muted-foreground">Utilization</th>
+      <Card className="w-full overflow-hidden">
+        <CardHeader className="border-b border-border/60 bg-muted/20 pb-6">
+          <CardTitle className="text-lg font-semibold">Department roster</CardTitle>
+          <CardDescription>
+            {analyticsMode === 'past'
+              ? 'Operational breakdown: enrollments, section counts, and physical-seat utilization by department.'
+              : 'Same roster — use academic weight chart above for instructional demand intensity.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-0 pb-0 pt-0">
+          <ScrollArea className="h-[420px] w-full">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead className="sticky top-0 z-10 bg-card">
+                <tr className="border-b border-border text-left">
+                  <th className="px-6 py-3 font-medium text-muted-foreground">Department</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Students</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Sections</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Courses</th>
+                  <th className="px-6 py-3 text-right font-medium text-muted-foreground">Utilization</th>
+                </tr>
+              </thead>
+              <tbody>
+                {departmentData.map((dept, index) => (
+                  <tr
+                    key={dept.fullName}
+                    className="border-b border-border/50 last:border-0 transition-colors hover:bg-muted/30"
+                  >
+                    <td className="px-6 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
+                          {index + 1}
+                        </span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-default truncate font-medium">{dept.name}</span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">{dept.fullName}</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold">{dept.students.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{dept.sections}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{dept.courses}</td>
+                    <td className="px-6 py-3 text-right">
+                      <Badge
+                        variant={
+                          dept.utilization >= 90
+                            ? 'default'
+                            : dept.utilization >= 75
+                              ? 'secondary'
+                              : dept.utilization >= 60
+                                ? 'outline'
+                                : 'destructive'
+                        }
+                        className="font-mono text-xs"
+                      >
+                        {dept.utilization}%
+                      </Badge>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {departmentData.map((dept, index) => (
-                    <tr
-                      key={dept.fullName}
-                      className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors"
-                    >
-                      <td className="px-6 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
-                            {index + 1}
-                          </span>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-default truncate font-medium">{dept.name}</span>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">{dept.fullName}</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold">{dept.students.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">{dept.sections}</td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">{dept.courses}</td>
-                      <td className="px-6 py-3 text-right">
-                        <Badge
-                          variant={
-                            dept.utilization >= 90
-                              ? 'default'
-                              : dept.utilization >= 75
-                                ? 'secondary'
-                                : dept.utilization >= 60
-                                  ? 'outline'
-                                  : 'destructive'
-                          }
-                          className="font-mono text-xs"
-                        >
-                          {dept.utilization}%
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </div>
+                ))}
+              </tbody>
+            </table>
+          </ScrollArea>
+        </CardContent>
+      </Card>
     </div>
   )
 }

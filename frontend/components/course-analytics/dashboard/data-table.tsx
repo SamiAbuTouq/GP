@@ -1,6 +1,6 @@
 'use client'
  
-import { formatName } from '@/lib/utils'
+import { cn, formatName } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Table,
@@ -90,12 +90,19 @@ interface TopLecturersTableProps {
   /** Number of distinct terms in the current filtered dataset (from stats.uniqueSemesters).
    *  When > 1 a disclaimer note is shown so users know section counts are cumulative. */
   uniqueSemesters?: number
+  /** Scroll viewport height for the table body (Tailwind height class). */
+  scrollAreaHeightClass?: string
 }
 
-export function TopLecturersTable({ data, className, uniqueSemesters = 1 }: TopLecturersTableProps) {
+export function TopLecturersTable({
+  data,
+  className,
+  uniqueSemesters = 1,
+  scrollAreaHeightClass = 'h-[600px]',
+}: TopLecturersTableProps) {
   return (
-    <Card className={className}>
-      <CardHeader className="pb-4">
+    <Card className={cn('flex h-full min-h-0 flex-col', className)}>
+      <CardHeader className="shrink-0 pb-4">
         <CardTitle className="text-lg font-semibold">Top Lecturers</CardTitle>
         <CardDescription>
           {uniqueSemesters > 1
@@ -103,8 +110,8 @@ export function TopLecturersTable({ data, className, uniqueSemesters = 1 }: TopL
             : 'Lecturers with most sections'}
         </CardDescription>
       </CardHeader>
-      <CardContent className="px-0 pb-0">
-        <ScrollArea className="h-[600px]">
+      <CardContent className="flex min-h-0 flex-1 flex-col px-0 pb-0 pt-0">
+        <ScrollArea className={cn('min-h-0 shrink-0', scrollAreaHeightClass)}>
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">

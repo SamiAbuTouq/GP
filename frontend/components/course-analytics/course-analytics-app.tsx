@@ -4,18 +4,11 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { motion } from 'motion/react'
 import {
   BookOpen,
-  Users,
   Building2,
   Presentation,
-  AlertTriangle,
   Calendar,
-  Clock,
-  BarChart3,
   Activity,
   Lightbulb,
-  PieChart,
-  Armchair,
-  Laptop,
   LayoutDashboard,
   History,
   Compass,
@@ -50,7 +43,6 @@ import {
   type FilterOptions,
   type SemesterTotal,
 } from '@/lib/course-analytics/course-data'
-import { StatCard, MiniStat } from '@/components/course-analytics/dashboard/stat-card'
 import { Filters } from '@/components/course-analytics/dashboard/filters'
 import { LoadingSkeleton } from '@/components/course-analytics/dashboard/loading-skeleton'
 import { ErrorBanner } from '@/components/course-analytics/dashboard/error-banner'
@@ -60,7 +52,6 @@ import { ScheduleTab } from '@/components/course-analytics/dashboard/tabs/schedu
 import { CoursesTab } from '@/components/course-analytics/dashboard/tabs/courses-tab'
 import { StaffTab } from '@/components/course-analytics/dashboard/tabs/staff-tab'
 import { InsightsTab } from '@/components/course-analytics/dashboard/tabs/insights-tab'
-import { Card, CardContent } from '@/components/course-analytics-ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/course-analytics-ui/tabs'
 import { Badge } from '@/components/course-analytics-ui/badge'
 import { PalettePicker } from '@/components/course-analytics/palette-picker'
@@ -190,45 +181,8 @@ export default function CourseAnalyticsApp({
 
   const studentLecturerRatioValue = useMemo(() => {
     if (stats.totalLecturers <= 0) return 'N/A'
-    // Issue 2: always use seat-enrollment sum so the ratio stays consistent across all filter states.
     return Math.round((stats.seatEnrollmentSum / stats.totalLecturers) * 10) / 10
   }, [stats.totalLecturers, stats.seatEnrollmentSum])
-
-  const studentLecturerRatioDescription = useMemo(() => {
-    if (studentLecturerRatioValue === 'N/A') {
-      return 'No lecturers in scope'
-    }
-    return 'Based on seat enrollments'
-  }, [studentLecturerRatioValue])
-
-  const lecturersKpiValue = useMemo(() => {
-    if (semesterHeadcountTotal != null && semesterHeadcountTotal > 0) return stats.totalLecturers
-    if (selectedSemester !== 'all' || selectedYear !== 'all') return stats.totalLecturers
-    return 'N/A'
-  }, [semesterHeadcountTotal, selectedSemester, selectedYear, stats.totalLecturers])
-
-  const lecturersKpiDescription = useMemo(() => {
-    if (lecturersKpiValue === 'N/A') {
-      return 'Narrow by year/semester for teaching staff in scope'
-    }
-    return `${stats.totalDepartments} departments`
-  }, [lecturersKpiValue, stats.totalDepartments])
-
-  const totalStudentsDescription = useMemo(() => {
-    if (semesterHeadcountTotal == null) {
-      return 'Seat enrollments summed across sections'
-    }
-    if (selectedYear === 'all' && selectedSemester === 'all') {
-      return 'Sum of official headcounts across all terms'
-    }
-    if (selectedYear !== 'all' && selectedSemester === 'all') {
-      return 'Sum of official headcounts for this academic year'
-    }
-    if (selectedYear === 'all' && selectedSemester !== 'all') {
-      return 'Sum of official headcounts for this term across all years'
-    }
-    return 'Official semester headcount'
-  }, [semesterHeadcountTotal, selectedYear, selectedSemester])
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -304,93 +258,6 @@ export default function CourseAnalyticsApp({
       </header>
 
       <div className="mx-auto max-w-[1680px] px-4 pt-6 pb-8 sm:px-6 lg:px-8 flex flex-col gap-4">
-
-        {/* Primary KPIs */}
-        <section className="mb-3 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard
-            title={
-              (() => {
-                // Both filters 'all' + institution-wide → cumulative all-terms label
-                if (selectedYear === 'all' && selectedSemester === 'all' && selectedDepartment === 'all' && !debouncedSearch.trim()) {
-                  return 'Total Enrollments (All Terms)'
-                }
-                // HC available for this filter combination → normal title
-                if (semesterHeadcountTotal != null) {
-                  return 'Total Students'
-                }
-                // HC suppressed by dept filter / search → make the fallback visible in the title
-                return 'Total Students (Seat Enrollment)'
-              })()
-            }
-            value={stats.totalStudents}
-            icon={Users}
-            description={totalStudentsDescription}
-            variant="primary"
-          />
-          <StatCard
-            title="Utilization Rate"
-            value={`${stats.utilizationRate}%`}
-            icon={PieChart}
-            description={
-              stats.uniqueSemesters > 1
-                ? `${stats.emptySeats.toLocaleString()} empty seats (${stats.uniqueSemesters} terms combined)`
-                : `${stats.emptySeats.toLocaleString()} empty seats`
-            }
-            // Issue 5: unified threshold — <60=warning, 60-89=default, ≥90=success
-            variant={stats.utilizationRate < 60 ? 'warning' : stats.utilizationRate >= 90 ? 'success' : 'default'}
-          />
-          <StatCard
-            title="Student-Lecturer"
-            value={studentLecturerRatioValue}
-            icon={Users}
-            description={studentLecturerRatioDescription}
-          />
-          <StatCard
-            title="Lecturers"
-            value={lecturersKpiValue}
-            icon={Presentation}
-            description={lecturersKpiDescription}
-          />
-        </section>
-
-        {/* Secondary KPIs */}
-        <section className="mb-1">
-          <Card>
-            <CardContent className="grid grid-cols-2 gap-2.5 p-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-8 lg:gap-3 lg:p-3">
-              <MiniStat label="Avg Class Size" value={stats.avgClassSize} icon={Users} />
-              <MiniStat
-                label="Full Sections"
-                value={stats.fullSections}
-                icon={AlertTriangle}
-                highlight={stats.fullSections > stats.totalSections * 0.2}
-              />
-              <MiniStat label="Total Capacity" value={stats.totalCapacity.toLocaleString()} icon={Armchair}
-                subValue={stats.uniqueSemesters > 1 ? `${stats.uniqueSemesters} terms combined` : undefined}
-              />
-              <MiniStat
-                label="Sections/Course (avg/term)"
-                value={stats.avgSectionsPerCourse}
-                icon={BarChart3}
-              />
-              <MiniStat label="Online" value={stats.onlineSections} icon={Laptop} />
-              {/* Bug 4 fix: inPersonSections = total - online - blended, so label clearly covers both face-to-face and blended */}
-              <MiniStat
-                label="Face To Face / Blended"
-                value={stats.inPersonSections + stats.blendedSections}
-                subValue={stats.blendedSections > 0 ? `incl. ${stats.blendedSections} blended` : undefined}
-                icon={Building2}
-              />
-              <MiniStat label="Peak Hour" value={stats.peakHour || 'N/A'} icon={Clock} />
-              {/* Issue 6: clarify that "Busiest Day" counts session-meetings (multi-day sections increment each day) */}
-              <MiniStat
-                label="Busiest Day (by session count)"
-                value={stats.busiestDay || 'N/A'}
-                subValue="Multi-day sections counted once per meeting day"
-                icon={Calendar}
-              />
-            </CardContent>
-          </Card>
-        </section>
 
         {/* Strategic view mode */}
         <section className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

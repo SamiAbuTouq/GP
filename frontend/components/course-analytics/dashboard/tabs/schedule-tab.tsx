@@ -19,6 +19,7 @@ interface ScheduleTabProps {
 
 export function ScheduleTab({ analyticsMode, heatmapData, slotDensityRows, planningTermSeries }: ScheduleTabProps) {
   const peakFromHeat = [...heatmapData].sort((a, b) => b.value - a.value)[0]
+  const hasPeak = peakFromHeat != null && peakFromHeat.value > 0
 
   return (
     <div className="space-y-6">
@@ -38,20 +39,20 @@ export function ScheduleTab({ analyticsMode, heatmapData, slotDensityRows, plann
             Slot intelligence
           </CardTitle>
           <CardDescription>
-            Campus density uses day and start hour; each section contributes its Registered_Students once per scheduled meeting
-            day.
+            Campus density uses day and start hour; each physical or blended section contributes its
+            Registered_Students once per scheduled meeting day (fully online sections excluded).
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <MiniStat
               label="Peak grid cell"
-              value={peakFromHeat ? `${peakFromHeat.day} ${peakFromHeat.hour}` : 'N/A'}
+              value={hasPeak ? `${peakFromHeat.day} ${peakFromHeat.hour}` : 'N/A'}
               icon={Clock}
             />
             <MiniStat
               label="Peak concurrent seats"
-              value={peakFromHeat ? peakFromHeat.value.toLocaleString() : '0'}
+              value={hasPeak ? peakFromHeat.value.toLocaleString() : '0'}
               icon={Clock}
             />
             <MiniStat label="Active day-hour cells" value={heatmapData.filter((h) => h.value > 0).length} icon={Clock} />

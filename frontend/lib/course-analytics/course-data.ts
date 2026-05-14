@@ -834,26 +834,32 @@ export function getAcademicLevelModeData(courses: Course[]): AcademicLevelModeDa
 
 
 
+/**
+ * Campus-oriented day × start-hour grid: for each calendar slot, sums Registered_Students
+ * across sections that meet on that day at that start hour (one contribution per section
+ * per meeting day). Fully online sections are omitted so totals match on-campus load.
+ * Workweek grid is Sun–Thu (Fri is not in DB day masks; Sat from masks is ignored here).
+ */
 export function getScheduleHeatmap(courses: Course[]): HeatmapData[] {
   const heatmap: HeatmapData[] = []
-  // Saturday excluded to match DayChart behaviour (PSUT workweek is Sun–Thu)
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu']
   const studentCounts = new Map<string, number>()
-  
-  courses.forEach(course => {
-    if (course.Day && course.Start_Time) {
-      const hour = course.Start_Time.split(':')[0]
-      const courseDays = course.Day.split(' ')
-      
-      courseDays.forEach(day => {
-        const shortDay = day.substring(0, 3)
-        if (days.includes(shortDay)) {
-          const key = `${shortDay}-${hour}`
-          studentCounts.set(key, (studentCounts.get(key) || 0) + course.Registered_Students)
-        }
-      })
+
+  for (const course of courses) {
+    if (course.isOnline) continue
+    if (!course.Day?.trim() || !course.Start_Time?.trim()) continue
+
+    const hourRaw = course.Start_Time.split(':')[0]
+    if (hourRaw === '') continue
+    const hour = hourRaw.padStart(2, '0')
+
+    for (const raw of course.Day.split(/\s+/).filter(Boolean)) {
+      const shortDay = raw.substring(0, 3)
+      if (!days.includes(shortDay)) continue
+      const key = `${shortDay}-${hour}`
+      studentCounts.set(key, (studentCounts.get(key) || 0) + course.Registered_Students)
     }
-  })
+  }
   
   // Get unique hours and sort
   const hours = [...new Set(Array.from(studentCounts.keys()).map(k => k.split('-')[1]))].sort((a, b) => parseInt(a) - parseInt(b))

@@ -22,7 +22,7 @@ import {
   YAxis,
   ZAxis,
 } from 'recharts'
-import { formatName } from '@/lib/utils'
+import { cn, formatName } from '@/lib/utils'
 import { usePalette } from '@/components/course-analytics/palette-provider'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/course-analytics-ui/card'
@@ -387,7 +387,8 @@ export function CampusConcurrentDensityChart({ data }: { data: HeatmapData[] }) 
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Campus Density</CardTitle>
         <CardDescription>
-          Concurrent enrolled seats summed by calendar slot (each section counted once per meeting day at its start hour).
+          Concurrent enrolled seats on campus by calendar slot (physical and blended sections only;
+          each counted once per meeting day at its start hour; fully online excluded).
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -413,7 +414,7 @@ export function CampusConcurrentDensityChart({ data }: { data: HeatmapData[] }) 
                         <div className={`flex-1 h-8 cursor-default rounded ${getColor(v)}`} />
                       </TooltipTrigger>
                       <TooltipContent side="top">
-                        {day} {hour}: {v.toLocaleString()} enrolled seats (summed)
+                        {day} {hour}: {v.toLocaleString()} on-campus enrolled seats (summed)
                       </TooltipContent>
                     </Tooltip>
                   )
@@ -476,20 +477,28 @@ export function SlotDensityComparisonChart({ rows }: { rows: SlotDensityClusterR
   )
 }
 
-export function LecturerStressScatterChart({ data }: { data: LecturerStressPoint[] }) {
+export function LecturerStressScatterChart({
+  data,
+  className,
+  chartHeight = 340,
+}: {
+  data: LecturerStressPoint[]
+  className?: string
+  chartHeight?: number
+}) {
   const colors = useChartColors()
   const plot = useMemo(() => data.filter((d) => d.creditHours > 0 || d.prepCount > 0).slice(0, 80), [data])
 
   return (
-    <Card>
-      <CardHeader className="pb-4">
+    <Card className={cn('flex h-full min-h-0 flex-col', className)}>
+      <CardHeader className="shrink-0 pb-4">
         <CardTitle className="text-lg font-semibold">Lecturer Stress Matrix</CardTitle>
         <CardDescription>
           X: Σ credit hours in scope · Y: distinct course preparations (Course_Number) · bubble ∝ sections taught.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={340}>
+      <CardContent className="shrink-0 pt-0">
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <ScatterChart margin={{ left: 8, right: 12, top: 12, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.35} />
             <XAxis
@@ -584,16 +593,26 @@ export function AcademicWeightBarChart({ data }: { data: AcademicWeightRow[] }) 
   )
 }
 
-export function FacultyCreditHoursBarChart({ data }: { data: FacultyCreditLoadRow[] }) {
+export function FacultyCreditHoursBarChart({
+  data,
+  className,
+  chartHeight,
+}: {
+  data: FacultyCreditLoadRow[]
+  className?: string
+  /** When set (e.g. Staff tab), fixes plot height so cards match a paired chart. */
+  chartHeight?: number
+}) {
   const colors = useChartColors()
+  const plotHeight = chartHeight ?? Math.max(300, data.length * 30)
   return (
-    <Card>
-      <CardHeader className="pb-4">
+    <Card className={cn('flex h-full min-h-0 flex-col', className)}>
+      <CardHeader className="shrink-0 pb-4">
         <CardTitle className="text-lg font-semibold">Faculty Load (Credit Hours)</CardTitle>
         <CardDescription>Σ credit_hours by lecturer in the filtered scope.</CardDescription>
       </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={Math.max(300, data.length * 30)}>
+      <CardContent className="shrink-0 pt-0">
+        <ResponsiveContainer width="100%" height={plotHeight}>
           <BarChart data={data} layout="vertical" margin={{ left: 4, right: 16, top: 8, bottom: 8 }}>
             <XAxis type="number" stroke={AXIS_STROKE} fontSize={11} tickLine={false} axisLine={false} tick={AXIS_TICK} />
             <YAxis
