@@ -41,6 +41,12 @@ function slotDurationHours(start: Date, end: Date): number {
   return diff
 }
 
+function formatUtcHm(d: Date): string {
+  const h = d.getUTCHours().toString().padStart(2, "0")
+  const m = d.getUTCMinutes().toString().padStart(2, "0")
+  return `${h}:${m}`
+}
+
 function weeklyHoursForEntry(daysMask: number, start: Date, end: Date): number {
   return slotDurationHours(start, end) * dayMultiplicity(daysMask)
 }
@@ -286,6 +292,7 @@ export async function GET(request: Request) {
           hardMismatchCount: 0,
           softMismatchCount: 0,
         },
+        timeslotDemandRows: [],
       })
     }
 
@@ -427,6 +434,53 @@ export async function GET(request: Request) {
       else if (e.course.delivery_mode === "BLENDED") ds.blended++
       else ds.f2f++
     }
+
+    type SlotAgg = {
+      slotId: number
+      days: string[]
+      startTime: Date
+      endTime: Date
+      sections: number
+      roomsUsed: Set<number>
+      totalEnrollment: number
+    }
+
+    const bySlot = new Map<number, SlotAgg>()
+    for (const e of entries) {
+      const sid = e.slot_id
+      if (!bySlot.has(sid)) {
+        bySlot.set(sid, {
+          slotId: sid,
+          days: daysFromMask(e.timeslot.days_mask),
+          startTime: e.timeslot.start_time,
+          endTime: e.timeslot.end_time,
+          sections: 0,
+          roomsUsed: new Set(),
+          totalEnrollment: 0,
+        })
+      }
+      const sa = bySlot.get(sid)!
+      sa.sections++
+      sa.roomsUsed.add(e.room_id)
+      sa.totalEnrollment += e.registered_students
+    }
+
+    const availableRoomsCount = allRooms.filter((r) => r.is_available).length
+    const timeslotDemandRows = [...bySlot.values()]
+      .map((sa) => ({
+        slotId: sa.slotId,
+        days: sa.days.join(", "),
+        startTime: formatUtcHm(sa.startTime),
+        endTime: formatUtcHm(sa.endTime),
+        sections: sa.sections,
+        roomsUsed: sa.roomsUsed.size,
+        totalEnrollment: sa.totalEnrollment,
+        slotPressurePct:
+          availableRoomsCount > 0
+            ? Math.round((sa.roomsUsed.size / availableRoomsCount) * 1000) / 10
+            : null,
+      }))
+      .sort((a, b) => b.sections - a.sections)
 
     const roomWeeklyList = [...byRoom.values()].map((v) => v.weeklyHours)
     const maxWeeklyHoursAnyRoom = roomWeeklyList.length ? Math.max(...roomWeeklyList) : 0
@@ -728,6 +782,7 @@ export async function GET(request: Request) {
       lecturerPreferenceSummary,
       roomTypeRows,
       roomTypeSummary,
+      timeslotDemandRows,
     })
   } catch (error) {
     console.error("[GET /api/reports/aggregates]", error)

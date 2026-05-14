@@ -149,6 +149,18 @@ export const ReportDatasetSchema = z.object({
     hardMismatchCount: z.number(),
     softMismatchCount: z.number(),
   }),
+  timeslotDemandRows: z.array(
+    z.object({
+      slotId: z.number(),
+      days: z.string(),
+      startTime: z.string(),
+      endTime: z.string(),
+      sections: z.number(),
+      roomsUsed: z.number(),
+      totalEnrollment: z.number(),
+      slotPressurePct: z.number().nullable(),
+    }),
+  ),
 })
 
 export type ReportDataset = z.infer<typeof ReportDatasetSchema>

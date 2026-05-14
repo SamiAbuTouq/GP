@@ -1,134 +1,114 @@
 ﻿'use client'
 
-import { TrendingUp, TrendingDown } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/course-analytics-ui/card'
-import { Badge } from '@/components/course-analytics-ui/badge'
-import { UnderenrolledAlert, HighDemandAlert, SemesterYoYChart, DepartmentUtilizationGauges, CourseGrowthChart } from '@/components/course-analytics/dashboard/charts'
-import type { UnderenrolledSection, HighDemandSection, DepartmentUtilization, CourseGrowthData } from '@/lib/course-analytics/course-data'
-
-interface YearGrowthData {
-  year: string
-  students: number
-  sections: number
-  growth: number
-  isPartial?: boolean
-}
-
-interface SemesterYoYData {
-  year: string
-  first: number
-  second: number
-  summer: number
-}
+import { UnderenrolledAlert, RoomWasteTable } from '@/components/course-analytics/dashboard/charts'
+import {
+  SemesterSeatVolumeChart,
+  HighDemandCourseTrendChart,
+  LabPressureLineChart,
+  HighSaturationPressureAreaChart,
+  RoomUtilizationTrendsChart,
+  SectionExpansionTable,
+} from '@/components/course-analytics/dashboard/strategic-charts'
+import type {
+  CourseSaturationTrendSeries,
+  PlanningTermRow,
+  RoomUtilizationTrendRoom,
+  RoomWasteData,
+  SectionExpansionRow,
+  SemesterData,
+  UnderenrolledSection,
+} from '@/lib/course-analytics/course-data'
 
 interface InsightsTabProps {
-  yearGrowth: YearGrowthData[]
-  underenrolled: UnderenrolledSection[]
-  highDemand: HighDemandSection[]
-  semesterYoY: SemesterYoYData[]
-  departmentUtilization: DepartmentUtilization[]
-  courseGrowthTrends: CourseGrowthData[]
+  readonly analyticsMode: 'past' | 'planning'
+  readonly semesterData: SemesterData[]
+  readonly underenrolled: UnderenrolledSection[]
+  readonly roomWasteData: RoomWasteData[]
+  readonly planningTermSeries: PlanningTermRow[]
+  readonly highDemandTermLabels: string[]
+  readonly highDemandSeries: CourseSaturationTrendSeries[]
+  readonly roomUtilTrends: { heavy: RoomUtilizationTrendRoom[]; light: RoomUtilizationTrendRoom[] }
+  readonly expansionRows: SectionExpansionRow[]
+  readonly distinctTermCount: number
 }
 
-export function InsightsTab({ yearGrowth, underenrolled, highDemand, semesterYoY, departmentUtilization, courseGrowthTrends }: InsightsTabProps) {
+export function InsightsTab({
+  analyticsMode,
+  semesterData,
+  underenrolled,
+  roomWasteData,
+  planningTermSeries,
+  highDemandTermLabels,
+  highDemandSeries,
+  roomUtilTrends,
+  expansionRows,
+  distinctTermCount,
+}: InsightsTabProps) {
+  const expansionNote =
+    distinctTermCount <= 1
+      ? 'Only one term in scope: a course needs ≥90% utilization in that term to appear (recurrence across terms is not observable here).'
+      : undefined
+
   return (
     <div className="space-y-8 pb-8">
-      {/* Top Row: Year and Semester Trends */}
-      <section className="space-y-4">
-        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider ml-1">Historical Trends</h3>
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Year-over-Year Growth Text */}
-          <Card className="h-full">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                Year-over-Year Growth Details
-              </CardTitle>
+      {analyticsMode === 'past' ? (
+        <section className="space-y-4">
+          <h3 className="ml-1 text-sm font-medium uppercase tracking-wider text-muted-foreground">Historical audit</h3>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <SemesterSeatVolumeChart data={semesterData} />
+            <RoomWasteTable data={roomWasteData} className="h-full min-h-[320px]" />
+          </div>
+          <UnderenrolledAlert data={underenrolled} threshold={10} />
+        </section>
+      ) : (
+        <section className="space-y-4">
+          <h3 className="ml-1 text-sm font-medium uppercase tracking-wider text-muted-foreground">Planning signals</h3>
+          <p className="ml-1 max-w-3xl text-sm text-muted-foreground">
+            All views below use historical section registrations and capacities only — no enrollment forecasts or synthetic
+            projections.
+          </p>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <HighDemandCourseTrendChart termLabels={highDemandTermLabels} series={highDemandSeries} />
+            <LabPressureLineChart data={planningTermSeries} />
+          </div>
+          {planningTermSeries.length > 0 ? (
+            <div className="grid gap-6 lg:grid-cols-2">
+              <HighSaturationPressureAreaChart data={planningTermSeries} />
+              <RoomUtilizationTrendsChart heavy={roomUtilTrends.heavy} light={roomUtilTrends.light} />
+            </div>
+          ) : (
+            <RoomUtilizationTrendsChart heavy={roomUtilTrends.heavy} light={roomUtilTrends.light} />
+          )}
+          <SectionExpansionTable rows={expansionRows} minTermsNote={expansionNote} />
+        </section>
+      )}
+
+      {analyticsMode === 'past' ? (
+        <section className="space-y-4">
+          <h3 className="ml-1 text-sm font-medium uppercase tracking-wider text-muted-foreground">Cross-check</h3>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Switch to Planning — Insight</CardTitle>
               <CardDescription>
-                Growth compares one consistent metric per year pair: headcount only when both years have it, otherwise seat-enrollment totals for both
+                For recurring high-saturation courses, lab occupancy over time, room utilization trends, and section expansion
+                candidates, use the perspective toggle above and reopen this tab.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              {yearGrowth.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No year data available.</p>
-              ) : (
-                <div className="space-y-4">
-                  {[...yearGrowth].reverse().map((yr, idx, arr) => (
-                    <div key={yr.year} className="flex items-center justify-between rounded-lg border border-border/50 p-4 transition-colors hover:bg-muted/50">
-                      <div className="flex items-center gap-6">
-                        <div className="flex h-10 px-3 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold tracking-wide text-primary">
-                          {yr.year}
-                        </div>
-                        <div className="flex gap-8">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Students</p>
-                            <p className="text-lg font-semibold tabular-nums tracking-tight">{yr.students.toLocaleString()}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Sections</p>
-                            <p className="text-lg font-semibold tabular-nums tracking-tight">{yr.sections.toLocaleString()}</p>
-                          </div>
-                        </div>
-                      </div>
-                      {idx < arr.length - 1 && (
-                        <div className="flex items-center gap-4 text-right">
-                          <div className="flex flex-col items-end">
-                            <p className="text-xs text-muted-foreground">Net Growth</p>
-                            <Badge
-                              variant={yr.growth >= 0 ? 'default' : 'destructive'}
-                              className="font-mono mt-0.5"
-                            >
-                              {yr.growth >= 0 ? '+' : ''}{yr.growth}%
-                            </Badge>
-                          </div>
-                          {yr.growth !== 0 && (
-                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${yr.growth > 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive'}`}>
-                              {yr.growth > 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {yearGrowth.some((yr) => yr.isPartial) && (
-                    <p className="text-xs text-muted-foreground">
-                      Partial years are compared using only semester types available in both adjacent years.
-                    </p>
-                  )}
-                </div>
-              )}
+            <CardContent className="text-sm text-muted-foreground">
+              {distinctTermCount} term{distinctTermCount === 1 ? '' : 's'} in the current filters.
             </CardContent>
           </Card>
-
-          {/* Semester YoY Chart */}
-          <SemesterYoYChart data={semesterYoY} />
-        </div>
-      </section>
-
-      {/* Middle Row: Efficiency & Growth Analysis */}
-      <section className="space-y-4">
-        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider ml-1">Performance Analysis</h3>
-        <div className="grid gap-6 lg:grid-cols-2 items-start">
-          {/* Department Utilization Gauges */}
-          <DepartmentUtilizationGauges data={departmentUtilization} />
-
-          {/* Course Growth Analysis */}
-          <CourseGrowthChart data={courseGrowthTrends} />
-        </div>
-      </section>
-
-      {/* Bottom Row: Resource Management & Alerts */}
-      <section className="space-y-4">
-        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider ml-1">Resource Alerts</h3>
-        <div className="grid gap-6">
-          <div className="min-h-0">
-            <HighDemandAlert data={highDemand} threshold={95} />
-          </div>
-          <div className="min-h-0">
+        </section>
+      ) : (
+        <section className="space-y-4">
+          <h3 className="ml-1 text-sm font-medium uppercase tracking-wider text-muted-foreground">Operational cross-check</h3>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <RoomWasteTable data={roomWasteData} className="h-full min-h-[280px]" />
             <UnderenrolledAlert data={underenrolled} threshold={10} />
           </div>
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   )
 }

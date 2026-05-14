@@ -3,25 +3,31 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/course-analytics-ui/card'
 import { Badge } from '@/components/course-analytics-ui/badge'
 import { ScrollArea } from '@/components/course-analytics-ui/scroll-area'
-import { DepartmentChart, SectionScatterChart } from '@/components/course-analytics/dashboard/charts'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import type { DepartmentData } from '@/lib/course-analytics/course-data'
+import { AcademicWeightBarChart, DepartmentalSaturationChart } from '@/components/course-analytics/dashboard/strategic-charts'
+import type { AcademicWeightRow, DepartmentData } from '@/lib/course-analytics/course-data'
 
 interface DepartmentsTabProps {
+  analyticsMode: 'past' | 'planning'
   departmentData: DepartmentData[]
-  scatterData: { name: string; classSize: number; utilization: number; sections: number }[]
+  academicWeight: AcademicWeightRow[]
 }
 
-export function DepartmentsTab({ departmentData, scatterData }: DepartmentsTabProps) {
+export function DepartmentsTab({ analyticsMode, departmentData, academicWeight }: DepartmentsTabProps) {
   return (
     <div className="space-y-6">
-      <DepartmentChart data={departmentData} />
+      <DepartmentalSaturationChart data={departmentData} />
+      <AcademicWeightBarChart data={academicWeight} />
+
       <div className="grid gap-6 lg:grid-cols-2">
-        <SectionScatterChart data={scatterData} />
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">Department Details</CardTitle>
-            <CardDescription>Complete breakdown by department</CardDescription>
+            <CardTitle className="text-lg font-semibold">Department roster</CardTitle>
+            <CardDescription>
+              {analyticsMode === 'past'
+                ? 'Operational breakdown: enrollments, section counts, and physical-seat utilization by department.'
+                : 'Same roster — use academic weight chart above for instructional demand intensity.'}
+            </CardDescription>
           </CardHeader>
           <CardContent className="px-0 pb-0">
             <ScrollArea className="h-[420px]">
@@ -37,7 +43,10 @@ export function DepartmentsTab({ departmentData, scatterData }: DepartmentsTabPr
                 </thead>
                 <tbody>
                   {departmentData.map((dept, index) => (
-                    <tr key={dept.fullName} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
+                    <tr
+                      key={dept.fullName}
+                      className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors"
+                    >
                       <td className="px-6 py-3">
                         <div className="flex items-center gap-2.5">
                           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
@@ -55,9 +64,16 @@ export function DepartmentsTab({ departmentData, scatterData }: DepartmentsTabPr
                       <td className="px-4 py-3 text-right text-muted-foreground">{dept.sections}</td>
                       <td className="px-4 py-3 text-right text-muted-foreground">{dept.courses}</td>
                       <td className="px-6 py-3 text-right">
-                        {/* Issue 5: unified thresholds — ≥90=full/default, ≥75=high/secondary, ≥60=medium/outline, <60=low/destructive */}
                         <Badge
-                          variant={dept.utilization >= 90 ? 'default' : dept.utilization >= 75 ? 'secondary' : dept.utilization >= 60 ? 'outline' : 'destructive'}
+                          variant={
+                            dept.utilization >= 90
+                              ? 'default'
+                              : dept.utilization >= 75
+                                ? 'secondary'
+                                : dept.utilization >= 60
+                                  ? 'outline'
+                                  : 'destructive'
+                          }
                           className="font-mono text-xs"
                         >
                           {dept.utilization}%

@@ -11,6 +11,8 @@ import {
   Check,
   ChevronRight,
   Search,
+  BookOpen,
+  Calendar,
 } from "lucide-react"
 import { ChartPieIcon } from "@/components/ui/chart-pie-icon"
 import { UserRoundIcon } from "@/components/ui/user-round-icon"
@@ -78,14 +80,11 @@ const REPORT_ICONS: Record<ReportTypeId, any> = {
   "lecturer-workload": UserRoundIcon,
   "course-distribution": ChartPieIcon,
   "conflict-analysis": TriangleAlertIcon,
+  "timetable-coverage": BookOpen,
+  "timeslot-demand": Calendar,
 }
 
-const ZIP_CSV_REPORT_TYPES = new Set<ReportTypeId>([
-  "room-utilization",
-  "lecturer-workload",
-  "course-distribution",
-  "conflict-analysis",
-])
+const ZIP_CSV_REPORT_TYPES = new Set<ReportTypeId>(["conflict-analysis"])
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`

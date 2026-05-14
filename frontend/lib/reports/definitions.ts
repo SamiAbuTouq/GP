@@ -37,6 +37,24 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     formats: ["pdf", "excel", "csv"],
     comingSoon: false,
   },
+  {
+    id: "timetable-coverage",
+    name: "Timetable Coverage Report",
+    shortName: "Coverage",
+    description:
+      "Per-department gap between catalog courses and courses actually on the timetable. Flags departments with unscheduled courses.",
+    formats: ["pdf", "excel"],
+    comingSoon: false,
+  },
+  {
+    id: "timeslot-demand",
+    name: "Timeslot Demand Report",
+    shortName: "Slot demand",
+    description:
+      "Sections, rooms in use, and enrollment by timeslot. Identifies scheduling bottlenecks and underused slots.",
+    formats: ["pdf", "excel"],
+    comingSoon: false,
+  },
 ]
 
 export function getReportDefinition(id: string) {

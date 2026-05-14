@@ -1,30 +1,24 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback, useDeferredValue } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import { motion } from 'motion/react'
 import {
   BookOpen,
   Users,
   Building2,
-  TrendingUp,
-  Percent,
   Presentation,
-  GraduationCap,
-  RefreshCw,
-  UserCheck,
   AlertTriangle,
-  MonitorPlay,
   Calendar,
   Clock,
-  Target,
   BarChart3,
   Activity,
   Lightbulb,
-  Library,
   PieChart,
   Armchair,
   Laptop,
   LayoutDashboard,
+  History,
+  Compass,
 } from 'lucide-react'
 import {
   loadCourseData,
@@ -34,21 +28,24 @@ import {
   getDepartmentData,
   getSemesterData,
   getTopLecturers,
-  getTimeSlotData,
-  getDayData,
-  getTopCourses,
-  getCapacityDistribution,
-  getDepartmentComparison,
+  getScheduleHeatmap,
   getFilterOptions,
   filterCourses,
-  getScheduleHeatmap,
-  getDepartmentScatterData,
-  getYearOverYearGrowth,
-  getUnderenrolledSections,
-  getSemesterYoYComparison,
-  getDepartmentUtilization,
+  getTopCourses,
   getRoomWasteAnalysis,
-  getCourseGrowthTrends,
+  getRoomTypeUtilization,
+  getUnderenrolledSections,
+  getOnlineModeData,
+  getLecturerStressScatterData,
+  getSlotDensityClusters,
+  getAcademicWeightByDepartment,
+  getRoomOccupancyHeatmap,
+  getPlanningTermPressureSeries,
+  getHighDemandCourseSaturationTrend,
+  getRoomUtilizationTrends,
+  getSectionExpansionCandidates,
+  getFacultyCreditLoadTop,
+  buildManagementActionItems,
   type Course,
   type FilterOptions,
   type SemesterTotal,
@@ -63,19 +60,13 @@ import { ScheduleTab } from '@/components/course-analytics/dashboard/tabs/schedu
 import { CoursesTab } from '@/components/course-analytics/dashboard/tabs/courses-tab'
 import { StaffTab } from '@/components/course-analytics/dashboard/tabs/staff-tab'
 import { InsightsTab } from '@/components/course-analytics/dashboard/tabs/insights-tab'
-import { Button } from '@/components/course-analytics-ui/button'
-import {
-  getHighDemandSections,
-  getFacultyWorkloadDistribution,
-  getRoomTypeUtilization,
-  getAcademicLevelModeData,
-} from '@/lib/course-analytics/course-data'
 import { Card, CardContent } from '@/components/course-analytics-ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/course-analytics-ui/tabs'
 import { Badge } from '@/components/course-analytics-ui/badge'
 import { PalettePicker } from '@/components/course-analytics/palette-picker'
 import { useDebounce } from '@/hooks/use-debounce'
 import { segmentedNavTabItemRadiusClass } from '@/lib/segmented-nav-tabs'
+import { cn } from '@/lib/utils'
 
 /**
  * Scope dashboard tab styles to the analytics surface so they follow app theme.
@@ -89,6 +80,16 @@ function DashboardActiveTabPill() {
       layoutId="dashboard-tabs-active"
       className={`absolute inset-0 z-0 ${segmentedNavTabItemRadiusClass} bg-primary shadow-sm`}
       transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+    />
+  )
+}
+
+function AnalyticsModePill() {
+  return (
+    <motion.div
+      layoutId="analytics-mode-pill"
+      className={`absolute inset-0 z-0 ${segmentedNavTabItemRadiusClass} bg-primary shadow-sm`}
+      transition={{ type: 'spring', bounce: 0.2, duration: 0.55 }}
     />
   )
 }
@@ -108,6 +109,7 @@ export default function CourseAnalyticsApp({
   const [selectedDepartment, setSelectedDepartment] = useState('all')
   const [selectedYear, setSelectedYear] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [analyticsMode, setAnalyticsMode] = useState<'past' | 'planning'>('past')
 
   // Debounce search so we don't re-filter on every keystroke
   const debouncedSearch = useDebounce(searchQuery, 400)
@@ -150,29 +152,41 @@ export default function CourseAnalyticsApp({
   const departmentData = useMemo(() => getDepartmentData(filteredCourses), [filteredCourses])
   const semesterData = useMemo(() => getSemesterData(filteredCourses), [filteredCourses])
   const lecturerData = useMemo(() => getTopLecturers(filteredCourses), [filteredCourses])
-  const timeSlotData = useMemo(() => getTimeSlotData(filteredCourses), [filteredCourses])
-  const dayData = useMemo(() => getDayData(filteredCourses), [filteredCourses])
   const topCourses = useMemo(() => getTopCourses(filteredCourses), [filteredCourses])
-  const capacityData = useMemo(() => getCapacityDistribution(filteredCourses), [filteredCourses])
-  const deptComparison = useMemo(() => getDepartmentComparison(filteredCourses), [filteredCourses])
   const heatmapData = useMemo(() => getScheduleHeatmap(filteredCourses), [filteredCourses])
-  const scatterData = useMemo(() => getDepartmentScatterData(filteredCourses), [filteredCourses])
-  const yearGrowth = useMemo(
-    () => getYearOverYearGrowth(filteredCourses, semesterTotals),
-    [filteredCourses, semesterTotals],
-  )
   const underenrolled = useMemo(() => getUnderenrolledSections(filteredCourses, 10), [filteredCourses])
-  const semesterYoYData = useMemo(
-    () => getSemesterYoYComparison(filteredCourses, semesterTotals),
-    [filteredCourses, semesterTotals],
-  )
-  const deptUtilizationData = useMemo(() => getDepartmentUtilization(filteredCourses), [filteredCourses])
   const roomWasteData = useMemo(() => getRoomWasteAnalysis(filteredCourses, 14), [filteredCourses])
-  const courseGrowthTrends = useMemo(() => getCourseGrowthTrends(filteredCourses), [filteredCourses])
-  const highDemandSections = useMemo(() => getHighDemandSections(filteredCourses, 95), [filteredCourses])
-  const facultyWorkload = useMemo(() => getFacultyWorkloadDistribution(filteredCourses), [filteredCourses])
   const roomTypeData = useMemo(() => getRoomTypeUtilization(filteredCourses), [filteredCourses])
-  const academicLevelModeData = useMemo(() => getAcademicLevelModeData(filteredCourses), [filteredCourses])
+
+  const onlineModeData = useMemo(() => getOnlineModeData(filteredCourses), [filteredCourses])
+  const lecturerStress = useMemo(() => getLecturerStressScatterData(filteredCourses), [filteredCourses])
+  const slotDensity = useMemo(() => getSlotDensityClusters(filteredCourses), [filteredCourses])
+  const academicWeight = useMemo(() => getAcademicWeightByDepartment(filteredCourses), [filteredCourses])
+  const roomOccupancyHeatmap = useMemo(() => getRoomOccupancyHeatmap(filteredCourses), [filteredCourses])
+  const planningTermSeries = useMemo(() => getPlanningTermPressureSeries(filteredCourses), [filteredCourses])
+  const highDemandCourseTrend = useMemo(() => getHighDemandCourseSaturationTrend(filteredCourses), [filteredCourses])
+  const roomUtilTrends = useMemo(() => getRoomUtilizationTrends(filteredCourses), [filteredCourses])
+  const facultyCreditTop = useMemo(() => getFacultyCreditLoadTop(filteredCourses), [filteredCourses])
+  const distinctTermCount = useMemo(
+    () => new Set(filteredCourses.map((c) => `${c.Year}|${c.Semester}`).filter(Boolean)).size,
+    [filteredCourses],
+  )
+  const expansionRows = useMemo(
+    () =>
+      getSectionExpansionCandidates(filteredCourses, {
+        minTermsWithHighSat: distinctTermCount <= 1 ? 1 : 2,
+      }),
+    [filteredCourses, distinctTermCount],
+  )
+  const labOccupancyPct = useMemo(() => {
+    const lab = roomTypeData.find((r) => r.type === 'Laboratory')
+    if (!lab || lab.sections <= 0) return null
+    return lab.avgUtilization
+  }, [roomTypeData])
+  const actionItems = useMemo(
+    () => buildManagementActionItems(filteredCourses, roomWasteData, slotDensity, lecturerStress, labOccupancyPct),
+    [filteredCourses, roomWasteData, slotDensity, lecturerStress, labOccupancyPct],
+  )
 
   const studentLecturerRatioValue = useMemo(() => {
     if (stats.totalLecturers <= 0) return 'N/A'
@@ -378,6 +392,39 @@ export default function CourseAnalyticsApp({
           </Card>
         </section>
 
+        {/* Strategic view mode */}
+        <section className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Analytics perspective</p>
+          <div className={`${DASHBOARD_TAB_LIST_CLASS} w-full sm:w-auto`}>
+            <button
+              type="button"
+              onClick={() => setAnalyticsMode('past')}
+              className={cn(
+                DASHBOARD_TAB_TRIGGER_CLASS,
+                'flex flex-1 items-center justify-center gap-2 sm:flex-initial',
+                analyticsMode === 'past' ? 'text-primary-foreground' : '',
+              )}
+            >
+              {analyticsMode === 'past' && <AnalyticsModePill />}
+              <History className="relative z-10 h-4 w-4" />
+              <span className="relative z-10">Past — Audit</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAnalyticsMode('planning')}
+              className={cn(
+                DASHBOARD_TAB_TRIGGER_CLASS,
+                'flex flex-1 items-center justify-center gap-2 sm:flex-initial',
+                analyticsMode === 'planning' ? 'text-primary-foreground' : '',
+              )}
+            >
+              {analyticsMode === 'planning' && <AnalyticsModePill />}
+              <Compass className="relative z-10 h-4 w-4" />
+              <span className="relative z-10">Planning — Insight</span>
+            </button>
+          </div>
+        </section>
+
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className={DASHBOARD_TAB_LIST_CLASS}>
@@ -420,35 +467,34 @@ export default function CourseAnalyticsApp({
 
           <TabsContent value="overview">
             <OverviewTab
+              analyticsMode={analyticsMode}
+              actionItems={actionItems}
               stats={stats}
               departmentData={departmentData}
-              semesterData={semesterData}
-              capacityData={capacityData}
-              deptComparison={deptComparison}
-              roomWasteData={roomWasteData}
-              roomTypeData={roomTypeData}
+              onlineModeData={onlineModeData}
+              roomOccupancyHeatmap={roomOccupancyHeatmap}
+              slotDensity={slotDensity}
+              labOccupancyPct={labOccupancyPct}
+              distinctTermCount={distinctTermCount}
+              planningTermSeries={planningTermSeries}
             />
           </TabsContent>
 
           <TabsContent value="departments">
-            <DepartmentsTab departmentData={departmentData} scatterData={scatterData} />
+            <DepartmentsTab analyticsMode={analyticsMode} departmentData={departmentData} academicWeight={academicWeight} />
           </TabsContent>
 
           <TabsContent value="schedule">
-            <ScheduleTab
-              stats={stats}
-              timeSlotData={timeSlotData}
-              dayData={dayData}
-              heatmapData={heatmapData}
-            />
+            <ScheduleTab analyticsMode={analyticsMode} heatmapData={heatmapData} slotDensityRows={slotDensity.rows} planningTermSeries={planningTermSeries} />
           </TabsContent>
 
           <TabsContent value="courses">
             <CoursesTab
-              stats={stats}
+              analyticsMode={analyticsMode}
               topCourses={topCourses}
-              academicLevelModeData={academicLevelModeData}
-              // Issue 7: pass filter state so tab can show multi-year disclaimer
+              highDemandTermLabels={highDemandCourseTrend.termLabels}
+              highDemandSeries={highDemandCourseTrend.series}
+              totalUniqueCourses={stats.totalCourses}
               hasYearOrSemFilter={selectedYear !== 'all' || selectedSemester !== 'all'}
             />
           </TabsContent>
@@ -457,19 +503,24 @@ export default function CourseAnalyticsApp({
             <StaffTab
               stats={stats}
               lecturerData={lecturerData}
-              facultyWorkload={facultyWorkload}
+              lecturerStress={lecturerStress}
+              facultyCreditTop={facultyCreditTop}
               studentLecturerRatioValue={studentLecturerRatioValue}
             />
           </TabsContent>
 
           <TabsContent value="insights">
-            <InsightsTab 
-              yearGrowth={yearGrowth} 
-              underenrolled={underenrolled} 
-              highDemand={highDemandSections}
-              semesterYoY={semesterYoYData}
-              departmentUtilization={deptUtilizationData}
-              courseGrowthTrends={courseGrowthTrends}
+            <InsightsTab
+              analyticsMode={analyticsMode}
+              semesterData={semesterData}
+              underenrolled={underenrolled}
+              roomWasteData={roomWasteData}
+              planningTermSeries={planningTermSeries}
+              highDemandTermLabels={highDemandCourseTrend.termLabels}
+              highDemandSeries={highDemandCourseTrend.series}
+              roomUtilTrends={roomUtilTrends}
+              expansionRows={expansionRows}
+              distinctTermCount={distinctTermCount}
             />
           </TabsContent>
         </Tabs>

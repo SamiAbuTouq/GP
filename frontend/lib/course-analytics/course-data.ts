@@ -1379,10 +1379,566 @@ export interface RoomTypeUtilization {
   avgUtilization: number
 }
 
-function isExcludedFromRoomUtilization(room?: string): boolean {
+export function isExcludedFromRoomUtilization(room?: string): boolean {
   if (!room) return true
   const normalized = room.trim().toLowerCase()
   return normalized === 'online' || normalized.includes('training') || normalized.includes('project')
+}
+
+/** Physical sections with positive capacity (seat-based occupancy applies). `Section_Capacity` is the room/section seat limit in this dataset. */
+export function isPhysicalCapacitySection(c: Course): boolean {
+  return !c.isOnline && c.Section_Capacity > 0 && !isExcludedFromRoomUtilization(c.Room)
+}
+
+export function sectionOccupancyPercent(c: Course): number | null {
+  if (!isPhysicalCapacitySection(c)) return null
+  return (c.Registered_Students / c.Section_Capacity) * 100
+}
+
+/** Sum of unused seats across physical sections: Σ max(0, capacity − registered). */
+export function getTotalPhysicalRoomWasteSeats(courses: Course[]): number {
+  return courses.reduce((sum, c) => {
+    if (!isPhysicalCapacitySection(c)) return sum
+    return sum + Math.max(0, c.Section_Capacity - c.Registered_Students)
+  }, 0)
+}
+
+function semesterTypeOrder(sem: string): number {
+  if (sem === 'First Semester') return 0
+  if (sem === 'Second Semester') return 1
+  if (sem === 'Summer Semester') return 2
+  return 9
+}
+
+function compareTermKeys(a: string, b: string): number {
+  const [ya, sa] = a.split('|')
+  const [yb, sb] = b.split('|')
+  const cy = String(ya).localeCompare(String(yb))
+  if (cy !== 0) return cy
+  return semesterTypeOrder(sa) - semesterTypeOrder(sb)
+}
+
+function formatTermLabel(year: string, semester: string): string {
+  const y = String(year)
+    .replace('2022-2023', "'22-'23")
+    .replace('2023-2024', "'23-'24")
+    .replace('2024-2025', "'24-'25")
+    .replace('2025-2026', "'25-'26")
+  const s = semester.replace('First Semester', 'Fall').replace('Second Semester', 'Spring').replace('Summer Semester', 'Summer')
+  return `${y} ${s}`
+}
+
+export interface LecturerStressPoint {
+  id: string
+  name: string
+  fullName: string
+  creditHours: number
+  prepCount: number
+  sections: number
+}
+
+/** Faculty load: Σ credit_hours; preparation stress: distinct Course_Number per Lecturer_ID. */
+export function getLecturerStressScatterData(courses: Course[], minSections = 1): LecturerStressPoint[] {
+  const byId = new Map<string, { name: string; credit: number; courses: Set<string>; sections: number }>()
+  for (const c of courses) {
+    if (!c.Lecturer_ID || !c.Lecturer_Name || c.Lecturer_Name.trim().toUpperCase() === 'TBA') continue
+    const row = byId.get(c.Lecturer_ID) ?? {
+      name: c.Lecturer_Name,
+      credit: 0,
+      courses: new Set<string>(),
+      sections: 0,
+    }
+    row.credit += Number(c.credit_hours) || 0
+    if (c.Course_Number) row.courses.add(c.Course_Number)
+    row.sections += 1
+    byId.set(c.Lecturer_ID, row)
+  }
+  return Array.from(byId.entries())
+    .map(([id, d]) => ({
+      id,
+      name: d.name.length > 22 ? `${d.name.slice(0, 20)}…` : d.name,
+      fullName: d.name,
+      creditHours: Math.round(d.credit * 10) / 10,
+      prepCount: d.courses.size,
+      sections: d.sections,
+    }))
+    .filter((r) => r.sections >= minSections)
+    .sort((a, b) => b.creditHours - a.creditHours)
+}
+
+export interface SlotDensityClusterRow {
+  cluster: string
+  avgSaturationPct: number
+  sessionCount: number
+}
+
+/**
+ * Session-weighted average occupancy for Sun–Tue–Thu vs Mon–Wed meeting patterns.
+ * Each section-day occurrence contributes that section's occupancy %.
+ */
+export function getSlotDensityClusters(courses: Course[]): {
+  rows: SlotDensityClusterRow[]
+  stt: number
+  mw: number
+} {
+  const STT = new Set(['Sun', 'Tue', 'Thu'])
+  const MW = new Set(['Mon', 'Wed'])
+  const sttUtils: number[] = []
+  const mwUtils: number[] = []
+
+  for (const c of courses) {
+    const u = sectionOccupancyPercent(c)
+    if (u == null || !c.Day) continue
+    const util = Math.min(150, Math.round(u * 10) / 10)
+    for (const raw of c.Day.split(/\s+/).filter(Boolean)) {
+      const d = raw.substring(0, 3)
+      if (STT.has(d)) sttUtils.push(util)
+      if (MW.has(d)) mwUtils.push(util)
+    }
+  }
+
+  const avg = (arr: number[]) =>
+    arr.length > 0 ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 10) / 10 : 0
+
+  const stt = avg(sttUtils)
+  const mw = avg(mwUtils)
+
+  return {
+    rows: [
+      { cluster: 'Sun–Tue–Thu', avgSaturationPct: stt, sessionCount: sttUtils.length },
+      { cluster: 'Mon–Wed', avgSaturationPct: mw, sessionCount: mwUtils.length },
+    ],
+    stt,
+    mw,
+  }
+}
+
+export interface AcademicWeightRow {
+  department: string
+  fullName: string
+  academicWeight: number
+}
+
+/** Instructional demand: Σ (Registered_Students × credit_hours) by department. */
+export function getAcademicWeightByDepartment(courses: Course[]): AcademicWeightRow[] {
+  const m = new Map<string, number>()
+  for (const c of courses) {
+    const ch = Number(c.credit_hours) || 0
+    const w = c.Registered_Students * ch
+    m.set(c.Department, (m.get(c.Department) || 0) + w)
+  }
+  return Array.from(m.entries())
+    .filter(([name]) => name)
+    .map(([fullName, academicWeight]) => ({
+      fullName,
+      department: fullName.length > 20 ? `${fullName.slice(0, 18)}…` : fullName,
+      academicWeight: Math.round(academicWeight),
+    }))
+    .sort((a, b) => b.academicWeight - a.academicWeight)
+}
+
+export interface RoomOccupancyHeatmapResult {
+  rooms: string[]
+  days: string[]
+  /** Row = room index, col = day index: average occupancy % for sections meeting that day in that room. */
+  matrix: number[][]
+  meetings: number[][]
+}
+
+const HEATMAP_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu']
+
+/** Room × weekday heat: mean section occupancy for physical sections in that room on that day. */
+export function getRoomOccupancyHeatmap(courses: Course[], roomLimit = 14): RoomOccupancyHeatmapResult {
+  const roomMeetings = new Map<string, Map<string, number[]>>()
+
+  for (const c of courses) {
+    const u = sectionOccupancyPercent(c)
+    if (u == null || !c.Room || !c.Day) continue
+    if (!roomMeetings.has(c.Room)) roomMeetings.set(c.Room, new Map())
+    const byDay = roomMeetings.get(c.Room)!
+    for (const raw of c.Day.split(/\s+/).filter(Boolean)) {
+      const d = raw.substring(0, 3)
+      if (!HEATMAP_DAYS.includes(d)) continue
+      if (!byDay.has(d)) byDay.set(d, [])
+      byDay.get(d)!.push(u)
+    }
+  }
+
+  const roomScores = [...roomMeetings.entries()].map(([room, byDay]) => {
+    let n = 0
+    for (const arr of byDay.values()) n += arr.length
+    const avgAll =
+      n > 0
+        ? [...byDay.values()].flat().reduce((s, v) => s + v, 0) / n
+        : 0
+    return { room, n, avgAll }
+  })
+  const rooms = roomScores
+    .filter((r) => r.n > 0)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, roomLimit)
+    .map((r) => r.room)
+
+  const matrix: number[][] = []
+  const meetings: number[][] = []
+  for (const room of rooms) {
+    const byDay = roomMeetings.get(room)!
+    const row: number[] = []
+    const mrow: number[] = []
+    for (const day of HEATMAP_DAYS) {
+      const arr = byDay.get(day) || []
+      const avg =
+        arr.length > 0 ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 10) / 10 : 0
+      row.push(avg)
+      mrow.push(arr.length)
+    }
+    matrix.push(row)
+    meetings.push(mrow)
+  }
+
+  return { rooms, days: HEATMAP_DAYS, matrix, meetings }
+}
+
+export interface PlanningTermRow {
+  termKey: string
+  termLabel: string
+  /** Physical sections at or above saturation threshold. */
+  highSaturationSectionCount: number
+  physicalSectionCount: number
+  /** Lab sections only: aggregate seat occupancy %. */
+  labOccupancyPct: number | null
+  labSectionCount: number
+}
+
+export function getPlanningTermPressureSeries(
+  courses: Course[],
+  saturationThresholdPct = 90,
+): PlanningTermRow[] {
+  const termMap = new Map<
+    string,
+    {
+      physical: Course[]
+      highSat: number
+      labStudents: number
+      labCap: number
+      labN: number
+    }
+  >()
+
+  for (const c of courses) {
+    const key = `${c.Year}|${c.Semester}`
+    if (!c.Year || !c.Semester) continue
+    const row =
+      termMap.get(key) ?? { physical: [], highSat: 0, labStudents: 0, labCap: 0, labN: 0 }
+    if (isPhysicalCapacitySection(c)) {
+      row.physical.push(c)
+      const u = sectionOccupancyPercent(c)!
+      if (u >= saturationThresholdPct) row.highSat += 1
+    }
+    if (c.islab === true && isPhysicalCapacitySection(c)) {
+      row.labStudents += c.Registered_Students
+      row.labCap += c.Section_Capacity
+      row.labN += 1
+    }
+    termMap.set(key, row)
+  }
+
+  return [...termMap.entries()]
+    .sort(([a], [b]) => compareTermKeys(a, b))
+    .map(([termKey, row]) => {
+      const [year, semester] = termKey.split('|')
+      return {
+        termKey,
+        termLabel: formatTermLabel(year, semester),
+        highSaturationSectionCount: row.highSat,
+        physicalSectionCount: row.physical.length,
+        labOccupancyPct:
+          row.labCap > 0 ? Math.round((row.labStudents / row.labCap) * 100) : row.labN > 0 ? 0 : null,
+        labSectionCount: row.labN,
+      }
+    })
+}
+
+export interface SectionExpansionRow {
+  courseNumber: string
+  courseName: string
+  department: string
+  termsWithHighSaturation: number
+  /** Distinct Year|Semester where the course has at least one physical section. */
+  termsOffered: number
+  maxObservedUtilizationPct: number
+  highSaturationSectionCount: number
+}
+
+/**
+ * Courses with recurring high saturation (≥ threshold in multiple distinct terms).
+ * Uses only observed section utilization — not a forecast.
+ */
+export function getSectionExpansionCandidates(
+  courses: Course[],
+  opts?: { saturationThresholdPct?: number; minTermsWithHighSat?: number },
+): SectionExpansionRow[] {
+  const threshold = opts?.saturationThresholdPct ?? 90
+  const minTerms = opts?.minTermsWithHighSat ?? 2
+
+  type PerCourse = {
+    name: string
+    dept: string
+    termHigh: Set<string>
+    termOffered: Set<string>
+    maxU: number
+    highSections: number
+  }
+  const byCourse = new Map<string, PerCourse>()
+
+  for (const c of courses) {
+    if (!c.Course_Number) continue
+    const u = sectionOccupancyPercent(c)
+    if (u == null) continue
+    const termKey = `${c.Year}|${c.Semester}`
+    const row =
+      byCourse.get(c.Course_Number) ?? {
+        name: c.English_Name || c.Course_Number,
+        dept: c.Department,
+        termHigh: new Set<string>(),
+        termOffered: new Set<string>(),
+        maxU: 0,
+        highSections: 0,
+      }
+    row.termOffered.add(termKey)
+    row.maxU = Math.max(row.maxU, u)
+    if (u >= threshold) {
+      row.termHigh.add(termKey)
+      row.highSections += 1
+    }
+    byCourse.set(c.Course_Number, row)
+  }
+
+  return Array.from(byCourse.entries())
+    .map(([courseNumber, r]) => ({
+      courseNumber,
+      courseName: r.name.length > 40 ? `${r.name.slice(0, 38)}…` : r.name,
+      department: r.dept,
+      termsWithHighSaturation: r.termHigh.size,
+      termsOffered: r.termOffered.size,
+      maxObservedUtilizationPct: Math.round(r.maxU),
+      highSaturationSectionCount: r.highSections,
+    }))
+    .filter((row) => row.termsWithHighSaturation >= minTerms)
+    .sort((a, b) => b.termsWithHighSaturation - a.termsWithHighSaturation || b.maxObservedUtilizationPct - a.maxObservedUtilizationPct)
+    .slice(0, 40)
+}
+
+export interface CourseSaturationTrendSeries {
+  courseNumber: string
+  label: string
+  /** Parallel to `terms` array from getHighDemandCourseSaturationTrend. */
+  maxUtilByTermIndex: number[]
+}
+
+export function getHighDemandCourseSaturationTrend(
+  courses: Course[],
+  maxSeries = 5,
+): { termKeys: string[]; termLabels: string[]; series: CourseSaturationTrendSeries[] } {
+  const termKeys = [...new Set(courses.map((c) => `${c.Year}|${c.Semester}`).filter((k) => k.includes('|')))].sort(
+    compareTermKeys,
+  )
+  if (termKeys.length === 0) return { termKeys: [], termLabels: [], series: [] }
+
+  const byCourseTermUtil = new Map<string, Map<string, number>>()
+  for (const c of courses) {
+    const u = sectionOccupancyPercent(c)
+    if (u == null || !c.Course_Number) continue
+    const tk = `${c.Year}|${c.Semester}`
+    if (!byCourseTermUtil.has(c.Course_Number)) byCourseTermUtil.set(c.Course_Number, new Map())
+    const m = byCourseTermUtil.get(c.Course_Number)!
+    m.set(tk, Math.max(m.get(tk) ?? 0, u))
+  }
+
+  const courseScores = [...byCourseTermUtil.entries()].map(([code, m]) => {
+    let score = 0
+    for (const tk of termKeys) {
+      const u = m.get(tk)
+      if (u != null && u >= 90) score += 1
+    }
+    const labelRow = courses.find((c) => c.Course_Number === code)
+    const label =
+      (labelRow?.English_Name && labelRow.English_Name.slice(0, 18)) || code
+    return { code, m, score, label: label.length > 22 ? `${label.slice(0, 20)}…` : label }
+  })
+  const top = courseScores
+    .filter((c) => c.score > 0)
+    .sort((a, b) => b.score - a.score || b.code.localeCompare(a.code))
+    .slice(0, maxSeries)
+
+  const termLabels = termKeys.map((k) => {
+    const [y, s] = k.split('|')
+    return formatTermLabel(y, s)
+  })
+
+  const series: CourseSaturationTrendSeries[] = top.map((c) => ({
+    courseNumber: c.code,
+    label: c.label,
+    maxUtilByTermIndex: termKeys.map((tk) => {
+      const u = c.m.get(tk)
+      return u != null ? Math.round(u) : 0
+    }),
+  }))
+
+  return { termKeys, termLabels, series }
+}
+
+export interface RoomUtilizationTrendRoom {
+  room: string
+  points: { termKey: string; termLabel: string; occupancyPct: number }[]
+}
+
+/** Heavily used vs lightly used rooms: mean physical occupancy % per term. */
+export function getRoomUtilizationTrends(
+  courses: Course[],
+  heavyCount = 3,
+  lightCount = 3,
+): { heavy: RoomUtilizationTrendRoom[]; light: RoomUtilizationTrendRoom[] } {
+  const termKeys = [...new Set(courses.map((c) => `${c.Year}|${c.Semester}`).filter((k) => k.includes('|')))].sort(
+    compareTermKeys,
+  )
+  const roomTermUtils = new Map<string, Map<string, number[]>>()
+
+  for (const c of courses) {
+    const u = sectionOccupancyPercent(c)
+    if (u == null || !c.Room) continue
+    const tk = `${c.Year}|${c.Semester}`
+    if (!roomTermUtils.has(c.Room)) roomTermUtils.set(c.Room, new Map())
+    const tm = roomTermUtils.get(c.Room)!
+    if (!tm.has(tk)) tm.set(tk, [])
+    tm.get(tk)!.push(u)
+  }
+
+  const roomOverall: { room: string; avg: number; n: number }[] = []
+  for (const [room, tm] of roomTermUtils) {
+    const flat = [...tm.values()].flat()
+    if (flat.length < 3) continue
+    const avg = flat.reduce((s, v) => s + v, 0) / flat.length
+    roomOverall.push({ room, avg, n: flat.length })
+  }
+  roomOverall.sort((a, b) => b.avg - a.avg)
+  const heavyRooms = roomOverall.slice(0, heavyCount).map((r) => r.room)
+  const lightRooms = roomOverall.slice(-lightCount).map((r) => r.room)
+
+  const buildSeries = (rooms: string[]): RoomUtilizationTrendRoom[] =>
+    rooms.map((room) => {
+      const tm = roomTermUtils.get(room)!
+      return {
+        room,
+        points: termKeys.map((tk) => {
+          const arr = tm.get(tk) || []
+          const occ =
+            arr.length > 0 ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 10) / 10 : 0
+          const [y, s] = tk.split('|')
+          return { termKey: tk, termLabel: formatTermLabel(y, s), occupancyPct: occ }
+        }),
+      }
+    })
+
+  return {
+    heavy: buildSeries(heavyRooms),
+    light: buildSeries(lightRooms),
+  }
+}
+
+export interface FacultyCreditLoadRow {
+  id: string
+  name: string
+  fullName: string
+  creditHours: number
+}
+
+export function getFacultyCreditLoadTop(courses: Course[], limit = 15): FacultyCreditLoadRow[] {
+  const stress = getLecturerStressScatterData(courses, 1)
+  return stress
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      fullName: s.fullName,
+      creditHours: s.creditHours,
+    }))
+    .sort((a, b) => b.creditHours - a.creditHours)
+    .slice(0, limit)
+}
+
+export type ManagementActionCategory = 'resource' | 'capacity' | 'hr' | 'scheduling'
+
+export interface ManagementActionItem {
+  id: string
+  category: ManagementActionCategory
+  message: string
+}
+
+export function buildManagementActionItems(
+  courses: Course[],
+  roomWaste: RoomWasteData[],
+  slotDensity: ReturnType<typeof getSlotDensityClusters>,
+  lecturerStress: LecturerStressPoint[],
+  labOccupancyPct: number | null,
+): ManagementActionItem[] {
+  const items: ManagementActionItem[] = []
+
+  const topWaste = roomWaste[0]
+  if (topWaste && topWaste.unusedSeats > 20 && topWaste.efficiencyScore < 55) {
+    items.push({
+      id: 'room-waste',
+      category: 'resource',
+      message: `Room ${topWaste.room} shows high unused capacity (${topWaste.unusedSeats} unused seats per term on average, ${topWaste.efficiencyScore}% fill). Action: Reassign smaller courses to smaller rooms or consolidate offerings.`,
+    })
+  }
+
+  if (labOccupancyPct != null && labOccupancyPct >= 85) {
+    items.push({
+      id: 'lab-pressure',
+      category: 'capacity',
+      message: `Laboratory sections average ${labOccupancyPct}% occupancy. Action: Expand lab scheduling windows or redistribute lab-heavy courses across terms.`,
+    })
+  }
+
+  const heavyPrep = lecturerStress.filter((l) => l.prepCount >= 4).sort((a, b) => b.prepCount - a.prepCount)[0]
+  if (heavyPrep) {
+    items.push({
+      id: 'prep-stress',
+      category: 'hr',
+      message: `Lecturer ${heavyPrep.fullName} is assigned ${heavyPrep.prepCount} distinct course preparations (${heavyPrep.creditHours} credit hours). Action: Rebalance preparations where possible to protect instructional quality.`,
+    })
+  }
+
+  const { stt, mw } = slotDensity
+  if (slotDensity.rows[0].sessionCount > 0 && slotDensity.rows[1].sessionCount > 0 && mw + 1 < stt && stt - mw >= 8) {
+    items.push({
+      id: 'slot-imbalance',
+      category: 'scheduling',
+      message: `Mon–Wed meeting slots average ${mw}% occupancy vs ${stt}% for Sun–Tue–Thu patterns. Action: Redistribute sections to lift mid-week slot efficiency.`,
+    })
+  } else if (
+    slotDensity.rows[0].sessionCount > 0 &&
+    slotDensity.rows[1].sessionCount > 0 &&
+    stt + 1 < mw &&
+    mw - stt >= 8
+  ) {
+    items.push({
+      id: 'slot-imbalance-2',
+      category: 'scheduling',
+      message: `Sun–Tue–Thu patterns average ${stt}% occupancy vs ${mw}% for Mon–Wed. Action: Review whether Sun–Tue–Thu bands are under-filled relative to demand.`,
+    })
+  }
+
+  const wasteTotal = getTotalPhysicalRoomWasteSeats(courses)
+  if (wasteTotal > 500 && !items.some((i) => i.id === 'room-waste')) {
+    items.push({
+      id: 'aggregate-waste',
+      category: 'resource',
+      message: `Physical sections leave about ${wasteTotal.toLocaleString()} unused seats in aggregate (Σ capacity − enrollment). Action: Prioritize room right-sizing in timetable reviews.`,
+    })
+  }
+
+  return items.slice(0, 8)
 }
 
 export function getRoomTypeUtilization(courses: Course[]): RoomTypeUtilization[] {

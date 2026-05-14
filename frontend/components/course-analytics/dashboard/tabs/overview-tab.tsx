@@ -1,118 +1,153 @@
 'use client'
 
-import {
-  BookOpen,
-  Users,
-  Target,
-  PieChart,
-  Gauge,
-  Award,
-} from 'lucide-react'
+import { Gauge } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/course-analytics-ui/card'
-import { Badge } from '@/components/course-analytics-ui/badge'
 import {
-  SemesterChart,
-  CapacityChart,
-  DepartmentComparisonChart,
-  RoomWasteTable,
-  RoomTypeChart,
-} from '@/components/course-analytics/dashboard/charts'
+  ActionCenterPanel,
+  DepartmentalSaturationChart,
+  DeliveryModeDonutChart,
+  RoomOccupancyHeatmapChart,
+  SlotDensityComparisonChart,
+  HighSaturationPressureAreaChart,
+  LabPressureLineChart,
+} from '@/components/course-analytics/dashboard/strategic-charts'
 import type {
   DashboardStats,
   DepartmentData,
-  SemesterData,
-  CapacityDistribution,
-  RoomWasteData,
-  RoomTypeUtilization,
+  ManagementActionItem,
+  OnlineModeData,
+  RoomOccupancyHeatmapResult,
+  PlanningTermRow,
 } from '@/lib/course-analytics/course-data'
 
 interface OverviewTabProps {
+  analyticsMode: 'past' | 'planning'
+  actionItems: ManagementActionItem[]
   stats: DashboardStats
   departmentData: DepartmentData[]
-  semesterData: SemesterData[]
-  capacityData: CapacityDistribution[]
-  deptComparison: { name: string; students: number; sections: number; courses: number; utilization: number }[]
-  roomWasteData: RoomWasteData[]
-  roomTypeData: RoomTypeUtilization[]
+  onlineModeData: OnlineModeData[]
+  roomOccupancyHeatmap: RoomOccupancyHeatmapResult
+  slotDensity: { rows: { cluster: string; avgSaturationPct: number; sessionCount: number }[]; stt: number; mw: number }
+  labOccupancyPct: number | null
+  distinctTermCount: number
+  planningTermSeries: PlanningTermRow[]
 }
 
 export function OverviewTab({
+  analyticsMode,
+  actionItems,
   stats,
   departmentData,
-  semesterData,
-  capacityData,
-  deptComparison,
-  roomWasteData,
-  roomTypeData,
+  onlineModeData,
+  roomOccupancyHeatmap,
+  slotDensity,
+  labOccupancyPct,
+  distinctTermCount,
+  planningTermSeries,
 }: OverviewTabProps) {
   return (
     <div className="space-y-6">
-      {/* Enrollment & Trends Row */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <SemesterChart data={semesterData} />
-        <DepartmentComparisonChart data={deptComparison.map(d => ({ ...d, utilization: d.utilization }))} />
-      </div>
+      <ActionCenterPanel items={actionItems} />
 
-      {/* Efficiency & Capacity Row */}
+      {analyticsMode === 'past' ? (
+        <>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <DepartmentalSaturationChart data={departmentData} />
+            <DeliveryModeDonutChart data={onlineModeData} />
+          </div>
+          <RoomOccupancyHeatmapChart data={roomOccupancyHeatmap} />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <SlotDensityComparisonChart rows={slotDensity.rows} />
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <Gauge className="h-4 w-4 text-primary" />
+                  Capacity snapshot
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Physical utilization (seats)</span>
+                  <span className="font-semibold tabular-nums">{stats.utilizationRate}%</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Empty seats (physical)</span>
+                  <span className="font-semibold tabular-nums">{stats.emptySeats.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Full physical sections</span>
+                  <span className="font-semibold tabular-nums">{stats.fullSections}</span>
+                </div>
+                {labOccupancyPct != null ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Lab seat occupancy (aggregate)</span>
+                    <span className="font-semibold tabular-nums">{labOccupancyPct}%</span>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      ) : (
+        <PlanningOverviewSection
+          slotDensity={slotDensity}
+          distinctTermCount={distinctTermCount}
+          stats={stats}
+          planningTermSeries={planningTermSeries}
+        />
+      )}
+    </div>
+  )
+}
+
+function PlanningOverviewSection({
+  slotDensity,
+  distinctTermCount,
+  stats,
+  planningTermSeries,
+}: {
+  slotDensity: OverviewTabProps['slotDensity']
+  distinctTermCount: number
+  stats: DashboardStats
+  planningTermSeries: PlanningTermRow[]
+}) {
+  return (
+    <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-2">
-        <RoomWasteTable data={roomWasteData} className="h-full" />
-        <div className="flex flex-col gap-6">
-          <RoomTypeChart data={roomTypeData} />
-          <CapacityChart data={capacityData} />
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold">Planning overview</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              This mode summarizes recurring pressure from historical registrations and room use. It does not project future
+              enrollment — open the Insights tab for demand curves, lab trends, room histories, and expansion candidates.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              <span className="font-medium text-foreground">{distinctTermCount}</span> distinct term
+              {distinctTermCount !== 1 ? 's' : ''} in the current filters.
+            </p>
+            <p>
+              Sun–Tue–Thu vs Mon–Wed average occupancy gap:{' '}
+              <span className="font-medium text-foreground tabular-nums">
+                {Math.abs(slotDensity.stt - slotDensity.mw).toFixed(1)} pts
+              </span>{' '}
+              ({slotDensity.stt}% vs {slotDensity.mw}%).
+            </p>
+            <p>
+              Institution-wide physical utilization in scope:{' '}
+              <span className="font-medium text-foreground">{stats.utilizationRate}%</span>.
+            </p>
+          </CardContent>
+        </Card>
+        <SlotDensityComparisonChart rows={slotDensity.rows} />
+      </div>
+      {planningTermSeries.length > 0 ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <HighSaturationPressureAreaChart data={planningTermSeries} />
+          <LabPressureLineChart data={planningTermSeries} />
         </div>
-      </div>
-
-      {/* Quick Insights */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Gauge className="h-4 w-4 text-primary" />
-              Capacity Insights
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Full sections</span>
-              <span className="font-semibold">{stats.fullSections}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Under 50% filled</span>
-              <span className="font-semibold">
-                {capacityData.filter(c => c.range === '0-25%' || c.range === '25-50%').reduce((sum, c) => sum + c.count, 0)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Over 75% filled</span>
-              <span className="font-semibold">
-                {capacityData.filter(c => c.range === '75-99%' || c.range === '100%+').reduce((sum, c) => sum + c.count, 0)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Empty seats total</span>
-              <span className="font-semibold">{stats.emptySeats.toLocaleString()}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Target className="h-4 w-4 text-destructive" />
-              Resource Alerts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 flex flex-col justify-center">
-            <div className="flex flex-col items-center justify-center py-2 text-center">
-              <span className="text-4xl font-bold text-destructive mb-2">{stats.wastedFacultyHours}</span>
-              <span className="text-sm font-medium">Est. Wasted Faculty Hours / Term</span>
-              <p className="text-xs text-muted-foreground mt-2 max-w-[250px]">
-                Avg per term — physical sections with fewer than 10 enrolled students (online excluded).
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      ) : null}
     </div>
   )
 }

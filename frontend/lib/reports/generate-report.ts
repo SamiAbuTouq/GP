@@ -417,6 +417,140 @@ function buildCourseExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
   return wb
 }
 
+type TimetableCoverageRow = {
+  department: string
+  catalogCount: number
+  scheduledCount: number
+  gap: number
+  coveragePct: number
+}
+
+function computeTimetableCoverage(ds: ReportDataset): {
+  coverageRows: TimetableCoverageRow[]
+  totalCatalog: number
+  totalScheduled: number
+  totalGap: number
+  depsWithGaps: number
+  depsFullCoverage: number
+  institutionCoveragePct: number
+} {
+  const coverageRows = ds.courseDistributionRows
+    .map((r) => ({
+      department: r.department,
+      catalogCount: r.catalogCourseCount,
+      scheduledCount: r.scheduledDistinctCourses,
+      gap: r.catalogCourseCount - r.scheduledDistinctCourses,
+      coveragePct:
+        r.catalogCourseCount > 0
+          ? Math.round((r.scheduledDistinctCourses / r.catalogCourseCount) * 1000) / 10
+          : 100,
+    }))
+    .sort((a, b) => b.gap - a.gap)
+  const totalCatalog = coverageRows.reduce((s, r) => s + r.catalogCount, 0)
+  const totalScheduled = coverageRows.reduce((s, r) => s + r.scheduledCount, 0)
+  const totalGap = totalCatalog - totalScheduled
+  const depsWithGaps = coverageRows.filter((r) => r.gap > 0).length
+  const depsFullCoverage = coverageRows.filter((r) => r.gap === 0).length
+  const institutionCoveragePct =
+    totalCatalog > 0 ? Math.round((totalScheduled / totalCatalog) * 1000) / 10 : 100
+  return {
+    coverageRows,
+    totalCatalog,
+    totalScheduled,
+    totalGap,
+    depsWithGaps,
+    depsFullCoverage,
+    institutionCoveragePct,
+  }
+}
+
+function buildTimetableCoverageExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
+  const {
+    coverageRows,
+    totalCatalog,
+    totalScheduled,
+    totalGap,
+    depsWithGaps,
+    depsFullCoverage,
+    institutionCoveragePct,
+  } = computeTimetableCoverage(ds)
+  const wb = XLSX.utils.book_new()
+  const summaryData: (string | number)[][] = [
+    ...excelCoverBlock("Timetable Coverage Report", ds, prefs),
+    ["Metric", "Value"],
+    ["Total catalog courses", totalCatalog],
+    ["Courses on timetable", totalScheduled],
+    ["Institution coverage %", institutionCoveragePct],
+    ["Departments with ≥1 unscheduled catalog course", depsWithGaps],
+    ["Departments with full coverage", depsFullCoverage],
+    ["Total unscheduled course titles (all departments)", totalGap],
+  ]
+  const summaryWs = XLSX.utils.aoa_to_sheet(summaryData)
+  applyTwoColumnKeyValueWidths(summaryWs)
+  XLSX.utils.book_append_sheet(wb, summaryWs, "Summary")
+
+  const detail = coverageRows.map((r) => ({
+    Department: r.department,
+    "Courses in catalog": r.catalogCount,
+    "On timetable": r.scheduledCount,
+    Gap: r.gap,
+    "Coverage %": r.coveragePct,
+  }))
+  const totalsRow = {
+    Department: "TOTAL",
+    "Courses in catalog": totalCatalog,
+    "On timetable": totalScheduled,
+    Gap: totalGap,
+    "Coverage %": institutionCoveragePct,
+  }
+  const detailSheet = XLSX.utils.json_to_sheet([...detail, totalsRow])
+  const totalRowNum = coverageRows.length + 2
+  for (const col of ["A", "B", "C", "D", "E"] as const) {
+    const cell = detailSheet[`${col}${totalRowNum}`]
+    if (cell) cell.s = { font: { bold: true } }
+  }
+  applyDetailSheetLayout(detailSheet)
+  XLSX.utils.book_append_sheet(wb, detailSheet, "By department")
+  return wb
+}
+
+function buildTimeslotDemandExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
+  const rows = ds.timeslotDemandRows
+  const busiest = rows[0]
+  const highPressure = rows.filter((r) => (r.slotPressurePct ?? 0) >= 80).length
+  const wb = XLSX.utils.book_new()
+  const summaryData: (string | number)[][] = [
+    ...excelCoverBlock("Timeslot Demand Report", ds, prefs),
+    ["Metric", "Value"],
+    ["Timeslots with ≥1 section", rows.length],
+    [
+      "Busiest slot",
+      busiest
+        ? `${busiest.days} ${busiest.startTime}–${busiest.endTime} (${busiest.sections} sections)`
+        : "N/A",
+    ],
+    ["Slots at ≥80% room pressure", highPressure],
+  ]
+  const summaryWs = XLSX.utils.aoa_to_sheet(summaryData)
+  applyTwoColumnKeyValueWidths(summaryWs)
+  XLSX.utils.book_append_sheet(wb, summaryWs, "Summary")
+
+  const detailWs = XLSX.utils.json_to_sheet(
+    rows.map((r) => ({
+      Days: r.days,
+      "Start time": r.startTime,
+      "End time": r.endTime,
+      Sections: r.sections,
+      "Rooms in use": r.roomsUsed,
+      "Total enrollment": r.totalEnrollment,
+      "Slot pressure %": xlOptNum(r.slotPressurePct),
+    })),
+  )
+  applyDetailSheetLayout(detailWs)
+  XLSX.utils.book_append_sheet(wb, detailWs, "Slot detail")
+  return wb
+}
+
 function timetableHealthConflictTypeLabel(t: string): string {
   return (
     {
@@ -834,6 +968,105 @@ export async function generateReportBlob(params: {
         ]
       })(),
       courseFootnotes,
+      undefined,
+      fmtGen,
+    )
+    return { blob, mimeType: "application/pdf", extension: "pdf", baseFilename: base }
+  }
+
+  if (reportTypeId === "timetable-coverage") {
+    const {
+      coverageRows,
+      totalCatalog,
+      totalScheduled,
+      totalGap,
+      depsWithGaps,
+      depsFullCoverage,
+      institutionCoveragePct,
+    } = computeTimetableCoverage(ds)
+
+    if (format === "excel") {
+      const wb = buildTimetableCoverageExcel(ds, dateTimePrefs)
+      const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+      return {
+        blob: new Blob([buf], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        extension: "xlsx",
+        baseFilename: base,
+      }
+    }
+
+    const coverageFootnotes = [
+      "Gap counts reflect course titles in the catalog with no sections on this timetable version. A course may be intentionally absent (not offered this semester) or missing due to a scheduling gap. This report flags gaps for human review — it cannot distinguish intentional absences from scheduling errors.",
+    ]
+
+    const summaryLines = [
+      `${totalScheduled} of ${totalCatalog} catalog courses appear on the timetable (${institutionCoveragePct}% coverage).`,
+      `${depsWithGaps} department(s) have at least one unscheduled catalog course; ${depsFullCoverage} have full coverage.`,
+      `Total unscheduled course titles across all departments: ${totalGap}.`,
+    ]
+
+    const blob = await buildPdf(
+      "Timetable Coverage Report",
+      pdfSubtitleLines(ds, dateTimePrefs),
+      summaryLines,
+      [["Department", "Courses in catalog", "On timetable", "Gap", "Coverage %"]],
+      coverageRows.map((r) => [
+        r.department,
+        r.catalogCount,
+        r.scheduledCount,
+        r.gap,
+        r.coveragePct,
+      ]),
+      coverageFootnotes,
+      undefined,
+      fmtGen,
+    )
+    return { blob, mimeType: "application/pdf", extension: "pdf", baseFilename: base }
+  }
+
+  if (reportTypeId === "timeslot-demand") {
+    const rows = ds.timeslotDemandRows
+    const busiestSlot = rows[0]
+    const highPressureSlots = rows.filter((r) => (r.slotPressurePct ?? 0) >= 80)
+
+    if (format === "excel") {
+      const wb = buildTimeslotDemandExcel(ds, dateTimePrefs)
+      const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+      return {
+        blob: new Blob([buf], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        extension: "xlsx",
+        baseFilename: base,
+      }
+    }
+
+    const summaryLines = [
+      `${rows.length} active timeslots with at least one scheduled section.`,
+      busiestSlot
+        ? `Busiest slot: ${busiestSlot.days} ${busiestSlot.startTime}–${busiestSlot.endTime} with ${busiestSlot.sections} sections.`
+        : "No scheduled sections — no busiest slot.",
+      `${highPressureSlots.length} slot(s) are using 80% or more of available rooms simultaneously.`,
+    ]
+
+    const blob = await buildPdf(
+      "Timeslot Demand Report",
+      pdfSubtitleLines(ds, dateTimePrefs),
+      summaryLines,
+      [["Days", "Time", "Sections", "Rooms in use", "Total enrollment", "Slot pressure %"]],
+      rows.map((r) => [
+        r.days,
+        `${r.startTime}–${r.endTime}`,
+        r.sections,
+        r.roomsUsed,
+        r.totalEnrollment,
+        r.slotPressurePct != null ? r.slotPressurePct : "—",
+      ]),
+      footnotes,
       undefined,
       fmtGen,
     )
