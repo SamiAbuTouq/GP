@@ -4,6 +4,7 @@ export declare class CreateLecturerDto {
     department: string;
     maxWorkload: number;
     courses?: string[];
+    createPortalUser?: boolean;
 }
 export declare class UpdateLecturerDto {
     name?: string;

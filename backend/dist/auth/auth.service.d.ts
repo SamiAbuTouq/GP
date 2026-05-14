@@ -14,6 +14,7 @@ export declare class AuthService {
     login(dto: LoginDto): Promise<AuthTokens>;
     refresh(rawRefreshToken: string): Promise<AuthTokens>;
     logout(userId: number): Promise<void>;
+    private assertLecturerPortalAccess;
     private generateTokens;
     private storeRefreshToken;
     private revokeAllUserTokens;

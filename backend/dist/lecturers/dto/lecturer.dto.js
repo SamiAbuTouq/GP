@@ -41,6 +41,11 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Array)
 ], CreateLecturerDto.prototype, "courses", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateLecturerDto.prototype, "createPortalUser", void 0);
 class UpdateLecturerDto {
 }
 exports.UpdateLecturerDto = UpdateLecturerDto;

@@ -67,7 +67,49 @@ let LecturersService = LecturersService_1 = class LecturersService {
             .map((byte) => chars[byte % chars.length])
             .join("");
     }
+    parseAcademicYearStart(academicYear) {
+        if (!academicYear)
+            return -1;
+        const m = String(academicYear).trim().match(/^(\d{4})-\d{4}$/);
+        return m ? Number.parseInt(m[1], 10) : -1;
+    }
     async resolveLatestTimetableId() {
+        const published = await this.prisma.timetable.findMany({
+            where: {
+                semester_id: { not: null },
+                status: "active",
+            },
+            include: {
+                semester: true,
+                _count: {
+                    select: { section_schedule_entries: true },
+                },
+            },
+        });
+        const publishedWithSemester = published.filter((t) => t.semester != null);
+        if (publishedWithSemester.length > 0) {
+            publishedWithSemester.sort((a, b) => {
+                const ay = this.parseAcademicYearStart(a.semester.academic_year);
+                const by = this.parseAcademicYearStart(b.semester.academic_year);
+                if (by !== ay)
+                    return by - ay;
+                const ast = a.semester.semester_type;
+                const bst = b.semester.semester_type;
+                if (bst !== ast)
+                    return bst - ast;
+                if (b.version_number !== a.version_number) {
+                    return b.version_number - a.version_number;
+                }
+                return b.generated_at.getTime() - a.generated_at.getTime();
+            });
+            const newestWithEntries = publishedWithSemester.find((t) => t._count.section_schedule_entries > 0);
+            if (newestWithEntries) {
+                return newestWithEntries.timetable_id;
+            }
+        }
+        return this.resolveLatestTimetableIdDraftFallback();
+    }
+    async resolveLatestTimetableIdDraftFallback() {
         const timetables = await this.prisma.timetable.findMany({
             include: {
                 _count: {
@@ -190,6 +232,7 @@ let LecturersService = LecturersService_1 = class LecturersService {
     async create(dto, options) {
         const email = dto.email.trim().toLowerCase();
         const bcryptRounds = options?.bcryptRounds ?? 10;
+        const portalAccessEnabled = dto.createPortalUser !== false;
         const existingUser = await this.prisma.user.findUnique({
             where: { email },
             select: { user_id: true, role_name: true },
@@ -253,6 +296,7 @@ let LecturersService = LecturersService_1 = class LecturersService {
                 dept_id: department.dept_id,
                 max_workload: dto.maxWorkload ?? STANDARD_MAX_WORKLOAD_HOURS,
                 is_available: true,
+                portal_access_enabled: portalAccessEnabled,
             },
         });
         if (dto.courses && dto.courses.length > 0) {
@@ -266,16 +310,18 @@ let LecturersService = LecturersService_1 = class LecturersService {
                 })),
             });
         }
-        void this.mailService
-            .sendLecturerWelcomeEmail({
-            to: email,
-            fullName: dto.name,
-            temporaryPassword,
-        })
-            .catch((error) => {
-            this.logger.warn(`Lecturer ${user.user_id} was created but welcome email failed for ${email}.`);
-            this.logger.debug(error instanceof Error ? error.stack : JSON.stringify(error));
-        });
+        if (portalAccessEnabled) {
+            void this.mailService
+                .sendLecturerWelcomeEmail({
+                to: email,
+                fullName: dto.name,
+                temporaryPassword,
+            })
+                .catch((error) => {
+                this.logger.warn(`Lecturer ${user.user_id} was created but welcome email failed for ${email}.`);
+                this.logger.debug(error instanceof Error ? error.stack : JSON.stringify(error));
+            });
+        }
         return {
             id: `LEC${String(lecturer.user_id).padStart(3, "0")}`,
             databaseId: lecturer.user_id,

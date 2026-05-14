@@ -7,6 +7,7 @@ import {
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import type { User } from "@prisma/client";
+import { Role } from "@prisma/client";
 import * as bcrypt from "bcrypt";
 
 import { PrismaService } from "../prisma/prisma.service";
@@ -44,6 +45,8 @@ export class AuthService {
     if (!passwordValid) {
       throw new UnauthorizedException("Invalid credentials");
     }
+
+    await this.assertLecturerPortalAccess(user.user_id, user.role_name);
 
     const tokens = await this.generateTokens(user);
     await this.storeRefreshToken(user.user_id, tokens.refresh_token);
@@ -103,6 +106,7 @@ export class AuthService {
       await this.revokeAllUserTokens(payload.sub);
       throw new UnauthorizedException("User account is deactivated");
     }
+    await this.assertLecturerPortalAccess(user.user_id, user.role_name);
     const tokens = await this.generateTokens(user);
     await this.storeRefreshToken(user.user_id, tokens.refresh_token);
 
@@ -117,6 +121,21 @@ export class AuthService {
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+  /** Scheduling-only lecturer rows must not authenticate. */
+  private async assertLecturerPortalAccess(
+    userId: number,
+    role: Role,
+  ): Promise<void> {
+    if (role !== Role.LECTURER) return;
+    const lecturer = await this.prisma.lecturer.findUnique({
+      where: { user_id: userId },
+      select: { portal_access_enabled: true },
+    });
+    if (lecturer && lecturer.portal_access_enabled === false) {
+      throw new UnauthorizedException("Invalid credentials");
+    }
+  }
 
   private async generateTokens(user: User): Promise<AuthTokens> {
     const payload: JwtPayload = {

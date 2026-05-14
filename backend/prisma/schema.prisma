@@ -109,6 +109,8 @@ model Lecturer {
   dept_id      Int
   max_workload Int
   is_available Boolean
+  /// When false, the row is used for timetabling only: no welcome email and sign-in is rejected.
+  portal_access_enabled Boolean @default(true)
 
   user         User       @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   department   Department @relation(fields: [dept_id], references: [dept_id])

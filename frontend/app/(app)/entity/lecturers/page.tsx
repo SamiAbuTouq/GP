@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
   Dialog,
   DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -137,6 +138,7 @@ export default function LecturersPage() {
   const [editCourseQuery, setEditCourseQuery] = useState("")
   const [editCoursePickerOpen, setEditCoursePickerOpen] = useState(false)
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+  const [importCreatePortalUsers, setImportCreatePortalUsers] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [sortColumn, setSortColumn] = useState<LecturerSortColumn | null>(null)
@@ -1324,12 +1326,50 @@ export default function LecturersPage() {
 
       <ImportDialog
         open={isImportDialogOpen}
-        onOpenChange={setIsImportDialogOpen}
+        onOpenChange={(open) => {
+          setIsImportDialogOpen(open)
+          if (!open) setImportCreatePortalUsers(true)
+        }}
         title="Import Lecturers"
         description="Upload a CSV, Excel, or JSON file with lecturer data."
         exampleHeaders={["name", "email", "department", "maxWorkload", "courses"]}
         columns={lecturerColumns}
         getRowKey={(row) => row.email.toLowerCase()}
+        importExtras={
+          <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+            <p className="text-sm font-medium text-foreground">Import mode</p>
+            <RadioGroup
+              value={importCreatePortalUsers ? "portal" : "schedule"}
+              onValueChange={(v) => setImportCreatePortalUsers(v === "portal")}
+              className="gap-3"
+            >
+              <label
+                htmlFor="import-lecturers-portal"
+                className="flex cursor-pointer items-start gap-3 rounded-md border border-transparent p-1 hover:bg-muted/50"
+              >
+                <RadioGroupItem value="portal" id="import-lecturers-portal" className="mt-0.5" />
+                <span className="space-y-0.5">
+                  <span className="text-sm font-medium leading-none">Create user accounts</span>
+                  <span className="block text-xs text-muted-foreground leading-snug">
+                    Adds lecturers as full portal users with login access, and participation in timetable generation.
+                  </span>
+                </span>
+              </label>
+              <label
+                htmlFor="import-lecturers-schedule-only"
+                className="flex cursor-pointer items-start gap-3 rounded-md border border-transparent p-1 hover:bg-muted/50"
+              >
+                <RadioGroupItem value="schedule" id="import-lecturers-schedule-only" className="mt-0.5" />
+                <span className="space-y-0.5">
+                  <span className="text-sm font-medium leading-none">Schedule-only records</span>
+                  <span className="block text-xs text-muted-foreground leading-snug">
+                    Adds lecturers for scheduling only, without creating portal accounts or login access.
+                  </span>
+                </span>
+              </label>
+            </RadioGroup>
+          </div>
+        }
         mapRow={(row: ParsedRow) => {
           const name = findColumn(row, "name", "full_name", "fullname", "lecturer_name")
           const email = findColumn(row, "email", "email_address", "emailaddress")
@@ -1357,7 +1397,14 @@ export default function LecturersPage() {
               const response = await fetch('/api/lecturers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(lecturer),
+                body: JSON.stringify({
+                  name: lecturer.name,
+                  email: lecturer.email,
+                  department: lecturer.department,
+                  maxWorkload: clampWorkload(lecturer.maxWorkload),
+                  courses: lecturer.courses,
+                  createPortalUser: importCreatePortalUsers,
+                }),
               })
               if (response.ok) {
                 const created = await response.json()

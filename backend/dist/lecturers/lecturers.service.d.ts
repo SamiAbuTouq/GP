@@ -12,7 +12,9 @@ export declare class LecturersService {
     private readonly logger;
     constructor(prisma: PrismaService, mailService: MailService, notifications: NotificationsService);
     private generateTemporaryPassword;
+    private parseAcademicYearStart;
     private resolveLatestTimetableId;
+    private resolveLatestTimetableIdDraftFallback;
     private teachingLoadByUserIdForTimetable;
     private teachingLoadForUserOnTimetable;
     findAll(): Promise<{

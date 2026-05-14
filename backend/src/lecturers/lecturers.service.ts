@@ -44,11 +44,66 @@ export class LecturersService {
   }
 
   /**
-   * Resolve the latest schedule stored in DB.
-   * Prefer an `active` timetable with section assignments; otherwise fall back
-   * to the newest timetable that contains section assignments.
+   * First year of "YYYY-YYYY" academic year label; -1 if missing/invalid.
+   */
+  private parseAcademicYearStart(academicYear: string | null | undefined): number {
+    if (!academicYear) return -1;
+    const m = String(academicYear).trim().match(/^(\d{4})-\d{4}$/);
+    return m ? Number.parseInt(m[1], 10) : -1;
+  }
+
+  /**
+   * Timetable used for lecturer workload: among **published** (semester-linked),
+   * `active` timetables, pick the academically latest period (academic year start,
+   * then semester type: First, Second, Summer). Tie-break: higher version, then
+   * more recent `generated_at`. Uses the first in that order that has section
+   * entries; if none do, falls back to draft-style resolution.
    */
   private async resolveLatestTimetableId(): Promise<number | null> {
+    const published = await this.prisma.timetable.findMany({
+      where: {
+        semester_id: { not: null },
+        status: "active",
+      },
+      include: {
+        semester: true,
+        _count: {
+          select: { section_schedule_entries: true },
+        },
+      },
+    });
+
+    const publishedWithSemester = published.filter((t) => t.semester != null);
+
+    if (publishedWithSemester.length > 0) {
+      publishedWithSemester.sort((a, b) => {
+        const ay = this.parseAcademicYearStart(a.semester!.academic_year);
+        const by = this.parseAcademicYearStart(b.semester!.academic_year);
+        if (by !== ay) return by - ay;
+        const ast = a.semester!.semester_type;
+        const bst = b.semester!.semester_type;
+        if (bst !== ast) return bst - ast;
+        if (b.version_number !== a.version_number) {
+          return b.version_number - a.version_number;
+        }
+        return b.generated_at.getTime() - a.generated_at.getTime();
+      });
+      const newestWithEntries = publishedWithSemester.find(
+        (t) => t._count.section_schedule_entries > 0,
+      );
+      if (newestWithEntries) {
+        return newestWithEntries.timetable_id;
+      }
+    }
+
+    return this.resolveLatestTimetableIdDraftFallback();
+  }
+
+  /**
+   * When nothing is published yet, keep prior behaviour so dev / pre-publish
+   * installs still show load from the best draft-like timetable.
+   */
+  private async resolveLatestTimetableIdDraftFallback(): Promise<number | null> {
     const timetables = await this.prisma.timetable.findMany({
       include: {
         _count: {
@@ -205,6 +260,7 @@ export class LecturersService {
   async create(dto: CreateLecturerDto, options?: CreateLecturerOptions) {
     const email = dto.email.trim().toLowerCase();
     const bcryptRounds = options?.bcryptRounds ?? 10;
+    const portalAccessEnabled = dto.createPortalUser !== false;
 
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
@@ -282,6 +338,7 @@ export class LecturersService {
         dept_id: department.dept_id,
         max_workload: dto.maxWorkload ?? STANDARD_MAX_WORKLOAD_HOURS,
         is_available: true,
+        portal_access_enabled: portalAccessEnabled,
       },
     });
 
@@ -299,20 +356,22 @@ export class LecturersService {
       });
     }
 
-    void this.mailService
-      .sendLecturerWelcomeEmail({
-        to: email,
-        fullName: dto.name,
-        temporaryPassword,
-      })
-      .catch((error: unknown) => {
-        this.logger.warn(
-          `Lecturer ${user.user_id} was created but welcome email failed for ${email}.`,
-        );
-        this.logger.debug(
-          error instanceof Error ? error.stack : JSON.stringify(error),
-        );
-      });
+    if (portalAccessEnabled) {
+      void this.mailService
+        .sendLecturerWelcomeEmail({
+          to: email,
+          fullName: dto.name,
+          temporaryPassword,
+        })
+        .catch((error: unknown) => {
+          this.logger.warn(
+            `Lecturer ${user.user_id} was created but welcome email failed for ${email}.`,
+          );
+          this.logger.debug(
+            error instanceof Error ? error.stack : JSON.stringify(error),
+          );
+        });
+    }
 
     return {
       id: `LEC${String(lecturer.user_id).padStart(3, "0")}`,

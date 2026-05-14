@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsArray,
   IsEmail,
+  IsBoolean,
 } from "class-validator";
 
 export class CreateLecturerDto {
@@ -31,6 +32,14 @@ export class CreateLecturerDto {
   @IsString({ each: true })
   @IsOptional()
   courses?: string[];
+
+  /**
+   * When false, creates a lecturer usable in scheduling but does not send the welcome email
+   * and portal sign-in is disabled for that account until changed in the database.
+   */
+  @IsOptional()
+  @IsBoolean()
+  createPortalUser?: boolean;
 }
 
 export class UpdateLecturerDto {

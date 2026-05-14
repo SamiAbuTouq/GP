@@ -47,6 +47,7 @@ exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
 const config_1 = require("@nestjs/config");
+const client_1 = require("@prisma/client");
 const bcrypt = __importStar(require("bcrypt"));
 const prisma_service_1 = require("../prisma/prisma.service");
 const users_service_1 = require("../users/users.service");
@@ -67,6 +68,7 @@ let AuthService = AuthService_1 = class AuthService {
         if (!passwordValid) {
             throw new common_1.UnauthorizedException("Invalid credentials");
         }
+        await this.assertLecturerPortalAccess(user.user_id, user.role_name);
         const tokens = await this.generateTokens(user);
         await this.storeRefreshToken(user.user_id, tokens.refresh_token);
         this.logger.log(`User ${user.email} logged in`);
@@ -110,6 +112,7 @@ let AuthService = AuthService_1 = class AuthService {
             await this.revokeAllUserTokens(payload.sub);
             throw new common_1.UnauthorizedException("User account is deactivated");
         }
+        await this.assertLecturerPortalAccess(user.user_id, user.role_name);
         const tokens = await this.generateTokens(user);
         await this.storeRefreshToken(user.user_id, tokens.refresh_token);
         return tokens;
@@ -117,6 +120,17 @@ let AuthService = AuthService_1 = class AuthService {
     async logout(userId) {
         await this.revokeAllUserTokens(userId);
         this.logger.log(`User ${userId} logged out — all tokens revoked`);
+    }
+    async assertLecturerPortalAccess(userId, role) {
+        if (role !== client_1.Role.LECTURER)
+            return;
+        const lecturer = await this.prisma.lecturer.findUnique({
+            where: { user_id: userId },
+            select: { portal_access_enabled: true },
+        });
+        if (lecturer && lecturer.portal_access_enabled === false) {
+            throw new common_1.UnauthorizedException("Invalid credentials");
+        }
     }
     async generateTokens(user) {
         const payload = {

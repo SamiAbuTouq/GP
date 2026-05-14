@@ -18,6 +18,9 @@ export async function POST(request: Request) {
     if (Array.isArray(body.courses)) {
       payload.courses = body.courses
     }
+    if (typeof body.createPortalUser === 'boolean') {
+      payload.createPortalUser = body.createPortalUser
+    }
     return proxyToBackend('/lecturers', {
       method: 'POST',
       body: JSON.stringify(payload),

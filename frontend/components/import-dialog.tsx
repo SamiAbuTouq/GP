@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -60,6 +60,8 @@ interface ImportDialogProps<T> {
    * If not provided, no intra-file dedup is performed.
    */
   getRowKey?: (row: T) => string
+  /** Optional controls shown on the upload and preview steps (e.g. import mode). */
+  importExtras?: ReactNode
 }
 
 type ImportStep = "upload" | "preview" | "importing" | "done"
@@ -74,6 +76,7 @@ export function ImportDialog<T>({
   onImport,
   exampleHeaders,
   getRowKey,
+  importExtras,
 }: ImportDialogProps<T>) {
   const [step, setStep] = useState<ImportStep>("upload")
   const [file, setFile] = useState<File | null>(null)
@@ -261,6 +264,8 @@ export function ImportDialog<T>({
               />
             </div>
 
+            {importExtras ? <div className="space-y-2">{importExtras}</div> : null}
+
             {exampleHeaders && (
               <div className="rounded-md border bg-muted/50 p-3">
                 <p className="text-xs font-medium text-muted-foreground mb-1">Expected column headers:</p>
@@ -316,6 +321,8 @@ export function ImportDialog<T>({
                 )}
               </div>
             </div>
+
+            {importExtras ? <div className="space-y-2">{importExtras}</div> : null}
 
             <ScrollArea className="h-[300px] w-full rounded-md border">
               <Table>

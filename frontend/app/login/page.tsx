@@ -374,16 +374,6 @@ function LoginPageContent() {
                 <ArrowRight className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" />
               </Link>
             </p>
-
-            <p className="mt-8 text-center text-[0.85rem] text-white/50">
-              Need help?{" "}
-              <Link
-                href="/help"
-                className="font-medium text-[#48CAE4] transition-colors hover:text-[#90E0EF]"
-              >
-                Contact IT Support
-              </Link>
-            </p>
           </div>
         </div>
       </div>
