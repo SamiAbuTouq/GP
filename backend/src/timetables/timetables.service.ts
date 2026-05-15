@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { DeliveryMode } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { SemestersService } from "../semesters/semesters.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { LECTURER_NOTIFICATION_PREF_KEYS } from "../notifications/notification-prefs";
 import {
@@ -74,6 +75,7 @@ export class TimetablesService {
   constructor(
     private prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly semestersService: SemestersService,
   ) {}
 
   private mapTimetableSummary(t: any) {
@@ -393,15 +395,10 @@ export class TimetablesService {
       );
     }
 
-    const semester = await this.prisma.semester.findFirst({
-      where: { academic_year: academicYear, semester_type: semesterType },
-      select: { semester_id: true },
-    });
-    if (!semester) {
-      throw new BadRequestException(
-        `Semester ${academicYear} (${decodeSemesterType(semesterType)}) does not exist.`,
-      );
-    }
+    const semester = await this.semestersService.findOrCreateSemester(
+      academicYear,
+      semesterType,
+    );
 
     const existingSameSemester = await this.prisma.timetable.count({
       where: { semester_id: semester.semester_id },

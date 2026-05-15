@@ -364,7 +364,7 @@ export async function POST(req: NextRequest) {
         timetableName = `${sem.academic_year} · ${semesterTypeLabel(sem.semester_type)}`;
       }
     } else {
-      timetableName = "Unassigned draft";
+      timetableName = "draft";
     }
 
     const hardConflictCount = conflictRows.filter((c) => c.severity === "hard").length;

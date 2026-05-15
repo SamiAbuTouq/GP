@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SemestersService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
+const semester_dates_util_1 = require("./semester-dates.util");
 function decodeSemesterType(type) {
     const map = {
         1: "First Semester",
@@ -45,6 +46,30 @@ let SemestersService = class SemestersService {
             startDate: s.start_date,
             endDate: s.end_date,
         }));
+    }
+    async findOrCreateSemester(academicYear, semesterType) {
+        if (![1, 2, 3].includes(semesterType)) {
+            throw new common_1.BadRequestException("semesterType must be one of: 1 (First), 2 (Second), 3 (Summer).");
+        }
+        const year = academicYear.trim();
+        const existing = await this.prisma.semester.findFirst({
+            where: { academic_year: year, semester_type: semesterType },
+            select: { semester_id: true },
+        });
+        if (existing)
+            return existing;
+        const yearStart = (0, semester_dates_util_1.parseAcademicYearStart)(year);
+        const { startDate, endDate } = (0, semester_dates_util_1.semesterDateRange)(yearStart, semesterType);
+        return this.prisma.semester.create({
+            data: {
+                academic_year: year,
+                semester_type: semesterType,
+                start_date: startDate,
+                end_date: endDate,
+                total_students: null,
+            },
+            select: { semester_id: true },
+        });
     }
 };
 exports.SemestersService = SemestersService;

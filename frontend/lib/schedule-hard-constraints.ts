@@ -51,6 +51,12 @@ function lectureIdKey(id: string | number): string {
   return String(id);
 }
 
+/** Credit hours are whole numbers in the DB; coerce for workload sums and display. */
+function creditHoursForWorkload(raw: unknown): number {
+  const n = typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : 1;
+  return Math.round(n);
+}
+
 /** One actionable hard-rule breach with a stable key and severity for before/after comparison. */
 export type ScheduleHardViolation = {
   /** Stable id for this constraint instance (not for display). */
@@ -203,7 +209,7 @@ export function collectScheduleHardViolations(
       }
     }
 
-    const ch = typeof lec.credit_hours === "number" && lec.credit_hours > 0 ? lec.credit_hours : 1;
+    const ch = creditHoursForWorkload(lec.credit_hours);
     const ln = e.lecturer.trim();
     creditByLecturer.set(ln, (creditByLecturer.get(ln) ?? 0) + ch);
   }
@@ -219,7 +225,7 @@ export function collectScheduleHardViolations(
         out,
         key,
         over,
-        `Lecturer "${name}" exceeds max teaching load (${load.toFixed(1)} credit hours > ${ceiling}).`,
+        `Lecturer "${name}" exceeds max teaching load (${Math.round(load)} credit hours > ${Math.round(ceiling)}).`,
       );
     }
   }

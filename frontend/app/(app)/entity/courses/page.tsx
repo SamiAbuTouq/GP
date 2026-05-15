@@ -43,6 +43,8 @@ import {
   Loader2,
   ArrowUpDown,
   AlertTriangle,
+  Layers,
+  Users,
 } from "lucide-react"
 import { ImportIcon } from "@/components/custom-icons"
 import {
@@ -63,9 +65,18 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Tooltip,
+  TooltipBody,
   TooltipContent,
+  TooltipDivider,
+  TooltipInset,
+  TooltipList,
+  TooltipListItem,
+  TooltipMuted,
   TooltipProvider,
+  TooltipSection,
+  TooltipTitle,
   TooltipTrigger,
+  tooltipIconClass,
 } from "@/components/ui/tooltip"
 
 type Course = {
@@ -114,39 +125,63 @@ const courseSortHeaderIcon = (
   <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
 )
 
+function SchedulingMetricPair({
+  sections,
+  expectedSize,
+}: {
+  sections: number
+  expectedSize: number | null | undefined
+}) {
+  const enrollment = formatExpectedSizeShort(expectedSize)
+  const hasEnrollment = expectedSize != null && expectedSize > 0
+  return (
+    <span className="inline-flex items-center gap-1.5 tabular-nums">
+      <span
+        className="inline-flex items-center gap-0.5"
+        title="Sections"
+        aria-label={`${sections} section${sections === 1 ? "" : "s"}`}
+      >
+        <Layers className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="font-medium">{sections}</span>
+      </span>
+      <span className="text-muted-foreground" aria-hidden>
+        ·
+      </span>
+      <span
+        className={cn("inline-flex items-center gap-0.5", !hasEnrollment && "text-muted-foreground")}
+        title="Expected enrollment (total)"
+        aria-label={`${enrollment} expected enrollment`}
+      >
+        <Users className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+        <span className={hasEnrollment ? "font-medium" : undefined}>{enrollment}</span>
+      </span>
+    </span>
+  )
+}
+
 /** One column: sections + expected enrollment for normal and summer. */
 function CourseSchedulingCell({ course }: { course: Course }) {
   return (
     <div className="mx-auto w-fit space-y-0.5 text-xs leading-tight">
-      <div className="flex items-center gap-2 tabular-nums">
+      <div
+        className="flex items-center gap-2"
+        aria-label={`Normal: ${course.sectionsNormal} sections, ${formatExpectedSizeShort(course.expectedSizeNormal)} expected enrollment`}
+      >
         <span className="w-12 shrink-0 text-muted-foreground">Normal</span>
-        <span className="font-medium">{course.sectionsNormal}</span>
-        <span className="text-muted-foreground">sec</span>
-        <span className="text-muted-foreground">·</span>
-        <span
-          className={
-            course.expectedSizeNormal != null && course.expectedSizeNormal > 0
-              ? "font-medium"
-              : "text-muted-foreground"
-          }
-        >
-          {formatExpectedSizeShort(course.expectedSizeNormal)}
-        </span>
+        <SchedulingMetricPair
+          sections={course.sectionsNormal}
+          expectedSize={course.expectedSizeNormal}
+        />
       </div>
-      <div className="flex items-center gap-2 tabular-nums">
+      <div
+        className="flex items-center gap-2"
+        aria-label={`Summer: ${course.sectionsSummer} sections, ${formatExpectedSizeShort(course.expectedSizeSummer)} expected enrollment`}
+      >
         <span className="w-12 shrink-0 text-muted-foreground">Summer</span>
-        <span className="font-medium">{course.sectionsSummer}</span>
-        <span className="text-muted-foreground">sec</span>
-        <span className="text-muted-foreground">·</span>
-        <span
-          className={
-            course.expectedSizeSummer != null && course.expectedSizeSummer > 0
-              ? "font-medium"
-              : "text-muted-foreground"
-          }
-        >
-          {formatExpectedSizeShort(course.expectedSizeSummer)}
-        </span>
+        <SchedulingMetricPair
+          sections={course.sectionsSummer}
+          expectedSize={course.expectedSizeSummer}
+        />
       </div>
     </div>
   )
@@ -1195,14 +1230,46 @@ export default function CoursesPage() {
                           side="top"
                           align="center"
                           sideOffset={8}
-                          className="w-max max-w-none text-xs leading-snug"
                         >
-                          <p className="whitespace-nowrap">
-                            <span className="font-medium">Normal:</span> First/Second scheduling data
-                          </p>
-                          <p className="mt-1 whitespace-nowrap">
-                            <span className="font-medium">Summer:</span> Summer scheduling data
-                          </p>
+                          <TooltipBody>
+                            <div className="space-y-1">
+                            <p>
+                              <TooltipTitle>Normal:</TooltipTitle>{" "}
+                              <TooltipMuted>First/Second semester</TooltipMuted>
+                            </p>
+                            <p>
+                              <TooltipTitle>Summer:</TooltipTitle>{" "}
+                              <TooltipMuted>Summer semester</TooltipMuted>
+                            </p>
+                          </div>
+                          <TooltipDivider className="pt-2.5" />
+                          <TooltipSection title="Column legend">
+                            <TooltipList>
+                              <TooltipListItem>
+                                <Layers className={tooltipIconClass} aria-hidden />
+                                <span>Sections to schedule</span>
+                              </TooltipListItem>
+                              <TooltipListItem>
+                                <Users className={tooltipIconClass} aria-hidden />
+                                <span>Expected enrollment (total across sections)</span>
+                              </TooltipListItem>
+                            </TooltipList>
+                            <TooltipInset>
+                              <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+                                Example row
+                              </p>
+                              <p className="flex items-center gap-2 tabular-nums">
+                                <Layers className={tooltipIconClass} aria-hidden />
+                                <span className="font-semibold">2</span>
+                                <span className="text-muted-foreground" aria-hidden>
+                                  ·
+                                </span>
+                                <Users className={tooltipIconClass} aria-hidden />
+                                <span className="font-semibold">45</span>
+                              </p>
+                            </TooltipInset>
+                          </TooltipSection>
+                          </TooltipBody>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

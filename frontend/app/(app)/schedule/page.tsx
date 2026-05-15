@@ -50,6 +50,12 @@ import {
 } from "@/lib/timetable-conflicts"
 import { useToast } from "@/hooks/use-toast"
 import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export-utils"
+import { AcademicYearInput } from "@/components/academic-year-input"
+import {
+  isValidAcademicYear,
+  normalizeAcademicYear,
+  parseAcademicYearStart,
+} from "@/lib/academic-years"
 import { cn } from "@/lib/utils"
 import { ArrowDown, ArrowUp, ArrowUpDown, Calendar, Check, ChevronsUpDown, ExternalLink, Grid3X3, List, Loader2, Printer, Upload, X } from "lucide-react"
 import { ChevronDownIcon } from "@/components/ui/chevron-down-icon"
@@ -105,8 +111,7 @@ type TimetableDto = {
 
 function timetableStatusBadges(tt: TimetableDto) {
   if (tt.semesterId != null) {
-    const seeded = tt.generationType?.toLowerCase() === "imported"
-    return [{ key: "pub", label: seeded ? "Published · seeded official" : "Published · official", variant: "default" as const }]
+    return [{ key: "pub", label: "Published", variant: "default" as const }]
   }
   if (tt.isScenarioResult || tt.generationType?.toLowerCase() === "what_if") {
     return [{ key: "sc", label: "Draft · scenario result", variant: "secondary" as const }]
@@ -564,6 +569,8 @@ export function ScheduleViewerPage({
 
   const [loadingSemesters, setLoadingSemesters] = useState(true)
   const [loadingTimetables, setLoadingTimetables] = useState(false)
+  const [publishedCatalog, setPublishedCatalog] = useState<TimetableDto[]>([])
+  const [loadingPublishedCatalog, setLoadingPublishedCatalog] = useState(false)
   const [loadingEntries, setLoadingEntries] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [publishDialogOpen, setPublishDialogOpen] = useState(false)
@@ -642,36 +649,109 @@ export function ScheduleViewerPage({
     }
   }, [autoSelectLatestTimetable])
 
-  const academicYears = useMemo(() => {
-    const ys = new Set(semesters.map((s) => s.academicYear))
-    return Array.from(ys).sort()
-  }, [semesters])
+  const publishedYearValid = isValidAcademicYear(publishedYear)
 
-  const semesterTypesForYear = useMemo(() => {
-    if (!publishedYear.trim()) return PUBLISHED_SEMESTER_TYPES
-    const types = new Set(
-      semesters.filter((s) => s.academicYear === publishedYear).map((s) => s.semesterType),
+  const publishedAcademicYears = useMemo(() => {
+    const years = new Set<string>()
+    for (const t of publishedCatalog) {
+      const normalized = normalizeAcademicYear(t.academicYear)
+      if (normalized) years.add(normalized)
+    }
+    return Array.from(years).sort(
+      (a, b) => (parseAcademicYearStart(a) ?? 0) - (parseAcademicYearStart(b) ?? 0),
     )
-    const opts = PUBLISHED_SEMESTER_TYPES.filter((o) => types.has(o.value))
-    return opts.length > 0 ? opts : PUBLISHED_SEMESTER_TYPES
-  }, [semesters, publishedYear])
+  }, [publishedCatalog])
+
+  const publishedSemesterTypesForYear = useMemo(() => {
+    const normalized = normalizeAcademicYear(publishedYear)
+    if (!normalized) return new Set<number>()
+    const types = new Set<number>()
+    for (const t of publishedCatalog) {
+      if (normalizeAcademicYear(t.academicYear) === normalized) {
+        types.add(t.semesterType)
+      }
+    }
+    return types
+  }, [publishedCatalog, publishedYear])
+
+  const selectedPublishedTimetable = useMemo(() => {
+    if (timetableSource !== "published") return null
+    const normalized = normalizeAcademicYear(publishedYear)
+    if (!normalized || !publishedSemesterTypesForYear.has(publishedSemesterType)) return null
+    const matches = publishedCatalog.filter(
+      (t) =>
+        normalizeAcademicYear(t.academicYear) === normalized &&
+        t.semesterType === publishedSemesterType,
+    )
+    if (matches.length === 0) return null
+    return [...matches].sort((a, b) => {
+      const tb = new Date(b.generatedAt).getTime()
+      const ta = new Date(a.generatedAt).getTime()
+      if (tb !== ta) return tb - ta
+      return b.timetableId - a.timetableId
+    })[0]!
+  }, [
+    timetableSource,
+    publishedCatalog,
+    publishedYear,
+    publishedSemesterType,
+    publishedSemesterTypesForYear,
+  ])
+
+  // Load published timetable catalog for "Published only" filters.
+  useEffect(() => {
+    if (autoSelectLatestTimetable || timetableSource !== "published") return
+    let mounted = true
+    setLoadingPublishedCatalog(true)
+    setPublishedCatalog([])
+    ApiClient.request<TimetableDto[]>("/timetables")
+      .then((data) => {
+        if (!mounted) return
+        setPublishedCatalog(data.filter((t) => t.semesterId != null))
+      })
+      .catch((e) => {
+        if (!mounted) return
+        setError(e instanceof Error ? e.message : "Failed to load published timetables.")
+        setPublishedCatalog([])
+      })
+      .finally(() => {
+        if (!mounted) return
+        setLoadingPublishedCatalog(false)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [timetableSource, autoSelectLatestTimetable])
 
   useEffect(() => {
     if (timetableSource !== "published") return
-    if (semesterTypesForYear.length === 0) return
-    if (!semesterTypesForYear.some((o) => o.value === publishedSemesterType)) {
-      setPublishedSemesterType(semesterTypesForYear[0].value)
+    if (publishedAcademicYears.length === 0) {
+      setPublishedYear("")
+      setTimetableId(null)
+      return
     }
-  }, [timetableSource, semesterTypesForYear, publishedSemesterType])
+    const normalized = normalizeAcademicYear(publishedYear)
+    if (!normalized || !publishedAcademicYears.includes(normalized)) {
+      setPublishedYear(publishedAcademicYears[publishedAcademicYears.length - 1]!)
+    }
+  }, [timetableSource, publishedAcademicYears, publishedYear])
 
-  const resolvedPublishedSemesterId = useMemo(() => {
-    if (timetableSource !== "published") return null
-    if (!publishedYear.trim()) return null
-    const row = semesters.find(
-      (s) => s.academicYear === publishedYear && s.semesterType === publishedSemesterType,
-    )
-    return row?.semesterId ?? null
-  }, [timetableSource, publishedYear, publishedSemesterType, semesters])
+  useEffect(() => {
+    if (timetableSource !== "published") return
+    if (publishedSemesterTypesForYear.size === 0) return
+    if (!publishedSemesterTypesForYear.has(publishedSemesterType)) {
+      const firstEnabled = PUBLISHED_SEMESTER_TYPES.find((o) =>
+        publishedSemesterTypesForYear.has(o.value),
+      )
+      if (firstEnabled) setPublishedSemesterType(firstEnabled.value)
+    }
+  }, [timetableSource, publishedSemesterTypesForYear, publishedSemesterType])
+
+  useEffect(() => {
+    if (timetableSource !== "published") return
+    setTimetables(publishedCatalog)
+    setTimetableId(selectedPublishedTimetable?.timetableId ?? null)
+  }, [timetableSource, publishedCatalog, selectedPublishedTimetable])
 
   const timetableVersionSelectModel = useMemo(() => {
     const drafts = timetables.filter((t) => t.semesterId == null)
@@ -720,11 +800,7 @@ export function ScheduleViewerPage({
 
     const simulationNeedsFullCatalog = isSimulationView && requestedTimetableId != null
 
-    if (
-      !simulationNeedsFullCatalog &&
-      timetableSource === "published" &&
-      resolvedPublishedSemesterId == null
-    ) {
+    if (!simulationNeedsFullCatalog && timetableSource === "published") {
       setLoadingTimetables(false)
       return () => {
         mounted = false
@@ -734,8 +810,6 @@ export function ScheduleViewerPage({
     if (!simulationNeedsFullCatalog) {
       if (timetableSource === "drafts") {
         endpoint = "/timetables?draftsOnly=true"
-      } else if (timetableSource === "published" && resolvedPublishedSemesterId != null) {
-        endpoint = `/timetables?semesterId=${resolvedPublishedSemesterId}`
       }
     }
 
@@ -773,7 +847,7 @@ export function ScheduleViewerPage({
     return () => {
       mounted = false
     }
-  }, [timetableSource, resolvedPublishedSemesterId, autoSelectLatestTimetable, requestedTimetableId, isSimulationView, simulationResultTimetableId])
+  }, [timetableSource, autoSelectLatestTimetable, requestedTimetableId, isSimulationView, simulationResultTimetableId])
 
   // Auto-select latest timetable (newest first from backend ordering).
   useEffect(() => {
@@ -1493,17 +1567,32 @@ export function ScheduleViewerPage({
       })
       return
     }
+    const academicYear = normalizeAcademicYear(publishedYear)
+    if (!academicYear) {
+      toast({
+        title: "Invalid academic year",
+        description: "Enter the academic year as YYYY-YYYY (for example 2035-2036).",
+        variant: "destructive",
+      })
+      return
+    }
     setPublishSubmitting(true)
     try {
       const updated = await ApiClient.request<TimetableDto>(`/timetables/${timetableId}/publish`, {
         method: "POST",
         body: JSON.stringify({
-          academicYear: publishedYear,
+          academicYear,
           semesterType: publishedSemesterType,
           ...(needConflictAck ? { acknowledgedHardConflicts: true } : {}),
         }),
       })
       setTimetables((prev) => prev.map((row) => (row.timetableId === updated.timetableId ? updated : row)))
+      const [refreshedSemesters, allTimetables] = await Promise.all([
+        ApiClient.request<SemesterDto[]>("/semesters"),
+        ApiClient.request<TimetableDto[]>("/timetables"),
+      ])
+      setSemesters(refreshedSemesters)
+      setPublishedCatalog(allTimetables.filter((t) => t.semesterId != null))
       setTimetableSource("published")
       setPublishedYear(updated.academicYear)
       setPublishedSemesterType(updated.semesterType)
@@ -1522,7 +1611,11 @@ export function ScheduleViewerPage({
   }
 
   const isReady = !loadingTimetables && !!timetableId
-  const isViewerLoading = loadingSemesters || loadingTimetables || loadingEntries
+  const isViewerLoading =
+    loadingSemesters ||
+    loadingTimetables ||
+    (timetableSource === "published" && loadingPublishedCatalog) ||
+    loadingEntries
 
   return (
     <div className="flex h-screen bg-background">
@@ -1563,19 +1656,16 @@ export function ScheduleViewerPage({
                     ) : null}
                     <div className="grid gap-3 py-1">
                       <div className="space-y-1">
-                        <Label className="text-xs font-medium text-muted-foreground">Academic year</Label>
-                        <Select value={publishedYear} onValueChange={setPublishedYear}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select year" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {academicYears.map((y) => (
-                              <SelectItem key={y} value={y}>
-                                {y}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Label htmlFor="publish-academic-year" className="text-xs font-medium text-muted-foreground">
+                          Academic year
+                        </Label>
+                        <AcademicYearInput
+                          id="publish-academic-year"
+                          value={publishedYear}
+                          onChange={setPublishedYear}
+                          showFormatHint
+                          showSuggestions={false}
+                        />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs font-medium text-muted-foreground">Semester</Label>
@@ -1634,7 +1724,7 @@ export function ScheduleViewerPage({
                         onClick={() => void publishCurrentDraft()}
                         disabled={
                           publishSubmitting ||
-                          !publishedYear ||
+                          !publishedYearValid ||
                           allowedPublishSemesterTypes.length === 0 ||
                           !allowedPublishSemesterTypes.includes(publishedSemesterType) ||
                           publishConflictLoading ||
@@ -1692,11 +1782,14 @@ export function ScheduleViewerPage({
             {!hideScheduleSelection ? (
             <CompactCollapsibleCard title="Schedule Selection">
                   <CardDescription className="text-xs">
-                    List GWO drafts (no semester), everything, or published timetables for a specific academic year and
-                    term. Then pick a version to view.
+                    {timetableSource === "published"
+                      ? "Browse published timetables by academic year and term."
+                      : "List GWO drafts (no semester), everything, or published timetables. Then pick a version to view."}
                   </CardDescription>
                   <div className="grid gap-3">
-                    <div className="grid gap-2 md:grid-cols-2">
+                    <div
+                      className={`grid gap-2 ${timetableSource === "published" ? "md:grid-cols-3" : "md:grid-cols-2"}`}
+                    >
                       <div className="space-y-1">
                         <div className="text-xs font-medium text-muted-foreground">Timetable source</div>
                         <Select
@@ -1714,6 +1807,7 @@ export function ScheduleViewerPage({
                           </SelectContent>
                         </Select>
                       </div>
+                      {timetableSource !== "published" ? (
                       <div className="space-y-1">
                         <div className="text-xs font-medium text-muted-foreground">Timetable version</div>
                         <Select
@@ -1721,8 +1815,7 @@ export function ScheduleViewerPage({
                           onValueChange={(v) => setTimetableId(v ? Number(v) : null)}
                           disabled={
                             loadingTimetables ||
-                            timetables.length === 0 ||
-                            (timetableSource === "published" && resolvedPublishedSemesterId == null)
+                            timetables.length === 0
                           }
                         >
                           <SelectTrigger className="h-8">
@@ -1731,14 +1824,9 @@ export function ScheduleViewerPage({
                           <SelectContent>
                             {timetableVersionSelectModel.runOrder.map((runNum) => {
                               const items = timetableVersionSelectModel.runs.get(runNum) ?? []
-                              const oldest = items[items.length - 1]
-                              const lineStarted = oldest ? formatDateTime(oldest.generatedAt) : ""
                               return (
                                 <SelectGroup key={`draft-line-${runNum}`}>
-                                  <SelectLabel>
-                                    Draft line {runNum}
-                                    {lineStarted ? ` · from ${lineStarted}` : ""}
-                                  </SelectLabel>
+                                  <SelectLabel>Draft line {runNum}</SelectLabel>
                                   {items.map((tt) => (
                                     <SelectItem key={tt.timetableId} value={String(tt.timetableId)}>
                                       [{timetableDropdownPrefix(tt)}] v{tt.versionNumber} ·{" "}
@@ -1755,8 +1843,7 @@ export function ScheduleViewerPage({
                                   <SelectLabel>Published timetables</SelectLabel>
                                   {timetableVersionSelectModel.published.map((tt) => (
                                     <SelectItem key={tt.timetableId} value={String(tt.timetableId)}>
-                                      {timetableStatusBadges(tt)[0]?.label ?? "Published"} · v{tt.versionNumber} ·{" "}
-                                      {tt.academicYear} {tt.semester} · {formatDateTime(tt.generatedAt)}
+                                      Published · {tt.academicYear} {tt.semester} · {formatDateTime(tt.generatedAt)}
                                     </SelectItem>
                                   ))}
                                 </SelectGroup>
@@ -1765,22 +1852,28 @@ export function ScheduleViewerPage({
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
-
-                    {timetableSource === "published" ? (
-                      <div className="grid gap-2 md:grid-cols-2">
-                        <div className="space-y-1">
-                          <div className="text-xs font-medium text-muted-foreground">Academic year</div>
+                      ) : (
+                        <>
+                          <div className="space-y-1">
+                            <div className="text-xs font-medium text-muted-foreground">Academic year</div>
                           <Select
-                            value={publishedYear || (academicYears[0] ?? "")}
-                            onValueChange={(v) => setPublishedYear(v)}
-                            disabled={loadingSemesters || academicYears.length === 0}
+                            value={publishedYear || undefined}
+                            onValueChange={setPublishedYear}
+                            disabled={loadingPublishedCatalog || publishedAcademicYears.length === 0}
                           >
                             <SelectTrigger className="h-8">
-                              <SelectValue placeholder="Select year" />
+                              <SelectValue
+                                placeholder={
+                                  loadingPublishedCatalog
+                                    ? "Loading years…"
+                                    : publishedAcademicYears.length === 0
+                                      ? "No published timetables"
+                                      : "Select year"
+                                }
+                              />
                             </SelectTrigger>
                             <SelectContent>
-                              {academicYears.map((y) => (
+                              {publishedAcademicYears.map((y) => (
                                 <SelectItem key={y} value={y}>
                                   {y}
                                 </SelectItem>
@@ -1793,27 +1886,40 @@ export function ScheduleViewerPage({
                           <Select
                             value={String(publishedSemesterType)}
                             onValueChange={(v) => setPublishedSemesterType(Number(v))}
-                            disabled={loadingSemesters || semesterTypesForYear.length === 0}
+                            disabled={
+                              loadingPublishedCatalog ||
+                              publishedAcademicYears.length === 0 ||
+                              !publishedYear
+                            }
                           >
                             <SelectTrigger className="h-8">
                               <SelectValue placeholder="Select semester" />
                             </SelectTrigger>
                             <SelectContent>
-                              {semesterTypesForYear.map((opt) => (
-                                <SelectItem key={opt.value} value={String(opt.value)}>
-                                  {opt.label}
-                                </SelectItem>
-                              ))}
+                              {PUBLISHED_SEMESTER_TYPES.map((opt) => {
+                                const hasPublished = publishedSemesterTypesForYear.has(opt.value)
+                                return (
+                                  <SelectItem
+                                    key={opt.value}
+                                    value={String(opt.value)}
+                                    disabled={!hasPublished}
+                                  >
+                                    {opt.label}
+                                  </SelectItem>
+                                )
+                              })}
                             </SelectContent>
                           </Select>
                         </div>
-                        {resolvedPublishedSemesterId == null && publishedYear ? (
-                          <p className="text-xs text-amber-800 dark:text-amber-200 md:col-span-2">
-                            No semester row matches this year and term in the database. Check entity data or pick
-                            another combination.
-                          </p>
-                        ) : null}
-                      </div>
+                        </>
+                      )}
+                    </div>
+                    {!loadingPublishedCatalog &&
+                    timetableSource === "published" &&
+                    publishedAcademicYears.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        No published timetables yet. Publish a draft to browse it here.
+                      </p>
                     ) : null}
                   </div>
             </CompactCollapsibleCard>

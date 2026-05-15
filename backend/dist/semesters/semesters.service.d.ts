@@ -11,4 +11,7 @@ export declare class SemestersService {
         startDate: Date;
         endDate: Date;
     }[]>;
+    findOrCreateSemester(academicYear: string, semesterType: number): Promise<{
+        semester_id: number;
+    }>;
 }

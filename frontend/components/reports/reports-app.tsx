@@ -986,7 +986,7 @@ export function ReportsApp() {
                                     </Button>
                                   </span>
                                 </TooltipTrigger>
-                                <TooltipContent side="top" className="max-w-sm text-pretty">
+                                <TooltipContent side="top">
                                   {selectedDef.comingSoonReason ??
                                     "This export is not available yet."}
                                 </TooltipContent>

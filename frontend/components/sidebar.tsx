@@ -272,9 +272,7 @@ function NavButton({
   return (
     <Tooltip>
       <TooltipTrigger asChild>{content}</TooltipTrigger>
-      <TooltipContent side="right" className="font-medium">
-        {title}
-      </TooltipContent>
+      <TooltipContent side="right">{title}</TooltipContent>
     </Tooltip>
   );
 }
@@ -559,9 +557,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           {collapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>{logoutButton}</TooltipTrigger>
-              <TooltipContent side="right" className="font-medium">
-                Logout
-              </TooltipContent>
+              <TooltipContent side="right">Logout</TooltipContent>
             </Tooltip>
           ) : (
             logoutButton
@@ -599,7 +595,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 </span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="right" className="font-medium">
+            <TooltipContent side="right">
               {collapsed ? "Expand sidebar" : "Collapse sidebar"}
             </TooltipContent>
           </Tooltip>

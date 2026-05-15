@@ -2741,12 +2741,7 @@ export function TimetableGrid() {
                       </Button>
                     </span>
                   </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    align="start"
-                    sideOffset={8}
-                    className="max-w-[min(22rem,calc(100vw-2rem))] px-3.5 py-2.5 text-left text-xs leading-relaxed shadow-lg"
-                  >
+                  <TooltipContent side="bottom" align="start" sideOffset={8}>
                     {draftDiffersFromWorkspaceFile
                       ? "Discard unsaved grid changes and reload from the workspace schedule file on the server"
                       : "Grid already matches the saved workspace schedule — nothing to reset"}
@@ -2808,15 +2803,10 @@ export function TimetableGrid() {
                       </Button>
                     </span>
                   </TooltipTrigger>
-                  <TooltipContent
-                    side="bottom"
-                    align="end"
-                    sideOffset={8}
-                    className="max-w-[min(22rem,calc(100vw-2rem))] px-3.5 py-2.5 text-left text-xs leading-relaxed shadow-lg"
-                  >
+                  <TooltipContent side="bottom" align="end" sideOffset={8}>
                     {isSimulationView
                       ? "Writes your edited grid back to this simulation timetable in the database. Then you can apply it to production from the simulation banner."
-                      : "Writes your edited timetable to the workspace schedule on the server (POST /api/schedule). That file is what this page loads and what the optimizer uses as the starting timetable for the next run."}
+                      : "Saves your manual edits so they persist after a page refresh."}
                   </TooltipContent>
                 </Tooltip>
               ) : null}

@@ -15,6 +15,7 @@ exports.decodeDaysMask = decodeDaysMask;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
+const semesters_service_1 = require("../semesters/semesters.service");
 const notifications_service_1 = require("../notifications/notifications.service");
 const notification_prefs_1 = require("../notifications/notification-prefs");
 const schedule_soft_metrics_1 = require("./schedule-soft-metrics");
@@ -66,9 +67,10 @@ const DEFAULT_SOFT_WEIGHTS = {
     single_session_day: 50,
 };
 let TimetablesService = class TimetablesService {
-    constructor(prisma, notifications) {
+    constructor(prisma, notifications, semestersService) {
         this.prisma = prisma;
         this.notifications = notifications;
+        this.semestersService = semestersService;
     }
     mapTimetableSummary(t) {
         const isDraft = t.semester_id == null;
@@ -299,13 +301,7 @@ let TimetablesService = class TimetablesService {
                 : `${decodeSemesterType(allowedSemesterTypes[0])} or ${decodeSemesterType(allowedSemesterTypes[1])}`;
             throw new common_1.BadRequestException(`This timetable can only be published to ${allowedLabel} based on its source/base semester type.`);
         }
-        const semester = await this.prisma.semester.findFirst({
-            where: { academic_year: academicYear, semester_type: semesterType },
-            select: { semester_id: true },
-        });
-        if (!semester) {
-            throw new common_1.BadRequestException(`Semester ${academicYear} (${decodeSemesterType(semesterType)}) does not exist.`);
-        }
+        const semester = await this.semestersService.findOrCreateSemester(academicYear, semesterType);
         const existingSameSemester = await this.prisma.timetable.count({
             where: { semester_id: semester.semester_id },
         });
@@ -889,6 +885,7 @@ exports.TimetablesService = TimetablesService;
 exports.TimetablesService = TimetablesService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        notifications_service_1.NotificationsService])
+        notifications_service_1.NotificationsService,
+        semesters_service_1.SemestersService])
 ], TimetablesService);
 //# sourceMappingURL=timetables.service.js.map

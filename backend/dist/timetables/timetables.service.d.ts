@@ -1,11 +1,13 @@
 import { PrismaService } from "../prisma/prisma.service";
+import { SemestersService } from "../semesters/semesters.service";
 import { NotificationsService } from "../notifications/notifications.service";
 export declare function decodeSemesterType(type: number): string;
 export declare function decodeDaysMask(daysMask: number): string[];
 export declare class TimetablesService {
     private prisma;
     private readonly notifications;
-    constructor(prisma: PrismaService, notifications: NotificationsService);
+    private readonly semestersService;
+    constructor(prisma: PrismaService, notifications: NotificationsService, semestersService: SemestersService);
     private mapTimetableSummary;
     list(semesterId?: number, draftsOnly?: boolean, scenarioRunBasesOnly?: boolean): Promise<{
         timetableId: any;
