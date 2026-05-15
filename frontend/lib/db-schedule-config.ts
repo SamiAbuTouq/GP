@@ -1,8 +1,58 @@
 import type { DeliveryMode } from "@prisma/client";
-import type { LectureConfig, RoomConfigValue, ScheduleConfig, TimeslotConfigEntry } from "./schedule-data";
+import type {
+  LectureConfig,
+  RoomConfigValue,
+  ScheduleConfig,
+  SchedulingMode,
+  TimeslotConfigEntry,
+} from "./schedule-data";
 import { prisma } from "./prisma";
 
 export type SemesterMode = "normal" | "summer";
+
+function resolveSchedulingMode(mode: unknown): SchedulingMode {
+  return mode === "student_based" ? "student_based" : "section_based";
+}
+
+function computeLectureSize(params: {
+  schedulingMode: SchedulingMode;
+  semesterMode: SemesterMode;
+  expectedSizeNormal: number | null;
+  expectedSizeSummer: number | null;
+  sectionCount: number;
+  creditHours: number;
+  registered: number;
+  maxCap: number;
+}): number {
+  const fallbackSize = Math.min(
+    params.maxCap,
+    Math.max(12, params.creditHours * 10),
+  );
+  const rawFromHistory =
+    params.registered > 0 ? params.registered : fallbackSize;
+
+  if (params.schedulingMode === "student_based") {
+    const expected =
+      params.semesterMode === "summer"
+        ? params.expectedSizeSummer
+        : params.expectedSizeNormal;
+    // 0 = not offered in that term; do not fall back to history or formula.
+    if (expected === 0) {
+      return 1;
+    }
+    if (expected != null && expected > 0) {
+      const perSection =
+        params.sectionCount > 0
+          ? Math.ceil(expected / params.sectionCount)
+          : expected;
+      return Math.min(Math.max(perSection, 1), params.maxCap);
+    }
+    // No auto-estimate: null or unset expected enrollment skips scheduling above.
+    return 1;
+  }
+
+  return Math.min(Math.max(rawFromHistory, 1), params.maxCap);
+}
 
 type SemesterRow = {
   semester_id: number;
@@ -304,6 +354,7 @@ function maxRoomCapacity(rooms: Record<string, RoomConfigValue>): number {
 // BUG 2 + 4 FIX: extended return type includes availability and per-lecturer max workload.
 export async function loadScheduleConfigEntitiesFromDatabase(
   semesterMode: SemesterMode,
+  schedulingMode: SchedulingMode = "section_based",
 ): Promise<
   Pick<ScheduleConfig, "rooms" | "lecturers" | "lecturer_preferences" | "lectures"
     | "lecturer_availability" | "lecturer_max_workload"> | null
@@ -452,7 +503,14 @@ export async function loadScheduleConfigEntitiesFromDatabase(
   for (const c of courses) {
     const dbFallback =
       semesterMode === "summer" ? c.sections_summer : c.sections_normal;
-    const sectionCount = dbFallback;
+    const expectedForMode =
+      semesterMode === "summer" ? c.expected_size_summer : c.expected_size_normal;
+    let sectionCount = dbFallback;
+    if (schedulingMode === "student_based") {
+      if (expectedForMode === 0 || expectedForMode == null) {
+        sectionCount = 0;
+      }
+    }
     if (sectionCount <= 0) continue;
 
     const allowed: number[] = [
@@ -468,9 +526,16 @@ export async function loadScheduleConfigEntitiesFromDatabase(
     const registered = scheduleSectionAgg
       ? (scheduleSectionAgg.maxRegisteredByCourseId.get(c.course_id) ?? 0)
       : (regByCourseGlobal.get(c.course_id) ?? 0);
-    const fallbackSize = Math.min(maxCap, Math.max(12, c.credit_hours * 10));
-    const rawSize = registered > 0 ? registered : fallbackSize;
-    const size = Math.min(Math.max(rawSize, 1), maxCap);
+    const size = computeLectureSize({
+      schedulingMode,
+      semesterMode,
+      expectedSizeNormal: c.expected_size_normal,
+      expectedSizeSummer: c.expected_size_summer,
+      sectionCount,
+      creditHours: c.credit_hours,
+      registered,
+      maxCap,
+    });
 
     for (let s = 0; s < sectionCount; s++) {
       if (maxCourses > 0 && lectures.length >= maxCourses) break;
@@ -505,10 +570,14 @@ export async function mergeFileConfigWithDatabase(
   fileBased: ScheduleConfig,
   semesterMode: SemesterMode = "normal",
 ): Promise<ScheduleConfig> {
-  let merged: ScheduleConfig = fileBased;
+  const schedulingMode = resolveSchedulingMode(fileBased.scheduling_mode);
+  let merged: ScheduleConfig = { ...fileBased, scheduling_mode: schedulingMode };
 
   try {
-    const fromDb = await loadScheduleConfigEntitiesFromDatabase(semesterMode);
+    const fromDb = await loadScheduleConfigEntitiesFromDatabase(
+      semesterMode,
+      schedulingMode,
+    );
     if (fromDb) {
       merged = {
         ...merged,

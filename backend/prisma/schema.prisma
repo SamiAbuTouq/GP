@@ -142,6 +142,10 @@ model Course {
   sections_normal Int @default(1)
   /// Parallel sections in summer; 0 = not offered in summer.
   sections_summer Int @default(0)
+  /// Expected enrollment per section in normal semesters (Student-based scheduling).
+  expected_size_normal Int?
+  /// Expected enrollment per section in summer (Student-based scheduling).
+  expected_size_summer Int?
   is_active       Boolean @default(true)
 
   department   Department @relation(fields: [dept_id], references: [dept_id])

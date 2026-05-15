@@ -928,25 +928,11 @@ export function SoftConstraintMetricsPanel({
   const meta = data.metadata;
   const softWeights = data.soft_weights ?? meta.soft_weights;
   const gapWarnings = data.gap_warnings ?? [];
-  const utilizationInfo = data.utilization_info ?? [];
   const workloadInfo = data.workload_info ?? [];
   const distributionInfo = data.distribution_info ?? [];
   const scheduleEntries = data.schedule ?? [];
 
   if (!softWeights) return null;
-
-  // Calculate total wasted seat capacity across ALL room-timeslot combinations
-  // (occupied slots: capacity - class_size; empty slots: full capacity)
-  const totalWastedSeats = utilizationInfo.reduce(
-    (sum, u) => sum + (u.wasted_seats ?? (u.capacity - u.class_size)),
-    0,
-  );
-  const totalSeatSlots = utilizationInfo.reduce((sum, u) => sum + u.capacity, 0);
-  const avgWaste =
-    totalSeatSlots > 0 ? (totalWastedSeats / totalSeatSlots) * 100 : 0;
-  /** Share of all room×timeslot seat capacity that is actually filled (higher is better). */
-  const timetableSeatUtilizationPct =
-    totalSeatSlots > 0 ? 100 - avgWaste : 0;
 
   // Calculate workload std dev
   const workloads = workloadInfo.map((w) => w.classes);
@@ -1002,15 +988,6 @@ export function SoftConstraintMetricsPanel({
   const studentGapsScore = scoreFromRatio(affectedStudentGapUnits, totalUnits);
   const singleSessionScore = scoreFromRatio(affectedSingleSessionUnits, totalUnits);
 
-  const zeroEnrollmentCount = utilizationInfo.filter(
-    (u) => (u.class_size ?? 0) === 0,
-  ).length;
-  const missingEnrollmentData =
-    utilizationInfo.length > 0 &&
-    zeroEnrollmentCount > utilizationInfo.length / 2;
-
-  const roomUtilScore = clamp(timetableSeatUtilizationPct);
-
   const workloadBalanceScore = scoreFromStdDev(workloadStdDev, avgWorkload);
   const distributeClassesScore = scoreFromStdDev(distStdDev, avgDist);
 
@@ -1046,6 +1023,7 @@ export function SoftConstraintMetricsPanel({
     weight: number;
     value: string;
     score: number | null;
+    unavailable?: boolean;
   }[] = [
     {
       key: "preferred_timeslot",
@@ -1067,15 +1045,6 @@ export function SoftConstraintMetricsPanel({
       weight: softWeights.minimize_gaps,
       value: `${gapWarnings.length} gaps`,
       score: gapRatioScore,
-    },
-    {
-      key: "room_utilization",
-      label: "Room seat fill",
-      weight: softWeights.room_utilization,
-      value: missingEnrollmentData
-        ? "No enrollment data (registration counts not saved)"
-        : `${timetableSeatUtilizationPct.toFixed(1)}% of catalog seat capacity used`,
-      score: missingEnrollmentData ? null : roomUtilScore,
     },
     {
       key: "balanced_workload",
@@ -1105,15 +1074,23 @@ export function SoftConstraintMetricsPanel({
       value: `${earlyDayWarnings.length} issue(s)`,
       score: singleSessionScore,
     },
+    {
+      key: "room_utilization",
+      label: "Room seat fill",
+      weight: softWeights.room_utilization,
+      value: "N/A",
+      score: null,
+      unavailable: true,
+    },
   ];
 
   const metricsInner = (
         <div className="p-4 pt-0 sm:pt-4">
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            {metrics.map(({ key, label, weight, value, score }) => {
+            {metrics.map(({ key, label, weight, value, score, unavailable }) => {
               const status =
-                score == null ? "warn" : statusFromScore(score);
-              const shell = shellFromPerformanceScore(score);
+                unavailable || score == null ? "warn" : statusFromScore(score);
+              const shell = unavailable ? "amber" : shellFromPerformanceScore(score);
               const statusTextColors = {
                 good: "text-emerald-800 dark:text-emerald-200",
                 warn: "text-amber-800 dark:text-amber-200",
@@ -1124,26 +1101,41 @@ export function SoftConstraintMetricsPanel({
                 warn: "from-amber-400 via-orange-400 to-amber-600",
                 bad: "from-rose-500 via-red-500 to-rose-700",
               };
-              const statusLabel =
-                status === "good" ? "On target" : status === "warn" ? "Watch" : "Attention";
+              const statusLabel = unavailable
+                ? "N/A"
+                : status === "good"
+                  ? "On target"
+                  : status === "warn"
+                    ? "Watch"
+                    : "Attention";
               const fillPct = score == null ? 0 : clamp(score);
               return (
                 <div
                   key={key}
-                  className={`rounded-xl border p-4 shadow-sm ${performanceShellStyles[shell]}`}
+                  className={`rounded-xl border p-4 shadow-sm ${
+                    unavailable
+                      ? "pointer-events-none border-border/60 bg-muted/35 opacity-55"
+                      : performanceShellStyles[shell]
+                  }`}
                 >
                   <div className="mb-3 flex items-start justify-between gap-2">
                     <span className="text-sm font-semibold leading-snug text-foreground">
                       {label}
                     </span>
                     <span
-                      className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusTextColors[status]} bg-card/70 ring-1 ring-border/60`}
+                      className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                        unavailable
+                          ? "text-muted-foreground bg-muted/80 ring-1 ring-border/60"
+                          : `${statusTextColors[status]} bg-card/70 ring-1 ring-border/60`
+                      }`}
                     >
                       {statusLabel}
                     </span>
                   </div>
                   <div
-                    className={`text-sm font-medium leading-snug ${statusTextColors[status]}`}
+                    className={`text-sm font-medium leading-snug ${
+                      unavailable ? "text-muted-foreground" : statusTextColors[status]
+                    }`}
                   >
                     {value}
                   </div>
@@ -3690,6 +3682,7 @@ const SOFT_CONSTRAINT_DEFINITIONS: Array<{
   key: keyof SoftWeights;
   label: string;
   description: string;
+  comingSoon?: boolean;
 }> = [
   {
     key: "preferred_timeslot",
@@ -3705,11 +3698,6 @@ const SOFT_CONSTRAINT_DEFINITIONS: Array<{
     key: "minimize_gaps",
     label: "Minimize gaps",
     description: "Penalize idle time between lecturer classes",
-  },
-  {
-    key: "room_utilization",
-    label: "Room utilization",
-    description: "Penalize oversized room assignments",
   },
   {
     key: "balanced_workload",
@@ -3730,6 +3718,12 @@ const SOFT_CONSTRAINT_DEFINITIONS: Array<{
     key: "single_session_day",
     label: "Single-session day",
     description: "Penalize a day with only one class in a unit",
+  },
+  {
+    key: "room_utilization",
+    label: "Room utilization",
+    description: "Penalize oversized room assignments",
+    comingSoon: true,
   },
 ];
 
@@ -4124,6 +4118,7 @@ export function SoftConstraintWeightsPanel() {
       <div className="space-y-3 p-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {SOFT_CONSTRAINT_DEFINITIONS.map((item) => {
+            const comingSoon = item.comingSoon === true;
             const value = Math.max(
               0,
               Math.min(100, (displayConfig.soft_weights[item.key] ?? 0) as number),
@@ -4131,19 +4126,30 @@ export function SoftConstraintWeightsPanel() {
             return (
               <div
                 key={String(item.key)}
-                className="rounded-xl border border-border/80 bg-muted/50 p-3 sm:p-3.5"
+                className={cn(
+                  "rounded-xl border border-border/80 bg-muted/50 p-3 sm:p-3.5",
+                  comingSoon && "pointer-events-none bg-muted/30 opacity-55",
+                )}
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <label className="text-sm font-medium text-foreground/90">{item.label}</label>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <label className="text-sm font-medium text-foreground/90">{item.label}</label>
+                    {comingSoon ? (
+                      <Badge variant="secondary" className="text-[10px] font-normal">
+                        Coming soon
+                      </Badge>
+                    ) : null}
+                  </div>
                   <input
                     type="number"
                     min={0}
                     max={100}
                     value={value}
+                    disabled={comingSoon}
                     onChange={(e) =>
                       updateSoftWeight(item.key, parseInt(e.target.value, 10) || 0)
                     }
-                    className="w-16 rounded-lg border border-border bg-card px-2 py-1 text-center text-sm tabular-nums shadow-sm"
+                    className="w-16 rounded-lg border border-border bg-card px-2 py-1 text-center text-sm tabular-nums shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 </div>
                 <div
@@ -4172,10 +4178,11 @@ export function SoftConstraintWeightsPanel() {
                       max={100}
                       step={5}
                       value={value}
+                      disabled={comingSoon}
                       onChange={(e) =>
                         updateSoftWeight(item.key, parseInt(e.target.value, 10))
                       }
-                      className="soft-weight-range relative z-10 w-full cursor-pointer"
+                      className="soft-weight-range relative z-10 w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </div>
                 </div>
@@ -5335,23 +5342,6 @@ export function ConfigurationPanel() {
                   cardWash: "bg-gradient-to-br from-card to-amber-50/50 dark:to-amber-950/30",
                 },
                 {
-                  key: "room_utilization",
-                  label: "Room utilization",
-                  desc: "Penalize oversized room assignments",
-                  trackTint: "bg-blue-100/80 dark:bg-blue-900/35",
-                  tickColor: "text-blue-700",
-                  tickMuted: "text-blue-400/90",
-                  labelTint: "text-blue-950 dark:text-blue-100",
-                  descTint: "text-blue-950/65 dark:text-blue-200/80",
-                  accentHex: "#2563eb",
-                  frameBorder:
-                    "border border-blue-200 dark:border-blue-700/60 border-l-4 border-l-blue-600",
-                  inputBorder: "border-blue-200 dark:border-blue-700/60",
-                  focusRing: "focus:ring-blue-500/90",
-                  cardFocusRing: "focus-within:ring-blue-300/55",
-                  cardWash: "bg-gradient-to-br from-card to-blue-50/50 dark:to-blue-950/30",
-                },
-                {
                   key: "balanced_workload",
                   label: "Balanced workload",
                   desc: "Penalize uneven class loads across lecturers",
@@ -5418,6 +5408,23 @@ export function ConfigurationPanel() {
                   focusRing: "focus:ring-pink-500/90",
                   cardFocusRing: "focus-within:ring-pink-300/55",
                   cardWash: "bg-gradient-to-br from-card to-pink-50/50 dark:to-pink-950/30",
+                },
+                {
+                  key: "room_utilization",
+                  label: "Room utilization",
+                  desc: "Penalize oversized room assignments",
+                  trackTint: "bg-blue-100/80 dark:bg-blue-900/35",
+                  tickColor: "text-blue-700",
+                  tickMuted: "text-blue-400/90",
+                  labelTint: "text-blue-950 dark:text-blue-100",
+                  descTint: "text-blue-950/65 dark:text-blue-200/80",
+                  accentHex: "#2563eb",
+                  frameBorder:
+                    "border border-blue-200 dark:border-blue-700/60 border-l-4 border-l-blue-600",
+                  inputBorder: "border-blue-200 dark:border-blue-700/60",
+                  focusRing: "focus:ring-blue-500/90",
+                  cardFocusRing: "focus-within:ring-blue-300/55",
+                  cardWash: "bg-gradient-to-br from-card to-blue-50/50 dark:to-blue-950/30",
                 },
               ].map(
                 ({

@@ -96,6 +96,8 @@ model Course {
   delivery_mode  DeliveryMode
   sections_normal Int @default(1)
   sections_summer Int @default(0)
+  expected_size_normal Int?
+  expected_size_summer Int?
   is_active       Boolean @default(true)
 
   department Department @relation(fields: [dept_id], references: [dept_id])

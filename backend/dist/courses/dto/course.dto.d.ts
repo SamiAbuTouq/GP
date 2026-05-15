@@ -9,6 +9,8 @@ export declare class CreateCourseDto {
     sectionsNormal?: number;
     sectionsSummer?: number;
     isLab?: boolean;
+    expectedSizeNormal?: number | null;
+    expectedSizeSummer?: number | null;
 }
 export declare class UpdateCourseDto {
     name?: string;
@@ -19,4 +21,6 @@ export declare class UpdateCourseDto {
     sectionsNormal?: number;
     sectionsSummer?: number;
     isLab?: boolean;
+    expectedSizeNormal?: number | null;
+    expectedSizeSummer?: number | null;
 }

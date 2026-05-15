@@ -41,8 +41,6 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Loader2,
-  ArrowUp,
-  ArrowDown,
   ArrowUpDown,
   AlertTriangle,
 } from "lucide-react"
@@ -63,6 +61,12 @@ import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 type Course = {
   id?: number
@@ -76,7 +80,76 @@ type Course = {
   sectionsSummer: number
   /** Distinct section labels in the newest term that has schedule rows (informational). */
   sectionsInLatestSchedule?: number
+  expectedSizeNormal?: number | null
+  expectedSizeSummer?: number | null
   isLab: boolean
+}
+
+function parseExpectedSize(value: unknown): number {
+  if (value == null || value === "") return 0
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return Math.trunc(value)
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed) && parsed >= 0) return Math.trunc(parsed)
+  }
+  return 0
+}
+
+function formatExpectedSizeShort(value: number | null | undefined): string {
+  return String(value ?? 0)
+}
+
+function courseSortHeaderButtonClass(centered = false) {
+  return cn(
+    "font-medium text-muted-foreground hover:text-foreground",
+    centered
+      ? "inline-flex w-full items-center justify-center gap-1"
+      : "inline-flex items-center gap-1",
+  )
+}
+
+const courseSortHeaderIcon = (
+  <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
+)
+
+/** One column: sections + expected enrollment for normal and summer. */
+function CourseSchedulingCell({ course }: { course: Course }) {
+  return (
+    <div className="mx-auto w-fit space-y-0.5 text-xs leading-tight">
+      <div className="flex items-center gap-2 tabular-nums">
+        <span className="w-12 shrink-0 text-muted-foreground">Normal</span>
+        <span className="font-medium">{course.sectionsNormal}</span>
+        <span className="text-muted-foreground">sec</span>
+        <span className="text-muted-foreground">·</span>
+        <span
+          className={
+            course.expectedSizeNormal != null && course.expectedSizeNormal > 0
+              ? "font-medium"
+              : "text-muted-foreground"
+          }
+        >
+          {formatExpectedSizeShort(course.expectedSizeNormal)}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 tabular-nums">
+        <span className="w-12 shrink-0 text-muted-foreground">Summer</span>
+        <span className="font-medium">{course.sectionsSummer}</span>
+        <span className="text-muted-foreground">sec</span>
+        <span className="text-muted-foreground">·</span>
+        <span
+          className={
+            course.expectedSizeSummer != null && course.expectedSizeSummer > 0
+              ? "font-medium"
+              : "text-muted-foreground"
+          }
+        >
+          {formatExpectedSizeShort(course.expectedSizeSummer)}
+        </span>
+      </div>
+    </div>
+  )
 }
 
 const parseNumber = (value: unknown, fallback: number) => {
@@ -106,6 +179,8 @@ function mapCatalogRow(raw: unknown): Course | null {
     sectionsNormal: parseNumber(item.sectionsNormal, 1),
     sectionsSummer: parseNumber(item.sectionsSummer, 0),
     sectionsInLatestSchedule: parseNumber(item.sectionsInLatestSchedule, 0),
+    expectedSizeNormal: parseExpectedSize(item.expectedSizeNormal),
+    expectedSizeSummer: parseExpectedSize(item.expectedSizeSummer),
     isLab: typeof item.isLab === "boolean" ? item.isLab : false,
   }
 }
@@ -117,8 +192,6 @@ type SortableColumn =
   | "academicLevel"
   | "deliveryMode"
   | "isLab"
-  | "sectionsNormal"
-  | "sectionsSummer"
 
 function sortCoursesCopy(
   list: Course[],
@@ -148,12 +221,6 @@ function sortCoursesCopy(
         break
       case "isLab":
         cmp = Number(a.isLab) - Number(b.isLab)
-        break
-      case "sectionsNormal":
-        cmp = a.sectionsNormal - b.sectionsNormal
-        break
-      case "sectionsSummer":
-        cmp = a.sectionsSummer - b.sectionsSummer
         break
       default:
         break
@@ -189,6 +256,8 @@ export default function CoursesPage() {
     sectionsNormal: 1,
     sectionsSummer: 0,
     sectionsInLatestSchedule: 0,
+    expectedSizeNormal: 0,
+    expectedSizeSummer: 0,
     isLab: false,
   })
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
@@ -219,6 +288,8 @@ export default function CoursesPage() {
         sectionsNormal: 1,
         sectionsSummer: 0,
         sectionsInLatestSchedule: 0,
+        expectedSizeNormal: 0,
+        expectedSizeSummer: 0,
         isLab: false,
       }),
     [newCourse],
@@ -399,6 +470,8 @@ export default function CoursesPage() {
           department: newCourse.department,
           sectionsNormal: newCourse.sectionsNormal,
           sectionsSummer: newCourse.sectionsSummer,
+          expectedSizeNormal: newCourse.expectedSizeNormal ?? 0,
+          expectedSizeSummer: newCourse.expectedSizeSummer ?? 0,
           isLab: newCourse.isLab,
         }),
       })
@@ -425,6 +498,8 @@ export default function CoursesPage() {
         sectionsNormal: 1,
         sectionsSummer: 0,
         sectionsInLatestSchedule: 0,
+        expectedSizeNormal: 0,
+        expectedSizeSummer: 0,
         isLab: false,
       })
       setIsAddDialogOpen(false)
@@ -461,6 +536,8 @@ export default function CoursesPage() {
           department: editingCourse.department,
           sectionsNormal: editingCourse.sectionsNormal,
           sectionsSummer: editingCourse.sectionsSummer,
+          expectedSizeNormal: editingCourse.expectedSizeNormal ?? 0,
+          expectedSizeSummer: editingCourse.expectedSizeSummer ?? 0,
           isLab: editingCourse.isLab,
         }),
       })
@@ -660,6 +737,8 @@ export default function CoursesPage() {
     { key: "department" as const, label: "Department" },
     { key: "sectionsNormal" as const, label: "Sections (normal)" },
     { key: "sectionsSummer" as const, label: "Sections (summer)" },
+    { key: "expectedSizeNormal" as const, label: "Expected (normal)" },
+    { key: "expectedSizeSummer" as const, label: "Expected (summer)" },
   ]
 
   const getDeliveryModeColor = (mode: DeliveryMode) => {
@@ -808,45 +887,6 @@ export default function CoursesPage() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="space-y-2 min-w-0">
-                      <Label htmlFor="course-sections-normal">Normal semester sections</Label>
-                      <Input
-                        id="course-sections-normal"
-                        type="number"
-                        min="0"
-                        max="20"
-                        value={newCourse.sectionsNormal}
-                        onChange={(e) =>
-                          setNewCourse({
-                            ...newCourse,
-                            sectionsNormal: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
-                          })
-                        }
-                        placeholder="1"
-                      />
-                    </div>
-                    <div className="space-y-2 min-w-0">
-                      <Label htmlFor="course-sections-summer">Summer semester sections</Label>
-                      <Input
-                        id="course-sections-summer"
-                        type="number"
-                        min="0"
-                        max="20"
-                        value={newCourse.sectionsSummer}
-                        onChange={(e) =>
-                          setNewCourse({
-                            ...newCourse,
-                            sectionsSummer: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
-                          })
-                        }
-                        placeholder="0"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Set to 0 if this course is not offered in summer.
-                      </p>
-                    </div>
-                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="course-name">Course Name</Label>
                     <Input
@@ -909,9 +949,99 @@ export default function CoursesPage() {
                       checked={newCourse.isLab}
                       onCheckedChange={(v) => setNewCourse({ ...newCourse, isLab: v === true })}
                     />
-                    <Label htmlFor="new-course-is-lab" className="text-sm font-normal cursor-pointer">
+                    <Label htmlFor="new-course-is-lab" className="cursor-pointer text-sm font-normal">
                       Lab course
                     </Label>
+                  </div>
+
+                  <hr className="border-border/60" />
+
+                  <div className="grid gap-4">
+                    <p className="text-sm font-medium leading-none">Expected Enrollment</p>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2 min-w-0">
+                        <Label htmlFor="course-expected-normal">Normal semester</Label>
+                        <Input
+                          id="course-expected-normal"
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={newCourse.expectedSizeNormal ?? 0}
+                          onChange={(e) =>
+                            setNewCourse({
+                              ...newCourse,
+                              expectedSizeNormal: Math.max(
+                                0,
+                                Number.parseInt(e.target.value, 10) || 0,
+                              ),
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2 min-w-0">
+                        <Label htmlFor="course-expected-summer">Summer semester</Label>
+                        <Input
+                          id="course-expected-summer"
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={newCourse.expectedSizeSummer ?? 0}
+                          onChange={(e) =>
+                            setNewCourse({
+                              ...newCourse,
+                              expectedSizeSummer: Math.max(
+                                0,
+                                Number.parseInt(e.target.value, 10) || 0,
+                              ),
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Used in Student-based mode. Set to 0 if this course is not offered in that
+                      semester.
+                    </p>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="space-y-2 min-w-0">
+                        <Label htmlFor="course-sections-normal">Normal semester sections</Label>
+                        <Input
+                          id="course-sections-normal"
+                          type="number"
+                          min="0"
+                          max="20"
+                          value={newCourse.sectionsNormal}
+                          onChange={(e) =>
+                            setNewCourse({
+                              ...newCourse,
+                              sectionsNormal: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
+                            })
+                          }
+                          placeholder="1"
+                        />
+                      </div>
+                      <div className="space-y-2 min-w-0">
+                        <Label htmlFor="course-sections-summer">Summer semester sections</Label>
+                        <Input
+                          id="course-sections-summer"
+                          type="number"
+                          min="0"
+                          max="20"
+                          value={newCourse.sectionsSummer}
+                          onChange={(e) =>
+                            setNewCourse({
+                              ...newCourse,
+                              sectionsSummer: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
+                            })
+                          }
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Used in Section-based mode. Set to 0 if this course is not offered in that
+                      semester.
+                    </p>
                   </div>
                 </div>
                 </div>
@@ -944,194 +1074,154 @@ export default function CoursesPage() {
             </div>
           </div>
 
-          <div className="rounded-md border">
+          <div className="rounded-md border [&_[data-slot=table-container]]:overflow-x-visible">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>
                     <button
                       type="button"
-                      className={cn(
-                        "inline-flex items-center gap-1 font-medium hover:text-foreground",
-                        sortColumn === "code" ? "text-foreground" : "text-muted-foreground",
-                      )}
+                      className={courseSortHeaderButtonClass()}
+                      aria-sort={
+                        sortColumn === "code"
+                          ? sortDirection === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
                       onClick={() => handleSortColumn("code")}
                     >
                       Code
-                      {sortColumn === "code" ? (
-                        sortDirection === "asc" ? (
-                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        ) : (
-                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
-                      )}
+                      {courseSortHeaderIcon}
                     </button>
                   </TableHead>
                   <TableHead>
                     <button
                       type="button"
-                      className={cn(
-                        "inline-flex items-center gap-1 font-medium hover:text-foreground",
-                        sortColumn === "name" ? "text-foreground" : "text-muted-foreground",
-                      )}
+                      className={courseSortHeaderButtonClass()}
+                      aria-sort={
+                        sortColumn === "name"
+                          ? sortDirection === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
                       onClick={() => handleSortColumn("name")}
                     >
                       Name
-                      {sortColumn === "name" ? (
-                        sortDirection === "asc" ? (
-                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        ) : (
-                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
-                      )}
+                      {courseSortHeaderIcon}
                     </button>
                   </TableHead>
                   <TableHead className="text-center">
                     <button
                       type="button"
-                      className={cn(
-                        "inline-flex w-full items-center justify-center gap-1 font-medium hover:text-foreground",
-                        sortColumn === "creditHours" ? "text-foreground" : "text-muted-foreground",
-                      )}
+                      className={courseSortHeaderButtonClass(true)}
+                      aria-sort={
+                        sortColumn === "creditHours"
+                          ? sortDirection === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
                       onClick={() => handleSortColumn("creditHours")}
                     >
-                      Credit Hours
-                      {sortColumn === "creditHours" ? (
-                        sortDirection === "asc" ? (
-                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        ) : (
-                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
-                      )}
+                      Credits
+                      {courseSortHeaderIcon}
                     </button>
                   </TableHead>
                   <TableHead className="text-center">
                     <button
                       type="button"
-                      className={cn(
-                        "inline-flex w-full items-center justify-center gap-1 font-medium hover:text-foreground",
-                        sortColumn === "academicLevel" ? "text-foreground" : "text-muted-foreground",
-                      )}
+                      className={courseSortHeaderButtonClass(true)}
+                      aria-sort={
+                        sortColumn === "academicLevel"
+                          ? sortDirection === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
                       onClick={() => handleSortColumn("academicLevel")}
                     >
-                      Academic Level
-                      {sortColumn === "academicLevel" ? (
-                        sortDirection === "asc" ? (
-                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        ) : (
-                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
-                      )}
+                      Level
+                      {courseSortHeaderIcon}
                     </button>
                   </TableHead>
                   <TableHead>
                     <button
                       type="button"
-                      className={cn(
-                        "inline-flex items-center gap-1 font-medium hover:text-foreground",
-                        sortColumn === "deliveryMode" ? "text-foreground" : "text-muted-foreground",
-                      )}
+                      className={courseSortHeaderButtonClass()}
+                      aria-sort={
+                        sortColumn === "deliveryMode"
+                          ? sortDirection === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
                       onClick={() => handleSortColumn("deliveryMode")}
                     >
                       Delivery Mode
-                      {sortColumn === "deliveryMode" ? (
-                        sortDirection === "asc" ? (
-                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        ) : (
-                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
-                      )}
+                      {courseSortHeaderIcon}
                     </button>
                   </TableHead>
                   <TableHead className="text-center">
                     <button
                       type="button"
-                      className={cn(
-                        "inline-flex w-full items-center justify-center gap-1 font-medium hover:text-foreground",
-                        sortColumn === "isLab" ? "text-foreground" : "text-muted-foreground",
-                      )}
+                      className={courseSortHeaderButtonClass(true)}
+                      aria-sort={
+                        sortColumn === "isLab"
+                          ? sortDirection === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
                       onClick={() => handleSortColumn("isLab")}
                     >
                       Lab
-                      {sortColumn === "isLab" ? (
-                        sortDirection === "asc" ? (
-                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        ) : (
-                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
-                      )}
+                      {courseSortHeaderIcon}
                     </button>
                   </TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead className="text-center">
-                    <button
-                      type="button"
-                      className={cn(
-                        "inline-flex w-full items-center justify-center gap-1 font-medium hover:text-foreground",
-                        sortColumn === "sectionsNormal" ? "text-foreground" : "text-muted-foreground",
-                      )}
-                      onClick={() => handleSortColumn("sectionsNormal")}
-                    >
-                      Normal
-                      {sortColumn === "sectionsNormal" ? (
-                        sortDirection === "asc" ? (
-                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        ) : (
-                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
-                      )}
-                    </button>
+                  <TableHead className="hidden lg:table-cell text-muted-foreground">
+                    Department
                   </TableHead>
-                  <TableHead className="text-center">
-                    <button
-                      type="button"
-                      className={cn(
-                        "inline-flex w-full items-center justify-center gap-1 font-medium hover:text-foreground",
-                        sortColumn === "sectionsSummer" ? "text-foreground" : "text-muted-foreground",
-                      )}
-                      onClick={() => handleSortColumn("sectionsSummer")}
-                    >
-                      Summer
-                      {sortColumn === "sectionsSummer" ? (
-                        sortDirection === "asc" ? (
-                          <ArrowUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        ) : (
-                          <ArrowDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        )
-                      ) : (
-                        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden />
-                      )}
-                    </button>
+                  <TableHead className="text-center text-muted-foreground">
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex w-full cursor-default items-center justify-center font-medium">
+                            Scheduling
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          align="center"
+                          sideOffset={8}
+                          className="w-max max-w-none text-xs leading-snug"
+                        >
+                          <p className="whitespace-nowrap">
+                            <span className="font-medium">Normal:</span> First/Second scheduling data
+                          </p>
+                          <p className="mt-1 whitespace-nowrap">
+                            <span className="font-medium">Summer:</span> Summer scheduling data
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </TableHead>
-                  <TableHead className="w-[70px]">Actions</TableHead>
+                  <TableHead className="w-[70px] text-muted-foreground">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedCourses.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No courses found
                     </TableCell>
                   </TableRow>
                 ) : (
                   paginatedCourses.map((course, index) => (
                     <TableRow key={getCourseRowKey(course, index)}>
-                      <TableCell className="font-mono font-medium">{course.code}</TableCell>
-                      <TableCell>{course.name}</TableCell>
+                      <TableCell className="font-mono font-medium whitespace-nowrap">{course.code}</TableCell>
+                      <TableCell className="max-w-[14rem] whitespace-normal">{course.name}</TableCell>
                       <TableCell className="text-center">{course.creditHours}</TableCell>
                       <TableCell className="text-center">{course.academicLevel}</TableCell>
                       <TableCell>
@@ -1142,11 +1232,12 @@ export default function CoursesPage() {
                       <TableCell className="text-center">
                         <Badge variant={course.isLab ? "default" : "secondary"}>{course.isLab ? "Yes" : "No"}</Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <Badge className={getDepartmentColor(course.department)}>{course.department}</Badge>
                       </TableCell>
-                      <TableCell className="text-center">{course.sectionsNormal}</TableCell>
-                      <TableCell className="text-center">{course.sectionsSummer}</TableCell>
+                      <TableCell className="whitespace-normal px-1">
+                        <CourseSchedulingCell course={course} />
+                      </TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -1160,6 +1251,8 @@ export default function CoursesPage() {
                                 const next = {
                                   ...course,
                                   academicLevel: academicLevelFromCourseCode(course.code),
+                                  expectedSizeNormal: course.expectedSizeNormal ?? 0,
+                                  expectedSizeSummer: course.expectedSizeSummer ?? 0,
                                 }
                                 setEditingCourse(next)
                                 setInitialEditingCourse(next)
@@ -1279,10 +1372,10 @@ export default function CoursesPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Code</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Department</TableHead>
-                        <TableHead className="w-[70px]">Actions</TableHead>
+                        <TableHead className="text-muted-foreground">Code</TableHead>
+                        <TableHead className="text-muted-foreground">Name</TableHead>
+                        <TableHead className="text-muted-foreground">Department</TableHead>
+                        <TableHead className="w-[70px] text-muted-foreground">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1367,46 +1460,10 @@ export default function CoursesPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2 min-w-0">
-                  <Label htmlFor="edit-course-sections-normal">Normal semester sections</Label>
-                  <Input
-                    id="edit-course-sections-normal"
-                    type="number"
-                    min="0"
-                    max="20"
-                    value={editingCourse.sectionsNormal}
-                    onChange={(e) =>
-                      setEditingCourse({
-                        ...editingCourse,
-                        sectionsNormal: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2 min-w-0">
-                  <Label htmlFor="edit-course-sections-summer">Summer semester sections</Label>
-                  <Input
-                    id="edit-course-sections-summer"
-                    type="number"
-                    min="0"
-                    max="20"
-                    value={editingCourse.sectionsSummer}
-                    onChange={(e) =>
-                      setEditingCourse({
-                        ...editingCourse,
-                        sectionsSummer: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
-                      })
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Set to 0 if this course is not offered in summer.
-                  </p>
-                </div>
-              </div>
               <div className="space-y-2">
-                <Label>Course Name</Label>
+                <Label htmlFor="edit-course-name">Course Name</Label>
                 <Input
+                  id="edit-course-name"
                   value={editingCourse.name}
                   onChange={(e) => setEditingCourse({ ...editingCourse, name: e.target.value })}
                 />
@@ -1464,9 +1521,95 @@ export default function CoursesPage() {
                   checked={editingCourse.isLab}
                   onCheckedChange={(v) => setEditingCourse({ ...editingCourse, isLab: v === true })}
                 />
-                <Label htmlFor="edit-course-is-lab" className="text-sm font-normal cursor-pointer">
+                <Label htmlFor="edit-course-is-lab" className="cursor-pointer text-sm font-normal">
                   Lab course
                 </Label>
+              </div>
+
+              <hr className="border-border/60" />
+
+              <div className="grid gap-4">
+                <p className="text-sm font-medium leading-none">Expected Enrollment</p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2 min-w-0">
+                    <Label htmlFor="edit-course-expected-normal">Normal semester</Label>
+                    <Input
+                      id="edit-course-expected-normal"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={editingCourse.expectedSizeNormal ?? 0}
+                      onChange={(e) =>
+                        setEditingCourse({
+                          ...editingCourse,
+                          expectedSizeNormal: Math.max(
+                            0,
+                            Number.parseInt(e.target.value, 10) || 0,
+                          ),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2 min-w-0">
+                    <Label htmlFor="edit-course-expected-summer">Summer semester</Label>
+                    <Input
+                      id="edit-course-expected-summer"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={editingCourse.expectedSizeSummer ?? 0}
+                      onChange={(e) =>
+                        setEditingCourse({
+                          ...editingCourse,
+                          expectedSizeSummer: Math.max(
+                            0,
+                            Number.parseInt(e.target.value, 10) || 0,
+                          ),
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Used in Student-based mode. Set to 0 if this course is not offered in that semester.
+                </p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2 min-w-0">
+                    <Label htmlFor="edit-course-sections-normal">Normal semester sections</Label>
+                    <Input
+                      id="edit-course-sections-normal"
+                      type="number"
+                      min="0"
+                      max="20"
+                      value={editingCourse.sectionsNormal}
+                      onChange={(e) =>
+                        setEditingCourse({
+                          ...editingCourse,
+                          sectionsNormal: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2 min-w-0">
+                    <Label htmlFor="edit-course-sections-summer">Summer semester sections</Label>
+                    <Input
+                      id="edit-course-sections-summer"
+                      type="number"
+                      min="0"
+                      max="20"
+                      value={editingCourse.sectionsSummer}
+                      onChange={(e) =>
+                        setEditingCourse({
+                          ...editingCourse,
+                          sectionsSummer: Math.max(0, Number.parseInt(e.target.value, 10) || 0),
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Used in Section-based mode. Set to 0 if this course is not offered in that semester.
+                </p>
               </div>
             </div>
             </div>

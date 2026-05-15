@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense, useCallback, useMemo } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
+import { SchedulingModeControl } from "@/components/scheduling-mode-control";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import {
@@ -46,6 +47,8 @@ function TimetableGenerationRunActionsInner(props: TimetableGenerationRunActions
     () => parseMode(searchParams.get("mode")),
     [searchParams],
   );
+
+  const [missingExpectedSizes, setMissingExpectedSizes] = useState(false);
 
   const setSemesterMode = useCallback(
     (mode: "normal" | "summer") => {
@@ -106,8 +109,13 @@ function TimetableGenerationRunActionsInner(props: TimetableGenerationRunActions
   }
 
   return (
-    <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-3">
-      <div className="flex h-10 min-w-0 overflow-hidden rounded-md border border-border bg-background shadow-sm">
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+      <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+        <SchedulingModeControl
+          semesterMode={semesterMode}
+          onMissingExpectedSizes={setMissingExpectedSizes}
+        />
+        <div className="flex h-10 min-w-0 overflow-hidden rounded-md border border-border bg-background shadow-sm">
         <Label
           id="tg-semester-mode-label"
           htmlFor="tg-semester-mode"
@@ -136,12 +144,19 @@ function TimetableGenerationRunActionsInner(props: TimetableGenerationRunActions
             <SelectItem value="summer">Summer semester</SelectItem>
           </SelectContent>
         </Select>
+        </div>
+        <RefreshButton
+          semesterMode={semesterMode}
+          className="sm:w-auto sm:max-w-none"
+          onRunError={props.onAlgorithmRunError}
+        />
       </div>
-      <RefreshButton
-        semesterMode={semesterMode}
-        className="sm:w-auto sm:max-w-none"
-        onRunError={props.onAlgorithmRunError}
-      />
+      {missingExpectedSizes ? (
+        <p className="text-right text-xs text-amber-700 dark:text-amber-400 sm:max-w-md">
+          No courses have expected sizes set. The optimizer will fall back to automatic
+          estimates for all courses.
+        </p>
+      ) : null}
     </div>
   );
 }

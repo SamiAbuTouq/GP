@@ -19,8 +19,28 @@ type CourseWithDepartment = {
   dept_id: number;
   sections_normal: number;
   sections_summer: number;
+  expected_size_normal: number | null;
+  expected_size_summer: number | null;
   department: { dept_name: string };
 };
+
+function mapCourseToApi(course: CourseWithDepartment) {
+  return {
+    id: course.course_id,
+    code: course.course_code,
+    name: course.course_name,
+    creditHours: course.credit_hours,
+    academicLevel: academicLevelFromCourseCode(course.course_code),
+    deliveryMode: course.delivery_mode,
+    department: course.department.dept_name,
+    departmentId: course.dept_id,
+    sectionsNormal: course.sections_normal,
+    sectionsSummer: course.sections_summer,
+    expectedSizeNormal: course.expected_size_normal,
+    expectedSizeSummer: course.expected_size_summer,
+    isLab: course.is_lab,
+  };
+}
 
 @Injectable()
 export class CoursesService {
@@ -50,19 +70,7 @@ export class CoursesService {
       orderBy: { course_code: "asc" },
     });
 
-    return courses.map((course) => ({
-      id: course.course_id,
-      code: course.course_code,
-      name: course.course_name,
-      creditHours: course.credit_hours,
-      academicLevel: academicLevelFromCourseCode(course.course_code),
-      deliveryMode: course.delivery_mode,
-      department: course.department.dept_name,
-      departmentId: course.dept_id,
-      sectionsNormal: course.sections_normal,
-      sectionsSummer: course.sections_summer,
-      isLab: course.is_lab,
-    }));
+    return courses.map((course) => mapCourseToApi(course as CourseWithDepartment));
   }
 
   async findOne(id: number) {
@@ -77,19 +85,7 @@ export class CoursesService {
       throw new NotFoundException(`Course with ID ${id} not found`);
     }
 
-    return {
-      id: course.course_id,
-      code: course.course_code,
-      name: course.course_name,
-      creditHours: course.credit_hours,
-      academicLevel: academicLevelFromCourseCode(course.course_code),
-      deliveryMode: course.delivery_mode,
-      department: course.department.dept_name,
-      departmentId: course.dept_id,
-      sectionsNormal: course.sections_normal,
-      sectionsSummer: course.sections_summer,
-      isLab: course.is_lab,
-    };
+    return mapCourseToApi(course as CourseWithDepartment);
   }
 
   async create(dto: CreateCourseDto) {
@@ -116,6 +112,12 @@ export class CoursesService {
         dept_id: department.dept_id,
         sections_normal: dto.sectionsNormal ?? 1,
         sections_summer: dto.sectionsSummer ?? 0,
+        ...(dto.expectedSizeNormal !== undefined
+          ? { expected_size_normal: dto.expectedSizeNormal }
+          : {}),
+        ...(dto.expectedSizeSummer !== undefined
+          ? { expected_size_summer: dto.expectedSizeSummer }
+          : {}),
         is_lab: dto.isLab ?? false,
       },
       include: {
@@ -123,19 +125,7 @@ export class CoursesService {
       },
     })) as CourseWithDepartment;
 
-    return {
-      id: course.course_id,
-      code: course.course_code,
-      name: course.course_name,
-      creditHours: course.credit_hours,
-      academicLevel: level,
-      deliveryMode: course.delivery_mode,
-      department: course.department.dept_name,
-      departmentId: course.dept_id,
-      sectionsNormal: course.sections_normal,
-      sectionsSummer: course.sections_summer,
-      isLab: course.is_lab,
-    };
+    return mapCourseToApi(course);
   }
 
   async update(id: number, dto: UpdateCourseDto) {
@@ -181,6 +171,12 @@ export class CoursesService {
         ...(dto.sectionsSummer !== undefined
           ? { sections_summer: dto.sectionsSummer }
           : {}),
+        ...(dto.expectedSizeNormal !== undefined
+          ? { expected_size_normal: dto.expectedSizeNormal }
+          : {}),
+        ...(dto.expectedSizeSummer !== undefined
+          ? { expected_size_summer: dto.expectedSizeSummer }
+          : {}),
         ...(dto.isLab !== undefined ? { is_lab: dto.isLab } : {}),
       },
       include: {
@@ -188,19 +184,7 @@ export class CoursesService {
       },
     })) as CourseWithDepartment;
 
-    return {
-      id: course.course_id,
-      code: course.course_code,
-      name: course.course_name,
-      creditHours: course.credit_hours,
-      academicLevel: syncedLevel,
-      deliveryMode: course.delivery_mode,
-      department: course.department.dept_name,
-      departmentId: course.dept_id,
-      sectionsNormal: course.sections_normal,
-      sectionsSummer: course.sections_summer,
-      isLab: course.is_lab,
-    };
+    return mapCourseToApi(course);
   }
 
   async remove(id: number) {
@@ -227,19 +211,7 @@ export class CoursesService {
       orderBy: { course_code: "asc" },
     });
 
-    return courses.map((course) => ({
-      id: course.course_id,
-      code: course.course_code,
-      name: course.course_name,
-      creditHours: course.credit_hours,
-      academicLevel: academicLevelFromCourseCode(course.course_code),
-      deliveryMode: course.delivery_mode,
-      department: course.department.dept_name,
-      departmentId: course.dept_id,
-      sectionsNormal: course.sections_normal,
-      sectionsSummer: course.sections_summer,
-      isLab: course.is_lab,
-    }));
+    return courses.map((course) => mapCourseToApi(course as CourseWithDepartment));
   }
 
   async restoreArchived(id: number) {

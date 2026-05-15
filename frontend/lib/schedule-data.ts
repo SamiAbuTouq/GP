@@ -34,6 +34,8 @@ export type LectureConfig = {
   section_number?: string
 }
 
+export type SchedulingMode = "section_based" | "student_based"
+
 export type GWOParams = {
   num_wolves: number
   num_iterations: number
@@ -69,6 +71,8 @@ export type ScheduleConfig = {
   lectures: LectureConfig[]
   /** Set when refreshing config from the DB before a GWO run (`normal` | `summer`). */
   semester_mode?: "normal" | "summer"
+  /** How lecture `size` is derived before GWO (`section_based` | `student_based`). */
+  scheduling_mode?: SchedulingMode
   gwo_params: GWOParams
   soft_weights: SoftWeights
   /** Optional: maps unit IDs to their course code bundles (e.g. "CompEng_Y1S1" -> ["CS101","MATH101"]) */

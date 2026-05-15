@@ -66,6 +66,22 @@ __decorate([
     (0, class_validator_1.IsBoolean)(),
     __metadata("design:type", Boolean)
 ], CreateCourseDto.prototype, "isLab", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateIf)((_, v) => v != null),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(9999),
+    __metadata("design:type", Object)
+], CreateCourseDto.prototype, "expectedSizeNormal", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateIf)((_, v) => v != null),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(9999),
+    __metadata("design:type", Object)
+], CreateCourseDto.prototype, "expectedSizeSummer", void 0);
 class UpdateCourseDto {
 }
 exports.UpdateCourseDto = UpdateCourseDto;
@@ -117,4 +133,20 @@ __decorate([
     (0, class_validator_1.IsBoolean)(),
     __metadata("design:type", Boolean)
 ], UpdateCourseDto.prototype, "isLab", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateIf)((_, v) => v != null),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(9999),
+    __metadata("design:type", Object)
+], UpdateCourseDto.prototype, "expectedSizeNormal", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateIf)((_, v) => v != null),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(9999),
+    __metadata("design:type", Object)
+], UpdateCourseDto.prototype, "expectedSizeSummer", void 0);
 //# sourceMappingURL=course.dto.js.map

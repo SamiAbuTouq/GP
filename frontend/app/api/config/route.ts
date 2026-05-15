@@ -82,6 +82,8 @@ export async function POST(req: NextRequest) {
           : body.last_allowed_hour === null
             ? null
             : String(body.last_allowed_hour),
+      scheduling_mode:
+        body.scheduling_mode === "student_based" ? "student_based" : "section_based",
     };
 
     await writeFile(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");

@@ -32,6 +32,26 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         : 0
     }
     if (body.isLab !== undefined) payload.isLab = Boolean(body.isLab)
+    if (body.expectedSizeNormal !== undefined) {
+      if (body.expectedSizeNormal === null || body.expectedSizeNormal === '') {
+        payload.expectedSizeNormal = null
+      } else {
+        const n = Number(body.expectedSizeNormal)
+        if (Number.isFinite(n) && n >= 0) {
+          payload.expectedSizeNormal = Math.min(9999, Math.trunc(n))
+        }
+      }
+    }
+    if (body.expectedSizeSummer !== undefined) {
+      if (body.expectedSizeSummer === null || body.expectedSizeSummer === '') {
+        payload.expectedSizeSummer = null
+      } else {
+        const n = Number(body.expectedSizeSummer)
+        if (Number.isFinite(n) && n >= 0) {
+          payload.expectedSizeSummer = Math.min(9999, Math.trunc(n))
+        }
+      }
+    }
     return proxyToBackend(`/courses/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify(payload),

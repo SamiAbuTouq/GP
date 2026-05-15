@@ -330,6 +330,176 @@ function mostFrequentInt(values: number[], fallback: number): number {
   return best;
 }
 
+type SemesterPickRow = {
+  semester_id: number;
+  academic_year: string;
+  semester_type: number;
+};
+
+/** Newest term first: academic year start, then semester_type. */
+function pickNewestSemester(semesters: SemesterPickRow[]): SemesterPickRow | null {
+  if (semesters.length === 0) return null;
+  const startYear = (y: string) => {
+    const m = String(y).trim().match(/^(\d{4})/);
+    return m ? parseInt(m[1], 10) : 0;
+  };
+  return [...semesters].sort((a, b) => {
+    const yd = startYear(b.academic_year) - startYear(a.academic_year);
+    if (yd !== 0) return yd;
+    return b.semester_type - a.semester_type;
+  })[0] ?? null;
+}
+
+/** Sum of `Registered_Students` across distinct sections for a course in a CSV semester key. */
+function sumRegisteredInCsvTerm(
+  rows: CsvRow[],
+  courseCode: string,
+  semKey: string | null,
+): number {
+  if (semKey == null) return 0;
+  const bySection = new Map<string, number>();
+  for (const r of rows) {
+    if (r.Course_Number !== courseCode) continue;
+    if (`${r.Year}|${r.Semester}` !== semKey) continue;
+    const sn = String(r.Section).trim() || "1";
+    const reg = parseInt(r.Registered_Students, 10) || 0;
+    bySection.set(sn, Math.max(bySection.get(sn) ?? 0, reg));
+  }
+  if (bySection.size === 0) return 0;
+  let sum = 0;
+  for (const v of bySection.values()) sum += v;
+  return sum;
+}
+
+type TermExpectedStats = {
+  sectionSets: Map<number, Set<string>>;
+  sumTotal: Map<number, number>;
+};
+
+function buildTermExpectedStats(
+  entries: Array<{
+    course_id: number;
+    section_number: string;
+    registered_students: number | null;
+    timetable: { semester: SemesterPickRow | null };
+  }>,
+  targetSemesterId: number,
+): TermExpectedStats {
+  const sectionSets = new Map<number, Set<string>>();
+  const regBySection = new Map<number, Map<string, number>>();
+  for (const row of entries) {
+    const sem = row.timetable.semester;
+    if (!sem || sem.semester_id !== targetSemesterId) continue;
+    const cid = row.course_id;
+    let set = sectionSets.get(cid);
+    if (!set) {
+      set = new Set();
+      sectionSets.set(cid, set);
+    }
+    const sn = String(row.section_number).trim() || "1";
+    set.add(sn);
+    let perCourse = regBySection.get(cid);
+    if (!perCourse) {
+      perCourse = new Map();
+      regBySection.set(cid, perCourse);
+    }
+    const reg = row.registered_students ?? 0;
+    perCourse.set(sn, Math.max(perCourse.get(sn) ?? 0, reg));
+  }
+  const sumTotal = new Map<number, number>();
+  for (const [cid, perSection] of regBySection) {
+    let sum = 0;
+    for (const v of perSection.values()) sum += v;
+    sumTotal.set(cid, sum);
+  }
+  return { sectionSets, sumTotal };
+}
+
+function resolveExpectedSizeFromTermStats(
+  courseId: number,
+  stats: TermExpectedStats,
+): number {
+  const sectionCount = stats.sectionSets.get(courseId)?.size ?? 0;
+  if (sectionCount === 0) return 0;
+  return stats.sumTotal.get(courseId) ?? 0;
+}
+
+/** After schedule entries exist, set expected sizes from total enrollment per course in latest normal/summer terms. */
+async function updateCourseExpectedSizesFromSchedule(
+  prisma: PrismaClient,
+): Promise<{ normalTerm: string | null; summerTerm: string | null; updated: number }> {
+  const entries = await prisma.sectionScheduleEntry.findMany({
+    where: { timetable: { semester_id: { not: null } } },
+    select: {
+      course_id: true,
+      section_number: true,
+      registered_students: true,
+      timetable: {
+        select: {
+          semester_id: true,
+          semester: {
+            select: {
+              semester_id: true,
+              academic_year: true,
+              semester_type: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const semesterById = new Map<number, SemesterPickRow>();
+  for (const row of entries) {
+    const s = row.timetable.semester;
+    if (!s) continue;
+    semesterById.set(s.semester_id, {
+      semester_id: s.semester_id,
+      academic_year: s.academic_year,
+      semester_type: s.semester_type,
+    });
+  }
+
+  const allSems = [...semesterById.values()];
+  const normalTarget = pickNewestSemester(
+    allSems.filter((s) => s.semester_type === 1 || s.semester_type === 2),
+  );
+  const summerTarget = pickNewestSemester(
+    allSems.filter((s) => s.semester_type === 3),
+  );
+
+  const normalStats = normalTarget
+    ? buildTermExpectedStats(entries, normalTarget.semester_id)
+    : null;
+  const summerStats = summerTarget
+    ? buildTermExpectedStats(entries, summerTarget.semester_id)
+    : null;
+
+  const allCourses = await prisma.course.findMany({ select: { course_id: true } });
+  for (const c of allCourses) {
+    await prisma.course.update({
+      where: { course_id: c.course_id },
+      data: {
+        expected_size_normal: normalStats
+          ? resolveExpectedSizeFromTermStats(c.course_id, normalStats)
+          : null,
+        expected_size_summer: summerStats
+          ? resolveExpectedSizeFromTermStats(c.course_id, summerStats)
+          : null,
+      },
+    });
+  }
+
+  const normalTerm = normalTarget
+    ? `${normalTarget.academic_year} (${semesterNameFromType(normalTarget.semester_type)})`
+    : null;
+  const summerTerm = summerTarget
+    ? `${summerTarget.academic_year} (${semesterNameFromType(summerTarget.semester_type)})`
+    : null;
+
+  return { normalTerm, summerTerm, updated: allCourses.length };
+}
+
 // ────────────────────────────────────────────────────
 // MAIN SEED
 // ────────────────────────────────────────────────────
@@ -555,6 +725,14 @@ async function main() {
       latestNormalKeyForSections == null ? 1 : distinctInTerm(latestNormalKeyForSections);
     const sectionsSummerCount =
       latestSummerKeyForSections == null ? 0 : distinctInTerm(latestSummerKeyForSections);
+    const expectedSizeNormal =
+      sectionsNormalCount === 0
+        ? 0
+        : sumRegisteredInCsvTerm(rows, code, latestNormalKeyForSections);
+    const expectedSizeSummer =
+      sectionsSummerCount === 0
+        ? 0
+        : sumRegisteredInCsvTerm(rows, code, latestSummerKeyForSections);
 
     const course = await prisma.course.upsert({
       where: { course_code: code },
@@ -567,6 +745,8 @@ async function main() {
         is_lab: info.isLab,
         sections_normal: sectionsNormalCount,
         sections_summer: sectionsSummerCount,
+        expected_size_normal: expectedSizeNormal,
+        expected_size_summer: expectedSizeSummer,
       },
       create: {
         dept_id: info.deptId,
@@ -578,6 +758,8 @@ async function main() {
         is_lab: info.isLab,
         sections_normal: sectionsNormalCount,
         sections_summer: sectionsSummerCount,
+        expected_size_normal: expectedSizeNormal,
+        expected_size_summer: expectedSizeSummer,
       },
     });
     courseIdMap.set(code, course.course_id);
@@ -981,6 +1163,17 @@ async function main() {
     }
   }
   console.log(`   Section schedule entries done: ${entryCount} created, ${skippedCount} skipped\n`);
+
+  // ── 12. EXPECTED ENROLLMENT (from latest normal / summer schedule) ──
+  console.log("Updating course expected enrollment from schedule history...");
+  const expectedSizeResult = await updateCourseExpectedSizesFromSchedule(prisma);
+  if (expectedSizeResult.normalTerm) {
+    console.log(`   Normal semester source: ${expectedSizeResult.normalTerm}`);
+  }
+  if (expectedSizeResult.summerTerm) {
+    console.log(`   Summer semester source: ${expectedSizeResult.summerTerm}`);
+  }
+  console.log(`   Expected sizes refreshed for ${expectedSizeResult.updated} courses\n`);
 
   // ── SUMMARY ──────────────────────────────────────
   console.log("═══════════════════════════════════════════");

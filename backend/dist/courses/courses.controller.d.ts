@@ -18,6 +18,8 @@ export declare class CoursesController {
         departmentId: number;
         sectionsNormal: number;
         sectionsSummer: number;
+        expectedSizeNormal: number | null;
+        expectedSizeSummer: number | null;
         isLab: boolean;
     }[]>;
     findArchived(): Promise<{
@@ -31,6 +33,8 @@ export declare class CoursesController {
         departmentId: number;
         sectionsNormal: number;
         sectionsSummer: number;
+        expectedSizeNormal: number | null;
+        expectedSizeSummer: number | null;
         isLab: boolean;
     }[]>;
     create(dto: CreateCourseDto): Promise<{
@@ -44,6 +48,8 @@ export declare class CoursesController {
         departmentId: number;
         sectionsNormal: number;
         sectionsSummer: number;
+        expectedSizeNormal: number | null;
+        expectedSizeSummer: number | null;
         isLab: boolean;
     }>;
     update(id: number, dto: UpdateCourseDto): Promise<{
@@ -57,6 +63,8 @@ export declare class CoursesController {
         departmentId: number;
         sectionsNormal: number;
         sectionsSummer: number;
+        expectedSizeNormal: number | null;
+        expectedSizeSummer: number | null;
         isLab: boolean;
     }>;
     remove(id: number): Promise<{
@@ -92,6 +100,8 @@ export declare class CoursesController {
         departmentId: number;
         sectionsNormal: number;
         sectionsSummer: number;
+        expectedSizeNormal: number | null;
+        expectedSizeSummer: number | null;
         isLab: boolean;
     }>;
 }

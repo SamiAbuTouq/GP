@@ -13,6 +13,23 @@ exports.CoursesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const academic_level_util_1 = require("./academic-level.util");
+function mapCourseToApi(course) {
+    return {
+        id: course.course_id,
+        code: course.course_code,
+        name: course.course_name,
+        creditHours: course.credit_hours,
+        academicLevel: (0, academic_level_util_1.academicLevelFromCourseCode)(course.course_code),
+        deliveryMode: course.delivery_mode,
+        department: course.department.dept_name,
+        departmentId: course.dept_id,
+        sectionsNormal: course.sections_normal,
+        sectionsSummer: course.sections_summer,
+        expectedSizeNormal: course.expected_size_normal,
+        expectedSizeSummer: course.expected_size_summer,
+        isLab: course.is_lab,
+    };
+}
 let CoursesService = class CoursesService {
     constructor(prisma) {
         this.prisma = prisma;
@@ -39,19 +56,7 @@ let CoursesService = class CoursesService {
             },
             orderBy: { course_code: "asc" },
         });
-        return courses.map((course) => ({
-            id: course.course_id,
-            code: course.course_code,
-            name: course.course_name,
-            creditHours: course.credit_hours,
-            academicLevel: (0, academic_level_util_1.academicLevelFromCourseCode)(course.course_code),
-            deliveryMode: course.delivery_mode,
-            department: course.department.dept_name,
-            departmentId: course.dept_id,
-            sectionsNormal: course.sections_normal,
-            sectionsSummer: course.sections_summer,
-            isLab: course.is_lab,
-        }));
+        return courses.map((course) => mapCourseToApi(course));
     }
     async findOne(id) {
         const course = await this.prisma.course.findUnique({
@@ -63,19 +68,7 @@ let CoursesService = class CoursesService {
         if (!course) {
             throw new common_1.NotFoundException(`Course with ID ${id} not found`);
         }
-        return {
-            id: course.course_id,
-            code: course.course_code,
-            name: course.course_name,
-            creditHours: course.credit_hours,
-            academicLevel: (0, academic_level_util_1.academicLevelFromCourseCode)(course.course_code),
-            deliveryMode: course.delivery_mode,
-            department: course.department.dept_name,
-            departmentId: course.dept_id,
-            sectionsNormal: course.sections_normal,
-            sectionsSummer: course.sections_summer,
-            isLab: course.is_lab,
-        };
+        return mapCourseToApi(course);
     }
     async create(dto) {
         let department = await this.prisma.department.findFirst({
@@ -97,25 +90,19 @@ let CoursesService = class CoursesService {
                 dept_id: department.dept_id,
                 sections_normal: dto.sectionsNormal ?? 1,
                 sections_summer: dto.sectionsSummer ?? 0,
+                ...(dto.expectedSizeNormal !== undefined
+                    ? { expected_size_normal: dto.expectedSizeNormal }
+                    : {}),
+                ...(dto.expectedSizeSummer !== undefined
+                    ? { expected_size_summer: dto.expectedSizeSummer }
+                    : {}),
                 is_lab: dto.isLab ?? false,
             },
             include: {
                 department: true,
             },
         }));
-        return {
-            id: course.course_id,
-            code: course.course_code,
-            name: course.course_name,
-            creditHours: course.credit_hours,
-            academicLevel: level,
-            deliveryMode: course.delivery_mode,
-            department: course.department.dept_name,
-            departmentId: course.dept_id,
-            sectionsNormal: course.sections_normal,
-            sectionsSummer: course.sections_summer,
-            isLab: course.is_lab,
-        };
+        return mapCourseToApi(course);
     }
     async update(id, dto) {
         const existing = await this.prisma.course.findUnique({
@@ -155,25 +142,19 @@ let CoursesService = class CoursesService {
                 ...(dto.sectionsSummer !== undefined
                     ? { sections_summer: dto.sectionsSummer }
                     : {}),
+                ...(dto.expectedSizeNormal !== undefined
+                    ? { expected_size_normal: dto.expectedSizeNormal }
+                    : {}),
+                ...(dto.expectedSizeSummer !== undefined
+                    ? { expected_size_summer: dto.expectedSizeSummer }
+                    : {}),
                 ...(dto.isLab !== undefined ? { is_lab: dto.isLab } : {}),
             },
             include: {
                 department: true,
             },
         }));
-        return {
-            id: course.course_id,
-            code: course.course_code,
-            name: course.course_name,
-            creditHours: course.credit_hours,
-            academicLevel: syncedLevel,
-            deliveryMode: course.delivery_mode,
-            department: course.department.dept_name,
-            departmentId: course.dept_id,
-            sectionsNormal: course.sections_normal,
-            sectionsSummer: course.sections_summer,
-            isLab: course.is_lab,
-        };
+        return mapCourseToApi(course);
     }
     async remove(id) {
         const existing = await this.prisma.course.findUnique({
@@ -194,19 +175,7 @@ let CoursesService = class CoursesService {
             include: { department: true },
             orderBy: { course_code: "asc" },
         });
-        return courses.map((course) => ({
-            id: course.course_id,
-            code: course.course_code,
-            name: course.course_name,
-            creditHours: course.credit_hours,
-            academicLevel: (0, academic_level_util_1.academicLevelFromCourseCode)(course.course_code),
-            deliveryMode: course.delivery_mode,
-            department: course.department.dept_name,
-            departmentId: course.dept_id,
-            sectionsNormal: course.sections_normal,
-            sectionsSummer: course.sections_summer,
-            isLab: course.is_lab,
-        }));
+        return courses.map((course) => mapCourseToApi(course));
     }
     async restoreArchived(id) {
         const course = await this.prisma.course.findUnique({

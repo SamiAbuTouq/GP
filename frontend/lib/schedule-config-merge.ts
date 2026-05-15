@@ -66,6 +66,7 @@ export const SCHEDULE_CONFIG_DEFAULTS: Omit<
   },
   study_plan_units: {},
   last_allowed_hour: null,
+  scheduling_mode: "section_based" as const,
 };
 
 export function mergeConfigWithDefaults(parsed: Record<string, unknown>): ScheduleConfig {
@@ -102,5 +103,7 @@ export function mergeConfigWithDefaults(parsed: Record<string, unknown>): Schedu
         : parsed.last_allowed_hour === null
           ? null
           : String(parsed.last_allowed_hour),
+    scheduling_mode:
+      parsed.scheduling_mode === "student_based" ? "student_based" : "section_based",
   };
 }

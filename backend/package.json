@@ -22,6 +22,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:prod": "prisma migrate deploy",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:update-expected-sizes": "ts-node prisma/update-expected-sizes.ts",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {

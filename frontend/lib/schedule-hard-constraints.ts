@@ -245,15 +245,14 @@ export function collectScheduleHardViolations(
   }
 
   const { conflicts } = buildUiConflicts(entries, catalogue);
+  const overlapKeys = new Set<string>();
   for (const c of conflicts) {
-    const [x, y] = c.entries;
-    const a = lectureIdKey(x!.lecture_id);
-    const b = lectureIdKey(y!.lecture_id);
-    const [lo, hi] = a < b ? [a, b] : [b, a];
     const resource = c.detail.trim().toLowerCase();
-    const pairKey =
-      c.type === "room" ? `overlap:room:${resource}:${lo}:${hi}` : `overlap:lecturer:${resource}:${lo}:${hi}`;
-    pushViolation(out, pairKey, 1, `${c.type} overlap: ${c.detail}`);
+    const overlapKey =
+      c.type === "room" ? `overlap:room:${resource}` : `overlap:lecturer:${resource}`;
+    if (overlapKeys.has(overlapKey)) continue;
+    overlapKeys.add(overlapKey);
+    pushViolation(out, overlapKey, 1, `${c.type} overlap: ${c.detail}`);
   }
 
   return out;

@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsBoolean,
   IsEnum,
+  ValidateIf,
 } from "class-validator";
 import { DeliveryMode } from "@prisma/client";
 
@@ -52,6 +53,20 @@ export class CreateCourseDto {
   @IsOptional()
   @IsBoolean()
   isLab?: boolean;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  expectedSizeNormal?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  expectedSizeSummer?: number | null;
 }
 
 export class UpdateCourseDto {
@@ -94,4 +109,18 @@ export class UpdateCourseDto {
   @IsOptional()
   @IsBoolean()
   isLab?: boolean;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  expectedSizeNormal?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  expectedSizeSummer?: number | null;
 }

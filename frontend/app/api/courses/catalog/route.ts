@@ -107,6 +107,8 @@ export async function GET() {
       department: c.department.dept_name,
       sectionsNormal: c.sections_normal,
       sectionsSummer: c.sections_summer,
+      expectedSizeNormal: c.expected_size_normal,
+      expectedSizeSummer: c.expected_size_summer,
       sectionsInLatestSchedule: sectionSetsByCourseId.get(c.course_id)?.size ?? 0,
       isLab: c.is_lab,
     }))
