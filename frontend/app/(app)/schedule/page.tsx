@@ -1,6 +1,6 @@
 "use client"
 
-import { type ReactNode, useEffect, useMemo, useState } from "react"
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Sidebar } from "@/components/sidebar"
@@ -107,6 +107,24 @@ type TimetableDto = {
     fitnessScore: number
     isValid: boolean
   }
+}
+
+function comparePublishedTimetablesAcademic(a: TimetableDto, b: TimetableDto): number {
+  const ay = parseAcademicYearStart(normalizeAcademicYear(a.academicYear) ?? "") ?? 0
+  const by = parseAcademicYearStart(normalizeAcademicYear(b.academicYear) ?? "") ?? 0
+  if (by !== ay) return by - ay
+  if (b.semesterType !== a.semesterType) return b.semesterType - a.semesterType
+  if (b.versionNumber !== a.versionNumber) return b.versionNumber - a.versionNumber
+  const tb = new Date(b.generatedAt).getTime()
+  const ta = new Date(a.generatedAt).getTime()
+  if (tb !== ta) return tb - ta
+  return b.timetableId - a.timetableId
+}
+
+function pickLatestPublishedTimetable(catalog: TimetableDto[]): TimetableDto | null {
+  const published = catalog.filter((t) => t.semesterId != null)
+  if (published.length === 0) return null
+  return [...published].sort(comparePublishedTimetablesAcademic)[0] ?? null
 }
 
 function timetableStatusBadges(tt: TimetableDto) {
@@ -526,11 +544,14 @@ export function ScheduleViewerPage({
   enableMySchedule = false,
   hideScheduleSelection = false,
   autoSelectLatestTimetable = false,
+  publishedTimetablesOnly = false,
   hideVersionInTitle = false,
 }: {
   enableMySchedule?: boolean
   hideScheduleSelection?: boolean
   autoSelectLatestTimetable?: boolean
+  /** Lecturer view: published timetables only, year/term picker, default to latest period. */
+  publishedTimetablesOnly?: boolean
   hideVersionInTitle?: boolean
 } = {}) {
   const searchParams = useSearchParams()
@@ -552,7 +573,10 @@ export function ScheduleViewerPage({
   const [listSortField, setListSortField] = useState<ListSortField>("courseCode")
   const [listSortDirection, setListSortDirection] = useState<SortDirection>("asc")
   const [semesters, setSemesters] = useState<SemesterDto[]>([])
-  const [timetableSource, setTimetableSource] = useState<TimetableSource>("all")
+  const [timetableSource, setTimetableSource] = useState<TimetableSource>(
+    publishedTimetablesOnly ? "published" : "all",
+  )
+  const publishedDefaultsApplied = useRef(false)
   const [publishedYear, setPublishedYear] = useState<string>("")
   const [publishedSemesterType, setPublishedSemesterType] = useState<number>(1)
 
@@ -616,7 +640,7 @@ export function ScheduleViewerPage({
 
   // Load semesters
   useEffect(() => {
-    if (autoSelectLatestTimetable) {
+    if (autoSelectLatestTimetable || publishedTimetablesOnly) {
       setLoadingSemesters(false)
       return
     }
@@ -647,7 +671,7 @@ export function ScheduleViewerPage({
     return () => {
       mounted = false
     }
-  }, [autoSelectLatestTimetable])
+  }, [autoSelectLatestTimetable, publishedTimetablesOnly])
 
   const publishedYearValid = isValidAcademicYear(publishedYear)
 
@@ -700,7 +724,8 @@ export function ScheduleViewerPage({
 
   // Load published timetable catalog for "Published only" filters.
   useEffect(() => {
-    if (autoSelectLatestTimetable || timetableSource !== "published") return
+    if (autoSelectLatestTimetable) return
+    if (!publishedTimetablesOnly && timetableSource !== "published") return
     let mounted = true
     setLoadingPublishedCatalog(true)
     setPublishedCatalog([])
@@ -721,7 +746,18 @@ export function ScheduleViewerPage({
     return () => {
       mounted = false
     }
-  }, [timetableSource, autoSelectLatestTimetable])
+  }, [timetableSource, autoSelectLatestTimetable, publishedTimetablesOnly])
+
+  useEffect(() => {
+    if (!publishedTimetablesOnly || loadingPublishedCatalog || publishedCatalog.length === 0) return
+    if (publishedDefaultsApplied.current) return
+    const latest = pickLatestPublishedTimetable(publishedCatalog)
+    if (!latest) return
+    publishedDefaultsApplied.current = true
+    const year = normalizeAcademicYear(latest.academicYear)
+    if (year) setPublishedYear(year)
+    setPublishedSemesterType(latest.semesterType)
+  }, [publishedTimetablesOnly, loadingPublishedCatalog, publishedCatalog])
 
   useEffect(() => {
     if (timetableSource !== "published") return
@@ -740,10 +776,13 @@ export function ScheduleViewerPage({
     if (timetableSource !== "published") return
     if (publishedSemesterTypesForYear.size === 0) return
     if (!publishedSemesterTypesForYear.has(publishedSemesterType)) {
-      const firstEnabled = PUBLISHED_SEMESTER_TYPES.find((o) =>
+      const enabled = PUBLISHED_SEMESTER_TYPES.filter((o) =>
         publishedSemesterTypesForYear.has(o.value),
       )
-      if (firstEnabled) setPublishedSemesterType(firstEnabled.value)
+      if (enabled.length > 0) {
+        const latestSemester = enabled.reduce((a, b) => (a.value > b.value ? a : b))
+        setPublishedSemesterType(latestSemester.value)
+      }
     }
   }, [timetableSource, publishedSemesterTypesForYear, publishedSemesterType])
 
@@ -790,7 +829,7 @@ export function ScheduleViewerPage({
 
   // Load timetables when scope changes (all, drafts only, or one semester).
   useEffect(() => {
-    if (autoSelectLatestTimetable) return
+    if (autoSelectLatestTimetable || publishedTimetablesOnly) return
     let mounted = true
 
     setLoadingTimetables(true)
@@ -847,7 +886,14 @@ export function ScheduleViewerPage({
     return () => {
       mounted = false
     }
-  }, [timetableSource, autoSelectLatestTimetable, requestedTimetableId, isSimulationView, simulationResultTimetableId])
+  }, [
+    timetableSource,
+    autoSelectLatestTimetable,
+    publishedTimetablesOnly,
+    requestedTimetableId,
+    isSimulationView,
+    simulationResultTimetableId,
+  ])
 
   // Auto-select latest timetable (newest first from backend ordering).
   useEffect(() => {
@@ -908,9 +954,9 @@ export function ScheduleViewerPage({
     setCourseFilter("all")
     setLecturerFilter("all")
     setRoomFilter("all")
-    setMyScheduleOnly(false)
+    if (!enableMySchedule) setMyScheduleOnly(false)
     setSearchText("")
-  }, [timetableId])
+  }, [timetableId, enableMySchedule])
 
   // Load entries for selected timetable
   useEffect(() => {
@@ -1612,10 +1658,14 @@ export function ScheduleViewerPage({
 
   const isReady = !loadingTimetables && !!timetableId
   const isViewerLoading =
-    loadingSemesters ||
+    (!publishedTimetablesOnly && loadingSemesters) ||
     loadingTimetables ||
-    (timetableSource === "published" && loadingPublishedCatalog) ||
+    ((publishedTimetablesOnly || timetableSource === "published") && loadingPublishedCatalog) ||
     loadingEntries
+
+  const showScheduleSelection = !hideScheduleSelection || publishedTimetablesOnly
+  const scheduleSelectionPublishedLayout =
+    publishedTimetablesOnly || timetableSource === "published"
 
   return (
     <div className="flex h-screen bg-background">
@@ -1779,17 +1829,26 @@ export function ScheduleViewerPage({
           ) : null}
 
           <div className="space-y-4">
-            {!hideScheduleSelection ? (
+            {showScheduleSelection ? (
             <CompactCollapsibleCard title="Schedule Selection">
                   <CardDescription className="text-xs">
-                    {timetableSource === "published"
-                      ? "Browse published timetables by academic year and term."
+                    {scheduleSelectionPublishedLayout
+                      ? publishedTimetablesOnly
+                        ? "Choose a published timetable by academic year and term. The latest period is selected by default."
+                        : "Browse published timetables by academic year and term."
                       : "List GWO drafts (no semester), everything, or published timetables. Then pick a version to view."}
                   </CardDescription>
                   <div className="grid gap-3">
                     <div
-                      className={`grid gap-2 ${timetableSource === "published" ? "md:grid-cols-3" : "md:grid-cols-2"}`}
+                      className={`grid gap-2 ${
+                        publishedTimetablesOnly
+                          ? "md:grid-cols-2"
+                          : scheduleSelectionPublishedLayout
+                            ? "md:grid-cols-3"
+                            : "md:grid-cols-2"
+                      }`}
                     >
+                      {!publishedTimetablesOnly ? (
                       <div className="space-y-1">
                         <div className="text-xs font-medium text-muted-foreground">Timetable source</div>
                         <Select
@@ -1807,7 +1866,8 @@ export function ScheduleViewerPage({
                           </SelectContent>
                         </Select>
                       </div>
-                      {timetableSource !== "published" ? (
+                      ) : null}
+                      {!scheduleSelectionPublishedLayout ? (
                       <div className="space-y-1">
                         <div className="text-xs font-medium text-muted-foreground">Timetable version</div>
                         <Select
@@ -1915,10 +1975,12 @@ export function ScheduleViewerPage({
                       )}
                     </div>
                     {!loadingPublishedCatalog &&
-                    timetableSource === "published" &&
+                    scheduleSelectionPublishedLayout &&
                     publishedAcademicYears.length === 0 ? (
                       <p className="text-xs text-muted-foreground">
-                        No published timetables yet. Publish a draft to browse it here.
+                        {publishedTimetablesOnly
+                          ? "No published timetables are available yet."
+                          : "No published timetables yet. Publish a draft to browse it here."}
                       </p>
                     ) : null}
                   </div>
@@ -2127,15 +2189,18 @@ export function ScheduleViewerPage({
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading schedule…
                     </div>
-                  ) : !autoSelectLatestTimetable && !loadingTimetables && timetables.length === 0 ? (
+                  ) : !autoSelectLatestTimetable &&
+                    !publishedTimetablesOnly &&
+                    !loadingTimetables &&
+                    timetables.length === 0 ? (
                     <div className="p-6 text-sm text-muted-foreground">
                       No timetables match this source. Try &quot;All timetables&quot; or store a schedule from GWO
                       first.
                     </div>
                   ) : !timetableId ? (
                     <div className="p-6 text-sm text-muted-foreground">
-                      {autoSelectLatestTimetable
-                        ? "No schedule found in the database yet."
+                      {autoSelectLatestTimetable || publishedTimetablesOnly
+                        ? "No published schedule is available yet."
                         : "No schedule selected. Please select a schedule to view."}
                     </div>
                   ) : exportRows.length === 0 ? (
