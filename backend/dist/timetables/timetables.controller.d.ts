@@ -84,7 +84,7 @@ export declare class TimetablesController {
             day: string;
             lecturer: string;
             allowed_lecturers: string[];
-            preference_issues: never[];
+            preference_issues: string[];
             has_pref_warning: boolean;
             delivery_mode: string;
             session_type: string;
@@ -139,11 +139,11 @@ export declare class TimetablesController {
             preferred_slots: string[];
             unpreferred_slots: string[];
             warning_count: number;
-            warnings: never[];
+            warnings: import("./schedule-soft-metrics").LecturerPreferenceWarning[];
             gap_count: number;
         }[];
-        preference_warnings: never[];
-        gap_warnings: never[];
+        preference_warnings: import("./schedule-soft-metrics").LecturerPreferenceWarning[];
+        gap_warnings: import("./schedule-soft-metrics").GapWarning[];
         utilization_info: {
             room: string;
             course: string;
@@ -211,8 +211,14 @@ export declare class TimetablesController {
             delivery_mode: string;
             session_type: string;
         }[];
-        study_plan_units: {};
-        study_plan_summary: never[];
+        study_plan_units: Record<string, string[]>;
+        study_plan_summary: {
+            unit_id: string;
+            courses: string[];
+            conflict_count: number;
+            gap_count: number;
+            single_session_day_count: number;
+        }[];
         unit_conflict_violations: {
             unit: string;
             course_a: string;
@@ -220,8 +226,8 @@ export declare class TimetablesController {
             timeslot_a: string;
             timeslot_b: string;
         }[];
-        student_gap_warnings: never[];
-        single_session_day_warnings: never[];
+        student_gap_warnings: import("./schedule-soft-metrics").StudentGapWarning[];
+        single_session_day_warnings: import("./schedule-soft-metrics").SingleSessionDayWarning[];
     }>;
     replaceSchedulePayload(id: number, body: {
         schedule?: unknown[];

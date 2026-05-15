@@ -906,6 +906,15 @@ export function SoftConstraintWarningsPanel({ asSection = false }: { asSection?:
 
 const clamp = (v: number, min = 0, max = 100) => Math.min(max, Math.max(min, v));
 
+/** σ=0 → 100%, σ=avg → 50%, σ≥2×avg → 0% (linear between anchor points). */
+function scoreFromStdDev(sigma: number, average: number): number {
+  if (sigma <= 0) return 100;
+  if (average <= 0) return sigma === 0 ? 100 : 0;
+  if (sigma >= 2 * average) return 0;
+  if (sigma <= average) return clamp(100 - (sigma / average) * 50);
+  return clamp(50 - ((sigma - average) / average) * 50);
+}
+
 export function SoftConstraintMetricsPanel({
   embedded = false,
 }: {
@@ -993,12 +1002,17 @@ export function SoftConstraintMetricsPanel({
   const studentGapsScore = scoreFromRatio(affectedStudentGapUnits, totalUnits);
   const singleSessionScore = scoreFromRatio(affectedSingleSessionUnits, totalUnits);
 
-  const roomUtilScore = clamp(timetableSeatUtilizationPct);
-  const roomUtilShell: "green" | "amber" | "red" =
-    roomUtilScore >= 80 ? "green" : roomUtilScore >= 60 ? "amber" : "red";
+  const zeroEnrollmentCount = utilizationInfo.filter(
+    (u) => (u.class_size ?? 0) === 0,
+  ).length;
+  const missingEnrollmentData =
+    utilizationInfo.length > 0 &&
+    zeroEnrollmentCount > utilizationInfo.length / 2;
 
-  const workloadBalanceScore = clamp(100 - workloadStdDev * 50);
-  const distributeClassesScore = clamp(100 - distStdDev * 50);
+  const roomUtilScore = clamp(timetableSeatUtilizationPct);
+
+  const workloadBalanceScore = scoreFromStdDev(workloadStdDev, avgWorkload);
+  const distributeClassesScore = scoreFromStdDev(distStdDev, avgDist);
 
   // Minimize gaps: score based on total gap-hours relative to total scheduled hours.
   const totalGapHours = gapWarnings.reduce((sum, w) => sum + Number(w.gap_hours ?? w.gap ?? 0), 0);
@@ -1008,21 +1022,34 @@ export function SoftConstraintMetricsPanel({
     gapDenom > 0 ? clamp(100 - (totalGapHours / gapDenom) * 100) : 100;
 
   const statusFromScore = (score: number): "good" | "warn" | "bad" =>
-    score >= 80 ? "good" : score >= 60 ? "warn" : "bad";
+    score >= 80 ? "good" : score >= 50 ? "warn" : "bad";
+
+  const shellFromPerformanceScore = (score: number | null): "green" | "amber" | "red" => {
+    if (score == null) return "amber";
+    if (score >= 80) return "green";
+    if (score >= 50) return "amber";
+    return "red";
+  };
+
+  const performanceShellStyles = {
+    green:
+      "border-emerald-200/80 dark:border-emerald-700/60 bg-gradient-to-br from-emerald-50/90 to-card dark:from-emerald-950/35",
+    amber:
+      "border-amber-200/80 dark:border-amber-700/60 bg-gradient-to-br from-amber-50/90 to-card dark:from-amber-950/35",
+    red:
+      "border-rose-200/80 dark:border-rose-700/60 bg-gradient-to-br from-rose-50/90 to-card dark:from-rose-950/35",
+  } as const;
 
   const metrics: {
     key: string;
     label: string;
-    /** Pastel shell + border hue (single border, no contrasting accent stripe) */
-    shell: "green" | "amber" | "red";
     weight: number;
     value: string;
-    score: number;
+    score: number | null;
   }[] = [
     {
       key: "preferred_timeslot",
       label: "Preferred timeslot",
-      shell: "green",
       weight: softWeights.preferred_timeslot,
       value: `${notPrefCount} not-in-preferred`,
       score: preferencePreferredScore,
@@ -1030,7 +1057,6 @@ export function SoftConstraintMetricsPanel({
     {
       key: "unpreferred_timeslot",
       label: "Unpreferred timeslot",
-      shell: "green",
       weight: softWeights.unpreferred_timeslot,
       value: `${unprefCount} in avoided slot`,
       score: preferenceUnpreferredScore,
@@ -1038,7 +1064,6 @@ export function SoftConstraintMetricsPanel({
     {
       key: "minimize_gaps",
       label: "Minimize gaps",
-      shell: "amber",
       weight: softWeights.minimize_gaps,
       value: `${gapWarnings.length} gaps`,
       score: gapRatioScore,
@@ -1046,15 +1071,15 @@ export function SoftConstraintMetricsPanel({
     {
       key: "room_utilization",
       label: "Room seat fill",
-      shell: roomUtilShell,
       weight: softWeights.room_utilization,
-      value: `${timetableSeatUtilizationPct.toFixed(1)}% of catalog seat capacity used`,
-      score: roomUtilScore,
+      value: missingEnrollmentData
+        ? "No enrollment data (registration counts not saved)"
+        : `${timetableSeatUtilizationPct.toFixed(1)}% of catalog seat capacity used`,
+      score: missingEnrollmentData ? null : roomUtilScore,
     },
     {
       key: "balanced_workload",
       label: "Balanced workload",
-      shell: "red",
       weight: softWeights.balanced_workload,
       value: `σ = ${workloadStdDev.toFixed(2)}`,
       score: workloadBalanceScore,
@@ -1062,7 +1087,6 @@ export function SoftConstraintMetricsPanel({
     {
       key: "distribute_classes",
       label: "Distribute classes",
-      shell: "amber",
       weight: softWeights.distribute_classes,
       value: `σ = ${distStdDev.toFixed(2)}`,
       score: distributeClassesScore,
@@ -1070,7 +1094,6 @@ export function SoftConstraintMetricsPanel({
     {
       key: "student_gaps",
       label: "Student gaps",
-      shell: "green",
       weight: softWeights.student_gaps ?? 70,
       value: `${studentGapWarnings.length} gap(s)`,
       score: studentGapsScore,
@@ -1078,7 +1101,6 @@ export function SoftConstraintMetricsPanel({
     {
       key: "single_session_day",
       label: "Single-session day",
-      shell: "green",
       weight: softWeights.single_session_day ?? 50,
       value: `${earlyDayWarnings.length} issue(s)`,
       score: singleSessionScore,
@@ -1088,16 +1110,10 @@ export function SoftConstraintMetricsPanel({
   const metricsInner = (
         <div className="p-4 pt-0 sm:pt-4">
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            {metrics.map(({ key, label, shell, weight, value, score }) => {
-              const status = statusFromScore(score);
-              const shellStyles = {
-                green:
-                  "border-emerald-200/80 dark:border-emerald-700/60 bg-gradient-to-br from-emerald-50/90 to-card dark:from-emerald-950/35",
-                amber:
-                  "border-amber-200/80 dark:border-amber-700/60 bg-gradient-to-br from-amber-50/90 to-card dark:from-amber-950/35",
-                red:
-                  "border-rose-200/80 dark:border-rose-700/60 bg-gradient-to-br from-rose-50/90 to-card dark:from-rose-950/35",
-              };
+            {metrics.map(({ key, label, weight, value, score }) => {
+              const status =
+                score == null ? "warn" : statusFromScore(score);
+              const shell = shellFromPerformanceScore(score);
               const statusTextColors = {
                 good: "text-emerald-800 dark:text-emerald-200",
                 warn: "text-amber-800 dark:text-amber-200",
@@ -1110,11 +1126,11 @@ export function SoftConstraintMetricsPanel({
               };
               const statusLabel =
                 status === "good" ? "On target" : status === "warn" ? "Watch" : "Attention";
-              const fillPct = clamp(score);
+              const fillPct = score == null ? 0 : clamp(score);
               return (
                 <div
                   key={key}
-                  className={`rounded-xl border p-4 shadow-sm ${shellStyles[shell]}`}
+                  className={`rounded-xl border p-4 shadow-sm ${performanceShellStyles[shell]}`}
                 >
                   <div className="mb-3 flex items-start justify-between gap-2">
                     <span className="text-sm font-semibold leading-snug text-foreground">
@@ -1134,7 +1150,9 @@ export function SoftConstraintMetricsPanel({
                   <div className="mt-3 space-y-1.5">
                     <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                       <span>Performance</span>
-                      <span className="tabular-nums text-muted-foreground">{fillPct.toFixed(0)}%</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {score == null ? "N/A" : `${fillPct.toFixed(0)}%`}
+                      </span>
                     </div>
                     <div className="h-2.5 overflow-hidden rounded-full bg-muted/90 ring-1 ring-inset ring-border/40">
                       <div
@@ -1957,10 +1975,10 @@ export function StudyPlanTabPanel() {
                                         <p className="text-[13px] font-medium text-foreground/80">{pseudoLabel}</p>
                                       ) : (
                                         <>
-                                          <p className="font-mono text-[11px] font-bold text-muted-foreground">{code}</p>
-                                          <p className="mt-0.5 text-xs font-medium text-foreground/90 leading-snug line-clamp-2">
+                                          <p className="text-[13px] font-semibold text-foreground leading-snug line-clamp-2">
                                             {name ?? "Course name unavailable"}
                                           </p>
+                                          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{code}</p>
                                         </>
                                       )}
                                     </div>
@@ -2036,10 +2054,10 @@ export function StudyPlanTabPanel() {
                                     key={`${unitId}-dialog-sd-${idx}-${w.course}-${w.day ?? "na"}`}
                                     className="rounded border border-sky-200 bg-sky-50 px-3 py-2 text-sm dark:border-sky-700/60 dark:bg-sky-950/35"
                                   >
-                                    <div className="font-mono font-semibold text-foreground">{w.course}</div>
-                                    <div className="mt-0.5 text-xs text-foreground/80">
+                                    <div className="text-sm font-semibold text-foreground leading-snug">
                                       {entryNameByCode.get(w.course) ?? "Course name unavailable"}
                                     </div>
+                                    <div className="mt-0.5 font-mono text-xs text-muted-foreground">{w.course}</div>
                                     <div className="mt-1 text-xs text-foreground/80">
                                       Day: {w.day ?? "N/A"}
                                     </div>

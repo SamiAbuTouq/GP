@@ -72,6 +72,8 @@ import {
   defaultNotificationPrefsMerged,
 } from "@/lib/notification-prefs";
 import { cn } from "@/lib/utils";
+import { isPasswordPolicyMet } from "@/lib/password-policy";
+import { PasswordRequirementsChecklist } from "@/components/password-requirements-checklist";
 
 function AvatarCropDialog({
   open,
@@ -556,16 +558,11 @@ function SettingsContent() {
     message: string;
   } | null>(null);
 
-  // Password validation
-  const passwordValidation = {
-    minLength: passwordData.newPassword.length >= 8,
-    hasUppercase: /[A-Z]/.test(passwordData.newPassword),
-    hasLowercase: /[a-z]/.test(passwordData.newPassword),
-    hasNumber: /\d/.test(passwordData.newPassword),
-    passwordsMatch: passwordData.newPassword === passwordData.confirmPassword && passwordData.confirmPassword !== "",
-  };
-  
-  const isPasswordValid = Object.values(passwordValidation).every(Boolean);
+  const passwordsMatch =
+    passwordData.newPassword === passwordData.confirmPassword &&
+    passwordData.confirmPassword !== "";
+
+  const isPasswordValid = isPasswordPolicyMet(passwordData.newPassword) && passwordsMatch;
 
   const hasFetchedProfile = useRef(false);
 
@@ -1232,20 +1229,22 @@ function SettingsContent() {
                       }
                     />
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <PasswordField
-                        id="new-password"
-                        label="New Password"
-                        value={passwordData.newPassword}
-                        onChange={(value) => {
-                          setPasswordFeedback(null);
-                          setPasswordData((prev) => ({ ...prev, newPassword: value }));
-                        }}
-                        placeholder="Enter new password"
-                        shown={showPasswords.new}
-                        onToggleShown={() =>
-                          setShowPasswords((prev) => ({ ...prev, new: !prev.new }))
-                        }
-                      />
+                      <div className="space-y-2">
+                        <PasswordField
+                          id="new-password"
+                          label="New Password"
+                          value={passwordData.newPassword}
+                          onChange={(value) => {
+                            setPasswordFeedback(null);
+                            setPasswordData((prev) => ({ ...prev, newPassword: value }));
+                          }}
+                          placeholder="Enter new password"
+                          shown={showPasswords.new}
+                          onToggleShown={() =>
+                            setShowPasswords((prev) => ({ ...prev, new: !prev.new }))
+                          }
+                        />
+                      </div>
                       <PasswordField
                         id="confirm-password"
                         label="Confirm Password"
@@ -1262,32 +1261,17 @@ function SettingsContent() {
                       />
                     </div>
 
-                    {/* Password Requirements */}
-                    {passwordData.newPassword && (
-                      <div className="rounded-lg border p-4 bg-muted/30">
-                        <p className="mb-3 text-sm font-medium">Password Requirements</p>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {[
-                            { key: "minLength", label: "At least 8 characters" },
-                            { key: "hasUppercase", label: "One uppercase letter" },
-                            { key: "hasLowercase", label: "One lowercase letter" },
-                            { key: "hasNumber", label: "One number" },
-                            { key: "passwordsMatch", label: "Passwords match" },
-                          ].map((req) => (
-                            <div key={req.key} className="flex items-center gap-2 text-sm">
-                              {passwordValidation[req.key as keyof typeof passwordValidation] ? (
-                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                              ) : (
-                                <XCircle className="h-4 w-4 text-muted-foreground" />
-                              )}
-                              <span className={passwordValidation[req.key as keyof typeof passwordValidation] ? "text-foreground" : "text-muted-foreground"}>
-                                {req.label}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    <PasswordRequirementsChecklist
+                      variant="settings"
+                      password={passwordData.newPassword}
+                      extraRules={[
+                        {
+                          id: "matches",
+                          label: "Passwords match",
+                          passed: passwordsMatch,
+                        },
+                      ]}
+                    />
                     {passwordFeedback && (
                       <Alert
                         variant={passwordFeedback.type === "error" ? "destructive" : "default"}

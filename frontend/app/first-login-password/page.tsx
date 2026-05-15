@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -9,14 +9,15 @@ import {
   EyeOff,
   CheckCircle2,
   XCircle,
-  Check,
-  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import { ApiClient } from "@/lib/api-client";
+import { isPasswordPolicyMet } from "@/lib/password-policy";
+import { PasswordRequirementsHint } from "@/components/password-requirements-hint";
+import { PasswordRequirementsChecklist } from "@/components/password-requirements-checklist";
 
 const INPUT_BASE_CLASSES =
   "form-input h-12 w-full rounded-[10px] border-[1.5px] border-white/20 bg-white/10 px-4 pr-12 text-[0.95rem] text-white placeholder:text-white/40 backdrop-blur-[4px] transition-all duration-[250ms] ease-out focus:bg-white/15 focus:border-[#48CAE4] focus:shadow-[0_0_0_3px_rgba(72,202,228,0.18)] focus:outline-none";
@@ -52,19 +53,10 @@ function FirstLoginPasswordForm() {
     return () => clearTimeout(t);
   }, [isSuccess, router]);
 
-  const passwordChecks = useMemo(
-    () => ({
-      minLength: newPassword.length >= 8,
-      hasUppercase: /[A-Z]/.test(newPassword),
-      hasLowercase: /[a-z]/.test(newPassword),
-      hasNumber: /\d/.test(newPassword),
-      hasSpecial: /[@$!%*?&]/.test(newPassword),
-      matches: newPassword === confirmPassword && confirmPassword.length > 0,
-    }),
-    [newPassword, confirmPassword],
-  );
+  const passwordsMatch =
+    newPassword === confirmPassword && confirmPassword.length > 0;
 
-  const isPasswordValid = Object.values(passwordChecks).every(Boolean);
+  const isPasswordValid = isPasswordPolicyMet(newPassword) && passwordsMatch;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,6 +163,7 @@ function FirstLoginPasswordForm() {
               )}
             </button>
           </div>
+          <PasswordRequirementsHint />
         </div>
 
         <div className="form-field space-y-2">
@@ -204,38 +197,16 @@ function FirstLoginPasswordForm() {
             </button>
           </div>
 
-          {newPassword.length > 0 && (
-            <ul className="mt-3 grid grid-cols-1 gap-1.5 rounded-[10px] border border-white/15 bg-white/5 p-3 backdrop-blur-[2px]">
-              {[
-                { key: "minLength", label: "At least 8 characters" },
-                { key: "hasUppercase", label: "One uppercase letter (A-Z)" },
-                { key: "hasLowercase", label: "One lowercase letter (a-z)" },
-                { key: "hasNumber", label: "One number (0-9)" },
-                { key: "hasSpecial", label: "One special character (@$!%*?&)" },
-                { key: "matches", label: "Passwords match" },
-              ].map((rule) => {
-                const passed =
-                  passwordChecks[rule.key as keyof typeof passwordChecks];
-                return (
-                  <li
-                    key={rule.key}
-                    className={`flex items-center gap-2 text-xs font-medium transition-colors ${
-                      passed
-                        ? "text-[#86EFAC]"
-                        : "text-white/45"
-                    }`}
-                  >
-                    {passed ? (
-                      <Check className="w-3.5 h-3.5 shrink-0" />
-                    ) : (
-                      <X className="w-3.5 h-3.5 shrink-0" />
-                    )}
-                    {rule.label}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          <PasswordRequirementsChecklist
+            password={newPassword}
+            extraRules={[
+              {
+                id: "matches",
+                label: "Passwords match",
+                passed: passwordsMatch,
+              },
+            ]}
+          />
         </div>
 
         <Button

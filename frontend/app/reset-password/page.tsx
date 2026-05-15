@@ -9,14 +9,15 @@ import {
   CheckCircle2,
   ArrowLeft,
   XCircle,
-  Check,
-  X,
   Eye,
   EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { isPasswordPolicyMet } from "@/lib/password-policy";
+import { PasswordRequirementsHint } from "@/components/password-requirements-hint";
+import { PasswordRequirementsChecklist } from "@/components/password-requirements-checklist";
 
 const INPUT_BASE_CLASSES =
   "h-12 w-full min-w-0 rounded-[10px] border px-4 text-white placeholder:text-white/45 backdrop-blur-[4px] transition-all duration-300 ease-out focus:outline-none focus:bg-white/[0.14] focus:border-[#48CAE4] focus:shadow-[0_0_0_3px_rgba(72,202,228,0.18)] bg-white/[0.08] border-white/[0.18]";
@@ -34,15 +35,7 @@ function ResetPasswordForm() {
   const token = searchParams.get("token");
   const router = useRouter();
 
-  const rules = [
-    { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
-    { label: "One uppercase letter (A-Z)", test: (p: string) => /[A-Z]/.test(p) },
-    { label: "One lowercase letter (a-z)", test: (p: string) => /[a-z]/.test(p) },
-    { label: "One number (0-9)", test: (p: string) => /\d/.test(p) },
-    { label: "One special character (@$!%*?&)", test: (p: string) => /[@$!%*?&]/.test(p) },
-  ];
-
-  const passwordValid = rules.every((r) => r.test(password));
+  const passwordValid = isPasswordPolicyMet(password);
 
   useEffect(() => {
     if (!isSuccess) return;
@@ -176,7 +169,7 @@ function ResetPasswordForm() {
               {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
             </button>
           </div>
-
+          <PasswordRequirementsHint />
         </div>
 
         {/* Confirm password field */}
@@ -223,31 +216,7 @@ function ResetPasswordForm() {
             </p>
           )}
 
-          {/* Live password strength checklist */}
-          {password.length > 0 && (
-            <ul className="mt-3 grid grid-cols-1 gap-1.5 p-3 bg-white/10 rounded-xl border border-white/20">
-              {rules.map((rule) => {
-                const passed = rule.test(password);
-                return (
-                  <li
-                    key={rule.label}
-                    className={`flex items-center gap-2 text-xs font-medium transition-colors ${
-                      passed
-                        ? "text-green-300"
-                        : "text-slate-300"
-                    }`}
-                  >
-                    {passed ? (
-                      <Check className="w-3.5 h-3.5 shrink-0" />
-                    ) : (
-                      <X className="w-3.5 h-3.5 shrink-0" />
-                    )}
-                    {rule.label}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+          <PasswordRequirementsChecklist password={password} />
         </div>
 
         <Button

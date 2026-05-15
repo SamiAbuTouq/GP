@@ -17,7 +17,6 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [devResetUrl, setDevResetUrl] = useState<string | null>(null);
   const [emailTouched, setEmailTouched] = useState(false);
   const { toast } = useToast();
 
@@ -56,7 +55,6 @@ export default function ForgotPasswordPage() {
         });
         return;
       }
-      setDevResetUrl(typeof data.devResetUrl === "string" ? data.devResetUrl : null);
       setIsSubmitted(true);
     } catch(err) {
       toast({
@@ -132,18 +130,6 @@ export default function ForgotPasswordPage() {
                           , you will receive an email with instructions to reset your
                           password.
                         </p>
-                        {devResetUrl ? (
-                          <div className="text-left text-sm text-amber-100 bg-amber-500/20 rounded-2xl p-4 border border-amber-300/40">
-                            <p className="font-semibold mb-1">Email delivery failed in development.</p>
-                            <p className="mb-2">Use this reset link directly:</p>
-                            <Link
-                              href={devResetUrl}
-                              className="break-all underline text-blue-200 hover:text-white"
-                            >
-                              {devResetUrl}
-                            </Link>
-                          </div>
-                        ) : null}
                         <Button
                           asChild
                           className="h-12 w-full rounded-xl bg-[linear-gradient(135deg,#2563EB_0%,#1E54B7_100%)] text-base font-semibold text-white transition-[transform,box-shadow] duration-150 hover:-translate-y-[1px] hover:shadow-[0_6px_20px_rgba(37,99,235,0.4)] active:translate-y-0 active:shadow-none"

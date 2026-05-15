@@ -44,6 +44,44 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { useSidebar } from "@/lib/sidebar-context";
 import { navActivePillRadiusClass } from "@/lib/segmented-nav-tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function useSidebarNavVisibility() {
+  const { user, authLoading } = useAuth();
+  const isLecturer = user?.role === "LECTURER";
+
+  return {
+    authLoading,
+    showLecturerNav: !authLoading && isLecturer,
+    showAdminNav: !authLoading && !!user && !isLecturer,
+  };
+}
+
+function SidebarNavSkeleton({ collapsed }: { collapsed: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
+      className={cn(
+        "flex flex-col space-y-1.5",
+        collapsed ? "w-full items-center px-0" : "px-3",
+      )}
+      aria-busy="true"
+      aria-label="Loading navigation"
+    >
+      {Array.from({ length: collapsed ? 4 : 6 }).map((_, index) => (
+        <Skeleton
+          key={index}
+          className={cn(
+            "rounded-lg bg-sidebar-accent/60",
+            collapsed ? "h-9 w-9" : "h-9 w-full",
+          )}
+        />
+      ))}
+    </motion.div>
+  );
+}
 
 interface AnimatedIconHandle {
   startAnimation: () => void;
@@ -249,10 +287,8 @@ function SidebarNavigation({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const { user, authLoading } = useAuth();
-  const isLecturer = user?.role === "LECTURER";
+  const { authLoading, showLecturerNav, showAdminNav } = useSidebarNavVisibility();
   const [entityOpen, setEntityOpen] = useState(() => isEntityManagementSectionActive(pathname));
-  const showRestrictedNavigation = authLoading || isLecturer;
   const entityRef = useRef<AnimatedIconHandle | null>(null);
 
   useEffect(() => {
@@ -267,7 +303,9 @@ function SidebarNavigation({
           collapsed ? "w-full items-center px-0" : "px-3",
         )}
       >
-        {!showRestrictedNavigation && mainNavItems.map((item) => (
+        {authLoading && <SidebarNavSkeleton collapsed={collapsed} />}
+
+        {showAdminNav && mainNavItems.map((item) => (
           <NavButton
             key={item.href}
             href={item.href}
@@ -283,7 +321,7 @@ function SidebarNavigation({
         ))}
 
         {/* Entity Management section */}
-        {!showRestrictedNavigation && (
+        {showAdminNav && (
           <div className="pt-0">
             {collapsed ? (
             /* In collapsed mode, show entity icons individually */
@@ -351,7 +389,7 @@ function SidebarNavigation({
           </div>
         )}
 
-        {!showRestrictedNavigation && (
+        {showAdminNav && (
           <div className="pt-0">
             {otherNavItems.map((item) => (
               <NavButton
@@ -370,7 +408,7 @@ function SidebarNavigation({
           </div>
         )}
 
-        {showRestrictedNavigation && (
+        {showLecturerNav && (
           <div className="pt-0">
             {lecturerNavItems.map((item) => (
               <NavButton
@@ -395,9 +433,8 @@ function SidebarNavigation({
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { logout, user, authLoading } = useAuth();
-  const isLecturer = user?.role === "LECTURER";
-  const showRestrictedNavigation = authLoading || isLecturer;
+  const { logout } = useAuth();
+  const { showAdminNav } = useSidebarNavVisibility();
   const { collapsed, toggle } = useSidebar();
   const logoutRef = useRef<AnimatedIconHandle | null>(null);
 
@@ -485,7 +522,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             collapsed ? "flex flex-col items-center px-0" : "px-3",
           )}
         >
-          {!showRestrictedNavigation && (
+          {showAdminNav && (
             <NavButton
               href={accessRequestsNavItem.href}
               icon={accessRequestsNavItem.icon}
@@ -496,7 +533,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               animated={accessRequestsNavItem.animated}
             />
           )}
-          {!showRestrictedNavigation && (
+          {showAdminNav && (
             <NavButton
               href={helpNavItem.href}
               icon={helpNavItem.icon}
@@ -626,9 +663,8 @@ export function MobileSidebar() {
 // Mobile sidebar uses its own non-collapsible content (always expanded)
 function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { logout, user, authLoading } = useAuth();
-  const isLecturer = user?.role === "LECTURER";
-  const showRestrictedNavigation = authLoading || isLecturer;
+  const { logout } = useAuth();
+  const { authLoading, showLecturerNav, showAdminNav } = useSidebarNavVisibility();
   const [entityOpen, setEntityOpen] = useState(() => isEntityManagementSectionActive(pathname));
 
   useEffect(() => {
@@ -664,7 +700,9 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <ScrollArea className="flex-1 py-2">
         <div className="space-y-1 px-3">
-          {!showRestrictedNavigation && mainNavItems.map((item) => (
+          {authLoading && <SidebarNavSkeleton collapsed={false} />}
+
+          {showAdminNav && mainNavItems.map((item) => (
             <NavButton
               key={item.href}
               href={item.href}
@@ -679,7 +717,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             />
           ))}
 
-          {!showRestrictedNavigation && <div className="pt-0">
+          {showAdminNav && <div className="pt-0">
             <Collapsible open={entityOpen} onOpenChange={setEntityOpen}>
               <CollapsibleTrigger asChild>
                 <Button
@@ -725,7 +763,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             </Collapsible>
           </div>}
 
-          {!showRestrictedNavigation && <div className="pt-0">
+          {showAdminNav && <div className="pt-0">
             {otherNavItems.map((item) => (
               <NavButton
                 key={item.href}
@@ -742,7 +780,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             ))}
           </div>}
 
-          {showRestrictedNavigation && (
+          {showLecturerNav && (
             <div className="pt-0">
               {lecturerNavItems.map((item) => (
                 <NavButton
@@ -764,7 +802,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </ScrollArea>
 
       <div className="border-t border-sidebar-border space-y-1 px-3 py-2">
-        {!showRestrictedNavigation && (
+        {showAdminNav && (
           <NavButton
             href={accessRequestsNavItem.href}
             icon={accessRequestsNavItem.icon}
@@ -775,7 +813,7 @@ function MobileSidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             animated={accessRequestsNavItem.animated}
           />
         )}
-        {!showRestrictedNavigation && (
+        {showAdminNav && (
           <NavButton
             href={helpNavItem.href}
             icon={helpNavItem.icon}

@@ -10,32 +10,27 @@ function buildDto(password: string): UpdatePasswordDto {
 
 describe("UpdatePasswordDto", () => {
   it("passes validation for a valid password", async () => {
-    const errors = await validate(buildDto("Valid@123"));
+    const errors = await validate(buildDto("ValidPass1@"));
     expect(errors).toHaveLength(0);
   });
 
   it("fails when uppercase is missing with matches constraint", async () => {
-    const errors = await validate(buildDto("valid@123"));
-    expect(errors[0]?.constraints).toHaveProperty("matches");
-  });
-
-  it("fails when lowercase is missing with matches constraint", async () => {
-    const errors = await validate(buildDto("VALID@123"));
+    const errors = await validate(buildDto("validpass1@"));
     expect(errors[0]?.constraints).toHaveProperty("matches");
   });
 
   it("fails when number is missing with matches constraint", async () => {
-    const errors = await validate(buildDto("Valid@Pass"));
+    const errors = await validate(buildDto("ValidPassword@"));
     expect(errors[0]?.constraints).toHaveProperty("matches");
   });
 
   it("fails when special character is missing with matches constraint", async () => {
-    const errors = await validate(buildDto("Valid1234"));
+    const errors = await validate(buildDto("ValidPass1"));
     expect(errors[0]?.constraints).toHaveProperty("matches");
   });
 
   it("fails when under 8 chars with minLength constraint", async () => {
-    const errors = await validate(buildDto("Va@1abc"));
+    const errors = await validate(buildDto("Va1@pa"));
     expect(errors[0]?.constraints).toHaveProperty("minLength");
   });
 });

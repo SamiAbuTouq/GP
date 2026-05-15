@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import { PASSWORD_MIN_LENGTH } from "@/lib/password-policy";
 
 interface ErrorState {
   message: string;
@@ -42,7 +43,7 @@ function LoginPageContent() {
 
   const validateEmail = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-  const validatePassword = (value: string) => value.length >= 6;
+  const validatePassword = (value: string) => value.length >= PASSWORD_MIN_LENGTH;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +79,7 @@ function LoginPageContent() {
 
     if (!validatePassword(password)) {
       setError({
-        message: "Password must be at least 6 characters.",
+        message: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
         type: "validation",
       });
       setShakeField("password");
@@ -162,7 +163,7 @@ function LoginPageContent() {
       ? !password
         ? "Password is required."
         : !validatePassword(password)
-          ? "Password must be at least 6 characters."
+          ? `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`
           : ""
       : "";
 

@@ -7,6 +7,12 @@ import { DeliveryMode } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { LECTURER_NOTIFICATION_PREF_KEYS } from "../notifications/notification-prefs";
+import {
+  buildCourseLookup,
+  computeSoftMetrics,
+  loadStudyPlanUnitsFromPrograms,
+  type ScheduleEntryForSoftMetrics,
+} from "./schedule-soft-metrics";
 
 export function decodeSemesterType(type: number): string {
   const map: Record<number, string> = {
@@ -556,6 +562,7 @@ export class TimetablesService {
       allTimeslots,
       conflicts,
       preferences,
+      allCourses,
     ] = await Promise.all([
       this.prisma.sectionScheduleEntry.findMany({
         where: { timetable_id: timetableId },
@@ -598,6 +605,9 @@ export class TimetablesService {
         include: {
           lecturer: { include: { user: true } },
         },
+      }),
+      this.prisma.course.findMany({
+        select: { course_id: true, course_code: true },
       }),
     ]);
 
@@ -686,7 +696,7 @@ export class TimetablesService {
         day: slot?.days[0] ?? "",
         lecturer: lecturerName,
         allowed_lecturers: allowed.length ? allowed : [lecturerName],
-        preference_issues: [],
+        preference_issues: [] as string[],
         has_pref_warning: false,
         delivery_mode:
           e.course.delivery_mode === DeliveryMode.ONLINE
@@ -720,23 +730,6 @@ export class TimetablesService {
         lecturerCourses.set(lecturerName, new Set());
       lecturerCourses.get(lecturerName)?.add(e.course.course_code);
     }
-
-    const lecturerSummary = allLecturers.map((l) => {
-      const name = `${l.user.first_name} ${l.user.last_name}`.trim();
-      const load = lecturerLoad.get(name) ?? 0;
-      return {
-        name,
-        teaching_load: load,
-        max_load: l.max_workload,
-        overloaded: load > l.max_workload,
-        courses: Array.from(lecturerCourses.get(name) ?? []),
-        preferred_slots: lecturerPreferences[name]?.preferred ?? [],
-        unpreferred_slots: lecturerPreferences[name]?.unpreferred ?? [],
-        warning_count: 0,
-        warnings: [],
-        gap_count: 0,
-      };
-    });
 
     const usedRoomSlots = new Map<string, Set<string>>();
     for (const e of entries) {
@@ -792,14 +785,6 @@ export class TimetablesService {
       }),
     );
 
-    const workloadInfo = lecturerSummary.map((l) => ({
-      lecturer: l.name,
-      classes: l.teaching_load,
-      credit_hour_load: l.teaching_load,
-      max_workload: l.max_load,
-      within_limit: l.teaching_load <= l.max_load,
-    }));
-
     const utilizationInfo = entries.map((e) => ({
       room: e.room.room_number,
       course: e.course.course_code,
@@ -851,6 +836,84 @@ export class TimetablesService {
         timeslot_b: c.timeslot_label ?? "",
       }));
 
+    const courseLookup = buildCourseLookup(allCourses);
+    const studyPlanUnits = loadStudyPlanUnitsFromPrograms(courseLookup);
+
+    const timeslotLabelById = new Map<string, string>();
+    for (const slot of allTimeslots) {
+      const days = decodeDaysMask(slot.days_mask);
+      timeslotLabelById.set(
+        `slot_${slot.slot_id}`,
+        `${days.map((d) => d.slice(0, 3)).join("/")} ${formatTimeHHmm(slot.start_time)}-${formatTimeHHmm(slot.end_time)}`,
+      );
+    }
+
+    const scheduleForMetrics: ScheduleEntryForSoftMetrics[] = schedule.map(
+      (e) => ({
+        lecturer: e.lecturer,
+        course_code: e.course_code,
+        timeslot: e.timeslot,
+        timeslot_label: e.timeslot_label,
+        delivery_mode: e.delivery_mode,
+        days: e.days,
+        start_hour: e.start_hour,
+        duration: e.duration,
+      }),
+    );
+
+    const softMetrics = computeSoftMetrics(
+      scheduleForMetrics,
+      lecturerPreferences,
+      studyPlanUnits,
+      unitConflictViolations,
+      timeslotLabelById,
+    );
+
+    const prefByLecturerCourse = new Map<
+      string,
+      typeof softMetrics.preference_warnings
+    >();
+    for (const w of softMetrics.preference_warnings) {
+      const key = `${w.lecturer}|${w.course}|${w.timeslot}`;
+      if (!prefByLecturerCourse.has(key)) prefByLecturerCourse.set(key, []);
+      prefByLecturerCourse.get(key)!.push(w);
+    }
+    for (const entry of schedule) {
+      const key = `${entry.lecturer}|${entry.course_code}|${entry.timeslot}`;
+      const warns = prefByLecturerCourse.get(key) ?? [];
+      entry.preference_issues = warns.map((w) => w.reason);
+      entry.has_pref_warning = warns.length > 0;
+    }
+
+    const lecturerSummary = allLecturers.map((l) => {
+      const name = `${l.user.first_name} ${l.user.last_name}`.trim();
+      const load = lecturerLoad.get(name) ?? 0;
+      const lecWarnings = softMetrics.preference_warnings.filter(
+        (w) => w.lecturer === name,
+      );
+      return {
+        name,
+        teaching_load: load,
+        max_load: l.max_workload,
+        overloaded: load > l.max_workload,
+        courses: Array.from(lecturerCourses.get(name) ?? []),
+        preferred_slots: lecturerPreferences[name]?.preferred ?? [],
+        unpreferred_slots: lecturerPreferences[name]?.unpreferred ?? [],
+        warning_count: lecWarnings.length,
+        warnings: lecWarnings,
+        gap_count: softMetrics.gap_warnings.filter((g) => g.lecturer === name)
+          .length,
+      };
+    });
+
+    const workloadInfo = lecturerSummary.map((l) => ({
+      lecturer: l.name,
+      classes: l.teaching_load,
+      credit_hour_load: l.teaching_load,
+      max_workload: l.max_load,
+      within_limit: l.teaching_load <= l.max_load,
+    }));
+
     const totalSlots = allRooms.length * allTimeslots.length;
     const usedSlots = new Set(
       entries
@@ -881,8 +944,8 @@ export class TimetablesService {
             : null,
         generated_at: timetable.generated_at.toISOString(),
         algorithm: "GWO",
-        soft_preference_warnings: 0,
-        gap_warnings: 0,
+        soft_preference_warnings: softMetrics.preference_warnings.length,
+        gap_warnings: softMetrics.gap_warnings.length,
         overload_violations: lecturerSummary.filter((l) => l.overloaded).length,
         max_classes_per_lecturer: Math.max(
           0,
@@ -896,12 +959,13 @@ export class TimetablesService {
         distribution_penalty: 0,
         soft_weights: DEFAULT_SOFT_WEIGHTS,
         unit_conflict_count: unitConflictViolations.length,
-        student_gap_count: 0,
-        single_session_day_count: 0,
+        student_gap_count: softMetrics.student_gap_warnings.length,
+        single_session_day_count:
+          softMetrics.single_session_day_warnings.length,
       },
       lecturer_summary: lecturerSummary,
-      preference_warnings: [],
-      gap_warnings: [],
+      preference_warnings: softMetrics.preference_warnings,
+      gap_warnings: softMetrics.gap_warnings,
       utilization_info: utilizationInfo,
       workload_info: workloadInfo,
       distribution_info: distributionInfo,
@@ -911,11 +975,11 @@ export class TimetablesService {
       timeslots_catalogue: Array.from(slotById.values()),
       room_types_map: roomTypesMap,
       wrong_slot_type_violations: wrongSlotTypeViolations,
-      study_plan_units: {},
-      study_plan_summary: [],
+      study_plan_units: softMetrics.study_plan_units,
+      study_plan_summary: softMetrics.study_plan_summary,
       unit_conflict_violations: unitConflictViolations,
-      student_gap_warnings: [],
-      single_session_day_warnings: [],
+      student_gap_warnings: softMetrics.student_gap_warnings,
+      single_session_day_warnings: softMetrics.single_session_day_warnings,
     };
   }
 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcrypt'
 import { resolveUserFromRefreshCookie } from '@/lib/server-auth'
+import { validatePassword } from '@/lib/password-policy'
 
 export const runtime = 'nodejs'
 
@@ -30,33 +31,9 @@ export async function POST(request: Request) {
       )
     }
 
-    // Validate password strength
-    if (newPassword.length < 8) {
-      return NextResponse.json(
-        { error: 'New password must be at least 8 characters long' },
-        { status: 400 },
-      )
-    }
-
-    if (!/[A-Z]/.test(newPassword)) {
-      return NextResponse.json(
-        { error: 'New password must contain at least one uppercase letter' },
-        { status: 400 },
-      )
-    }
-
-    if (!/[a-z]/.test(newPassword)) {
-      return NextResponse.json(
-        { error: 'New password must contain at least one lowercase letter' },
-        { status: 400 },
-      )
-    }
-
-    if (!/\d/.test(newPassword)) {
-      return NextResponse.json(
-        { error: 'New password must contain at least one number' },
-        { status: 400 },
-      )
+    const passwordError = validatePassword(newPassword)
+    if (passwordError) {
+      return NextResponse.json({ error: passwordError }, { status: 400 })
     }
 
     // Find the user (always the session owner)

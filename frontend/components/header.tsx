@@ -18,6 +18,16 @@ import { useAuth } from "@/lib/auth-context"
 import { ApiClient, ApiError, UserProfile } from "@/lib/api-client"
 import { NotificationBell } from "@/components/notification-bell"
 
+function formatRoleLabel(role: string | undefined): string {
+  if (!role) return ""
+  return role.charAt(0) + role.slice(1).toLowerCase()
+}
+
+function profileDisplayName(profile: UserProfile | null): string {
+  if (!profile) return ""
+  return [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim()
+}
+
 export function Header() {
   const router = useRouter()
   const { user, logout } = useAuth()
@@ -54,6 +64,9 @@ export function Header() {
   const handleLogout = async () => {
     await logout()
   }
+
+  const displayName = profileDisplayName(profile)
+  const roleLabel = formatRoleLabel(profile?.role ?? user?.role)
 
   return (
     <header
@@ -95,8 +108,10 @@ export function Header() {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{user?.role || "User"}</p>
-                <p className="text-xs text-muted-foreground">{user?.email || "Not signed in"}</p>
+                <p className="text-sm font-medium">{displayName || "User"}</p>
+                {roleLabel ? (
+                  <p className="text-xs font-normal text-muted-foreground">{roleLabel}</p>
+                ) : null}
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

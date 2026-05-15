@@ -11,22 +11,22 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdatePasswordDto = void 0;
 const class_validator_1 = require("class-validator");
+const password_policy_1 = require("../../common/password-policy");
 class UpdatePasswordDto {
 }
 exports.UpdatePasswordDto = UpdatePasswordDto;
 __decorate([
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MinLength)(8, { message: "Password must be at least 8 characters long" }),
-    (0, class_validator_1.Matches)(/[A-Z]/, {
+    (0, class_validator_1.MinLength)(password_policy_1.PASSWORD_MIN_LENGTH, {
+        message: "Password must be at least 8 characters long",
+    }),
+    (0, class_validator_1.Matches)(password_policy_1.PASSWORD_UPPERCASE_PATTERN, {
         message: "Password must contain at least one uppercase letter",
     }),
-    (0, class_validator_1.Matches)(/[a-z]/, {
-        message: "Password must contain at least one lowercase letter",
-    }),
-    (0, class_validator_1.Matches)(/\d/, {
+    (0, class_validator_1.Matches)(password_policy_1.PASSWORD_NUMBER_PATTERN, {
         message: "Password must contain at least one number",
     }),
-    (0, class_validator_1.Matches)(/[@$!%*?&]/, {
+    (0, class_validator_1.Matches)(password_policy_1.PASSWORD_SPECIAL_CHAR_PATTERN, {
         message: "Password must contain at least one special character (@$!%*?&)",
     }),
     __metadata("design:type", String)

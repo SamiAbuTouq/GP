@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LoginDto = void 0;
 const class_validator_1 = require("class-validator");
+const password_policy_1 = require("../../common/password-policy");
 class LoginDto {
 }
 exports.LoginDto = LoginDto;
@@ -22,7 +23,9 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)(),
-    (0, class_validator_1.MinLength)(8, { message: "Password must be at least 8 characters" }),
+    (0, class_validator_1.MinLength)(password_policy_1.PASSWORD_MIN_LENGTH, {
+        message: "Password must be at least 8 characters",
+    }),
     __metadata("design:type", String)
 ], LoginDto.prototype, "password", void 0);
 //# sourceMappingURL=login.dto.js.map
