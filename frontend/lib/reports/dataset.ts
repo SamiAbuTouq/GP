@@ -24,6 +24,8 @@ export const ReportDatasetSchema = z.object({
     totalScheduleEntries: z.number(),
     invalidTimeslotEntries: z.number(),
     totalRoomsInCatalog: z.number(),
+    /** Active (in-service) rooms — denominator for timeslot slot pressure %. */
+    totalActiveRooms: z.number(),
     roomsWithSchedule: z.number(),
     totalWeeklyScheduledHours: z.number(),
     maxWeeklyHoursAnyRoom: z.number(),
@@ -107,6 +109,8 @@ export const ReportDatasetSchema = z.object({
       detail: z.string(),
     }),
   ),
+  /** Lecturer display name → department (from schedule entries; used for conflict hotspot rollups). */
+  lecturerNameToDepartment: z.record(z.string(), z.string()),
   lecturerPreferenceRows: z.array(
     z.object({
       userId: z.number(),

@@ -1478,7 +1478,7 @@ export default function WhatIfScenariosPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-bold text-foreground">What-If Scenarios</h1>
-                <p className="text-sm text-muted-foreground">Simulate timetable changes in an isolated sandbox before applying them.</p>
+                <p className="text-sm text-muted-foreground">Simulate timetable changes in an isolated sandbox before promoting a draft.</p>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" asChild>
@@ -1509,7 +1509,7 @@ export default function WhatIfScenariosPage() {
               <Card>
                 <CardContent className="py-16 text-center">
                   <p className="text-muted-foreground">No scenarios yet. Create one to start simulating changes.</p>
-                  <p className="mt-2 text-xs text-muted-foreground">Create scenario → add conditions → run simulation → apply if outcome is better.</p>
+                  <p className="mt-2 text-xs text-muted-foreground">Create scenario → add conditions → run simulation → store and compare results.</p>
                   <Button className="mt-4" onClick={openCreate}>New Scenario</Button>
                 </CardContent>
               </Card>

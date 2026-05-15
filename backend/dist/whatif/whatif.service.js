@@ -634,7 +634,7 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
                 timeslot: {
                     select: { days_mask: true, start_time: true, end_time: true },
                 },
-                course: { select: { course_code: true } },
+                course: { select: { course_code: true, course_name: true } },
             },
         });
         const entriesByTimetable = new Map();
@@ -838,6 +838,100 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
         }
         return { ok: true, action, runId };
     }
+    async storeScenarioRun(runId) {
+        const run = await this.prisma.scenarioRun.findUnique({
+            where: { run_id: runId },
+            select: {
+                run_id: true,
+                status: true,
+                result_timetable_id: true,
+                result_metrics: true,
+            },
+        });
+        if (!run)
+            throw new common_1.NotFoundException("Run not found.");
+        if (run.status !== "completed") {
+            throw new common_1.BadRequestException(`Run is not completed (current status: ${run.status}).`);
+        }
+        if (run.result_timetable_id != null) {
+            throw new common_1.BadRequestException(`Run already has stored result timetable #${run.result_timetable_id}.`);
+        }
+        const metrics = run.result_metrics;
+        if (!metrics?._persistPayload) {
+            throw new common_1.BadRequestException("Run has no transient simulation output to store. Re-run the scenario if the payload was cleared.");
+        }
+        const databaseUrl = process.env.DATABASE_URL;
+        if (!databaseUrl) {
+            throw new common_1.BadRequestException("DATABASE_URL is not configured.");
+        }
+        const scriptPath = path.join(process.cwd(), "whatif", "run_scenario.py");
+        const python = process.env.PYTHON_BIN ??
+            process.env.PYTHON ??
+            (process.platform === "win32" ? "python" : "python3");
+        const resultTimetableId = await new Promise((resolve, reject) => {
+            const proc = (0, child_process_1.spawn)(python, [scriptPath, "--store-run-id", String(runId)], {
+                env: { ...process.env, PYTHONUNBUFFERED: "1", DATABASE_URL: databaseUrl },
+            });
+            let lineBuffer = "";
+            let stderrBuffer = "";
+            let resolvedId = null;
+            let errorMessage = null;
+            proc.stdout?.on("data", (chunk) => {
+                lineBuffer += chunk.toString();
+                const lines = lineBuffer.split("\n");
+                lineBuffer = lines.pop() ?? "";
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed)
+                        continue;
+                    try {
+                        const parsed = JSON.parse(trimmed);
+                        if (parsed.type === "result") {
+                            const tid = parsed.result_timetable_id;
+                            if (typeof tid === "number" && tid > 0)
+                                resolvedId = tid;
+                        }
+                        else if (parsed.type === "error") {
+                            errorMessage =
+                                (parsed.detail ?? "").trim() ||
+                                    (parsed.message ?? "").trim() ||
+                                    "Store failed.";
+                        }
+                    }
+                    catch {
+                    }
+                }
+            });
+            proc.stderr?.on("data", (chunk) => {
+                stderrBuffer += chunk.toString();
+            });
+            proc.on("close", (code) => {
+                if (resolvedId != null) {
+                    resolve(resolvedId);
+                    return;
+                }
+                const detail = stderrBuffer.trim();
+                reject(new common_1.BadRequestException(errorMessage ??
+                    (detail
+                        ? `Store process failed: ${detail.slice(0, 1800)}`
+                        : `Store process exited with code ${code ?? "unknown"}.`)));
+            });
+            proc.on("error", (err) => {
+                reject(new common_1.BadRequestException(err.message));
+            });
+        });
+        const updated = await this.prisma.scenarioRun.findUnique({
+            where: { run_id: runId },
+            select: { result_timetable_id: true },
+        });
+        const storedId = updated?.result_timetable_id ?? resultTimetableId;
+        return {
+            ok: true,
+            runId,
+            resultTimetableId: storedId,
+            message: `Stored as draft timetable #${storedId}.`,
+        };
+    }
     async cancelRun(runId) {
         this.userCancelledRunIds.add(runId);
         const proc = this.activeProcesses.get(runId);
@@ -1024,18 +1118,30 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
             return;
         }
         if (parsed.type === "result") {
+            const displayMetrics = parsed.result_metrics ?? {};
+            const persistPayload = parsed.persist_payload;
+            const resultMetricsForDb = persistPayload && typeof persistPayload === "object"
+                ? { ...displayMetrics, _persistPayload: persistPayload }
+                : displayMetrics;
+            const resultTimetableId = typeof parsed.result_timetable_id === "number" &&
+                parsed.result_timetable_id > 0
+                ? parsed.result_timetable_id
+                : null;
             await this.prisma.scenarioRun.update({
                 where: { run_id: runId },
                 data: {
                     status: "completed",
                     completed_at: new Date(),
-                    result_timetable_id: parsed.result_timetable_id ?? null,
-                    result_metrics: parsed.result_metrics ?? undefined,
+                    result_timetable_id: resultTimetableId,
+                    result_metrics: resultMetricsForDb,
                     gwo_iterations_run: parsed.gwo_iterations_run ?? null,
                     generation_seconds: parsed.generation_seconds ?? null,
                 },
             });
-            void this.notifyAdminsScenarioRunSucceeded(runId, parsed).catch(() => { });
+            void this.notifyAdminsScenarioRunSucceeded(runId, {
+                ...parsed,
+                result_timetable_id: resultTimetableId ?? undefined,
+            }).catch(() => { });
         }
         else if (parsed.type === "error") {
             const detail = (parsed.detail ?? "").trim();
@@ -1393,11 +1499,11 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
         else {
             const ratio = positives / total;
             const verdict = ratio >= 0.8 && negatives === 0
-                ? "Apply recommended"
+                ? "Strong outcome"
                 : ratio >= 0.6
-                    ? "Apply with caution"
+                    ? "Proceed with caution"
                     : negatives > positives
-                        ? "Apply not recommended"
+                        ? "Not recommended"
                         : "Mixed outcome";
             parts.push(`${verdict}: "${scenarioName}" shifts ${positives} headline metric(s) favorably vs ${negatives} unfavorably (among comparable deltas).`);
             const metricNotes = [];
@@ -1541,6 +1647,7 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
         let changed = 0;
         let unchanged = 0;
         const courseAgg = new Map();
+        const changedSections = [];
         const allKeys = new Set([...baseline.keys(), ...result.keys()]);
         let affectedUnion = 0;
         const bumpCourse = (cid, code, dims) => {
@@ -1561,6 +1668,27 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
                 agg.sectionsWithSlotChange += 1;
             courseAgg.set(cid, agg);
         };
+        const recordSection = (br, rr, changeType, dims) => {
+            const row = br?.[0] ?? rr?.[0];
+            if (!row)
+                return;
+            const courseCode = row.course?.course_code ?? String(row.course_id);
+            const courseName = row.course?.course_name?.trim() || courseCode;
+            changedSections.push({
+                courseId: row.course_id,
+                courseCode,
+                courseName,
+                sectionNumber: String(row.section_number),
+                changeType,
+                ...(changeType === "reassigned"
+                    ? {
+                        roomChanged: dims?.room === true,
+                        lecturerChanged: dims?.lec === true,
+                        timeslotChanged: dims?.slot === true,
+                    }
+                    : {}),
+            });
+        };
         for (const key of allKeys) {
             const br = baseline.get(key);
             const rr = result.get(key);
@@ -1572,12 +1700,14 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
                 added += 1;
                 affectedUnion += 1;
                 bumpCourse(courseId, courseCode);
+                recordSection(br, rr, "added");
                 continue;
             }
             if (br && !rr) {
                 removed += 1;
                 affectedUnion += 1;
                 bumpCourse(courseId, courseCode);
+                recordSection(br, rr, "removed");
                 continue;
             }
             if (br && rr) {
@@ -1586,11 +1716,13 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
                 else {
                     changed += 1;
                     affectedUnion += 1;
-                    bumpCourse(courseId, courseCode, {
+                    const dims = {
                         room: roomsSig(br) !== roomsSig(rr),
                         lec: lecturersSig(br) !== lecturersSig(rr),
                         slot: slotsSig(br) !== slotsSig(rr),
-                    });
+                    };
+                    bumpCourse(courseId, courseCode, dims);
+                    recordSection(br, rr, "reassigned", dims);
                 }
             }
         }
@@ -1607,6 +1739,17 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
             sectionsWithSlotChange: v.sectionsWithSlotChange,
         }))
             .sort((a, b) => b.sectionsAffected - a.sectionsAffected);
+        changedSections.sort((a, b) => {
+            const byName = a.courseName.localeCompare(b.courseName, undefined, {
+                sensitivity: "base",
+            });
+            if (byName !== 0)
+                return byName;
+            return a.sectionNumber.localeCompare(b.sectionNumber, undefined, {
+                numeric: true,
+                sensitivity: "base",
+            });
+        });
         return {
             added,
             removed,
@@ -1616,6 +1759,7 @@ let WhatIfService = WhatIfService_1 = class WhatIfService {
             resultCount: result.size,
             percentSectionsAffected,
             perCourse,
+            changedSections,
         };
     }
 };

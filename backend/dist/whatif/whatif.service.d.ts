@@ -25,6 +25,16 @@ export interface SectionChangePerCourse {
     sectionsWithLecturerChange: number;
     sectionsWithSlotChange: number;
 }
+export interface SectionChangeDetail {
+    courseId: number;
+    courseCode: string;
+    courseName: string;
+    sectionNumber: string;
+    changeType: "added" | "removed" | "reassigned";
+    roomChanged?: boolean;
+    lecturerChanged?: boolean;
+    timeslotChanged?: boolean;
+}
 export interface SectionChangeSummary {
     added: number;
     removed: number;
@@ -34,6 +44,7 @@ export interface SectionChangeSummary {
     resultCount: number;
     percentSectionsAffected: number;
     perCourse: SectionChangePerCourse[];
+    changedSections: SectionChangeDetail[];
 }
 export declare class WhatIfService {
     private readonly prisma;
@@ -248,6 +259,12 @@ export declare class WhatIfService {
         ok: boolean;
         action: "pause" | "resume";
         runId: number;
+    }>;
+    storeScenarioRun(runId: number): Promise<{
+        ok: boolean;
+        runId: number;
+        resultTimetableId: number;
+        message: string;
     }>;
     cancelRun(runId: number): Promise<{
         ok: boolean;

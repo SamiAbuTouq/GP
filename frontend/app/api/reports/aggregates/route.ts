@@ -217,6 +217,8 @@ export async function GET(request: Request) {
         : Promise.resolve([]),
     ])
 
+    const totalActiveRooms = allRooms.filter((r) => r.is_available).length
+
     const catalogByDept = new Map<string, { total: number; ug: number; grad: number }>()
     for (const c of catalogCourses) {
       const dept = c.department.dept_name
@@ -240,6 +242,7 @@ export async function GET(request: Request) {
           totalScheduleEntries: 0,
           invalidTimeslotEntries: 0,
           totalRoomsInCatalog: allRooms.length,
+          totalActiveRooms,
           roomsWithSchedule: 0,
           totalWeeklyScheduledHours: 0,
           maxWeeklyHoursAnyRoom: 0,
@@ -250,6 +253,7 @@ export async function GET(request: Request) {
           distinctCoursesScheduled: 0,
           departmentsScheduled: 0,
         },
+        lecturerNameToDepartment: {},
         roomRows: allRooms.map((r) => ({
           roomId: r.room_id,
           roomNumber: r.room_number,
@@ -393,8 +397,14 @@ export async function GET(request: Request) {
     }
 
     const bySlot = new Map<number, SlotAgg>()
+    const lecturerNameToDepartment: Record<string, string> = {}
 
     for (const e of entries) {
+      if (needConflicts && e.lecturer && e.user_id != null) {
+        const u = e.lecturer.user
+        const lectName = `${u.first_name} ${u.last_name}`.trim()
+        if (lectName) lecturerNameToDepartment[lectName] = e.lecturer.department.dept_name
+      }
       const dayList = daysFromMask(e.timeslot.days_mask)
       if (dayList.length === 0) {
         invalidTimeslotEntries++
@@ -503,7 +513,6 @@ export async function GET(request: Request) {
       }
     }
 
-    const availableRoomsCount = allRooms.filter((r) => r.is_available).length
     const timeslotDemandRows = aggSlot
       ? [...bySlot.values()]
           .map((sa) => ({
@@ -515,8 +524,8 @@ export async function GET(request: Request) {
             roomsUsed: sa.roomsUsed.size,
             totalEnrollment: sa.totalEnrollment,
             slotPressurePct:
-              availableRoomsCount > 0
-                ? Math.round((sa.roomsUsed.size / availableRoomsCount) * 1000) / 10
+              totalActiveRooms > 0
+                ? Math.round((sa.roomsUsed.size / totalActiveRooms) * 1000) / 10
                 : null,
           }))
           .sort((a, b) => b.sections - a.sections)
@@ -802,6 +811,7 @@ export async function GET(request: Request) {
       totalScheduleEntries: entries.length,
       invalidTimeslotEntries,
       totalRoomsInCatalog: allRooms.length,
+      totalActiveRooms,
       roomsWithSchedule: [...byRoom.keys()].length,
       totalWeeklyScheduledHours: Math.round(totalWeeklyHoursAllEntries * 100) / 100,
       maxWeeklyHoursAnyRoom: Math.round(maxWeeklyHoursAnyRoom * 100) / 100,
@@ -851,6 +861,7 @@ export async function GET(request: Request) {
         timeslotLabel: c.timeslot_label,
         detail: c.detail,
       })),
+      lecturerNameToDepartment,
       lecturerPreferenceRows,
       lecturerPreferenceSummary,
       roomTypeRows,

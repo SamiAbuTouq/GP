@@ -86,6 +86,7 @@ async function buildPdf(
   extraNotes?: string[],
   appendSections?: PdfTableSection[],
   fmtGen: (d: Date) => string = (d) => formatDateTime(d, DEFAULT_DATETIME_PREFS),
+  preMainTableSections?: PdfTableSection[],
 ): Promise<Blob> {
   const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
     import("jspdf"),
@@ -149,6 +150,46 @@ async function buildPdf(
     doc.setTextColor(0)
   }
 
+  const drawPdfTableSection = (section: PdfTableSection, startY: number): number => {
+    doc.setFont("helvetica", "bold")
+    doc.setFontSize(11)
+    if (section.title) doc.text(section.title, margin, startY)
+    let tableStartY = section.title ? startY + 5 : startY
+    if (section.introLines?.length) {
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(9.5)
+      doc.setTextColor(60)
+      for (const line of section.introLines) {
+        const wrapped = doc.splitTextToSize(line, pageW - margin * 2)
+        doc.text(wrapped, margin, tableStartY)
+        tableStartY += wrapped.length * 4.5 + 1
+      }
+      doc.setTextColor(0)
+      tableStartY += 3
+    }
+
+    autoTable(doc, {
+      startY: tableStartY,
+      head: section.tableHead,
+      body: section.tableBody,
+      styles: { fontSize: 8, cellPadding: 1.8 },
+      headStyles: { fillColor: [41, 98, 255], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+      margin: { left: margin, right: margin },
+      tableWidth: "auto",
+      showHead: "everyPage",
+      didDrawPage: drawPdfFooter,
+    })
+    doc.setFont("helvetica", "normal")
+    return (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? tableStartY
+  }
+
+  if (preMainTableSections?.length) {
+    for (const section of preMainTableSections) {
+      y = drawPdfTableSection(section, y) + 10
+    }
+  }
+
   autoTable(doc, {
     startY: y,
     head: tableHead,
@@ -166,37 +207,7 @@ async function buildPdf(
     for (const section of appendSections) {
       const lastY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable
         ?.finalY
-      const startY = (lastY ?? y) + 10
-      doc.setFont("helvetica", "bold")
-      doc.setFontSize(11)
-      doc.text(section.title, margin, startY)
-      let tableStartY = startY + 5
-      if (section.introLines?.length) {
-        doc.setFont("helvetica", "normal")
-        doc.setFontSize(9.5)
-        doc.setTextColor(60)
-        for (const line of section.introLines) {
-          const wrapped = doc.splitTextToSize(line, pageW - margin * 2)
-          doc.text(wrapped, margin, tableStartY)
-          tableStartY += wrapped.length * 4.5 + 1
-        }
-        doc.setTextColor(0)
-        tableStartY += 3
-      }
-
-      autoTable(doc, {
-        startY: tableStartY,
-        head: section.tableHead,
-        body: section.tableBody,
-        styles: { fontSize: 8, cellPadding: 1.8 },
-        headStyles: { fillColor: [41, 98, 255], textColor: 255, fontStyle: "bold" },
-        alternateRowStyles: { fillColor: [245, 247, 250] },
-        margin: { left: margin, right: margin },
-        tableWidth: "auto",
-        showHead: "everyPage",
-        didDrawPage: drawPdfFooter,
-      })
-      doc.setFont("helvetica", "normal")
+      drawPdfTableSection(section, (lastY ?? y) + 10)
     }
   }
 
@@ -502,8 +513,12 @@ function buildCourseExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
   return wb
 }
 
+const TIMESLOT_PRESSURE_FOOTNOTE =
+  "Slot pressure % = rooms in use ÷ total active rooms × 100. Shown as — when total room count is zero."
+
 function buildTimeslotDemandExcel(ds: ReportDataset, prefs: DateTimeFormatPreferences) {
   const rows = ds.timeslotDemandRows
+  const totalRooms = ds.insights.totalActiveRooms
   const busiest = rows[0]
   const highPressure = rows.filter((r) => (r.slotPressurePct ?? 0) >= 80).length
   const wb = XLSX.utils.book_new()
@@ -518,6 +533,8 @@ function buildTimeslotDemandExcel(ds: ReportDataset, prefs: DateTimeFormatPrefer
         : "N/A",
     ],
     ["Slots at ≥80% room pressure", highPressure],
+    [],
+    ["Note", TIMESLOT_PRESSURE_FOOTNOTE],
   ]
   const summaryWs = XLSX.utils.aoa_to_sheet(summaryData)
   applyTwoColumnKeyValueWidths(summaryWs)
@@ -530,6 +547,7 @@ function buildTimeslotDemandExcel(ds: ReportDataset, prefs: DateTimeFormatPrefer
       "End time": r.endTime,
       Sections: r.sections,
       "Rooms in use": r.roomsUsed,
+      "Total rooms": totalRooms,
       "Total enrollment": r.totalEnrollment,
       "Slot pressure %": xlOptNum(r.slotPressurePct),
     })),
@@ -554,33 +572,123 @@ function timetableHealthConflictTypeLabel(t: string): string {
   )[t] ?? t
 }
 
-function buildTimetableHealthHotspotLines(
+type ConflictHotspotCounts = { hard: number; soft: number }
+
+function lecturerDepartmentLookup(
+  ds: ReportDataset,
+): Map<string, string> {
+  const m = new Map(Object.entries(ds.lecturerNameToDepartment))
+  for (const r of ds.lecturerRows) {
+    const name = r.lecturerName.trim()
+    if (name && !m.has(name)) m.set(name, r.department)
+  }
+  for (const r of ds.lecturerPreferenceRows) {
+    const name = r.lecturerName.trim()
+    if (name && !m.has(name)) m.set(name, r.department)
+  }
+  return m
+}
+
+function buildTimetableHealthConflictHotspots(
   conflicts: ReportDataset["conflicts"],
-): string[] {
-  if (conflicts.length === 0) return []
-  const roomCounts = new Map<string, number>()
-  const lectCounts = new Map<string, number>()
+  deptLookup: Map<string, string>,
+) {
+  const lectMap = new Map<string, ConflictHotspotCounts>()
+  const roomMap = new Map<string, ConflictHotspotCounts>()
   for (const c of conflicts) {
-    const rn = c.roomNumber?.trim()
-    if (rn) roomCounts.set(rn, (roomCounts.get(rn) ?? 0) + 1)
-    const ln = c.lecturerName?.trim()
-    if (ln) lectCounts.set(ln, (lectCounts.get(ln) ?? 0) + 1)
+    const name = c.lecturerName?.trim()
+    if (name) {
+      const cur = lectMap.get(name) ?? { hard: 0, soft: 0 }
+      if (c.severity === "hard") cur.hard++
+      else cur.soft++
+      lectMap.set(name, cur)
+    }
+    const room = c.roomNumber?.trim()
+    if (room) {
+      const cur = roomMap.get(room) ?? { hard: 0, soft: 0 }
+      if (c.severity === "hard") cur.hard++
+      else cur.soft++
+      roomMap.set(room, cur)
+    }
   }
-  const hotRooms = [...roomCounts.entries()]
-    .filter(([, n]) => n >= 3)
-    .sort((a, b) => b[1] - a[1])
-  const hotLecs = [...lectCounts.entries()]
-    .filter(([, n]) => n >= 3)
-    .sort((a, b) => b[1] - a[1])
-  const parts: string[] = []
-  for (const [room, n] of hotRooms) {
-    parts.push(`Room ${room} appears in ${n} conflict records`)
+  const lecturers = [...lectMap.entries()]
+    .map(([name, counts]) => ({
+      name,
+      department: deptLookup.get(name) ?? "—",
+      hard: counts.hard,
+      soft: counts.soft,
+      total: counts.hard + counts.soft,
+    }))
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
+    .slice(0, 5)
+  const rooms = [...roomMap.entries()]
+    .map(([roomNumber, counts]) => ({
+      roomNumber,
+      hard: counts.hard,
+      soft: counts.soft,
+      total: counts.hard + counts.soft,
+    }))
+    .sort((a, b) => b.total - a.total || a.roomNumber.localeCompare(b.roomNumber))
+    .slice(0, 5)
+  return { lecturers, rooms }
+}
+
+function timetableHealthHotspotExcelRows(ds: ReportDataset): (string | number)[][] {
+  if (ds.conflicts.length === 0) return []
+  const { lecturers, rooms } = buildTimetableHealthConflictHotspots(
+    ds.conflicts,
+    lecturerDepartmentLookup(ds),
+  )
+  const rows: (string | number)[][] = [
+    [],
+    ["Conflict hotspots", ""],
+    ["Top 5 lecturers (by total conflict count)", ""],
+    ["Lecturer", "Department", "Hard", "Soft", "Total"],
+  ]
+  if (lecturers.length === 0) {
+    rows.push(["—", "—", 0, 0, 0])
+  } else {
+    for (const l of lecturers) {
+      rows.push([l.name, l.department, l.hard, l.soft, l.total])
+    }
   }
-  for (const [name, n] of hotLecs) {
-    parts.push(`Lecturer ${name} appears in ${n} conflict records`)
+  rows.push([], ["Top 5 rooms (by total conflict count)", ""], ["Room", "Hard", "Soft", "Total"])
+  if (rooms.length === 0) {
+    rows.push(["—", 0, 0, 0])
+  } else {
+    for (const r of rooms) {
+      rows.push([r.roomNumber, r.hard, r.soft, r.total])
+    }
   }
-  if (parts.length === 0) return []
-  return [`Note: ${parts.join("; ")} — prioritize reviewing those assignments.`]
+  return rows
+}
+
+function timetableHealthHotspotPdfSections(ds: ReportDataset): PdfTableSection[] {
+  if (ds.conflicts.length === 0) return []
+  const { lecturers, rooms } = buildTimetableHealthConflictHotspots(
+    ds.conflicts,
+    lecturerDepartmentLookup(ds),
+  )
+  return [
+    {
+      title: "Conflict hotspots",
+      introLines: ["Top 5 lecturers by total conflict count"],
+      tableHead: [["Lecturer", "Department", "Hard", "Soft", "Total"]],
+      tableBody:
+        lecturers.length > 0
+          ? lecturers.map((l) => [l.name, l.department, l.hard, l.soft, l.total])
+          : [["—", "—", 0, 0, 0]],
+    },
+    {
+      title: "",
+      introLines: ["Top 5 rooms by total conflict count"],
+      tableHead: [["Room", "Hard", "Soft", "Total"]],
+      tableBody:
+        rooms.length > 0
+          ? rooms.map((r) => [r.roomNumber, r.hard, r.soft, r.total])
+          : [["—", 0, 0, 0]],
+    },
+  ]
 }
 
 function optimizerRunValidPdfLabel(
@@ -625,6 +733,7 @@ function buildTimetableHealthExcel(ds: ReportDataset, prefs: DateTimeFormatPrefe
     ["Total runs", runs.length],
     ["Active version", active ? `v${active.versionNumber}` : "N/A"],
     ["Valid runs (isValid === true)", validRunCount],
+    ...timetableHealthHotspotExcelRows(ds),
   ]
   const summaryWs = XLSX.utils.aoa_to_sheet(summaryData)
   applyTwoColumnKeyValueWidths(summaryWs)
@@ -848,12 +957,13 @@ export async function generateReportBlob(params: {
       `Collectively they deliver ${totalHrs} weekly contact hours. ${highLoad} faculty meet or exceed a 1.20 load index.`,
       `${noAssignments} active lecturers currently have no scheduled sections this term.`,
       "Labs are counted separately so chairs can see experimental teaching intensity alongside lecture contact hours.",
-      "The Excel export includes “By department” workload roll-up and a “Preference detail” sheet for timeslot preference compliance.",
+      "A “By department” roll-up follows the workload table (also in the Excel “By department” sheet). Preference detail is Excel-only.",
       prefSum.lecturersWithPreferences === 0
         ? "No lecturers have timeslot preferences defined — avoided-slot compliance is not applicable this semester."
         : `${requireAttention} lecturer(s) have at least one avoided-slot violation (${avoidedViolationCount} total violations). These appear in the 'Avoided violations' column.`,
     ]
 
+    const deptRollup = lecturerDepartmentRollups(rows)
     const blob = await buildPdf(
       "Lecturer Workload Report",
       pdfSubtitleLines(ds, dateTimePrefs),
@@ -883,7 +993,22 @@ export async function generateReportBlob(params: {
         lecturerWorkloadPdfAvoidedViolations(r, prefByUserId),
       ]),
       footnotes,
-      undefined,
+      deptRollup.length
+        ? [
+            {
+              title: "By department",
+              tableHead: [
+                ["Department", "Lecturers scheduled", "Sections", "Weekly hours"],
+              ],
+              tableBody: deptRollup.map((r) => [
+                r.department,
+                r.lecturers,
+                r.sections,
+                r.weeklyContactHours,
+              ]),
+            },
+          ]
+        : undefined,
       fmtGen,
     )
 
@@ -996,8 +1121,10 @@ export async function generateReportBlob(params: {
 
   if (reportTypeId === "timeslot-demand") {
     const rows = ds.timeslotDemandRows
+    const totalRooms = ds.insights.totalActiveRooms
     const busiestSlot = rows[0]
     const highPressureSlots = rows.filter((r) => (r.slotPressurePct ?? 0) >= 80)
+    const timeslotFootnotes = [...footnotes, TIMESLOT_PRESSURE_FOOTNOTE]
 
     if (format === "excel") {
       const wb = buildTimeslotDemandExcel(ds, dateTimePrefs)
@@ -1024,16 +1151,27 @@ export async function generateReportBlob(params: {
       "Timeslot Demand Report",
       pdfSubtitleLines(ds, dateTimePrefs),
       summaryLines,
-      [["Days", "Time", "Sections", "Rooms in use", "Total enrollment", "Slot pressure %"]],
+      [
+        [
+          "Days",
+          "Time",
+          "Sections",
+          "Rooms in use",
+          "Total rooms",
+          "Total enrollment",
+          "Slot pressure %",
+        ],
+      ],
       rows.map((r) => [
         r.days,
         `${r.startTime}–${r.endTime}`,
         r.sections,
         r.roomsUsed,
+        totalRooms,
         r.totalEnrollment,
         r.slotPressurePct != null ? r.slotPressurePct : "—",
       ]),
-      footnotes,
+      timeslotFootnotes,
       undefined,
       fmtGen,
     )
@@ -1236,7 +1374,6 @@ export async function generateReportBlob(params: {
             "First table: hard violations. The following sections list soft violations (or state if there are none), then room assignment quality and optimizer runs.",
           ]
         : []),
-      ...buildTimetableHealthHotspotLines(conflicts),
     ]
 
     const blob = await buildPdf(
@@ -1248,6 +1385,7 @@ export async function generateReportBlob(params: {
       undefined,
       appendPdfSections,
       fmtGen,
+      timetableHealthHotspotPdfSections(ds),
     )
     return { blob, mimeType: "application/pdf", extension: "pdf", baseFilename: base }
   }

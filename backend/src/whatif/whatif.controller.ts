@@ -24,7 +24,6 @@ import { Role } from "@prisma/client";
 import { Roles } from "../common/decorators/roles.decorator";
 import { WhatIfService } from "./whatif.service";
 import {
-  ApplyScenarioRunDto,
   CompareDto,
   ControlRunDto,
   CreateScenarioDto,
@@ -148,20 +147,13 @@ export class WhatIfController {
     return this.whatIfService.compare(dto);
   }
 
-  // ── Apply ──────────────────────────────────────────────────────────────────
-
   /**
-   * POST /what-if/runs/:runId/apply
-   * Promote the scenario result timetable to production.
-   * Replaces the base timetable's schedule entries with the result entries.
-   * This is the ONLY moment simulation data touches production.
+   * POST /what-if/runs/:runId/store
+   * Persist the transient simulation output as a draft timetable (explicit Store only).
    */
-  @Post("runs/:runId/apply")
-  applyScenarioRun(
-    @Param("runId", ParseIntPipe) runId: number,
-    @Body() body: ApplyScenarioRunDto,
-  ) {
-    return this.whatIfService.applyScenarioRun(runId, body);
+  @Post("runs/:runId/store")
+  storeScenarioRun(@Param("runId", ParseIntPipe) runId: number) {
+    return this.whatIfService.storeScenarioRun(runId);
   }
 
   @Post("runs/:runId/control")

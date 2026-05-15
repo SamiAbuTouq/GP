@@ -188,16 +188,7 @@ async def run_scenario(
         run.metrics             = metrics_snap.dict()
         run.generation_seconds  = metrics_snap.generation_seconds
 
-        # ── Phase 8: Persist sandbox timetable (97%) ─────────────────────────
-        await emit("computing_metrics", 97, "Saving sandbox timetable result...")
-        result_timetable_id = await timetable_repo.save_sandbox_timetable(
-            base_timetable_id=run.base_timetable_id,
-            scenario_run_id=run.id,
-            schedule_entries=schedule_entries,
-            label=f"[SIMULATION] Scenario Run #{run.id}",
-            is_simulation=True,
-        )
-        run.result_timetable_id = result_timetable_id
+        # Timetable rows are created only via explicit Store (not on completion).
 
         # ── Done ──────────────────────────────────────────────────────────────
         run.status       = ScenarioStatus.COMPLETED

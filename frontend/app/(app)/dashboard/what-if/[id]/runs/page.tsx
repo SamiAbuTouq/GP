@@ -8,24 +8,22 @@ import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useToast } from "@/hooks/use-toast";
-import { HardConflictsAcknowledgmentFields } from "@/components/hard-conflicts-ui";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ApiClient, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import {
   fetchTimetableConflictSummary,
   resolveHardConflictCount,
   type HardConflictByTimetableId,
-  type TimetableConflictSummary,
 } from "@/lib/timetable-conflicts";
 import {
   buildWhatIfCompareHref,
+  formatTimetableOptionLabel,
   getRuns,
   getScenario,
   getTimetables,
+  storeScenarioRun,
   type TimetableOption,
   type WhatIfRun,
 } from "@/lib/what-if";
@@ -113,13 +111,9 @@ export default function WhatIfRunsPage() {
   const [timetables, setTimetables] = useState<TimetableOption[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedRun, setSelectedRun] = useState<WhatIfRun | null>(null);
-  const [applyRun, setApplyRun] = useState<WhatIfRun | null>(null);
-  const [confirmText, setConfirmText] = useState("");
-  const [applyConflictSummary, setApplyConflictSummary] = useState<TimetableConflictSummary | null>(null);
-  const [applyConflictLoading, setApplyConflictLoading] = useState(false);
-  const [applyConflictAcknowledged, setApplyConflictAcknowledged] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "running" | "completed" | "failed" | "applied">("all");
   const [hardConflictByTimetableId, setHardConflictByTimetableId] = useState<HardConflictByTimetableId>({});
+  const [storingRunId, setStoringRunId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     if (!scenarioIdValid) return;
@@ -221,42 +215,15 @@ export default function WhatIfRunsPage() {
     };
   }, [scenarioIdValid, timetableIdsForConflictFetch]);
 
-  useEffect(() => {
-    const ttId = applyRun?.resultTimetableId;
-    if (ttId == null || ttId <= 0) {
-      setApplyConflictSummary(null);
-      setApplyConflictAcknowledged(false);
-      setApplyConflictLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setApplyConflictAcknowledged(false);
-    setApplyConflictLoading(true);
-    fetchTimetableConflictSummary(ttId)
-      .then((data) => {
-        if (!cancelled) setApplyConflictSummary(data);
-      })
-      .catch(() => {
-        if (!cancelled) setApplyConflictSummary(null);
-      })
-      .finally(() => {
-        if (!cancelled) setApplyConflictLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [applyRun]);
-
   const visibleRuns = runs.filter((r) => statusFilter === "all" || r.status === statusFilter);
 
-  const timetableSemesterById = useMemo(() => {
+  const timetableLabelById = useMemo(() => {
     const map = new Map<number, string>();
     for (const t of timetables) {
-      const label = shortSemesterLabel(String(t.semester ?? ""));
-      map.set(Number(t.timetableId), label || "—");
+      map.set(Number(t.timetableId), formatTimetableOptionLabel(t, { formatDateTime }));
     }
     return map;
-  }, [timetables]);
+  }, [timetables, formatDateTime]);
 
   return (
     <div className="flex h-screen">
@@ -320,9 +287,21 @@ export default function WhatIfRunsPage() {
                     {visibleRuns.map((run) => (
                       <tr key={run.id} className="border-b last:border-0">
                         <td className="p-2">{run.id}</td>
-                        <td className="p-2">{run.baseTimetableName}</td>
                         <td className="p-2">
-                          {timetableSemesterById.get(run.baseTimetableId) ?? "—"}
+                          {timetableLabelById.get(run.baseTimetableId) ?? run.baseTimetableName}
+                        </td>
+                        <td className="p-2">
+                          {(() => {
+                            const t = timetables.find(
+                              (x) => Number(x.timetableId) === Number(run.baseTimetableId),
+                            );
+                            if (!t || !t.isPublished) return "—";
+                            return (
+                              shortSemesterLabel(String(t.semester ?? "")) ||
+                              `${t.academicYear}`.trim() ||
+                              "—"
+                            );
+                          })()}
                         </td>
                         <td className="p-2">{formatDateTime(run.startedAt)}</td>
                         <td className="p-2">{formatDurationSeconds(run.durationSeconds)}</td>
@@ -330,10 +309,45 @@ export default function WhatIfRunsPage() {
                         <td className="p-2">
                           <div className="flex flex-wrap gap-1">
                             <Button size="sm" variant="outline" onClick={() => setSelectedRun(run)}>View Results</Button>
+                            {(run.status === "completed" || run.status === "applied") && !run.resultTimetableId ? (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={storingRunId === run.id}
+                                onClick={() => {
+                                  setStoringRunId(run.id);
+                                  void storeScenarioRun(run.id)
+                                    .then((res) => {
+                                      toast({
+                                        title: "Stored",
+                                        description:
+                                          res.message ??
+                                          `Draft timetable #${res.resultTimetableId} saved.`,
+                                      });
+                                      return load();
+                                    })
+                                    .catch((error: unknown) => {
+                                      toast({
+                                        title: "Store failed",
+                                        description:
+                                          error instanceof ApiError
+                                            ? error.message
+                                            : error instanceof Error
+                                              ? error.message
+                                              : "Unknown error",
+                                        variant: "destructive",
+                                      });
+                                    })
+                                    .finally(() => setStoringRunId(null));
+                                }}
+                              >
+                                {storingRunId === run.id ? "Storing…" : "Store"}
+                              </Button>
+                            ) : null}
                             {(run.status === "completed" || run.status === "applied") && run.resultTimetableId ? (
                               <Button size="sm" variant="secondary" asChild>
                                 <Link href={`/schedule?simulation=1&timetableId=${run.resultTimetableId}&runId=${run.id}`}>
-                                  View Schedule
+                                  View in Schedule Viewer
                                 </Link>
                               </Button>
                             ) : null}
@@ -349,7 +363,6 @@ export default function WhatIfRunsPage() {
                                 Compare
                               </Link>
                             </Button>
-                            <Button size="sm" onClick={() => { setApplyRun(run); setConfirmText(""); }} disabled={run.status !== "completed"}>Apply</Button>
                           </div>
                         </td>
                       </tr>
@@ -429,67 +442,6 @@ export default function WhatIfRunsPage() {
           ) : null}
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelectedRun(null)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={Boolean(applyRun)}
-        onOpenChange={(open) => {
-          if (!open) setApplyRun(null);
-        }}
-      >
-        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-6 sm:max-w-lg">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden pr-1">
-            <DialogHeader><DialogTitle>Apply Scenario Result?</DialogTitle></DialogHeader>
-            <p className="text-sm text-muted-foreground">This will replace the schedule entries in the selected timetable with the simulation result. This action cannot be undone.</p>
-            <div className="space-y-2">
-              <Label>Type scenario name to confirm</Label>
-              <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder={scenarioName} />
-            </div>
-            <HardConflictsAcknowledgmentFields
-              summary={applyConflictSummary}
-              loading={applyConflictLoading}
-              acknowledged={applyConflictAcknowledged}
-              onAcknowledgedChange={setApplyConflictAcknowledged}
-              contextLabel="Applying replaces the base timetable’s schedule with this result."
-            />
-          </div>
-          <DialogFooter className="mt-4 shrink-0 border-t pt-4">
-            <Button variant="outline" onClick={() => setApplyRun(null)}>Cancel</Button>
-            <Button
-              variant="destructive"
-              disabled={
-                confirmText !== scenarioName ||
-                applyConflictLoading ||
-                (applyConflictSummary?.requiresConflictAcknowledgment === true && !applyConflictAcknowledged)
-              }
-              onClick={async () => {
-                if (!applyRun) return;
-                try {
-                  const needAck = applyConflictSummary?.requiresConflictAcknowledgment === true;
-                  await ApiClient.request(`/what-if/runs/${applyRun.id}/apply`, {
-                    method: "POST",
-                    body: JSON.stringify(needAck ? { acknowledgedHardConflicts: true } : {}),
-                  });
-                  toast({ title: "Scenario applied" });
-                  setApplyRun(null);
-                  router.push("/timetable-generation");
-                } catch (error: unknown) {
-                  toast({
-                    title: "Apply failed",
-                    description:
-                      error instanceof ApiError
-                        ? error.message
-                        : error instanceof Error
-                          ? error.message
-                          : "Unknown error",
-                    variant: "destructive",
-                  });
-                }
-              }}
-            >
-              Confirm & Apply
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

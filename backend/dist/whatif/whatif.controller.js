@@ -58,8 +58,8 @@ let WhatIfController = class WhatIfController {
     compare(dto) {
         return this.whatIfService.compare(dto);
     }
-    applyScenarioRun(runId, body) {
-        return this.whatIfService.applyScenarioRun(runId, body);
+    storeScenarioRun(runId) {
+        return this.whatIfService.storeScenarioRun(runId);
     }
     controlScenarioRun(runId, dto) {
         return this.whatIfService.controlRun(runId, dto.action);
@@ -157,13 +157,12 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], WhatIfController.prototype, "compare", null);
 __decorate([
-    (0, common_1.Post)("runs/:runId/apply"),
+    (0, common_1.Post)("runs/:runId/store"),
     __param(0, (0, common_1.Param)("runId", common_1.ParseIntPipe)),
-    __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, whatif_dto_1.ApplyScenarioRunDto]),
+    __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
-], WhatIfController.prototype, "applyScenarioRun", null);
+], WhatIfController.prototype, "storeScenarioRun", null);
 __decorate([
     (0, common_1.Post)("runs/:runId/control"),
     __param(0, (0, common_1.Param)("runId", common_1.ParseIntPipe)),

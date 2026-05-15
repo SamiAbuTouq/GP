@@ -15,13 +15,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { HardConflictsAcknowledgmentFields } from "@/components/hard-conflicts-ui";
 import { ApiClient, ApiError } from "@/lib/api-client";
 import { streamScenarioRunSse } from "@/lib/scenario-sse";
-import {
-  fetchTimetableConflictSummary,
-  type TimetableConflictSummary,
-} from "@/lib/timetable-conflicts";
 import {
   buildWhatIfCompareHref,
   conditionLabel,
@@ -29,7 +24,9 @@ import {
   getScenario,
   getScenarios,
   getTimetables,
-  scheduleHrefAfterScenarioApply,
+  storeScenarioRun,
+  formatTimetableOptionLabel,
+  timetableOptionSearchText,
   type Scenario,
   type TimetableOption,
   type WhatIfLookupOption,
@@ -39,13 +36,6 @@ import { useDateTimeFormat } from "@/components/datetime-preferences-context";
 import { AlertTriangle, Check, Play, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
-function isPublishedTimetableStatus(status: string | null | undefined): boolean {
-  const normalized = String(status ?? "")
-    .trim()
-    .toLowerCase();
-  return normalized === "published" || normalized === "live" || normalized === "active";
-}
 
 function numericString(value: unknown): string | null {
   const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
@@ -109,16 +99,10 @@ export default function WhatIfScenarioDetailPage() {
   const [timetables, setTimetables] = useState<TimetableOption[]>([]);
   const [launcherOpen, setLauncherOpen] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
-  const [applyOpen, setApplyOpen] = useState(false);
-  const [applyText, setApplyText] = useState("");
-  const [applySubmitting, setApplySubmitting] = useState(false);
-  const [applySuccess, setApplySuccess] = useState<string | null>(null);
-  const [applyConflictSummary, setApplyConflictSummary] = useState<TimetableConflictSummary | null>(null);
-  const [applyConflictLoading, setApplyConflictLoading] = useState(false);
-  const [applyConflictAcknowledged, setApplyConflictAcknowledged] = useState(false);
   const [scenarioLoading, setScenarioLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [simStarting, setSimStarting] = useState(false);
+  const [storingRun, setStoringRun] = useState(false);
   const [timetableSearch, setTimetableSearch] = useState("");
   const [lecturerOptions, setLecturerOptions] = useState<WhatIfLookupOption[]>([]);
   const [roomOptions, setRoomOptions] = useState<WhatIfLookupOption[]>([]);
@@ -148,11 +132,6 @@ export default function WhatIfScenarioDetailPage() {
     { refreshInterval: 1500, dedupingInterval: 0 },
   );
   const canStart = selected.length === 1;
-  const applyNeedsConflictAck = applyConflictSummary?.requiresConflictAcknowledgment === true;
-  const canApply =
-    applyText === (scenario?.name ?? "") &&
-    (!applyNeedsConflictAck || applyConflictAcknowledged) &&
-    !applyConflictLoading;
   const runStatus = scenario?.latestRun?.status;
   const scenarioLatestRunId = scenario?.latestRun?.id ?? null;
   const latestRunErrorMessage = scenario?.latestRun?.errorMessage;
@@ -350,37 +329,6 @@ export default function WhatIfScenarioDetailPage() {
   }, [scenario?.isRunning, scenario?.latestRun?.status, load]);
 
   useEffect(() => {
-    if (!applyOpen) {
-      setApplyConflictSummary(null);
-      setApplyConflictAcknowledged(false);
-      setApplyConflictLoading(false);
-      return;
-    }
-    const ttId = scenario?.latestRun?.resultTimetableId;
-    if (ttId == null || ttId <= 0) {
-      setApplyConflictSummary(null);
-      setApplyConflictLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setApplyConflictAcknowledged(false);
-    setApplyConflictLoading(true);
-    fetchTimetableConflictSummary(ttId)
-      .then((data) => {
-        if (!cancelled) setApplyConflictSummary(data);
-      })
-      .catch(() => {
-        if (!cancelled) setApplyConflictSummary(null);
-      })
-      .finally(() => {
-        if (!cancelled) setApplyConflictLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [applyOpen, scenario?.latestRun?.resultTimetableId]);
-
-  useEffect(() => {
     if (!scenario || simStarting) return;
     const latest = scenario.latestRun;
     if (!latest || typeof latest.id !== "number") return;
@@ -518,42 +466,14 @@ export default function WhatIfScenarioDetailPage() {
       }
       setFinalizing();
 
-      const sseResultTimetableId =
-        typeof outcome.resultTimetableId === "number" && outcome.resultTimetableId > 0
-          ? outcome.resultTimetableId
-          : null;
       if (pageMountedRef.current) {
         await load();
       }
-      if (sseResultTimetableId && pageMountedRef.current) {
+      if (pageMountedRef.current) {
         toast({
-          title: "Scenario result saved",
-          description: `Stored as draft timetable #${sseResultTimetableId}. Use View schedule below when you want to inspect it.`,
+          title: "Simulation complete",
+          description: "Review metrics below. Use Store to save a draft timetable for the schedule viewer.",
         });
-        return;
-      }
-
-      if (pageMountedRef.current) {
-        const refreshedScenario = await getScenario(id);
-        const latestRun = refreshedScenario.latestRun;
-        if (
-          latestRun &&
-          (latestRun.status === "completed" || latestRun.status === "applied") &&
-          latestRun.resultTimetableId
-        ) {
-          toast({
-            title: "Scenario result saved",
-            description: `Stored as draft timetable #${latestRun.resultTimetableId}. Use View schedule below when you want to inspect it.`,
-          });
-          return;
-        }
-      }
-      if (pageMountedRef.current) {
-        if (pageMountedRef.current) {
-          toast({
-            title: "Simulation complete",
-          });
-        }
       }
     } catch (error: unknown) {
       if (!(error instanceof Error && error.name === "AbortError")) {
@@ -578,41 +498,63 @@ export default function WhatIfScenarioDetailPage() {
 
   const filteredTimetables = useMemo(() => {
     const q = timetableSearch.trim().toLowerCase();
-    if (!q) return selectableBaseTimetables;
-    return selectableBaseTimetables.filter((t) => {
-      const label = `${t.academicYear} ${t.semester} v${t.versionNumber} ${t.status ?? ""} ${t.timetableKind}`.toLowerCase();
-      return label.includes(q);
+    const rows = !q
+      ? selectableBaseTimetables
+      : selectableBaseTimetables.filter((t) => timetableOptionSearchText(t).includes(q));
+    return [...rows].sort((a, b) => {
+      const ta = Date.parse(a.generatedAt ?? "") || 0;
+      const tb = Date.parse(b.generatedAt ?? "") || 0;
+      if (tb !== ta) return tb - ta;
+      return b.timetableId - a.timetableId;
     });
   }, [selectableBaseTimetables, timetableSearch]);
 
-  const latestRunBaseTimetableStatus = useMemo(() => {
-    const baseId = scenario?.latestRun?.baseTimetableId;
-    if (!baseId) return null;
-    return (
-      timetables.find((t) => Number(t.timetableId) === Number(baseId))?.status ?? null
-    );
-  }, [scenario?.latestRun?.baseTimetableId, timetables]);
-  const applyTargetsPublishedTimetable = isPublishedTimetableStatus(latestRunBaseTimetableStatus);
-
-  const latestRunCompleteWithResult = useMemo(() => {
+  const latestRunComplete = useMemo(() => {
     const lr = scenario?.latestRun;
-    if (!lr?.resultTimetableId) return null;
+    if (!lr) return null;
     if (lr.status !== "completed" && lr.status !== "applied") return null;
     return lr;
   }, [scenario?.latestRun]);
 
   const latestRunBaseLabel = useMemo(() => {
-    if (!latestRunCompleteWithResult) return "";
-    const fromRun = latestRunCompleteWithResult.baseTimetableName?.trim();
+    if (!latestRunComplete) return "";
+    const fromRun = latestRunComplete.baseTimetableName?.trim();
     if (fromRun) return fromRun;
     const t = timetables.find(
-      (x) => Number(x.timetableId) === Number(latestRunCompleteWithResult.baseTimetableId),
+      (x) => Number(x.timetableId) === Number(latestRunComplete.baseTimetableId),
     );
     if (t) {
-      return `${t.academicYear} · ${t.semester} · v${t.versionNumber}`;
+      return formatTimetableOptionLabel(t, { formatDateTime });
     }
-    return `Timetable #${latestRunCompleteWithResult.baseTimetableId}`;
-  }, [latestRunCompleteWithResult, timetables]);
+    return `Timetable #${latestRunComplete.baseTimetableId}`;
+  }, [latestRunComplete, timetables, formatDateTime]);
+
+  async function handleStoreLatestRun() {
+    const runId = latestRunComplete?.id;
+    if (!runId) return;
+    setStoringRun(true);
+    try {
+      const res = await storeScenarioRun(runId);
+      toast({
+        title: "Stored",
+        description: res.message ?? `Draft timetable #${res.resultTimetableId} saved.`,
+      });
+      await load();
+    } catch (error: unknown) {
+      toast({
+        title: "Store failed",
+        description:
+          error instanceof ApiError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setStoringRun(false);
+    }
+  }
 
   return (
     <div className="flex h-screen">
@@ -715,12 +657,12 @@ export default function WhatIfScenarioDetailPage() {
                       <div
                         className={cn(
                           "mb-4 flex h-14 w-14 items-center justify-center rounded-full",
-                          latestRunCompleteWithResult && !scenarioRunBusy
+                          latestRunComplete && !scenarioRunBusy
                             ? "bg-emerald-100 dark:bg-emerald-950/50"
                             : "bg-green-100 dark:bg-green-950/50",
                         )}
                       >
-                        {latestRunCompleteWithResult && !scenarioRunBusy ? (
+                        {latestRunComplete && !scenarioRunBusy ? (
                           <Check
                             className="h-7 w-7 stroke-[2.5] text-emerald-700 dark:text-emerald-300"
                             aria-hidden
@@ -740,7 +682,7 @@ export default function WhatIfScenarioDetailPage() {
                                 ? "Simulation cancelled"
                                 : scenario?.latestRun?.status === "failed"
                                   ? "Simulation failed"
-                                  : latestRunCompleteWithResult
+                                  : latestRunComplete
                                     ? "Latest run finished"
                                     : "Ready to simulate"}
                       </p>
@@ -755,8 +697,8 @@ export default function WhatIfScenarioDetailPage() {
                                 ? "This run was cancelled by you. You can start another simulation at any time."
                                 : scenario?.latestRun?.status === "failed"
                                   ? "Review the error below, adjust conditions or pick another timetable, then try again."
-                                  : latestRunCompleteWithResult
-                                    ? `Your most recent completed run used baseline “${latestRunBaseLabel}”. Compare, apply, or open the draft below — you can still run this scenario on other timetables.`
+                                  : latestRunComplete
+                                    ? `Your most recent completed run used baseline “${latestRunBaseLabel}”. Compare metrics or store the result as a draft timetable — you can still run this scenario on other baselines.`
                                     : "Select a timetable to run this scenario against."}
                       </p>
                     </div>
@@ -832,7 +774,7 @@ export default function WhatIfScenarioDetailPage() {
                         </div>
                       </div>
                     ) : null}
-                    {latestRunCompleteWithResult ? (
+                    {latestRunComplete ? (
                       <>
                         <div className="border-t border-border/80 pt-4" />
                         <div className="rounded-lg border border-border/80 bg-muted/25 px-4 py-3 text-left text-sm shadow-sm">
@@ -841,8 +783,8 @@ export default function WhatIfScenarioDetailPage() {
                             <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
                               <dt className="shrink-0 text-xs font-medium uppercase tracking-wide">Finished</dt>
                               <dd className="text-foreground sm:text-right">
-                                {latestRunCompleteWithResult.completedAt
-                                  ? formatDateTime(latestRunCompleteWithResult.completedAt)
+                                {latestRunComplete.completedAt
+                                  ? formatDateTime(latestRunComplete.completedAt)
                                   : "—"}
                               </dd>
                             </div>
@@ -850,7 +792,7 @@ export default function WhatIfScenarioDetailPage() {
                               <dt className="shrink-0 text-xs font-medium uppercase tracking-wide">Duration</dt>
                               <dd className="tabular-nums text-foreground sm:text-right">
                                 {formatRunDurationSeconds(
-                                  effectiveRunDurationSeconds(latestRunCompleteWithResult),
+                                  effectiveRunDurationSeconds(latestRunComplete),
                                 )}
                               </dd>
                             </div>
@@ -859,13 +801,13 @@ export default function WhatIfScenarioDetailPage() {
                               <dd className="min-w-0 text-foreground sm:max-w-[65%] sm:text-right">
                                 <span className="break-words">{latestRunBaseLabel}</span>
                                 <span className="mt-0.5 block font-mono text-[11px] text-muted-foreground">
-                                  #{latestRunCompleteWithResult.baseTimetableId}
+                                  #{latestRunComplete.baseTimetableId}
                                 </span>
                               </dd>
                             </div>
                           </dl>
                         </div>
-                        <div className="grid w-full gap-2 [grid-template-columns:minmax(0,1fr)_minmax(0,1.55fr)_minmax(0,1fr)]">
+                        <div className="grid w-full gap-2 sm:grid-cols-2">
                           <Button
                             asChild
                             variant="default"
@@ -875,40 +817,44 @@ export default function WhatIfScenarioDetailPage() {
                             <Link
                               href={buildWhatIfCompareHref({
                                 mode: "before_after",
-                                runIds: [latestRunCompleteWithResult.id],
+                                runIds: [latestRunComplete.id],
                                 scenarioId: id,
-                                timetableId: latestRunCompleteWithResult.baseTimetableId ?? null,
+                                timetableId: latestRunComplete.baseTimetableId ?? null,
                               })}
                             >
                               Compare results
                             </Link>
                           </Button>
-                          <Button
-                            type="button"
-                            variant="default"
-                            className="w-full min-w-0 justify-center px-2 text-center text-sm sm:px-3"
-                            onClick={() => setApplyOpen(true)}
-                          >
-                            Apply to timetable
-                          </Button>
-                          <Button
-                            asChild
-                            variant="default"
-                            type="button"
-                            className="w-full min-w-0 justify-center px-2 text-center text-sm sm:px-3"
-                          >
-                            <Link
-                              href={`/schedule?simulation=1&timetableId=${latestRunCompleteWithResult.resultTimetableId}&runId=${latestRunCompleteWithResult.id}`}
+                          {latestRunComplete.resultTimetableId ? (
+                            <Button
+                              asChild
+                              variant="default"
+                              type="button"
+                              className="w-full min-w-0 justify-center px-2 text-center text-sm sm:px-3"
                             >
-                              View schedule
-                            </Link>
-                          </Button>
+                              <Link
+                                href={`/schedule?simulation=1&timetableId=${latestRunComplete.resultTimetableId}&runId=${latestRunComplete.id}`}
+                              >
+                                View schedule
+                              </Link>
+                            </Button>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="default"
+                              className="w-full min-w-0 justify-center px-2 text-center text-sm sm:px-3"
+                              disabled={storingRun}
+                              onClick={() => void handleStoreLatestRun()}
+                            >
+                              {storingRun ? "Storing…" : "Store"}
+                            </Button>
+                          )}
                         </div>
                       </>
                     ) : null}
                   </CardContent>
                 </Card>
-                <Button asChild variant="outline" className="w-full"><Link href={`/dashboard/what-if/${id}/runs`}>Run history & apply</Link></Button>
+                <Button asChild variant="outline" className="w-full"><Link href={`/dashboard/what-if/${id}/runs`}>Run history</Link></Button>
               </div>
             </div>
           </div>
@@ -969,20 +915,17 @@ export default function WhatIfScenarioDetailPage() {
                       >
                         {checked ? <Check className="h-3 w-3 text-white" strokeWidth={3} /> : null}
                       </span>
-                      <span className="min-w-0 flex-1 font-medium text-foreground">
-                        {t.academicYear} - {t.semester}
+                      <span className="min-w-0 flex-1 font-medium leading-snug text-foreground">
+                        {formatTimetableOptionLabel(t, { formatDateTime })}
                       </span>
-                      <Badge variant="outline" className="shrink-0 font-mono text-xs font-normal">
-                        v{t.versionNumber}
-                      </Badge>
                       <Badge
                         variant={t.isPublished ? "default" : "secondary"}
                         className="shrink-0 text-xs capitalize"
                       >
                         {t.isPublished
                           ? "Published"
-                          : ["gwo_ui", "gwo"].includes(String(t.generationType ?? "").toLowerCase())
-                            ? "Draft · optimizer"
+                          : t.draftOrigin === "optimizer"
+                            ? "Optimizer"
                             : "Draft"}
                       </Badge>
                     </button>
@@ -1004,82 +947,6 @@ export default function WhatIfScenarioDetailPage() {
               <Play className="mr-2 h-4 w-4 fill-current" />
               {simStarting ? "Starting…" : "Start Simulation"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={applyOpen}
-        onOpenChange={(open) => {
-          setApplyOpen(open);
-          if (!open) {
-            setApplyText("");
-            setApplySubmitting(false);
-            setApplySuccess(null);
-            setApplyConflictAcknowledged(false);
-          }
-        }}
-      >
-        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-6 sm:max-w-lg">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden pr-1">
-            <DialogHeader><DialogTitle>Apply Scenario Result?</DialogTitle></DialogHeader>
-            {applyTargetsPublishedTimetable ? (
-              <Alert variant="destructive" className="border-2 shadow-sm">
-                <AlertTriangle className="h-4 w-4" aria-hidden />
-                <AlertTitle>Warning: base timetable is published</AlertTitle>
-                <AlertDescription>
-                  Applying this scenario will overwrite the currently published live schedule.
-                  This change is immediately visible to everyone using the live timetable.
-                </AlertDescription>
-              </Alert>
-            ) : null}
-            <p className="text-sm text-muted-foreground">
-              This promotes the sandbox result onto the base timetable: schedule entries and metrics are replaced. Works for draft or published timetables.
-              Production was not modified during the simulation; this is the only step that writes live data.
-            </p>
-            <div className="space-y-2">
-              <Label>Type scenario name to confirm</Label>
-              <Input value={applyText} onChange={(e) => setApplyText(e.target.value)} placeholder={scenario?.name ?? ""} />
-            </div>
-            <HardConflictsAcknowledgmentFields
-              summary={applyConflictSummary}
-              loading={applyConflictLoading}
-              acknowledged={applyConflictAcknowledged}
-              onAcknowledgedChange={setApplyConflictAcknowledged}
-              contextLabel="Applying replaces the base timetable’s schedule with this result."
-            />
-            {applySuccess ? <p className="text-sm text-emerald-600">{applySuccess}</p> : null}
-          </div>
-          <DialogFooter className="mt-4 shrink-0 border-t pt-4">
-            <Button variant="outline" onClick={() => setApplyOpen(false)} disabled={applySubmitting}>Cancel</Button>
-            <Button variant="destructive" disabled={!canApply || applySubmitting} onClick={async () => {
-              if (!scenario?.latestRun) return;
-              setApplySubmitting(true);
-              setApplySuccess(null);
-              try {
-                const needAck = applyConflictSummary?.requiresConflictAcknowledgment === true;
-                await ApiClient.request(`/what-if/runs/${scenario.latestRun.id}/apply`, {
-                  method: "POST",
-                  body: JSON.stringify(needAck ? { acknowledgedHardConflicts: true } : {}),
-                });
-                setApplySuccess("Scenario applied successfully.");
-                toast({ title: "Scenario applied" });
-                router.push(scheduleHrefAfterScenarioApply(scenario.latestRun.baseTimetableId));
-              } catch (error: unknown) {
-                toast({
-                  title: "Apply failed",
-                  description:
-                    error instanceof ApiError
-                      ? error.message
-                      : error instanceof Error
-                        ? error.message
-                        : "Unknown error",
-                  variant: "destructive",
-                });
-              } finally {
-                setApplySubmitting(false);
-              }
-            }}>{applySubmitting ? "Applying…" : "Confirm & Apply"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

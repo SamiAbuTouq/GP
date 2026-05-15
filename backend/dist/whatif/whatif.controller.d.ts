@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { WhatIfService } from "./whatif.service";
-import { ApplyScenarioRunDto, CompareDto, ControlRunDto, CreateScenarioDto, DeleteScenarioQueryDto, RunScenarioDto, UpdateScenarioDto } from "./dto/whatif.dto";
+import { CompareDto, ControlRunDto, CreateScenarioDto, DeleteScenarioQueryDto, RunScenarioDto, UpdateScenarioDto } from "./dto/whatif.dto";
 export declare class WhatIfController {
     private readonly whatIfService;
     constructor(whatIfService: WhatIfService);
@@ -192,9 +192,10 @@ export declare class WhatIfController {
             sectionChanges: import("./whatif.service").SectionChangeSummary;
         }[];
     }>;
-    applyScenarioRun(runId: number, body: ApplyScenarioRunDto): Promise<{
+    storeScenarioRun(runId: number): Promise<{
         ok: boolean;
-        appliedToTimetableId: number;
+        runId: number;
+        resultTimetableId: number;
         message: string;
     }>;
     controlScenarioRun(runId: number, dto: ControlRunDto): Promise<{

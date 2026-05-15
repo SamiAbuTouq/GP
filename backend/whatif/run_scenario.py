@@ -10,8 +10,11 @@ Responsibilities:
   3. Apply each ScenarioCondition to mutate the sandbox (all 11 condition types)
   4. Write the mutated config to a temp file in GWO-v6.py's expected input format
   5. Spawn GWO-v6.py as a subprocess, forwarding its progress lines to stdout
-  6. When GWO exits, collect its result JSON, save the result timetable to DB
-     via psycopg2, and emit a final {"type":"result",...} line
+  6. When GWO exits, collect its result JSON and emit a final {"type":"result",...}
+     line with metrics and a transient persist_payload (no timetable row until Store)
+
+  Store (explicit user action via NestJS):
+  python3 whatif/run_scenario.py --store-run-id <id>
 
 Every line written to stdout is a JSON object.  NestJS reads these lines and
 forwards them as SSE events to the frontend, which re-uses the existing
@@ -1799,14 +1802,150 @@ def save_result_timetable(
         conn.close()
 
 
+def _metrics_snapshot_from_gwo(gwo_result: Dict[str, Any]) -> Dict[str, Any]:
+    metrics = gwo_result.get("metrics", {}) if isinstance(gwo_result.get("metrics"), dict) else {}
+    return {
+        "conflicts": len(gwo_result.get("conflicts", []) or []),
+        "roomUtilizationRate": metrics.get("roomUtilizationRate", 0),
+        "softConstraintsScore": metrics.get("softConstraintsScore", 0),
+        "fitnessScore": metrics.get("fitnessScore", 0),
+        "lecturerBalanceScore": metrics.get("lecturerBalanceScore", 0),
+        "isValid": metrics.get("isValid", False),
+    }
+
+
+def store_run_from_db(run_id: int, database_url: str) -> int:
+    """
+    Persist a completed run's transient simulation output as a draft timetable.
+    Uses the same save_result_timetable() path as the former auto-save on completion.
+    """
+    import psycopg2
+    from psycopg2.extras import Json
+
+    conn = psycopg2.connect(database_url)
+    conn.autocommit = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT run_id, scenario_id, base_timetable_id, status,
+                       result_timetable_id, result_metrics
+                FROM scenario_run
+                WHERE run_id = %s
+                FOR UPDATE
+                """,
+                (run_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise ValueError(f"Run {run_id} not found.")
+            (
+                _run_id,
+                scenario_id,
+                base_timetable_id,
+                status,
+                existing_result_tt,
+                result_metrics_raw,
+            ) = row
+            if status not in ("completed", "applied"):
+                raise ValueError(
+                    f"Run {run_id} is not completed (status={status})."
+                )
+            if existing_result_tt is not None:
+                raise ValueError(
+                    f"Run {run_id} already has stored result timetable #{existing_result_tt}."
+                )
+            if result_metrics_raw is None:
+                raise ValueError(f"Run {run_id} has no result metrics.")
+            if isinstance(result_metrics_raw, str):
+                result_metrics = json.loads(result_metrics_raw)
+            else:
+                result_metrics = dict(result_metrics_raw)
+            persist_payload = result_metrics.get("_persistPayload")
+            if not isinstance(persist_payload, dict):
+                raise ValueError(
+                    f"Run {run_id} has no transient simulation payload to store."
+                )
+            gwo_result = persist_payload.get("gwo_result")
+            mapper_tt = persist_payload.get("mapper_tt")
+            if not isinstance(gwo_result, dict):
+                raise ValueError(f"Run {run_id} persist payload is missing gwo_result.")
+
+        result_timetable_id = save_result_timetable(
+            database_url=database_url,
+            base_timetable_id=int(base_timetable_id),
+            semester_id=None,
+            gwo_result=gwo_result,
+            scenario_id=int(scenario_id),
+            mapper_tt=mapper_tt if isinstance(mapper_tt, dict) else None,
+        )
+
+        cleaned_metrics = {
+            k: v for k, v in result_metrics.items() if k != "_persistPayload"
+        }
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE scenario_run
+                SET result_timetable_id = %s,
+                    result_metrics = %s
+                WHERE run_id = %s
+                """,
+                (result_timetable_id, Json(cleaned_metrics), run_id),
+            )
+        conn.commit()
+        return int(result_timetable_id)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="What-If Scenario Runner")
-    parser.add_argument("--config", required=True, help="Path to the run config JSON")
+    parser.add_argument("--config", help="Path to the run config JSON")
+    parser.add_argument(
+        "--store-run-id",
+        type=int,
+        default=None,
+        help="Persist transient simulation output for a completed run (Store action)",
+    )
     args = parser.parse_args()
+
+    if args.store_run_id is not None:
+        database_url = os.environ.get("DATABASE_URL", "")
+        if not database_url:
+            emit_error(
+                "DATABASE_URL not configured.",
+                detail="Set DATABASE_URL in the environment.",
+            )
+            return 1
+        try:
+            result_timetable_id = store_run_from_db(int(args.store_run_id), database_url)
+        except Exception as exc:
+            emit_error(
+                "Failed to store scenario result.",
+                detail=traceback.format_exc(),
+            )
+            return 1
+        emit(
+            "result",
+            phase="done",
+            pct=100,
+            message=f"Stored as draft timetable #{result_timetable_id}.",
+            run_id=int(args.store_run_id),
+            result_timetable_id=result_timetable_id,
+        )
+        return 0
+
+    if not args.config:
+        emit_error("Missing --config for scenario run.")
+        return 1
 
     # ── Load config ──────────────────────────────────────────────────────────
     try:
@@ -1931,16 +2070,9 @@ def main() -> int:
     emit("progress", phase="validating", pct=93,
          message="GWO complete. Validating constraints...")
 
-    # ── Phase 5: Save result timetable to DB ─────────────────────────────────
+    # ── Phase 5: Finalize metrics (persistence happens only on explicit Store) ─
     emit("progress", phase="computing_metrics", pct=96,
-         message="Saving sandbox timetable to database...")
-
-    if not database_url:
-        emit_error(
-            "DATABASE_URL not configured.",
-            detail="Set DATABASE_URL in the environment or include it in the run config.",
-        )
-        return 1
+         message="Finalizing simulation metrics...")
 
     if not mapper_tt:
         mapper_tt = _build_mapper_context(
@@ -1977,68 +2109,26 @@ def main() -> int:
     elif fallback_text and fallback_text_entries:
         result_for_persistence = fallback_text
 
-    try:
-        result_timetable_id = save_result_timetable(
-            database_url=database_url,
-            base_timetable_id=base_tt_id,
-            # Scenario outputs are always drafts until an explicit publish action.
-            semester_id=None,
-            gwo_result=result_for_persistence,
-            scenario_id=scenario_id,
-            mapper_tt=mapper_tt,
-        )
-    except Exception as exc:
-        # Last-chance recovery: if the selected payload couldn't be persisted,
-        # retry with the other payload (direct vs UI fallback) before failing.
-        candidates: List[Dict[str, Any]] = []
-        for c in [normalized_direct, fallback_ui, fallback_text]:
-            if isinstance(c, dict) and (c.get("schedule_entries") or []):
-                if c is not result_for_persistence:
-                    candidates.append(c)
-        recovered_ok = False
-        for candidate in candidates:
-            try:
-                result_timetable_id = save_result_timetable(
-                    database_url=database_url,
-                    base_timetable_id=base_tt_id,
-                    semester_id=None,
-                    gwo_result=candidate,
-                    scenario_id=scenario_id,
-                    mapper_tt=mapper_tt,
-                )
-                gwo_result = candidate
-                recovered_ok = True
-                break
-            except Exception:
-                continue
-        if not recovered_ok:
-            emit_error(
-                "Failed to save result timetable.",
-                detail=traceback.format_exc(),
-            )
-            return 1
-
     generation_seconds = round(time.perf_counter() - t_start, 2)
 
-    # ── Phase 6: Emit final result ────────────────────────────────────────────
-    result_metrics = gwo_result.get("metrics", {})
+    # ── Phase 6: Emit final result (transient until user clicks Store) ────────
+    metrics_snapshot = _metrics_snapshot_from_gwo(gwo_result)
+    persist_payload = {
+        "gwo_result": result_for_persistence,
+        "mapper_tt": mapper_tt,
+        "base_timetable_id": base_tt_id,
+        "scenario_id": scenario_id,
+    }
 
     emit(
         "result",
         phase="done",
         pct=100,
-        message="Simulation complete — results ready.",
+        message="Simulation complete — use Store to save a draft timetable.",
         run_id=run_id,
-        result_timetable_id=result_timetable_id,
         baseline_metrics=baseline_metrics,
-        result_metrics={
-            "conflicts": len(gwo_result.get("conflicts", [])),
-            "roomUtilizationRate":   result_metrics.get("roomUtilizationRate", 0),
-            "softConstraintsScore":  result_metrics.get("softConstraintsScore", 0),
-            "fitnessScore":          result_metrics.get("fitnessScore", 0),
-            "lecturerBalanceScore":  result_metrics.get("lecturerBalanceScore", 0),
-            "isValid":               result_metrics.get("isValid", False),
-        },
+        result_metrics=metrics_snapshot,
+        persist_payload=persist_payload,
         gwo_iterations_run=gwo_result.get("iterations_run", 0),
         generation_seconds=generation_seconds,
     )

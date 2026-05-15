@@ -2636,7 +2636,7 @@ export function TimetableGrid() {
       toast({
         title: "Saved",
         description: isSimulationView
-          ? "Simulation timetable updated. Apply this run when you're satisfied."
+          ? "Simulation timetable updated. Store the run from What-If if you want to keep this draft."
           : "The server schedule file was updated. You can turn Edit back on to keep adjusting.",
       });
     } catch (e) {
@@ -2713,7 +2713,7 @@ export function TimetableGrid() {
           </p>
           {isSimulationView ? (
             <p className="max-w-xl text-right text-xs leading-relaxed text-muted-foreground">
-              Simulation draft. You can manually edit this grid and save changes before applying to production.
+              Simulation draft. You can manually edit this grid and save changes; it does not affect production timetables.
             </p>
           ) : null}
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -2805,7 +2805,7 @@ export function TimetableGrid() {
                   </TooltipTrigger>
                   <TooltipContent side="bottom" align="end" sideOffset={8}>
                     {isSimulationView
-                      ? "Writes your edited grid back to this simulation timetable in the database. Then you can apply it to production from the simulation banner."
+                      ? "Writes your edited grid back to this simulation timetable in the database."
                       : "Saves your manual edits so they persist after a page refresh."}
                   </TooltipContent>
                 </Tooltip>

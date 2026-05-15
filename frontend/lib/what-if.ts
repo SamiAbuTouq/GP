@@ -86,6 +86,7 @@ export type TimetableOption = {
   versionNumber: number;
   status?: string;
   generationType?: string;
+  generatedAt?: string | null;
   isDraft: boolean;
   isPublished: boolean;
   isScenarioResult: boolean;
@@ -94,6 +95,60 @@ export type TimetableOption = {
   /** From API: bases allowed for scenario runs (published schedules + optimizer-saved drafts). */
   canUseAsScenarioBase?: boolean;
 };
+
+function formatGeneratedAtShort(iso: string | null | undefined): string | null {
+  if (iso == null || String(iso).trim() === "") return null;
+  const ms = Date.parse(String(iso));
+  if (!Number.isFinite(ms)) return null;
+  return new Date(ms).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+/** Human-readable label for timetable pickers (What-If run dialog, compare filters, etc.). */
+export function formatTimetableOptionLabel(
+  t: TimetableOption,
+  opts?: { formatDateTime?: (iso: string) => string },
+): string {
+  if (t.isPublished) {
+    return `${t.academicYear} · ${t.semester} · v${t.versionNumber} · #${t.timetableId}`;
+  }
+
+  const origin =
+    t.draftOrigin === "optimizer"
+      ? "Optimizer draft"
+      : t.draftOrigin === "scenario"
+        ? "Scenario draft"
+        : "Draft";
+
+  const whenRaw = t.generatedAt?.trim() ? String(t.generatedAt) : null;
+  const when =
+    whenRaw && opts?.formatDateTime
+      ? opts.formatDateTime(whenRaw)
+      : formatGeneratedAtShort(whenRaw);
+
+  return [origin, `#${t.timetableId}`, `v${t.versionNumber}`, when].filter(Boolean).join(" · ");
+}
+
+/** Lowercase blob for client-side search in timetable lists. */
+export function timetableOptionSearchText(t: TimetableOption): string {
+  const when = formatGeneratedAtShort(t.generatedAt ?? null);
+  return [
+    formatTimetableOptionLabel(t),
+    t.timetableId,
+    t.academicYear,
+    t.semester,
+    t.versionNumber,
+    t.status,
+    t.generationType,
+    t.draftOrigin,
+    when,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
 
 export const CONDITION_LABELS: Record<string, string> = {
   add_lecturer: "Add Lecturer",
@@ -123,6 +178,16 @@ export async function getRuns(scenarioId: number): Promise<WhatIfRun[]> {
   return rows.map(normalizeRun);
 }
 
+/** Persist a completed run's transient simulation output as a draft timetable. */
+export async function storeScenarioRun(runId: number): Promise<{
+  ok: boolean;
+  runId: number;
+  resultTimetableId: number;
+  message: string;
+}> {
+  return ApiClient.request(`/what-if/runs/${runId}/store`, { method: "POST" });
+}
+
 function mapTimetableRowToOption(row: any): TimetableOption {
   const gen = String(row.generationType ?? row.generation_type ?? "").toLowerCase();
   const isPublishedApi = Boolean(row.isPublished ?? row.is_published ?? (row.semesterId ?? row.semester_id) != null);
@@ -140,6 +205,12 @@ function mapTimetableRowToOption(row: any): TimetableOption {
     versionNumber: Number(row.versionNumber ?? row.version_number ?? 1),
     status: row.status,
     generationType: String(row.generationType ?? row.generation_type ?? ""),
+    generatedAt:
+      row.generatedAt != null
+        ? String(row.generatedAt)
+        : row.generated_at != null
+          ? String(row.generated_at)
+          : null,
     isDraft: Boolean(row.isDraft ?? row.is_draft ?? (row.semesterId ?? row.semester_id) == null),
     isPublished: isPublishedApi,
     isScenarioResult,
@@ -257,7 +328,7 @@ export function conditionParameterSummary(
   }
 }
 
-/** Client-side apply hint from baseline vs result (aligned with backend compare recommendations). */
+/** Client-side outcome hint from baseline vs result (aligned with backend compare recommendations). */
 export function recommendationFromMetrics(
   baseline: MetricSnapshot | null,
   result: MetricSnapshot | null,
@@ -291,9 +362,9 @@ export function recommendationFromMetrics(
   const total = positives + negatives;
   if (total === 0) return `"${scenarioName}" produces no measurable change in key metrics.`;
   const ratio = positives / total;
-  if (ratio >= 0.8) return `Apply recommended — "${scenarioName}" improves ${positives}/${total} key metrics with no significant downsides.`;
-  if (ratio >= 0.6) return `Apply with caution — "${scenarioName}" improves most metrics but has ${negatives} area(s) of concern.`;
-  if (negatives > positives) return `Apply not recommended — "${scenarioName}" worsens more metrics than it improves.`;
+  if (ratio >= 0.8) return `Strong outcome — "${scenarioName}" improves ${positives}/${total} key metrics with no significant downsides.`;
+  if (ratio >= 0.6) return `Proceed with caution — "${scenarioName}" improves most metrics but has ${negatives} area(s) of concern.`;
+  if (negatives > positives) return `Not recommended — "${scenarioName}" worsens more metrics than it improves.`;
   return `Mixed results — "${scenarioName}" has equal positive and negative effects.`;
 }
 

@@ -487,7 +487,7 @@ export function ReportsApp() {
       setRecentReports((prev) => [record, ...prev])
       void saveRecentReport(record)
       setHasGenerated(true)
-      // Reset the wizard after successful generation so the next report starts from a fresh selection.
+      // Keep report type selected; reset format and timetable scope for the next export.
       setExportFormat("")
       setHasChosenFormat(false)
       setSelectedYear("")
@@ -572,10 +572,45 @@ export function ReportsApp() {
         return
       }
       if (r.extension === "zip") {
-        setPreviewTable([
-          ["Preview unavailable for ZIP exports"],
-          ["Download the file to inspect the packaged CSV files."],
-        ])
+        void (async () => {
+          try {
+            const { unzipSync, strFromU8 } = await import("fflate")
+            const buf = new Uint8Array(await r.blob.arrayBuffer())
+            const archive = unzipSync(buf)
+            const summaryKey = Object.keys(archive).find((k) => k.endsWith("-summary.csv"))
+            if (!summaryKey) {
+              setPreviewTable([
+                ["Could not read summary CSV"],
+                ["Download the ZIP to inspect the packaged files."],
+              ])
+              return
+            }
+            const text = strFromU8(archive[summaryKey]!)
+            const lines = text.trim().split(/\r?\n/)
+            const rows = lines.map((line) => {
+              const out: string[] = []
+              let cur = ""
+              let q = false
+              for (let i = 0; i < line.length; i++) {
+                const c = line[i]
+                if (c === '"') {
+                  q = !q
+                } else if (c === "," && !q) {
+                  out.push(cur)
+                  cur = ""
+                } else cur += c
+              }
+              out.push(cur)
+              return out
+            })
+            setPreviewTable(rows)
+          } catch {
+            setPreviewTable([
+              ["Could not preview ZIP contents"],
+              ["Download the file to inspect the packaged CSV files."],
+            ])
+          }
+        })()
         return
       }
       if (r.extension === "xlsx") {
@@ -1021,7 +1056,7 @@ export function ReportsApp() {
                                 disabled={!canGenerate}
                                 onClick={() => handleGenerate({ download: false })}
                               >
-                                Save without downloading
+                                Generate
                               </Button>
                             </div>
                             <p className="text-muted-foreground max-w-md text-xs leading-snug sm:pt-1">

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -7,25 +7,22 @@ import { Header } from "@/components/header";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { useToast } from "@/hooks/use-toast";
-import { HardConflictsAcknowledgmentFields } from "@/components/hard-conflicts-ui";
 import { ApiClient, ApiError } from "@/lib/api-client";
 import {
   fetchTimetableConflictSummary,
   resolveHardConflictCount,
   type HardConflictByTimetableId,
-  type TimetableConflictSummary,
 } from "@/lib/timetable-conflicts";
 import {
   getTimetables,
   getRuns,
   getScenarios,
   normalizeMetricSnapshot,
-  normalizeRun,
+  storeScenarioRun,
   type MetricSnapshot,
   type Scenario,
   type TimetableOption,
@@ -72,6 +69,27 @@ type SectionChangePerCourse = {
   sectionsWithSlotChange: number;
 };
 
+type SectionChangeDetail = {
+  courseId: number;
+  courseCode: string;
+  courseName: string;
+  sectionNumber: string;
+  changeType: "added" | "removed" | "reassigned";
+  roomChanged?: boolean;
+  lecturerChanged?: boolean;
+  timeslotChanged?: boolean;
+};
+
+function sectionChangeSummaryLabel(row: SectionChangeDetail): string {
+  if (row.changeType === "added") return "Added";
+  if (row.changeType === "removed") return "Removed";
+  const parts: string[] = [];
+  if (row.roomChanged) parts.push("room");
+  if (row.lecturerChanged) parts.push("lecturer");
+  if (row.timeslotChanged) parts.push("timeslot");
+  return parts.length > 0 ? `Reassigned (${parts.join(", ")})` : "Reassigned";
+}
+
 type ComparisonRow = {
   runId: number;
   scenarioId: number;
@@ -104,6 +122,7 @@ type ComparisonRow = {
     resultCount: number;
     percentSectionsAffected: number;
     perCourse: SectionChangePerCourse[];
+    changedSections: SectionChangeDetail[];
   } | null;
 };
 
@@ -116,13 +135,6 @@ type SelectableRun = {
   status: WhatIfRun["status"];
   startedAt: string;
 };
-
-function isPublishedTimetableStatus(status: string | null | undefined): boolean {
-  const normalized = String(status ?? "")
-    .trim()
-    .toLowerCase();
-  return normalized === "published" || normalized === "live" || normalized === "active";
-}
 
 function parseRunIds(searchParams: URLSearchParams): number[] {
   const raw = searchParams.get("runIds") ?? searchParams.get("runId");
@@ -209,6 +221,27 @@ function normalizeComparisonApiRow(raw: Record<string, unknown>): ComparisonRow 
         sectionsWithSlotChange: num(row.sectionsWithSlotChange ?? row.sections_with_slot_change),
       }))
     : [];
+  const changedSectionsRaw = sectionRaw?.changedSections ?? sectionRaw?.changed_sections;
+  const changedSections: SectionChangeDetail[] = Array.isArray(changedSectionsRaw)
+    ? changedSectionsRaw.map((row: Record<string, unknown>) => {
+        const changeTypeRaw = String(row.changeType ?? row.change_type ?? "reassigned");
+        const changeType: SectionChangeDetail["changeType"] =
+          changeTypeRaw === "added" || changeTypeRaw === "removed" || changeTypeRaw === "reassigned"
+            ? changeTypeRaw
+            : "reassigned";
+        const courseCode = String(row.courseCode ?? row.course_code ?? "");
+        return {
+          courseId: Number(row.courseId ?? row.course_id ?? 0),
+          courseCode,
+          courseName: String(row.courseName ?? row.course_name ?? "").trim() || courseCode,
+          sectionNumber: String(row.sectionNumber ?? row.section_number ?? ""),
+          changeType,
+          roomChanged: Boolean(row.roomChanged ?? row.room_changed),
+          lecturerChanged: Boolean(row.lecturerChanged ?? row.lecturer_changed),
+          timeslotChanged: Boolean(row.timeslotChanged ?? row.timeslot_changed),
+        };
+      })
+    : [];
 
   if (!Number.isFinite(pct) && sectionRaw) {
     const changed = num(sectionRaw.changed);
@@ -280,6 +313,7 @@ function normalizeComparisonApiRow(raw: Record<string, unknown>): ComparisonRow 
           resultCount: num(sectionRaw.resultCount ?? sectionRaw.result_count),
           percentSectionsAffected: pct,
           perCourse,
+          changedSections,
         }
       : null,
   };
@@ -328,7 +362,7 @@ function DeltaVerdictBadge({ verdict }: { verdict: "Better" | "Worse" | "No Chan
 }
 
 function formatDelta(delta: number | null): string {
-  if (delta == null || !Number.isFinite(delta)) return "—";
+  if (delta == null || !Number.isFinite(delta)) return "â€”";
   const absSmall = Math.abs(delta) < 10;
   const s = absSmall ? delta.toFixed(2).replace(/\.?0+$/, "") : String(delta);
   return `${delta > 0 ? "+" : ""}${s}`;
@@ -393,8 +427,8 @@ function metricTable(
             return (
               <tr key={label} className="border-b last:border-0">
                 <td className="p-2">{label}</td>
-                <td className="p-2 text-center tabular-nums">{b ?? "—"}</td>
-                <td className="p-2 text-center tabular-nums">{r ?? "—"}</td>
+                <td className="p-2 text-center tabular-nums">{b ?? "â€”"}</td>
+                <td className="p-2 text-center tabular-nums">{r ?? "â€”"}</td>
                 <td
                   className={`p-2 text-center tabular-nums ${
                     delta == null || delta === 0 ? "text-muted-foreground" : good ? "text-emerald-600" : "text-rose-600"
@@ -428,7 +462,7 @@ function conflictBreakdownPanel(
       <td className="p-2 text-center tabular-nums">{b}</td>
       <td className="p-2 text-center tabular-nums">{r}</td>
       <td className="p-2 text-center tabular-nums text-muted-foreground">
-        {d == null ? "—" : `${d > 0 ? "+" : ""}${d}`}
+        {d == null ? "â€”" : `${d > 0 ? "+" : ""}${d}`}
       </td>
     </tr>
   );
@@ -451,7 +485,7 @@ function conflictBreakdownPanel(
               <th className="p-2 text-left font-medium">Type</th>
               <th className="p-2 text-center font-medium">Baseline</th>
               <th className="p-2 text-center font-medium">Result</th>
-              <th className="p-2 text-center font-medium">Δ pairs</th>
+              <th className="p-2 text-center font-medium">Î” pairs</th>
             </tr>
           </thead>
           <tbody>
@@ -513,7 +547,7 @@ function metricSnapshotMiniTable(
               <div key={label} className="flex justify-between gap-3 border-b border-border/40 py-2 last:border-0">
                 <dt className="text-muted-foreground">{label}</dt>
                 <dd className="text-right tabular-nums font-medium">
-                  <span className="block">{val == null ? "—" : val}</span>
+                  <span className="block">{val == null ? "â€”" : val}</span>
                   {extra}
                 </dd>
               </div>
@@ -547,7 +581,7 @@ function competitionRanks(
 }
 
 function ordinalRankLabel(rank: number | null): string {
-  if (rank == null) return "—";
+  if (rank == null) return "â€”";
   const j = rank % 10;
   const k = rank % 100;
   if (j === 1 && k !== 11) return `${rank}st`;
@@ -607,11 +641,13 @@ function paretoOptimalFlags(
 function CrossTimetableComparisonBlock({
   comparisons,
   hardConflictByTimetableId,
-  openApply,
+  onStore,
+  storingRunId,
 }: {
   comparisons: ComparisonRow[];
   hardConflictByTimetableId: HardConflictByTimetableId;
-  openApply: (runId: number) => void;
+  onStore?: (runId: number) => void;
+  storingRunId?: number | null;
 }) {
   const bestOverallIdx = useMemo(() => {
     if (!comparisons.length) return -1;
@@ -678,7 +714,7 @@ function CrossTimetableComparisonBlock({
         );
     };
     summarize(
-      "Conflict Δ",
+      "Conflict Î”",
       comparisons.map((c) => {
         const bH = resolveHardConflictCount(c.baseTimetableId, c.baseline?.conflicts ?? null, hardConflictByTimetableId);
         const rH = resolveHardConflictCount(c.resultTimetableId, c.result?.conflicts ?? null, hardConflictByTimetableId);
@@ -688,12 +724,12 @@ function CrossTimetableComparisonBlock({
       true,
     );
     summarize(
-      "Fitness Δ",
+      "Fitness Î”",
       comparisons.map((c) => c.deltas?.fitnessScore),
       false,
     );
     summarize(
-      "Room utilization Δ",
+      "Room utilization Î”",
       comparisons.map((c) => c.deltas?.roomUtilizationRate),
       false,
     );
@@ -797,8 +833,8 @@ function CrossTimetableComparisonBlock({
             </p>
           ) : null}
           <p>
-            Scenario sensitivity — variance of fitness across timetables:{" "}
-            <strong>{sensitivity.variance.toFixed(5)}</strong> (σ ≈ {sensitivity.stdev.toFixed(4)}). Larger variance means the
+            Scenario sensitivity â€” variance of fitness across timetables:{" "}
+            <strong>{sensitivity.variance.toFixed(5)}</strong> (Ïƒ â‰ˆ {sensitivity.stdev.toFixed(4)}). Larger variance means the
             scenario&apos;s quality swing depends more on the starting timetable.
           </p>
           <div>
@@ -826,7 +862,7 @@ function CrossTimetableComparisonBlock({
                   </CardTitle>
                   <p className="mt-1 font-mono text-[11px] text-muted-foreground">
                     Run #{c.runId}
-                    {c.resultTimetableId != null ? ` · Result #${c.resultTimetableId}` : ""}
+                    {c.resultTimetableId != null ? ` Â· Result #${c.resultTimetableId}` : ""}
                   </p>
                 </div>
                 {idx === bestOverallIdx ? (
@@ -848,7 +884,7 @@ function CrossTimetableComparisonBlock({
                       <th className="p-2 text-left font-medium">Metric</th>
                       <th className="p-2 text-center font-medium">Baseline</th>
                       <th className="p-2 text-center font-medium">Result</th>
-                      <th className="p-2 text-center font-medium">Δ</th>
+                      <th className="p-2 text-center font-medium">Î”</th>
                       <th className="p-2 text-center font-medium">Rank</th>
                     </tr>
                   </thead>
@@ -867,8 +903,8 @@ function CrossTimetableComparisonBlock({
                       return (
                         <tr key={row.label} className="border-b last:border-0">
                           <td className="p-2">{row.label}</td>
-                          <td className="p-2 text-center tabular-nums">{row.b ?? "—"}</td>
-                          <td className="p-2 text-center tabular-nums">{row.r ?? "—"}</td>
+                          <td className="p-2 text-center tabular-nums">{row.b ?? "â€”"}</td>
+                          <td className="p-2 text-center tabular-nums">{row.r ?? "â€”"}</td>
                           <td
                             className={`p-2 text-center tabular-nums ${
                               delta == null || delta === 0
@@ -893,7 +929,7 @@ function CrossTimetableComparisonBlock({
                 <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm">
                   <p className="font-medium">Sections</p>
                   <p className="mt-1 text-muted-foreground">
-                    Δ changed {c.sectionChanges.changed}, +{c.sectionChanges.added}, −{c.sectionChanges.removed} ·{" "}
+                    Î” changed {c.sectionChanges.changed}, +{c.sectionChanges.added}, âˆ’{c.sectionChanges.removed} Â·{" "}
                     {c.sectionChanges.percentSectionsAffected.toFixed(1)}% of union slots touched
                   </p>
                 </div>
@@ -907,19 +943,21 @@ function CrossTimetableComparisonBlock({
                     <Link
                       href={`/schedule?simulation=1&timetableId=${c.resultTimetableId}&runId=${c.runId}`}
                     >
-                      Viewer
+                      View in Schedule Viewer
                     </Link>
                   </Button>
+                ) : onStore ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="w-full shrink-0"
+                    disabled={storingRunId === c.runId}
+                    onClick={() => onStore(c.runId)}
+                  >
+                    {storingRunId === c.runId ? "Storingâ€¦" : "Store"}
+                  </Button>
                 ) : null}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  className="flex-1"
-                  onClick={() => void openApply(c.runId)}
-                >
-                  Apply
-                </Button>
                 <Button type="button" size="sm" variant="ghost" className="flex-1" asChild>
                   <Link href={`/dashboard/what-if/${c.scenarioId}/runs`}>Runs</Link>
                 </Button>
@@ -945,11 +983,13 @@ type ScenarioSortCol =
 function CrossScenarioComparisonBlock({
   comparisons,
   hardConflictByTimetableId,
-  openApply,
+  onStore,
+  storingRunId,
 }: {
   comparisons: ComparisonRow[];
   hardConflictByTimetableId: HardConflictByTimetableId;
-  openApply: (runId: number) => void;
+  onStore?: (runId: number) => void;
+  storingRunId?: number | null;
 }) {
   const [sortCol, setSortCol] = useState<ScenarioSortCol>("fitness");
   const [sortAsc, setSortAsc] = useState(false);
@@ -1002,15 +1042,15 @@ function CrossScenarioComparisonBlock({
 
     const domCount = pareto.filter(Boolean).length;
     if (domCount === 0)
-      parts.push("no scenario is undominated — every option loses on at least one metric compared to some alternative");
+      parts.push("no scenario is undominated â€” every option loses on at least one metric compared to some alternative");
     else if (domCount === 1) {
       const i = pareto.findIndex(Boolean);
       parts.push(`${nameAt(i)} is Pareto-optimal (nothing strictly dominates it)`);
     } else parts.push(`${domCount} scenarios sit on the Pareto frontier`);
 
-    if (!parts.length) return "Compare scenarios using the table — hover metrics to see baseline versus sandbox deltas.";
+    if (!parts.length) return "Compare scenarios using the table â€” hover metrics to see baseline versus sandbox deltas.";
     let tail = "";
-    if (winners.conflicts.length > 1 && winners.fitness.length > 1) tail = " — no single scenario dominates every metric.";
+    if (winners.conflicts.length > 1 && winners.fitness.length > 1) tail = " â€” no single scenario dominates every metric.";
     return `${parts.join("; ")}.${tail}`;
   }, [comparisons, pareto, winners]);
 
@@ -1093,19 +1133,19 @@ function CrossScenarioComparisonBlock({
                 % sections disrupted
               </TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("conflicts")}>
-                Hard conflicts (base → result)
+                Hard conflicts (base â†’ result)
               </TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("room")}>
-                Room util. (base → result)
+                Room util. (base â†’ result)
               </TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("soft")}>
-                Soft score (base → result)
+                Soft score (base â†’ result)
               </TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("fitness")}>
-                Fitness (base → result)
+                Fitness (base â†’ result)
               </TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("lecturer")}>
-                Lecturer balance (base → result)
+                Lecturer balance (base â†’ result)
               </TableHead>
               <TableHead className="text-center">Pareto</TableHead>
               <TableHead className="min-w-[220px]">Why</TableHead>
@@ -1127,7 +1167,7 @@ function CrossScenarioComparisonBlock({
 
               const pair = (b: number | null | undefined, r: number | null | undefined, d: number | null | undefined) => (
                 <span className="tabular-nums">
-                  {b ?? "—"} → {r ?? "—"}
+                  {b ?? "â€”"} â†’ {r ?? "â€”"}
                   <span className="ml-1 text-muted-foreground">({formatDelta(d ?? null)})</span>
                 </span>
               );
@@ -1140,7 +1180,7 @@ function CrossScenarioComparisonBlock({
                   </TableCell>
                   <TableCell className="text-center tabular-nums">{c.conditionCount}</TableCell>
                   <TableCell className={`text-center tabular-nums ${cellClass(wDisrupt)}`}>
-                    {c.sectionChanges ? `${c.sectionChanges.percentSectionsAffected.toFixed(1)}%` : "—"}
+                    {c.sectionChanges ? `${c.sectionChanges.percentSectionsAffected.toFixed(1)}%` : "â€”"}
                   </TableCell>
                   <TableCell className={`text-center ${cellClass(wConf)}`}>
                     {(() => {
@@ -1188,12 +1228,12 @@ function CrossScenarioComparisonBlock({
                         Pareto
                       </Badge>
                     ) : (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-muted-foreground">â€”</span>
                     )}
                   </TableCell>
                   <TableCell className="align-top text-xs leading-snug text-muted-foreground">
                     {c.recommendation.slice(0, 280)}
-                    {c.recommendation.length > 280 ? "…" : ""}
+                    {c.recommendation.length > 280 ? "â€¦" : ""}
                   </TableCell>
                   <TableCell className="space-y-1 text-right align-top">
                     {c.resultTimetableId != null ? (
@@ -1201,19 +1241,21 @@ function CrossScenarioComparisonBlock({
                         <Link
                           href={`/schedule?simulation=1&timetableId=${c.resultTimetableId}&runId=${c.runId}`}
                         >
-                          Viewer
+                          View in Schedule Viewer
                         </Link>
                       </Button>
+                    ) : onStore ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        disabled={storingRunId === c.runId}
+                        onClick={() => onStore(c.runId)}
+                      >
+                        {storingRunId === c.runId ? "Storingâ€¦" : "Store"}
+                      </Button>
                     ) : null}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => void openApply(c.runId)}
-                    >
-                      Apply
-                    </Button>
                   </TableCell>
                 </TableRow>
               );
@@ -1237,11 +1279,7 @@ export default function WhatIfComparePage() {
   const [comparisons, setComparisons] = useState<ComparisonRow[]>([]);
   const [compareError, setCompareError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [applyRun, setApplyRun] = useState<WhatIfRun | null>(null);
-  const [confirmText, setConfirmText] = useState("");
-  const [applyConflictSummary, setApplyConflictSummary] = useState<TimetableConflictSummary | null>(null);
-  const [applyConflictLoading, setApplyConflictLoading] = useState(false);
-  const [applyConflictAcknowledged, setApplyConflictAcknowledged] = useState(false);
+  const [storingRunId, setStoringRunId] = useState<number | null>(null);
   const [availableRuns, setAvailableRuns] = useState<SelectableRun[]>([]);
   const [timetables, setTimetables] = useState<TimetableOption[]>([]);
   const [runsLoading, setRunsLoading] = useState(false);
@@ -1463,42 +1501,35 @@ export default function WhatIfComparePage() {
     });
   }
 
-  async function openApply(runId: number) {
-    try {
-      const row = await ApiClient.request<any>(`/what-if/runs/${runId}`);
-      setApplyRun(normalizeRun(row));
-      setConfirmText("");
-      setApplyConflictAcknowledged(false);
-    } catch {
-      toast({ title: "Could not load run", variant: "destructive" });
-    }
-  }
-
-  useEffect(() => {
-    const ttId = applyRun?.resultTimetableId;
-    if (ttId == null || ttId <= 0) {
-      setApplyConflictSummary(null);
-      setApplyConflictAcknowledged(false);
-      setApplyConflictLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setApplyConflictAcknowledged(false);
-    setApplyConflictLoading(true);
-    fetchTimetableConflictSummary(ttId)
-      .then((data) => {
-        if (!cancelled) setApplyConflictSummary(data);
-      })
-      .catch(() => {
-        if (!cancelled) setApplyConflictSummary(null);
-      })
-      .finally(() => {
-        if (!cancelled) setApplyConflictLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [applyRun]);
+  const handleStoreRun = useCallback(
+    async (runId: number) => {
+      setStoringRunId(runId);
+      try {
+        const res = await storeScenarioRun(runId);
+        toast({
+          title: "Stored",
+          description: res.message ?? `Draft timetable #${res.resultTimetableId} saved.`,
+        });
+        if (mode && selectedRunIds.length > 0) {
+          await fetchCompare(selectedRunIds, mode);
+        }
+      } catch (error: unknown) {
+        toast({
+          title: "Store failed",
+          description:
+            error instanceof ApiError
+              ? error.message
+              : error instanceof Error
+                ? error.message
+                : "Unknown error",
+          variant: "destructive",
+        });
+      } finally {
+        setStoringRunId(null);
+      }
+    },
+    [fetchCompare, mode, selectedRunIds, toast],
+  );
 
   const availableTimetables = useMemo(() => {
     const map = new Map<number, string>();
@@ -1554,13 +1585,6 @@ export default function WhatIfComparePage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [availableRuns, scenarioFilter]);
 
-  const applyRunBaseTimetableStatus = useMemo(() => {
-    if (!applyRun) return null;
-    return (
-      timetables.find((t) => Number(t.timetableId) === Number(applyRun.baseTimetableId))?.status ?? null
-    );
-  }, [applyRun, timetables]);
-  const applyTargetsPublishedTimetable = isPublishedTimetableStatus(applyRunBaseTimetableStatus);
   const requiresFilterStep =
     mode === "cross-scenario" || mode === "cross-timetable" || mode === "before-after";
   const filterReady =
@@ -1644,7 +1668,7 @@ export default function WhatIfComparePage() {
 
             <Card className="border-border/80 shadow-sm">
               <CardHeader className="border-b bg-muted/30">
-                <CardTitle className="text-lg">Step 1 — Choose a comparison mode</CardTitle>
+                <CardTitle className="text-lg">Step 1 â€” Choose a comparison mode</CardTitle>
                 <CardDescription>Select one mode to begin.</CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-1 gap-3 pt-4 md:grid-cols-3 md:items-stretch">
@@ -1679,7 +1703,7 @@ export default function WhatIfComparePage() {
               <Card className="border-border/80 shadow-sm">
                 <CardHeader className="border-b bg-muted/30">
                   <CardTitle className="text-lg">
-                    {requiresFilterStep ? "Step 2 — Apply a filter" : "Step 2 — Filter"}
+                    {requiresFilterStep ? "Step 2 — Choose a filter" : "Step 2 — Filter"}
                   </CardTitle>
                   <CardDescription>
                     {mode === "cross-scenario" &&
@@ -1819,7 +1843,7 @@ export default function WhatIfComparePage() {
             {mode && filterReady ? (
               <Card className="border-border/80 shadow-sm">
               <CardHeader className="border-b bg-muted/30">
-                <CardTitle className="text-lg">Step 3 — Pick runs</CardTitle>
+                <CardTitle className="text-lg">Step 3 â€” Pick runs</CardTitle>
                 <CardDescription>
                   {mode === "before-after" && "Select exactly one completed run."}
                   {mode === "cross-timetable" && "Select two or more runs for the same scenario."}
@@ -1837,7 +1861,7 @@ export default function WhatIfComparePage() {
                   />
                 </div>
                 <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border p-2">
-                  {runsLoading ? <p className="px-2 py-6 text-sm text-muted-foreground">Loading runs…</p> : null}
+                  {runsLoading ? <p className="px-2 py-6 text-sm text-muted-foreground">Loading runsâ€¦</p> : null}
                   {!runsLoading && selectableRuns.length === 0 ? (
                     <p className="px-2 py-6 text-sm text-muted-foreground">No completed runs match this filter.</p>
                   ) : null}
@@ -1866,10 +1890,10 @@ export default function WhatIfComparePage() {
                         />
                         <div className="min-w-0 flex-1 text-sm">
                           <p className="truncate font-medium">
-                            Run #{run.id} · {run.scenarioName}
+                            Run #{run.id} Â· {run.scenarioName}
                           </p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {run.baseTimetableName} · {formatDateTime(run.startedAt)}
+                            {run.baseTimetableName} Â· {formatDateTime(run.startedAt)}
                           </p>
                         </div>
                         <Badge variant={run.status === "applied" ? "default" : "secondary"} className="shrink-0">
@@ -1904,7 +1928,7 @@ export default function WhatIfComparePage() {
 
             {showCompareResults ? (
               <div className="border-t border-border/70 pt-6">
-                <h2 className="mb-3 text-lg font-semibold">Step 4 — Results</h2>
+                <h2 className="mb-3 text-lg font-semibold">Step 4 â€” Results</h2>
               </div>
             ) : null}
 
@@ -1941,8 +1965,8 @@ export default function WhatIfComparePage() {
                             <div>
                               <CardTitle className="text-lg leading-snug">{c.scenarioName}</CardTitle>
                               <p className="mt-1 font-mono text-xs text-muted-foreground">
-                                Run #{c.runId}: baseline timetable #{c.baseTimetableId} → scenario draft #
-                                {c.resultTimetableId ?? "—"}
+                                Run #{c.runId}: baseline timetable #{c.baseTimetableId} â†’ scenario draft #
+                                {c.resultTimetableId ?? "â€”"}
                               </p>
                               <p className="mt-2 text-xs text-muted-foreground">
                                 Scenario uses{" "}
@@ -1952,7 +1976,7 @@ export default function WhatIfComparePage() {
                             </div>
                             {c.sectionChanges ? (
                               <Badge variant="outline" className="shrink-0 font-normal">
-                                {c.disruptionLevel} disruption · {c.sectionChanges.percentSectionsAffected.toFixed(1)}%
+                                {c.disruptionLevel} disruption Â· {c.sectionChanges.percentSectionsAffected.toFixed(1)}%
                                 sections touched
                               </Badge>
                             ) : null}
@@ -1965,9 +1989,9 @@ export default function WhatIfComparePage() {
                           <AlertTriangle className="h-4 w-4 text-amber-700 dark:text-amber-400" />
                           <AlertTitle>Few optimizer iterations</AlertTitle>
                           <AlertDescription>
-                            This run completed after only{" "}
-                            <strong>{c.gwoIterationsRun}</strong> iterations. Treat the draft as exploratory — quality may
-                            improve with more search budget.
+                            <span>
+                              This run completed after only <strong>{c.gwoIterationsRun}</strong> iterations. Treat the draft as exploratory — quality may improve with more search budget.
+                            </span>
                           </AlertDescription>
                         </Alert>
                       ) : null}
@@ -1999,13 +2023,13 @@ export default function WhatIfComparePage() {
                             <div className="flex justify-between gap-3 rounded-lg border border-border/60 px-3 py-2">
                               <dt className="text-muted-foreground">Iterations executed</dt>
                               <dd className="tabular-nums font-medium">
-                                {c.gwoIterationsRun != null ? c.gwoIterationsRun : "—"}
+                                {c.gwoIterationsRun != null ? c.gwoIterationsRun : "â€”"}
                               </dd>
                             </div>
                             <div className="flex justify-between gap-3 rounded-lg border border-border/60 px-3 py-2">
                               <dt className="text-muted-foreground">Generation time</dt>
                               <dd className="tabular-nums font-medium">
-                                {c.generationSeconds != null ? `${c.generationSeconds}s` : "—"}
+                                {c.generationSeconds != null ? `${c.generationSeconds}s` : "â€”"}
                               </dd>
                             </div>
                           </dl>
@@ -2025,7 +2049,7 @@ export default function WhatIfComparePage() {
                         <CardHeader className="border-b bg-muted/30">
                           <CardTitle className="text-base">Metrics compared</CardTitle>
                           <CardDescription>
-                            Baseline vs sandbox — verdict badges encode directionality (lower hard conflicts / higher
+                            Baseline vs sandbox â€” verdict badges encode directionality (lower hard conflicts / higher
                             fitness is better). Hard conflicts use the same persisted summary as the schedule viewer; run
                             metrics may differ when the snapshot row is stale.
                           </CardDescription>
@@ -2045,42 +2069,36 @@ export default function WhatIfComparePage() {
                           <CardHeader className="border-b bg-muted/30">
                             <CardTitle className="text-base">Section-level changes</CardTitle>
                             <CardDescription>
-                              +{c.sectionChanges.added} / −{c.sectionChanges.removed} sections · {c.sectionChanges.changed}{" "}
-                              reassigned · {c.sectionChanges.unchanged} untouched · Union coverage{" "}
+                              +{c.sectionChanges.added} / âˆ’{c.sectionChanges.removed} sections Â· {c.sectionChanges.changed}{" "}
+                              reassigned Â· {c.sectionChanges.unchanged} untouched Â· Union coverage{" "}
                               {c.sectionChanges.percentSectionsAffected.toFixed(1)}%
                             </CardDescription>
                           </CardHeader>
                           <CardContent className="space-y-4 pt-4">
-                            {c.sectionChanges.perCourse.length > 0 ? (
+                            {c.sectionChanges.changedSections.length > 0 ? (
                               <div className="rounded-xl border border-border/70">
                                 <Table>
                                   <TableHeader>
                                     <TableRow className="bg-muted/40 hover:bg-muted/40">
                                       <TableHead>Course</TableHead>
-                                      <TableHead className="text-center">Sections affected</TableHead>
-                                      <TableHead className="text-center">Room moves</TableHead>
-                                      <TableHead className="text-center">Lecturer moves</TableHead>
-                                      <TableHead className="text-center">Timeslot moves</TableHead>
+                                      <TableHead>Section</TableHead>
+                                      <TableHead>Change</TableHead>
                                     </TableRow>
                                   </TableHeader>
                                   <TableBody>
-                                    {c.sectionChanges.perCourse.map((row) => (
-                                      <TableRow key={row.courseId}>
-                                        <TableCell className="font-medium">
-                                          {row.courseCode}
-                                          <span className="ml-2 font-mono text-[11px] text-muted-foreground">
-                                            #{row.courseId}
-                                          </span>
+                                    {c.sectionChanges.changedSections.map((row) => (
+                                      <TableRow
+                                        key={`${row.courseId}-${row.sectionNumber}-${row.changeType}`}
+                                      >
+                                        <TableCell>
+                                          <p className="font-medium text-foreground">{row.courseName}</p>
+                                          <p className="font-mono text-[11px] text-muted-foreground">{row.courseCode}</p>
                                         </TableCell>
-                                        <TableCell className="text-center tabular-nums">{row.sectionsAffected}</TableCell>
-                                        <TableCell className="text-center tabular-nums">
-                                          {row.sectionsWithRoomChange}
+                                        <TableCell className="tabular-nums text-muted-foreground">
+                                          {row.sectionNumber}
                                         </TableCell>
-                                        <TableCell className="text-center tabular-nums">
-                                          {row.sectionsWithLecturerChange}
-                                        </TableCell>
-                                        <TableCell className="text-center tabular-nums">
-                                          {row.sectionsWithSlotChange}
+                                        <TableCell className="text-sm text-muted-foreground">
+                                          {sectionChangeSummaryLabel(row)}
                                         </TableCell>
                                       </TableRow>
                                     ))}
@@ -2089,7 +2107,7 @@ export default function WhatIfComparePage() {
                               </div>
                             ) : (
                               <p className="text-sm text-muted-foreground">
-                                No course-level diffs — roster stayed aligned with baseline composition.
+                                No section-level changes — every course section matched the baseline placement.
                               </p>
                             )}
                           </CardContent>
@@ -2104,13 +2122,20 @@ export default function WhatIfComparePage() {
                             <Link
                               href={`/schedule?simulation=1&timetableId=${c.resultTimetableId}&runId=${c.runId}`}
                             >
-                              Open result in schedule viewer
+                              View in Schedule Viewer
                             </Link>
                           </Button>
-                        ) : null}
-                        <Button type="button" size="sm" variant="default" onClick={() => void openApply(c.runId)}>
-                          Apply this result
-                        </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={storingRunId === c.runId}
+                            onClick={() => void handleStoreRun(c.runId)}
+                          >
+                            {storingRunId === c.runId ? "Storingâ€¦" : "Store"}
+                          </Button>
+                        )}
                         <Button type="button" size="sm" variant="ghost" asChild>
                           <Link href={`/dashboard/what-if/${c.scenarioId}/runs`}>Scenario runs</Link>
                         </Button>
@@ -2122,13 +2147,15 @@ export default function WhatIfComparePage() {
                 <CrossScenarioComparisonBlock
                   comparisons={comparisons}
                   hardConflictByTimetableId={hardConflictByTimetableId}
-                  openApply={(id) => void openApply(id)}
+                  onStore={(id) => void handleStoreRun(id)}
+                  storingRunId={storingRunId}
                 />
               ) : (
                 <CrossTimetableComparisonBlock
                   comparisons={comparisons}
                   hardConflictByTimetableId={hardConflictByTimetableId}
-                  openApply={(id) => void openApply(id)}
+                  onStore={(id) => void handleStoreRun(id)}
+                  storingRunId={storingRunId}
                 />
               )
             ) : null}
@@ -2139,91 +2166,6 @@ export default function WhatIfComparePage() {
           </div>
         </main>
       </div>
-
-      <Dialog
-        open={Boolean(applyRun)}
-        onOpenChange={(open) => {
-          if (!open) setApplyRun(null);
-        }}
-      >
-        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-6 sm:max-w-lg">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden pr-1">
-            <DialogHeader>
-              <DialogTitle>Apply run {applyRun?.id}?</DialogTitle>
-            </DialogHeader>
-            {applyTargetsPublishedTimetable ? (
-              <Alert variant="destructive" className="border-2 shadow-sm">
-                <AlertTriangle className="h-4 w-4" aria-hidden />
-                <AlertTitle>Warning: base timetable is published</AlertTitle>
-                <AlertDescription>
-                  Confirming this action will overwrite the currently published live schedule for
-                  the selected base timetable.
-                </AlertDescription>
-              </Alert>
-            ) : null}
-            <p className="text-sm text-muted-foreground">
-              Replaces the base timetable’s schedule with this sandbox result. Allowed for draft or published timetables.
-            </p>
-            <div className="space-y-2">
-              <Label>Type scenario name to confirm</Label>
-              <Input
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                placeholder={applyRun?.scenarioName ?? ""}
-                autoComplete="off"
-              />
-            </div>
-            <HardConflictsAcknowledgmentFields
-              summary={applyConflictSummary}
-              loading={applyConflictLoading}
-              acknowledged={applyConflictAcknowledged}
-              onAcknowledgedChange={setApplyConflictAcknowledged}
-              contextLabel="Applying replaces the base timetable’s schedule with this result."
-            />
-          </div>
-          <DialogFooter className="mt-4 shrink-0 border-t pt-4">
-            <Button variant="outline" type="button" onClick={() => setApplyRun(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              type="button"
-              disabled={
-                confirmText !== (applyRun?.scenarioName ?? "") ||
-                !applyRun ||
-                applyConflictLoading ||
-                (applyConflictSummary?.requiresConflictAcknowledgment === true && !applyConflictAcknowledged)
-              }
-              onClick={async () => {
-                if (!applyRun) return;
-                try {
-                  const needAck = applyConflictSummary?.requiresConflictAcknowledgment === true;
-                  await ApiClient.request(`/what-if/runs/${applyRun.id}/apply`, {
-                    method: "POST",
-                    body: JSON.stringify(needAck ? { acknowledgedHardConflicts: true } : {}),
-                  });
-                  toast({ title: "Applied", description: "The base timetable now uses this scenario result." });
-                  setApplyRun(null);
-                  router.push("/timetable-generation");
-                } catch (error: unknown) {
-                  toast({
-                    title: "Apply failed",
-                    description:
-                      error instanceof ApiError
-                        ? error.message
-                        : error instanceof Error
-                          ? error.message
-                          : "Unknown error",
-                    variant: "destructive",
-                  });
-                }
-              }}
-            >
-              Confirm apply
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
