@@ -275,21 +275,17 @@ export function DeliveryModeDonutChart({ data }: { data: OnlineModeData[] }) {
   )
 }
 
-export function RoomOccupancyHeatmapChart({ data }: { data: RoomOccupancyHeatmapResult }) {
-  const maxVal = useMemo(() => {
-    let m = 0
-    for (const row of data.matrix) for (const v of row) m = Math.max(m, v)
-    return m || 1
-  }, [data.matrix])
+/** Occupancy is 0–100%; buckets match the legend gradient (absolute scale, not dataset-relative). */
+function occupancyTint(pct: number) {
+  const t = Math.min(100, Math.max(0, pct)) / 100
+  if (t < 0.2) return 'bg-primary/10'
+  if (t < 0.4) return 'bg-primary/25'
+  if (t < 0.6) return 'bg-primary/45'
+  if (t < 0.8) return 'bg-primary/65'
+  return 'bg-primary/85'
+}
 
-  const tint = (v: number) => {
-    const t = v / maxVal
-    if (t < 0.2) return 'bg-primary/10'
-    if (t < 0.4) return 'bg-primary/25'
-    if (t < 0.6) return 'bg-primary/45'
-    if (t < 0.85) return 'bg-primary/65'
-    return 'bg-primary/85'
-  }
+export function RoomOccupancyHeatmapChart({ data }: { data: RoomOccupancyHeatmapResult }) {
 
   if (!data.rooms.length) {
     return (
@@ -307,8 +303,9 @@ export function RoomOccupancyHeatmapChart({ data }: { data: RoomOccupancyHeatmap
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold">Room Utilization Heatmap</CardTitle>
         <CardDescription>
-          Busiest rooms (by section-meetings) × weekday: cell = average section occupancy % for that room on that day (
-          <span className="text-primary">Registered</span> ÷ section seat capacity).
+          Busiest rooms (by section-meetings) × weekday: average section occupancy % for that room on that day (
+          <span className="text-primary">Registered</span> ÷ section seat capacity). Shading maps to 0–100%; empty cells
+          mean no section meets that day in that room.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -333,13 +330,26 @@ export function RoomOccupancyHeatmapChart({ data }: { data: RoomOccupancyHeatmap
                 {data.days.map((_, di) => {
                   const v = data.matrix[ri][di]
                   const n = data.meetings[ri][di]
+                  const empty = n === 0
                   return (
                     <Tooltip key={`${room}-${di}`}>
                       <TooltipTrigger asChild>
-                        <div className={`flex-1 h-7 cursor-default rounded-sm ${tint(v)}`} />
+                        <div
+                          className={`flex-1 h-7 cursor-default rounded-sm ${
+                            empty ? 'bg-muted/50 ring-1 ring-border/40 ring-inset' : occupancyTint(v)
+                          }`}
+                        />
                       </TooltipTrigger>
                       <TooltipContent side="top">
-                        {room} · {data.days[di]}: avg occupancy {v}% ({n} section-day{n !== 1 ? 's' : ''})
+                        {empty ? (
+                          <>
+                            {room} · {data.days[di]}: no sections
+                          </>
+                        ) : (
+                          <>
+                            {room} · {data.days[di]}: avg occupancy {v}% ({n} section-day{n !== 1 ? 's' : ''})
+                          </>
+                        )}
                       </TooltipContent>
                     </Tooltip>
                   )
@@ -348,16 +358,22 @@ export function RoomOccupancyHeatmapChart({ data }: { data: RoomOccupancyHeatmap
             ))}
           </div>
         </div>
-        <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-          <span>Lower</span>
-          <div className="flex gap-1">
-            <div className="h-3.5 w-3.5 rounded-sm bg-primary/10" />
-            <div className="h-3.5 w-3.5 rounded-sm bg-primary/25" />
-            <div className="h-3.5 w-3.5 rounded-sm bg-primary/45" />
-            <div className="h-3.5 w-3.5 rounded-sm bg-primary/65" />
-            <div className="h-3.5 w-3.5 rounded-sm bg-primary/85" />
+        <div className="mt-4 flex flex-col items-center gap-2">
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <span>0%</span>
+            <div className="flex gap-1">
+              <div className="h-3.5 w-3.5 rounded-sm bg-primary/10" />
+              <div className="h-3.5 w-3.5 rounded-sm bg-primary/25" />
+              <div className="h-3.5 w-3.5 rounded-sm bg-primary/45" />
+              <div className="h-3.5 w-3.5 rounded-sm bg-primary/65" />
+              <div className="h-3.5 w-3.5 rounded-sm bg-primary/85" />
+            </div>
+            <span>100%</span>
           </div>
-          <span>Higher</span>
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span className="inline-block h-3.5 w-3.5 shrink-0 rounded-sm bg-muted/50 ring-1 ring-border/40 ring-inset" />
+            <span>No section that day</span>
+          </div>
         </div>
       </CardContent>
     </Card>

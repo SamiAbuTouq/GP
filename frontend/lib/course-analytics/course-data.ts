@@ -1597,7 +1597,8 @@ export interface RoomOccupancyHeatmapResult {
   meetings: number[][]
 }
 
-const HEATMAP_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu']
+/** All weekday columns; must cover every token `expandCourseMeetingDays` can emit (incl. Fri/Sat). */
+const HEATMAP_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 /** Room × weekday heat: mean section occupancy for physical sections in that room on that day. */
 export function getRoomOccupancyHeatmap(courses: Course[], roomLimit = 14): RoomOccupancyHeatmapResult {

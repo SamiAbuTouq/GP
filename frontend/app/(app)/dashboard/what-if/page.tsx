@@ -65,7 +65,6 @@ function withoutRemovedWhatIfConditions(conditions: Condition[]): Condition[] {
 }
 const TIMESLOT_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"] as const;
 const DELIVERY_MODES = ["FACE_TO_FACE", "ONLINE", "BLENDED"] as const;
-const TIME_RANGE_SEP = "::";
 
 type TimeslotPickRow = {
   value: string;
@@ -92,26 +91,6 @@ function normalizeDeliveryModeKey(mode: string): (typeof DELIVERY_MODES)[number]
   return hit ?? "FACE_TO_FACE";
 }
 
-function encodeTimeRange(start: string, end: string) {
-  return `${start}${TIME_RANGE_SEP}${end}`;
-}
-
-function decodeTimeRange(key: string): { start: string; end: string } | null {
-  const i = key.indexOf(TIME_RANGE_SEP);
-  if (i < 0) return null;
-  return { start: key.slice(0, i), end: key.slice(i + TIME_RANGE_SEP.length) };
-}
-
-/** Collapse whitespace + lowercase — stable key for filtering session types (API strings vary). */
-function sessionTypeKey(raw: string): string {
-  return String(raw ?? "")
-    .normalize("NFKC")
-    .replace(/[\u200B-\u200D\uFEFF]/g, "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase();
-}
-
 function displaySessionType(raw: string): string {
   return String(raw ?? "")
     .normalize("NFKC")
@@ -132,248 +111,16 @@ function normalizeClock(t: unknown): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-function DeleteTimeslotCascade({
-  rows,
-  value,
-  onChange,
-}: {
-  rows: TimeslotPickRow[];
-  value: string;
-  onChange: (slotId: string) => void;
-}) {
-  const [day, setDay] = useState("");
-  const [rangeKey, setRangeKey] = useState("");
-  const [sessionTypeFilterKey, setSessionTypeFilterKey] = useState("");
-  const [summerPick, setSummerPick] = useState<"" | "summer" | "regular">("");
-
-  // Hydrate filters only when a slot is chosen (saved draft / restoring). Clearing slotId ("") happens
-  // whenever the user adjusts steps 1–4 and must NOT reset those steps or Radix Select can drift from filter logic.
-  useEffect(() => {
-    const slotId = typeof value === "string" ? value.trim() : String(value ?? "").trim();
-    if (!slotId) return;
-    const r = rows.find((x) => x.value === slotId);
-    if (!r) return;
-    const d0 = r.days[0] ?? "";
-    const ns = normalizeClock(r.start);
-    const ne = normalizeClock(r.end);
-    setDay(d0);
-    setRangeKey(ns && ne ? encodeTimeRange(ns, ne) : encodeTimeRange(r.start, r.end));
-    setSessionTypeFilterKey(sessionTypeKey(r.slotType));
-    setSummerPick(r.isSummer ? "summer" : "regular");
-  }, [value, rows]);
-
-  const daysAvailable = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of rows) for (const d of r.days) set.add(d);
-    return TIMESLOT_DAYS.filter((d) => set.has(d));
-  }, [rows]);
-
-  const rowsForDay = useMemo(() => {
-    if (!day) return [];
-    return rows.filter((r) => r.days.includes(day));
-  }, [rows, day]);
-
-  const rangeOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const r of rowsForDay) {
-      const ns = normalizeClock(r.start);
-      const ne = normalizeClock(r.end);
-      const k = ns && ne ? encodeTimeRange(ns, ne) : encodeTimeRange(r.start, r.end);
-      const label = `${r.start} – ${r.end}`.trim();
-      if (!seen.has(k)) seen.set(k, label || `${ns} – ${ne}`);
-    }
-    return [...seen.entries()];
-  }, [rowsForDay]);
-
-  const decodedRange = rangeKey ? decodeTimeRange(rangeKey) : null;
-
-  const rowsForDayTime = useMemo(() => {
-    if (!decodedRange) return [];
-    const ds = normalizeClock(decodedRange.start);
-    const de = normalizeClock(decodedRange.end);
-    return rowsForDay.filter(
-      (r) => normalizeClock(r.start) === ds && normalizeClock(r.end) === de,
-    );
-  }, [rowsForDay, decodedRange]);
-
-  /** Unique session types for this day+time; Select value is normalized key, label is human-readable. */
-  const sessionTypeChoices = useMemo(() => {
-    const byKey = new Map<string, string>();
-    for (const r of rowsForDayTime) {
-      const label = displaySessionType(r.slotType);
-      if (!label) continue;
-      const key = sessionTypeKey(r.slotType);
-      if (!byKey.has(key)) byKey.set(key, label);
-    }
-    return [...byKey.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [rowsForDayTime]);
-
-  const rowsForSessionType = useMemo(() => {
-    if (!sessionTypeFilterKey) return [];
-    return rowsForDayTime.filter((r) => sessionTypeKey(r.slotType) === sessionTypeFilterKey);
-  }, [rowsForDayTime, sessionTypeFilterKey]);
-
-  const needsSummerDisambig =
-    rowsForSessionType.some((r) => r.isSummer) && rowsForSessionType.some((r) => !r.isSummer);
-
-  const finalCandidates = useMemo(() => {
-    if (!sessionTypeFilterKey || rowsForSessionType.length === 0) return [];
-    if (!needsSummerDisambig) return rowsForSessionType;
-    if (summerPick === "summer") return rowsForSessionType.filter((r) => r.isSummer);
-    if (summerPick === "regular") return rowsForSessionType.filter((r) => !r.isSummer);
-    return [];
-  }, [rowsForSessionType, sessionTypeFilterKey, needsSummerDisambig, summerPick]);
-
-  useEffect(() => {
-    if (finalCandidates.length !== 1) return;
-    const pick = finalCandidates[0].value;
-    if (pick !== value) onChange(pick);
-  }, [finalCandidates, value, onChange]);
-
-  return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label className="font-semibold">1. Day</Label>
-        <Select
-          value={day || "__none__"}
-          onValueChange={(v) => {
-            const next = v === "__none__" ? "" : v;
-            setDay(next);
-            setRangeKey("");
-            setSessionTypeFilterKey("");
-            setSummerPick("");
-            onChange("");
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Choose a weekday" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__" disabled>
-              Select day
-            </SelectItem>
-            {daysAvailable.map((d) => (
-              <SelectItem key={d} value={d}>
-                {d}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2">
-        <Label className="font-semibold">2. Time</Label>
-        <Select
-          value={rangeKey || "__none__"}
-          onValueChange={(v) => {
-            const next = v === "__none__" ? "" : v;
-            setRangeKey(next);
-            setSessionTypeFilterKey("");
-            setSummerPick("");
-            onChange("");
-          }}
-          disabled={!day}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder={day ? "Start – end time" : "Pick a day first"} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__" disabled>
-              Select time range
-            </SelectItem>
-            {rangeOptions.map(([k, lab]) => (
-              <SelectItem key={k} value={k}>
-                {lab}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2">
-        <Label className="font-semibold">3. Session type</Label>
-        <Select
-          value={sessionTypeFilterKey || "__none__"}
-          onValueChange={(v) => {
-            const next = v === "__none__" ? "" : v;
-            setSessionTypeFilterKey(next);
-            setSummerPick("");
-            onChange("");
-          }}
-          disabled={!rangeKey}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder={rangeKey ? "Lecture, lab…" : "Pick a time range first"} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__" disabled>
-              Select type
-            </SelectItem>
-            {sessionTypeChoices.map(([key, label]) => (
-              <SelectItem key={key} value={key}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      {needsSummerDisambig ? (
-        <div className="space-y-2">
-          <Label className="font-semibold">4. Term</Label>
-          <Select
-            value={summerPick || "__none__"}
-            onValueChange={(v) => {
-              const next = v === "__none__" ? "" : (v as "summer" | "regular");
-              setSummerPick(next);
-              onChange("");
-            }}
-            disabled={!sessionTypeFilterKey}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Regular or summer slot" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__" disabled>
-                Select term
-              </SelectItem>
-              {rowsForSessionType.some((r) => !r.isSummer) ? (
-                <SelectItem value="regular">Regular (Fall/Spring)</SelectItem>
-              ) : null}
-              {rowsForSessionType.some((r) => r.isSummer) ? (
-                <SelectItem value="summer">Summer</SelectItem>
-              ) : null}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
-      {finalCandidates.length > 1 ? (
-        <div className="space-y-2">
-          <Label className="font-semibold">{needsSummerDisambig ? "5." : "4."} Choose slot</Label>
-          <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border p-2">
-            {finalCandidates.map((r) => (
-              <label key={r.value} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1.5 hover:bg-muted/60">
-                <input
-                  type="radio"
-                  className="h-4 w-4 accent-primary"
-                  checked={value === r.value}
-                  onChange={() => onChange(r.value)}
-                />
-                <span className="text-sm">
-                  {`${r.start} – ${r.end} | ${r.days.join(" ")} | ${displaySessionType(r.slotType)}`}
-                  {r.isSummer ? " · Summer" : ""}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {sessionTypeFilterKey && finalCandidates.length === 1 ? (
-        <p className="text-xs text-muted-foreground">
-          Selected: {finalCandidates[0].start} – {finalCandidates[0].end} |{" "}
-          {finalCandidates[0].days.join(" ")} | {displaySessionType(finalCandidates[0].slotType)}
-          {finalCandidates[0].isSummer ? " · Summer" : ""}
-        </p>
-      ) : null}
-    </div>
-  );
+/** Collapse unicode dash variants + spacing around hyphens so "08:00 -" matches "08:00 – 09:00". */
+function normalizeForSearchText(raw: string): string {
+  let s = String(raw ?? "")
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .toLowerCase();
+  s = s.replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, "-");
+  s = s.replace(/\s+/g, " ").trim();
+  s = s.replace(/\s*-\s*/g, "-");
+  return s;
 }
 
 const INITIAL_DRAFT_PARAMS: Record<string, unknown> = {
@@ -524,9 +271,12 @@ function SearchableSelect({
   const [query, setQuery] = useState("");
   const selected = options.find((o) => o.value === value);
   const filteredOptions = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizeForSearchText(query);
     if (!q) return options;
-    return options.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q));
+    return options.filter((o) => {
+      const hay = normalizeForSearchText(`${o.label} ${o.value}`);
+      return hay.includes(q);
+    });
   }, [options, query]);
   return (
     <Popover
@@ -571,6 +321,41 @@ function SearchableSelect({
   );
 }
 
+function DeleteTimeslotPicker({
+  rows,
+  value,
+  onChange,
+}: {
+  rows: TimeslotPickRow[];
+  value: string;
+  onChange: (slotId: string) => void;
+}) {
+  const options = useMemo(() => {
+    const dayOrder = new Map(TIMESLOT_DAYS.map((d, i) => [d, i]));
+    const minDayIdx = (days: string[]) => {
+      if (!days.length) return 99;
+      return Math.min(...days.map((d) => dayOrder.get(d) ?? 99));
+    };
+    const sorted = [...rows].sort((a, b) => {
+      const da = minDayIdx(a.days);
+      const db = minDayIdx(b.days);
+      if (da !== db) return da - db;
+      const ta = normalizeClock(a.start);
+      const tb = normalizeClock(b.start);
+      if (ta !== tb) return ta.localeCompare(tb);
+      const ea = normalizeClock(a.end);
+      const eb = normalizeClock(b.end);
+      if (ea !== eb) return ea.localeCompare(eb);
+      const typeCmp = a.slotType.localeCompare(b.slotType);
+      if (typeCmp !== 0) return typeCmp;
+      return Number(a.isSummer) - Number(b.isSummer);
+    });
+    return sorted.map((r) => ({ value: r.value, label: r.label }));
+  }, [rows]);
+
+  return <SearchableSelect value={value} onChange={onChange} placeholder="Select timeslot" options={options} />;
+}
+
 function MultiSelectChecklist({
   title,
   options,
@@ -586,9 +371,12 @@ function MultiSelectChecklist({
 }) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizeForSearchText(query);
     if (!q) return options;
-    return options.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q));
+    return options.filter((o) => {
+      const hay = normalizeForSearchText(`${o.label} ${o.value}`);
+      return hay.includes(q);
+    });
   }, [options, query]);
 
   function toggle(v: string) {
@@ -2154,10 +1942,10 @@ export default function WhatIfScenariosPage() {
                     <div>
                       <Label className="font-semibold">Timeslot</Label>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Narrow down by day, time, and session type, then confirm the slot to remove.
+                        Choose from existing timeslots. Search by day, time, session type, or ID.
                       </p>
                     </div>
-                  <DeleteTimeslotCascade
+                  <DeleteTimeslotPicker
                     rows={deleteTimeslotPickerRows}
                     value={getParamString("slotId")}
                     onChange={(id) => setParam("slotId", id)}

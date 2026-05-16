@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/header";
@@ -80,14 +80,46 @@ type SectionChangeDetail = {
   timeslotChanged?: boolean;
 };
 
-function sectionChangeSummaryLabel(row: SectionChangeDetail): string {
-  if (row.changeType === "added") return "Added";
-  if (row.changeType === "removed") return "Removed";
-  const parts: string[] = [];
-  if (row.roomChanged) parts.push("room");
-  if (row.lecturerChanged) parts.push("lecturer");
-  if (row.timeslotChanged) parts.push("timeslot");
-  return parts.length > 0 ? `Reassigned (${parts.join(", ")})` : "Reassigned";
+type CourseSectionChangeRow = {
+  key: string;
+  courseId: number;
+  courseName: string;
+  courseCode: string;
+  deltaLabel: string;
+  kind: "added" | "removed";
+};
+
+function courseSectionChangeRows(changedSections: SectionChangeDetail[]): CourseSectionChangeRow[] {
+  const byCourse = new Map<
+    number,
+    { courseName: string; courseCode: string; added: number; removed: number }
+  >();
+  for (const s of changedSections) {
+    if (s.changeType !== "added" && s.changeType !== "removed") continue;
+    const agg = byCourse.get(s.courseId) ?? {
+      courseName: s.courseName,
+      courseCode: s.courseCode,
+      added: 0,
+      removed: 0,
+    };
+    if (s.changeType === "added") agg.added += 1;
+    else agg.removed += 1;
+    byCourse.set(s.courseId, agg);
+  }
+  const rows: CourseSectionChangeRow[] = [];
+  for (const [courseId, agg] of byCourse) {
+    const net = agg.added - agg.removed;
+    if (net === 0) continue;
+    const base = { courseId, courseName: agg.courseName, courseCode: agg.courseCode };
+    if (net > 0) {
+      rows.push({ ...base, key: String(courseId), deltaLabel: `+${net}`, kind: "added" });
+    } else {
+      rows.push({ ...base, key: String(courseId), deltaLabel: `−${Math.abs(net)}`, kind: "removed" });
+    }
+  }
+  return rows.sort((a, b) =>
+    a.courseName.localeCompare(b.courseName, undefined, { sensitivity: "base" }),
+  );
 }
 
 type ComparisonRow = {
@@ -362,7 +394,7 @@ function DeltaVerdictBadge({ verdict }: { verdict: "Better" | "Worse" | "No Chan
 }
 
 function formatDelta(delta: number | null): string {
-  if (delta == null || !Number.isFinite(delta)) return "â€”";
+  if (delta == null || !Number.isFinite(delta)) return "—";
   const absSmall = Math.abs(delta) < 10;
   const s = absSmall ? delta.toFixed(2).replace(/\.?0+$/, "") : String(delta);
   return `${delta > 0 ? "+" : ""}${s}`;
@@ -427,8 +459,8 @@ function metricTable(
             return (
               <tr key={label} className="border-b last:border-0">
                 <td className="p-2">{label}</td>
-                <td className="p-2 text-center tabular-nums">{b ?? "â€”"}</td>
-                <td className="p-2 text-center tabular-nums">{r ?? "â€”"}</td>
+                <td className="p-2 text-center tabular-nums">{b ?? "—"}</td>
+                <td className="p-2 text-center tabular-nums">{r ?? "—"}</td>
                 <td
                   className={`p-2 text-center tabular-nums ${
                     delta == null || delta === 0 ? "text-muted-foreground" : good ? "text-emerald-600" : "text-rose-600"
@@ -462,7 +494,7 @@ function conflictBreakdownPanel(
       <td className="p-2 text-center tabular-nums">{b}</td>
       <td className="p-2 text-center tabular-nums">{r}</td>
       <td className="p-2 text-center tabular-nums text-muted-foreground">
-        {d == null ? "â€”" : `${d > 0 ? "+" : ""}${d}`}
+        {d == null ? "—" : `${d > 0 ? "+" : ""}${d}`}
       </td>
     </tr>
   );
@@ -473,10 +505,6 @@ function conflictBreakdownPanel(
     <div className="rounded-lg border bg-card shadow-sm">
       <div className="border-b bg-muted/30 px-4 py-3">
         <p className="text-sm font-semibold">{title}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Pairwise clashes detected from weekly slot expansions (room double-booking, lecturer overlap, section/cohort
-          overlap).
-        </p>
       </div>
       <div className="overflow-x-auto p-2">
         <table className="w-full text-sm">
@@ -485,7 +513,7 @@ function conflictBreakdownPanel(
               <th className="p-2 text-left font-medium">Type</th>
               <th className="p-2 text-center font-medium">Baseline</th>
               <th className="p-2 text-center font-medium">Result</th>
-              <th className="p-2 text-center font-medium">Î” pairs</th>
+              <th className="p-2 text-center font-medium">Δ pairs</th>
             </tr>
           </thead>
           <tbody>
@@ -547,7 +575,7 @@ function metricSnapshotMiniTable(
               <div key={label} className="flex justify-between gap-3 border-b border-border/40 py-2 last:border-0">
                 <dt className="text-muted-foreground">{label}</dt>
                 <dd className="text-right tabular-nums font-medium">
-                  <span className="block">{val == null ? "â€”" : val}</span>
+                  <span className="block">{val == null ? "—" : val}</span>
                   {extra}
                 </dd>
               </div>
@@ -581,7 +609,7 @@ function competitionRanks(
 }
 
 function ordinalRankLabel(rank: number | null): string {
-  if (rank == null) return "â€”";
+  if (rank == null) return "—";
   const j = rank % 10;
   const k = rank % 100;
   if (j === 1 && k !== 11) return `${rank}st`;
@@ -668,18 +696,6 @@ function CrossTimetableComparisonBlock({
     return best;
   }, [comparisons, hardConflictByTimetableId]);
 
-  const scenarioLabel = comparisons[0]?.scenarioName ?? "Scenario";
-
-  const sensitivity = useMemo(() => {
-    const xs = comparisons
-      .map((c) => c.result?.fitnessScore)
-      .filter((x): x is number => typeof x === "number" && Number.isFinite(x));
-    if (xs.length < 2) return { variance: 0, stdev: 0 };
-    const mean = xs.reduce((s, x) => s + x, 0) / xs.length;
-    const variance = xs.reduce((s, x) => s + (x - mean) ** 2, 0) / xs.length;
-    return { variance, stdev: Math.sqrt(variance) };
-  }, [comparisons]);
-
   const improvedHowMany = useMemo(() => {
     return comparisons.filter((c) => {
       const d = c.deltas;
@@ -690,50 +706,6 @@ function CrossTimetableComparisonBlock({
       if (conflictDelta != null && conflictDelta < 0) return true;
       return fitnessOk;
     }).length;
-  }, [comparisons, hardConflictByTimetableId]);
-
-  const consistencyLines = useMemo(() => {
-    const lines: string[] = [];
-    const summarize = (label: string, vals: (number | undefined)[], lowerBetter: boolean) => {
-      const nums = vals.filter((x): x is number => typeof x === "number");
-      if (!nums.length) return;
-      let up = 0;
-      let down = 0;
-      let flat = 0;
-      for (const x of nums) {
-        if (x === 0) flat++;
-        else if (lowerBetter ? x < 0 : x > 0) up++;
-        else down++;
-      }
-      const n = nums.length;
-      if (up === n) lines.push(`${label}: improved on every timetable.`);
-      else if (down === n) lines.push(`${label}: worse on every timetable.`);
-      else
-        lines.push(
-          `${label}: mixed (${up} improved, ${down} worse, ${flat} unchanged).`,
-        );
-    };
-    summarize(
-      "Conflict Î”",
-      comparisons.map((c) => {
-        const bH = resolveHardConflictCount(c.baseTimetableId, c.baseline?.conflicts ?? null, hardConflictByTimetableId);
-        const rH = resolveHardConflictCount(c.resultTimetableId, c.result?.conflicts ?? null, hardConflictByTimetableId);
-        if (bH != null && rH != null) return rH - bH;
-        return c.deltas?.conflicts;
-      }),
-      true,
-    );
-    summarize(
-      "Fitness Î”",
-      comparisons.map((c) => c.deltas?.fitnessScore),
-      false,
-    );
-    summarize(
-      "Room utilization Î”",
-      comparisons.map((c) => c.deltas?.roomUtilizationRate),
-      false,
-    );
-    return lines;
   }, [comparisons, hardConflictByTimetableId]);
 
   const conflictRanks = useMemo(
@@ -770,201 +742,267 @@ function CrossTimetableComparisonBlock({
 
   const bestRun = bestOverallIdx >= 0 ? comparisons[bestOverallIdx] : null;
 
-  const metricRows = (
-    c: ComparisonRow,
-    idx: number,
-  ): Array<{ label: string; b: number | null | undefined; r: number | null | undefined; d: number | null | undefined; lower: boolean; rank: number | null }> => {
-    const bH = resolveHardConflictCount(c.baseTimetableId, c.baseline?.conflicts ?? null, hardConflictByTimetableId);
-    const rH = resolveHardConflictCount(c.resultTimetableId, c.result?.conflicts ?? null, hardConflictByTimetableId);
-    const dH = bH != null && rH != null ? rH - bH : c.deltas?.conflicts;
-    return [
-    {
-      label: "Hard conflicts",
-      b: bH ?? undefined,
-      r: rH ?? undefined,
-      d: dH,
-      lower: true,
-      rank: conflictRanks[idx] ?? null,
-    },
-    {
-      label: "Room util. %",
-      b: c.baseline?.roomUtilizationRate,
-      r: c.result?.roomUtilizationRate,
-      d: c.deltas?.roomUtilizationRate,
-      lower: false,
-      rank: roomRanks[idx] ?? null,
-    },
-    {
-      label: "Soft constraints",
-      b: c.baseline?.softConstraintsScore,
-      r: c.result?.softConstraintsScore,
-      d: c.deltas?.softConstraintsScore,
-      lower: false,
-      rank: softRanks[idx] ?? null,
-    },
-    {
-      label: "Fitness",
-      b: c.baseline?.fitnessScore,
-      r: c.result?.fitnessScore,
-      d: c.deltas?.fitnessScore,
-      lower: false,
-      rank: fitnessRanks[idx] ?? null,
-    },
-    ];
+  const [expandedRunIds, setExpandedRunIds] = useState<Set<number>>(() => new Set());
+
+  const toggleDetails = (runId: number) => {
+    setExpandedRunIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(runId)) next.delete(runId);
+      else next.add(runId);
+      return next;
+    });
   };
+
+  const winnerCellClass = "bg-emerald-500/15";
+
+  const renderMetricCell = (
+    b: number | null | undefined,
+    r: number | null | undefined,
+    d: number | null | undefined,
+    lowerBetter: boolean,
+    isWinner: boolean,
+  ) => {
+    const delta =
+      typeof d === "number" && Number.isFinite(d)
+        ? d
+        : b != null && r != null && typeof b === "number" && typeof r === "number"
+          ? r - b
+          : null;
+    const good =
+      delta != null && delta !== 0 && (lowerBetter ? delta < 0 : Boolean(delta > 0));
+    return (
+      <TableCell className={`align-top text-center ${isWinner ? winnerCellClass : ""}`}>
+        <div className="tabular-nums text-sm">
+          {b ?? "—"} → {r ?? "—"}
+        </div>
+        <div
+          className={`mt-0.5 text-xs tabular-nums ${
+            delta == null || delta === 0
+              ? "text-muted-foreground"
+              : good
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-rose-600 dark:text-rose-400"
+          }`}
+        >
+          {formatDelta(delta)}
+        </div>
+      </TableCell>
+    );
+  };
+
+  const disruptionBadgeClass = (level: ComparisonRow["disruptionLevel"]) => {
+    if (level === "Low") {
+      return "border-emerald-500/50 bg-emerald-500/10 font-normal text-emerald-800 dark:text-emerald-300";
+    }
+    if (level === "Moderate") {
+      return "border-amber-500/50 bg-amber-500/10 font-normal text-amber-800 dark:text-amber-300";
+    }
+    return "border-rose-500/50 bg-rose-500/10 font-normal text-rose-800 dark:text-rose-300";
+  };
+
+  const sectionDetailLabel = (row: SectionChangeDetail): string => {
+    if (row.changeType === "added") return "Added";
+    if (row.changeType === "removed") return "Removed";
+    const parts: string[] = [];
+    if (row.roomChanged) parts.push("room");
+    if (row.lecturerChanged) parts.push("lecturer");
+    if (row.timeslotChanged) parts.push("timeslot");
+    return parts.length > 0 ? `Reassigned (${parts.join(", ")})` : "Reassigned";
+  };
+
+  const columnCount = 8;
 
   return (
     <div className="space-y-4">
-      <Alert className="border-border/80 bg-muted/30">
-        <AlertTitle className="text-base">Cross-timetable summary</AlertTitle>
-        <AlertDescription className="space-y-2 text-foreground/90">
-          <p>
-            Comparing <strong>{scenarioLabel}</strong> across{" "}
-            <strong>{comparisons.length}</strong> baseline drafts.{" "}
-            <strong>{improvedHowMany}</strong> run(s) register lower conflicts or higher fitness than their baseline.
-          </p>
-          {bestRun ? (
-            <p>
-              Best composite card (tie-break: lowest conflicts, then highest fitness):{" "}
-              <strong>
-                Run #{bestRun.runId}
-              </strong>{" "}
-              on base timetable #{bestRun.baseTimetableId}.
-            </p>
-          ) : null}
-          <p>
-            Scenario sensitivity â€” variance of fitness across timetables:{" "}
-            <strong>{sensitivity.variance.toFixed(5)}</strong> (Ïƒ â‰ˆ {sensitivity.stdev.toFixed(4)}). Larger variance means the
-            scenario&apos;s quality swing depends more on the starting timetable.
-          </p>
-          <div>
-            <p className="font-medium text-foreground">Consistency across timetables</p>
-            <ul className="mt-1 list-inside list-disc text-sm">
-              {consistencyLines.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-            </ul>
-          </div>
-        </AlertDescription>
-      </Alert>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border/80 bg-muted/30 px-4 py-3 text-sm text-foreground/90">
+        <span>
+          Timetables compared: <strong className="text-foreground">{comparisons.length}</strong>
+        </span>
+        {improvedHowMany > 0 ? (
+          <span>
+            Improved:{" "}
+            <strong className="text-foreground">
+              {improvedHowMany} of {comparisons.length}
+            </strong>
+          </span>
+        ) : null}
+        {bestRun ? (
+          <span>
+            Best result:{" "}
+            <strong className="text-foreground">
+              Run #{bestRun.runId} on Timetable #{bestRun.baseTimetableId}
+            </strong>
+          </span>
+        ) : null}
+      </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-2 lg:justify-center">
-        {comparisons.map((c, idx) => (
-          <Card
-            key={c.runId}
-            className={`w-[min(100%,380px)] shrink-0 overflow-hidden border-border/80 shadow-sm lg:w-[400px] ${idx === bestOverallIdx ? "ring-2 ring-primary/35" : ""}`}
-          >
-            <CardHeader className="border-b bg-muted/30">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <CardTitle className="text-base leading-snug">
-                    Base timetable #{c.baseTimetableId}
-                  </CardTitle>
-                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                    Run #{c.runId}
-                    {c.resultTimetableId != null ? ` Â· Result #${c.resultTimetableId}` : ""}
-                  </p>
-                </div>
-                {idx === bestOverallIdx ? (
-                  <Badge className="shrink-0 bg-primary font-normal text-primary-foreground hover:bg-primary">
-                    Best overall
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary" className="shrink-0 font-normal">
-                    Timetable
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-4">
-              <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/40">
-                      <th className="p-2 text-left font-medium">Metric</th>
-                      <th className="p-2 text-center font-medium">Baseline</th>
-                      <th className="p-2 text-center font-medium">Result</th>
-                      <th className="p-2 text-center font-medium">Î”</th>
-                      <th className="p-2 text-center font-medium">Rank</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {metricRows(c, idx).map((row) => {
-                      const delta =
-                        typeof row.d === "number"
-                          ? row.d
-                          : row.r != null && row.b != null
-                            ? row.r - row.b
-                            : null;
-                      const good =
-                        delta != null &&
-                        delta !== 0 &&
-                        (row.lower ? delta < 0 : delta > 0);
-                      return (
-                        <tr key={row.label} className="border-b last:border-0">
-                          <td className="p-2">{row.label}</td>
-                          <td className="p-2 text-center tabular-nums">{row.b ?? "â€”"}</td>
-                          <td className="p-2 text-center tabular-nums">{row.r ?? "â€”"}</td>
-                          <td
-                            className={`p-2 text-center tabular-nums ${
-                              delta == null || delta === 0
-                                ? "text-muted-foreground"
-                                : good
-                                  ? "text-emerald-600"
-                                  : "text-rose-600"
-                            }`}
+      <div className="overflow-x-auto rounded-xl border border-border/80 bg-card shadow-sm">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="min-w-[140px]">Timetable</TableHead>
+              <TableHead className="text-center">Hard Conflicts</TableHead>
+              <TableHead className="text-center">Room Util. %</TableHead>
+              <TableHead className="text-center">Soft Score</TableHead>
+              <TableHead className="text-center">Fitness</TableHead>
+              <TableHead className="text-center">Disruption</TableHead>
+              <TableHead className="text-center">Sections affected</TableHead>
+              <TableHead className="min-w-[160px] text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {comparisons.map((c, idx) => {
+              const bH = resolveHardConflictCount(
+                c.baseTimetableId,
+                c.baseline?.conflicts ?? null,
+                hardConflictByTimetableId,
+              );
+              const rH = resolveHardConflictCount(
+                c.resultTimetableId,
+                c.result?.conflicts ?? null,
+                hardConflictByTimetableId,
+              );
+              const dH = bH != null && rH != null ? rH - bH : c.deltas?.conflicts;
+              const isExpanded = expandedRunIds.has(c.runId);
+              const isBest = idx === bestOverallIdx;
+
+              return (
+                <Fragment key={c.runId}>
+                  <TableRow className={isBest ? "bg-primary/[0.04]" : undefined}>
+                    <TableCell className="align-top">
+                      <div className="flex flex-wrap items-start gap-2">
+                        <div>
+                          <p className="font-medium">Timetable #{c.baseTimetableId}</p>
+                          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                            Run #{c.runId}
+                          </p>
+                        </div>
+                        {isBest ? (
+                          <Badge className="shrink-0 bg-primary font-normal text-primary-foreground hover:bg-primary">
+                            Best overall
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    {renderMetricCell(bH ?? undefined, rH ?? undefined, dH, true, conflictRanks[idx] === 1)}
+                    {renderMetricCell(
+                      c.baseline?.roomUtilizationRate,
+                      c.result?.roomUtilizationRate,
+                      c.deltas?.roomUtilizationRate,
+                      false,
+                      roomRanks[idx] === 1,
+                    )}
+                    {renderMetricCell(
+                      c.baseline?.softConstraintsScore,
+                      c.result?.softConstraintsScore,
+                      c.deltas?.softConstraintsScore,
+                      false,
+                      softRanks[idx] === 1,
+                    )}
+                    {renderMetricCell(
+                      c.baseline?.fitnessScore,
+                      c.result?.fitnessScore,
+                      c.deltas?.fitnessScore,
+                      false,
+                      fitnessRanks[idx] === 1,
+                    )}
+                    <TableCell className="align-top text-center">
+                      <Badge variant="outline" className={disruptionBadgeClass(c.disruptionLevel)}>
+                        {c.disruptionLevel}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="align-top text-center tabular-nums text-sm">
+                      {c.sectionChanges
+                        ? `${c.sectionChanges.percentSectionsAffected.toFixed(1)}%`
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="align-top text-right">
+                      <div className="flex flex-col items-end gap-1.5">
+                        {c.resultTimetableId != null ? (
+                          <Button size="sm" variant="outline" className="h-8" asChild>
+                            <Link
+                              href={`/schedule?simulation=1&timetableId=${c.resultTimetableId}&runId=${c.runId}`}
+                            >
+                              View in Schedule Viewer
+                            </Link>
+                          </Button>
+                        ) : onStore ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8"
+                            disabled={storingRunId === c.runId}
+                            onClick={() => onStore(c.runId)}
                           >
-                            {formatDelta(delta)}
-                          </td>
-                          <td className="p-2 text-center tabular-nums text-muted-foreground">
-                            {ordinalRankLabel(row.rank)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              {c.sectionChanges ? (
-                <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm">
-                  <p className="font-medium">Sections</p>
-                  <p className="mt-1 text-muted-foreground">
-                    Î” changed {c.sectionChanges.changed}, +{c.sectionChanges.added}, âˆ’{c.sectionChanges.removed} Â·{" "}
-                    {c.sectionChanges.percentSectionsAffected.toFixed(1)}% of union slots touched
-                  </p>
-                </div>
-              ) : null}
-              <p className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-[13px] leading-relaxed">
-                {c.recommendation}
-              </p>
-              <div className="flex flex-wrap gap-2 border-t border-border/40 pt-3">
-                {c.resultTimetableId != null ? (
-                  <Button size="sm" variant="outline" className="w-full shrink-0" asChild>
-                    <Link
-                      href={`/schedule?simulation=1&timetableId=${c.resultTimetableId}&runId=${c.runId}`}
-                    >
-                      View in Schedule Viewer
-                    </Link>
-                  </Button>
-                ) : onStore ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="w-full shrink-0"
-                    disabled={storingRunId === c.runId}
-                    onClick={() => onStore(c.runId)}
-                  >
-                    {storingRunId === c.runId ? "Storingâ€¦" : "Store"}
-                  </Button>
-                ) : null}
-                <Button type="button" size="sm" variant="ghost" className="flex-1" asChild>
-                  <Link href={`/dashboard/what-if/${c.scenarioId}/runs`}>Runs</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                            {storingRunId === c.runId ? "Storing…" : "Store"}
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-8"
+                          onClick={() => toggleDetails(c.runId)}
+                        >
+                          {isExpanded ? "Hide details" : "Details"}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {isExpanded ? (
+                    <TableRow className="bg-muted/20 hover:bg-muted/20">
+                      <TableCell colSpan={columnCount} className="py-4">
+                        <div className="space-y-3">
+                          <p className="text-sm leading-relaxed text-foreground/90">{c.recommendation}</p>
+                          {c.sectionChanges ? (
+                            <p className="text-sm text-muted-foreground">
+                              {c.sectionChanges.changed} reassigned · +{c.sectionChanges.added} added · −
+                              {c.sectionChanges.removed} removed
+                            </p>
+                          ) : null}
+                          {c.sectionChanges && c.sectionChanges.changedSections.length > 0 ? (
+                            <div className="overflow-x-auto rounded-lg border border-border/70">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                    <TableHead>Course</TableHead>
+                                    <TableHead>Section</TableHead>
+                                    <TableHead>Change</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {c.sectionChanges.changedSections.map((row) => (
+                                    <TableRow
+                                      key={`${row.courseId}-${row.sectionNumber}-${row.changeType}`}
+                                    >
+                                      <TableCell>
+                                        <p className="font-medium text-foreground">{row.courseName}</p>
+                                        <p className="font-mono text-[11px] text-muted-foreground">
+                                          {row.courseCode}
+                                        </p>
+                                      </TableCell>
+                                      <TableCell className="tabular-nums text-muted-foreground">
+                                        {row.sectionNumber}
+                                      </TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">
+                                        {sectionDetailLabel(row)}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                </Fragment>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
@@ -1042,15 +1080,15 @@ function CrossScenarioComparisonBlock({
 
     const domCount = pareto.filter(Boolean).length;
     if (domCount === 0)
-      parts.push("no scenario is undominated â€” every option loses on at least one metric compared to some alternative");
+      parts.push("no scenario is undominated — every option loses on at least one metric compared to some alternative");
     else if (domCount === 1) {
       const i = pareto.findIndex(Boolean);
       parts.push(`${nameAt(i)} is Pareto-optimal (nothing strictly dominates it)`);
     } else parts.push(`${domCount} scenarios sit on the Pareto frontier`);
 
-    if (!parts.length) return "Compare scenarios using the table â€” hover metrics to see baseline versus sandbox deltas.";
+    if (!parts.length) return "Compare scenarios using the table — hover metrics to see baseline versus sandbox deltas.";
     let tail = "";
-    if (winners.conflicts.length > 1 && winners.fitness.length > 1) tail = " â€” no single scenario dominates every metric.";
+    if (winners.conflicts.length > 1 && winners.fitness.length > 1) tail = " — no single scenario dominates every metric.";
     return `${parts.join("; ")}.${tail}`;
   }, [comparisons, pareto, winners]);
 
@@ -1115,7 +1153,7 @@ function CrossScenarioComparisonBlock({
   return (
     <div className="space-y-4">
       <Alert className="border-border/80 bg-muted/30">
-        <AlertTitle className="text-base">Decision summary</AlertTitle>
+        <AlertTitle className="text-base">Summary</AlertTitle>
         <AlertDescription className="text-foreground/90">{decisionBanner}</AlertDescription>
       </Alert>
 
@@ -1133,19 +1171,19 @@ function CrossScenarioComparisonBlock({
                 % sections disrupted
               </TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("conflicts")}>
-                Hard conflicts (base â†’ result)
+                Hard conflicts (base → result)
               </TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("room")}>
-                Room util. (base â†’ result)
+                Room util. (base → result)
               </TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("soft")}>
-                Soft score (base â†’ result)
+                Soft score (base → result)
               </TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("fitness")}>
-                Fitness (base â†’ result)
+                Fitness (base → result)
               </TableHead>
               <TableHead className="cursor-pointer text-center" onClick={() => toggleSort("lecturer")}>
-                Lecturer balance (base â†’ result)
+                Lecturer balance (base → result)
               </TableHead>
               <TableHead className="text-center">Pareto</TableHead>
               <TableHead className="min-w-[220px]">Why</TableHead>
@@ -1167,7 +1205,7 @@ function CrossScenarioComparisonBlock({
 
               const pair = (b: number | null | undefined, r: number | null | undefined, d: number | null | undefined) => (
                 <span className="tabular-nums">
-                  {b ?? "â€”"} â†’ {r ?? "â€”"}
+                  {b ?? "—"} → {r ?? "—"}
                   <span className="ml-1 text-muted-foreground">({formatDelta(d ?? null)})</span>
                 </span>
               );
@@ -1180,7 +1218,7 @@ function CrossScenarioComparisonBlock({
                   </TableCell>
                   <TableCell className="text-center tabular-nums">{c.conditionCount}</TableCell>
                   <TableCell className={`text-center tabular-nums ${cellClass(wDisrupt)}`}>
-                    {c.sectionChanges ? `${c.sectionChanges.percentSectionsAffected.toFixed(1)}%` : "â€”"}
+                    {c.sectionChanges ? `${c.sectionChanges.percentSectionsAffected.toFixed(1)}%` : "—"}
                   </TableCell>
                   <TableCell className={`text-center ${cellClass(wConf)}`}>
                     {(() => {
@@ -1228,12 +1266,12 @@ function CrossScenarioComparisonBlock({
                         Pareto
                       </Badge>
                     ) : (
-                      <span className="text-muted-foreground">â€”</span>
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell className="align-top text-xs leading-snug text-muted-foreground">
                     {c.recommendation.slice(0, 280)}
-                    {c.recommendation.length > 280 ? "â€¦" : ""}
+                    {c.recommendation.length > 280 ? "…" : ""}
                   </TableCell>
                   <TableCell className="space-y-1 text-right align-top">
                     {c.resultTimetableId != null ? (
@@ -1253,7 +1291,7 @@ function CrossScenarioComparisonBlock({
                         disabled={storingRunId === c.runId}
                         onClick={() => onStore(c.runId)}
                       >
-                        {storingRunId === c.runId ? "Storingâ€¦" : "Store"}
+                        {storingRunId === c.runId ? "Storing…" : "Store"}
                       </Button>
                     ) : null}
                   </TableCell>
@@ -1585,8 +1623,6 @@ export default function WhatIfComparePage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [availableRuns, scenarioFilter]);
 
-  const requiresFilterStep =
-    mode === "cross-scenario" || mode === "cross-timetable" || mode === "before-after";
   const filterReady =
     mode === "cross-scenario"
       ? Boolean(timetableFilter)
@@ -1604,11 +1640,6 @@ export default function WhatIfComparePage() {
   const showCompareResults =
     Boolean(mode && filterReady) &&
     (step >= 4 || loading || compareError !== null || comparisons.length > 0);
-
-  const canCompare =
-    mode === "before-after"
-      ? selectedRunIds.length === 1 && filterReady
-      : selectedRunIds.length >= 2;
 
   const modeCards: Array<{ key: UiMode; title: string; description: string }> = [
     {
@@ -1657,9 +1688,6 @@ export default function WhatIfComparePage() {
             <div className="flex flex-col gap-3 border-b border-border/60 pb-6 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">Compare scenario runs</h1>
-                <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                  Follow the steps to pick a mode, filter the available runs, and compare outcomes.
-                </p>
               </div>
               <Badge variant="outline" className="w-fit shrink-0 font-normal">
                 Step {step} of 4
@@ -1668,8 +1696,7 @@ export default function WhatIfComparePage() {
 
             <Card className="border-border/80 shadow-sm">
               <CardHeader className="border-b bg-muted/30">
-                <CardTitle className="text-lg">Step 1 â€” Choose a comparison mode</CardTitle>
-                <CardDescription>Select one mode to begin.</CardDescription>
+                <CardTitle className="text-lg">Step 1 — Comparison Mode</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 gap-3 pt-4 md:grid-cols-3 md:items-stretch">
                 {modeCards.map((card) => (
@@ -1702,16 +1729,11 @@ export default function WhatIfComparePage() {
             {mode ? (
               <Card className="border-border/80 shadow-sm">
                 <CardHeader className="border-b bg-muted/30">
-                  <CardTitle className="text-lg">
-                    {requiresFilterStep ? "Step 2 — Choose a filter" : "Step 2 — Filter"}
-                  </CardTitle>
+                  <CardTitle className="text-lg">Step 2 — Filter</CardTitle>
                   <CardDescription>
-                    {mode === "cross-scenario" &&
-                      "Pick one timetable. Step 3 lists completed runs that used that baseline."}
-                    {mode === "cross-timetable" &&
-                      "Pick one scenario. Step 3 lists completed runs for that scenario."}
-                    {mode === "before-after" &&
-                      "Pick the scenario and baseline timetable for the run. Step 3 lists only matching completed runs."}
+                    {mode === "cross-scenario" && "Select the baseline timetable."}
+                    {mode === "cross-timetable" && "Select the scenario."}
+                    {mode === "before-after" && "Select the scenario and baseline timetable."}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 pt-4">
@@ -1843,11 +1865,10 @@ export default function WhatIfComparePage() {
             {mode && filterReady ? (
               <Card className="border-border/80 shadow-sm">
               <CardHeader className="border-b bg-muted/30">
-                <CardTitle className="text-lg">Step 3 â€” Pick runs</CardTitle>
+                <CardTitle className="text-lg">Step 3 — Select Runs</CardTitle>
                 <CardDescription>
-                  {mode === "before-after" && "Select exactly one completed run."}
-                  {mode === "cross-timetable" && "Select two or more runs for the same scenario."}
-                  {mode === "cross-scenario" && "Select two or more runs from the selected timetable."}
+                  {mode === "before-after" && "Select one run."}
+                  {(mode === "cross-timetable" || mode === "cross-scenario") && "Select two or more runs."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 pt-4">
@@ -1861,7 +1882,7 @@ export default function WhatIfComparePage() {
                   />
                 </div>
                 <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border p-2">
-                  {runsLoading ? <p className="px-2 py-6 text-sm text-muted-foreground">Loading runsâ€¦</p> : null}
+                  {runsLoading ? <p className="px-2 py-6 text-sm text-muted-foreground">Loading runs…</p> : null}
                   {!runsLoading && selectableRuns.length === 0 ? (
                     <p className="px-2 py-6 text-sm text-muted-foreground">No completed runs match this filter.</p>
                   ) : null}
@@ -1884,16 +1905,36 @@ export default function WhatIfComparePage() {
                                   : [...selectedRunIds, run.id]
                               : selectedRunIds.filter((id) => id !== run.id);
                             setSelectedRunIds(ids);
-                            resetResults();
-                            if (step !== 3) setStep(3);
+                            lastAutoCompareKeyRef.current = null;
+                            if (!mode) return;
+                            const selectionValid =
+                              mode === "before-after"
+                                ? ids.length === 1 && filterReady
+                                : ids.length >= 2;
+                            applyUrl(ids, mode, {
+                              scenarioId:
+                                mode === "cross-timetable" || mode === "before-after"
+                                  ? scenarioFilter
+                                  : null,
+                              timetableId:
+                                mode === "cross-scenario" || mode === "before-after"
+                                  ? timetableFilter
+                                  : null,
+                            });
+                            if (selectionValid) {
+                              setStep(4);
+                            } else {
+                              resetResults();
+                              setStep(3);
+                            }
                           }}
                         />
                         <div className="min-w-0 flex-1 text-sm">
                           <p className="truncate font-medium">
-                            Run #{run.id} Â· {run.scenarioName}
+                            Run #{run.id} · {run.scenarioName}
                           </p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {run.baseTimetableName} Â· {formatDateTime(run.startedAt)}
+                            {run.baseTimetableName} · {formatDateTime(run.startedAt)}
                           </p>
                         </div>
                         <Badge variant={run.status === "applied" ? "default" : "secondary"} className="shrink-0">
@@ -1903,32 +1944,13 @@ export default function WhatIfComparePage() {
                     );
                   })}
                 </div>
-                <div className="flex justify-end border-t border-border/40 pt-3">
-                  <Button
-                    type="button"
-                    disabled={!canCompare || loading}
-                    onClick={() => {
-                      if (!mode) return;
-                      setStep(4);
-                      applyUrl(selectedRunIds, mode, {
-                        scenarioId:
-                          mode === "cross-timetable" || mode === "before-after" ? scenarioFilter : null,
-                        timetableId:
-                          mode === "cross-scenario" || mode === "before-after" ? timetableFilter : null,
-                      });
-                      void fetchCompare(selectedRunIds, mode);
-                    }}
-                  >
-                    Compare
-                  </Button>
-                </div>
               </CardContent>
             </Card>
             ) : null}
 
             {showCompareResults ? (
               <div className="border-t border-border/70 pt-6">
-                <h2 className="mb-3 text-lg font-semibold">Step 4 â€” Results</h2>
+                <h2 className="mb-3 text-lg font-semibold">Step 4 — Results</h2>
               </div>
             ) : null}
 
@@ -1948,7 +1970,7 @@ export default function WhatIfComparePage() {
             {showCompareResults && !loading && comparisons.length === 0 && !compareError ? (
               <Card className="border-dashed">
                 <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                  No results yet. Pick valid runs in Step 3 and click Compare.
+                  No results yet. Pick valid runs in Step 3.
                 </CardContent>
               </Card>
             ) : null}
@@ -1957,6 +1979,9 @@ export default function WhatIfComparePage() {
               mode === "before-after" && comparisons.length === 1 ? (
                 (() => {
                   const c = comparisons[0]!;
+                  const sectionChangeRows = courseSectionChangeRows(
+                    c.sectionChanges?.changedSections ?? [],
+                  );
                   return (
                     <div className="space-y-4">
                       <Card className="overflow-hidden border-border/80 shadow-sm">
@@ -1965,18 +1990,13 @@ export default function WhatIfComparePage() {
                             <div>
                               <CardTitle className="text-lg leading-snug">{c.scenarioName}</CardTitle>
                               <p className="mt-1 font-mono text-xs text-muted-foreground">
-                                Run #{c.runId}: baseline timetable #{c.baseTimetableId} â†’ scenario draft #
-                                {c.resultTimetableId ?? "â€”"}
-                              </p>
-                              <p className="mt-2 text-xs text-muted-foreground">
-                                Scenario uses{" "}
-                                <strong className="text-foreground">{c.conditionCount}</strong> condition
-                                {c.conditionCount === 1 ? "" : "s"}.
+                                Run #{c.runId}: baseline timetable #{c.baseTimetableId} → scenario draft #
+                                {c.resultTimetableId ?? "—"}
                               </p>
                             </div>
                             {c.sectionChanges ? (
                               <Badge variant="outline" className="shrink-0 font-normal">
-                                {c.disruptionLevel} disruption Â· {c.sectionChanges.percentSectionsAffected.toFixed(1)}%
+                                {c.disruptionLevel} disruption · {c.sectionChanges.percentSectionsAffected.toFixed(1)}%
                                 sections touched
                               </Badge>
                             ) : null}
@@ -2013,29 +2033,6 @@ export default function WhatIfComparePage() {
                         )}
                       </div>
 
-                      <Card className="border-border/80 shadow-sm">
-                        <CardHeader className="border-b bg-muted/30">
-                          <CardTitle className="text-base">GWO optimizer run</CardTitle>
-                          <CardDescription>Persisted on the scenario run record.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="pt-4 text-sm">
-                          <dl className="grid gap-3 sm:grid-cols-2">
-                            <div className="flex justify-between gap-3 rounded-lg border border-border/60 px-3 py-2">
-                              <dt className="text-muted-foreground">Iterations executed</dt>
-                              <dd className="tabular-nums font-medium">
-                                {c.gwoIterationsRun != null ? c.gwoIterationsRun : "â€”"}
-                              </dd>
-                            </div>
-                            <div className="flex justify-between gap-3 rounded-lg border border-border/60 px-3 py-2">
-                              <dt className="text-muted-foreground">Generation time</dt>
-                              <dd className="tabular-nums font-medium">
-                                {c.generationSeconds != null ? `${c.generationSeconds}s` : "â€”"}
-                              </dd>
-                            </div>
-                          </dl>
-                        </CardContent>
-                      </Card>
-
                       {c.baselineConflictBreakdown && c.resultConflictBreakdown ? (
                         conflictBreakdownPanel(
                           "Hard clash breakdown (schedule-derived)",
@@ -2049,9 +2046,7 @@ export default function WhatIfComparePage() {
                         <CardHeader className="border-b bg-muted/30">
                           <CardTitle className="text-base">Metrics compared</CardTitle>
                           <CardDescription>
-                            Baseline vs sandbox â€” verdict badges encode directionality (lower hard conflicts / higher
-                            fitness is better). Hard conflicts use the same persisted summary as the schedule viewer; run
-                            metrics may differ when the snapshot row is stale.
+                            Lower conflicts and higher fitness indicate a better result.
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="pt-4">
@@ -2068,37 +2063,46 @@ export default function WhatIfComparePage() {
                         <Card className="border-border/80 shadow-sm">
                           <CardHeader className="border-b bg-muted/30">
                             <CardTitle className="text-base">Section-level changes</CardTitle>
-                            <CardDescription>
-                              +{c.sectionChanges.added} / âˆ’{c.sectionChanges.removed} sections Â· {c.sectionChanges.changed}{" "}
-                              reassigned Â· {c.sectionChanges.unchanged} untouched Â· Union coverage{" "}
-                              {c.sectionChanges.percentSectionsAffected.toFixed(1)}%
-                            </CardDescription>
+                            {c.resultTimetableId != null ? (
+                              <CardDescription>
+                                +{c.sectionChanges.added} added · −{c.sectionChanges.removed} removed ·{" "}
+                                {c.sectionChanges.percentSectionsAffected.toFixed(1)}% of sections affected
+                              </CardDescription>
+                            ) : null}
                           </CardHeader>
                           <CardContent className="space-y-4 pt-4">
-                            {c.sectionChanges.changedSections.length > 0 ? (
+                            {c.resultTimetableId == null ? (
+                              <p className="text-sm text-muted-foreground">
+                                The timetable should be stored first.
+                              </p>
+                            ) : sectionChangeRows.length > 0 ? (
                               <div className="rounded-xl border border-border/70">
                                 <Table>
                                   <TableHeader>
                                     <TableRow className="bg-muted/40 hover:bg-muted/40">
                                       <TableHead>Course</TableHead>
-                                      <TableHead>Section</TableHead>
-                                      <TableHead>Change</TableHead>
+                                      <TableHead className="text-right">Sections</TableHead>
                                     </TableRow>
                                   </TableHeader>
                                   <TableBody>
-                                    {c.sectionChanges.changedSections.map((row) => (
-                                      <TableRow
-                                        key={`${row.courseId}-${row.sectionNumber}-${row.changeType}`}
-                                      >
+                                    {sectionChangeRows.map((row) => (
+                                      <TableRow key={row.key}>
                                         <TableCell>
-                                          <p className="font-medium text-foreground">{row.courseName}</p>
-                                          <p className="font-mono text-[11px] text-muted-foreground">{row.courseCode}</p>
+                                          <p className="font-medium text-foreground">
+                                            {row.courseName.trim() || row.courseCode}{" "}
+                                            <span className="font-mono text-[11px] font-normal text-muted-foreground">
+                                              {row.courseCode}
+                                            </span>
+                                          </p>
                                         </TableCell>
-                                        <TableCell className="tabular-nums text-muted-foreground">
-                                          {row.sectionNumber}
-                                        </TableCell>
-                                        <TableCell className="text-sm text-muted-foreground">
-                                          {sectionChangeSummaryLabel(row)}
+                                        <TableCell
+                                          className={`text-right text-sm font-semibold tabular-nums ${
+                                            row.kind === "added"
+                                              ? "text-emerald-600 dark:text-emerald-400"
+                                              : "text-rose-600 dark:text-rose-400"
+                                          }`}
+                                        >
+                                          {row.deltaLabel}
                                         </TableCell>
                                       </TableRow>
                                     ))}
@@ -2113,12 +2117,12 @@ export default function WhatIfComparePage() {
                           </CardContent>
                         </Card>
                       ) : null}
-                      <p className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm leading-relaxed text-foreground/90">
-                        {c.recommendation}
-                      </p>
-                      <div className="flex flex-wrap gap-2 border-t border-border/40 pt-3">
+                      <div className="flex flex-row flex-wrap items-center gap-2 border-t border-border/40 pt-3">
+                        <Button size="sm" variant="outline" className="shrink-0" asChild>
+                          <Link href="/dashboard/what-if">Back to scenarios</Link>
+                        </Button>
                         {c.resultTimetableId != null ? (
-                          <Button size="sm" variant="outline" asChild>
+                          <Button size="sm" variant="outline" className="shrink-0" asChild>
                             <Link
                               href={`/schedule?simulation=1&timetableId=${c.resultTimetableId}&runId=${c.runId}`}
                             >
@@ -2130,13 +2134,14 @@ export default function WhatIfComparePage() {
                             type="button"
                             size="sm"
                             variant="outline"
+                            className="shrink-0"
                             disabled={storingRunId === c.runId}
                             onClick={() => void handleStoreRun(c.runId)}
                           >
-                            {storingRunId === c.runId ? "Storingâ€¦" : "Store"}
+                            {storingRunId === c.runId ? "Storing…" : "Store"}
                           </Button>
                         )}
-                        <Button type="button" size="sm" variant="ghost" asChild>
+                        <Button size="sm" variant="outline" className="shrink-0" asChild>
                           <Link href={`/dashboard/what-if/${c.scenarioId}/runs`}>Scenario runs</Link>
                         </Button>
                       </div>
@@ -2160,9 +2165,16 @@ export default function WhatIfComparePage() {
               )
             ) : null}
 
-            <Button variant="outline" asChild>
-              <Link href="/dashboard/what-if">Back to scenarios</Link>
-            </Button>
+            {!(
+              showCompareResults &&
+              !loading &&
+              comparisons.length === 1 &&
+              mode === "before-after"
+            ) ? (
+              <Button variant="outline" asChild>
+                <Link href="/dashboard/what-if">Back to scenarios</Link>
+              </Button>
+            ) : null}
           </div>
         </main>
       </div>
