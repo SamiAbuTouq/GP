@@ -1,5 +1,9 @@
 import { z } from 'zod'
 import { ApiClient } from '@/lib/api-client'
+import { startHourKeyFromHhMm } from '@/lib/db-time'
+
+/** PSUT scheduling workweek (no Friday or Saturday). */
+export const WORKWEEK_SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu'] as const
 
 /** Next route handlers may not see the Nest refresh cookie (different host); forward the SPA access token. */
 function nextApiAuthHeaders(): Record<string, string> {
@@ -850,16 +854,15 @@ export function getAcademicLevelModeData(courses: Course[]): AcademicLevelModeDa
  */
 export function getScheduleHeatmap(courses: Course[]): HeatmapData[] {
   const heatmap: HeatmapData[] = []
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu']
+  const days = [...WORKWEEK_SHORT_DAYS]
   const studentCounts = new Map<string, number>()
 
   for (const course of courses) {
     if (course.isOnline) continue
     if (!course.Day?.trim() || !course.Start_Time?.trim()) continue
 
-    const hourRaw = course.Start_Time.split(':')[0]
-    if (hourRaw === '') continue
-    const hour = hourRaw.padStart(2, '0')
+    const hour = startHourKeyFromHhMm(course.Start_Time)
+    if (!hour) continue
 
     for (const shortDay of expandCourseMeetingDays(course.Day)) {
       if (!days.includes(shortDay)) continue
@@ -1443,7 +1446,7 @@ export function expandCourseMeetingDays(dayField: string | undefined): string[] 
       continue
     }
     const d = canonicalWeekdayFromToken(raw)
-    if (d) out.push(d)
+    if (d && (WORKWEEK_SHORT_DAYS as readonly string[]).includes(d)) out.push(d)
   }
   return out
 }
@@ -1597,8 +1600,8 @@ export interface RoomOccupancyHeatmapResult {
   meetings: number[][]
 }
 
-/** All weekday columns; must cover every token `expandCourseMeetingDays` can emit (incl. Fri/Sat). */
-const HEATMAP_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+/** Workweek columns for room heatmaps (Sun–Thu only). */
+const HEATMAP_DAYS = [...WORKWEEK_SHORT_DAYS]
 
 /** Room × weekday heat: mean section occupancy for physical sections in that room on that day. */
 export function getRoomOccupancyHeatmap(courses: Course[], roomLimit = 14): RoomOccupancyHeatmapResult {

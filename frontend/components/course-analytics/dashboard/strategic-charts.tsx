@@ -28,6 +28,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/course-analytics-ui/card'
 import { ScrollArea } from '@/components/course-analytics-ui/scroll-area'
 import { Badge } from '@/components/course-analytics-ui/badge'
+import { WORKWEEK_SHORT_DAYS } from '@/lib/course-analytics/course-data'
 import type {
   AcademicWeightRow,
   CourseData,
@@ -381,7 +382,7 @@ export function RoomOccupancyHeatmapChart({ data }: { data: RoomOccupancyHeatmap
 }
 
 export function CampusConcurrentDensityChart({ data }: { data: HeatmapData[] }) {
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu']
+  const days = [...WORKWEEK_SHORT_DAYS]
   const hours = [...new Set(data.map((d) => d.hour))].sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
   const maxValue = Math.max(1, ...data.map((d) => d.value))
 

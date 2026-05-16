@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import type { Semester, Timetable, TimetableMetrics } from "@prisma/client"
+import { formatPrismaTimeAsHhMm, parseWallClockTimeToMinutes } from "@/lib/db-time"
 import { prisma } from "@/lib/prisma"
 import { requireAdminFromRefreshCookie } from "@/lib/server-auth"
 
@@ -21,7 +22,7 @@ function formatSemesterLabel(academicYear: string, semesterType: number): string
   return `${academicYear.replace(/-/g, "–")} ${decodeSemesterType(semesterType)}`
 }
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu"] as const
 
 const REPORT_TYPE_PARAMS = [
   "room-utilization",
@@ -45,17 +46,12 @@ function daysFromMask(mask: number): string[] {
 }
 
 function slotDurationHours(start: Date, end: Date): number {
-  const sm = start.getUTCHours() * 60 + start.getUTCMinutes()
-  const em = end.getUTCHours() * 60 + end.getUTCMinutes()
+  const sm = parseWallClockTimeToMinutes(formatPrismaTimeAsHhMm(start))
+  const em = parseWallClockTimeToMinutes(formatPrismaTimeAsHhMm(end))
+  if (sm == null || em == null) return 0
   let diff = (em - sm) / 60
   if (diff <= 0) diff += 24
   return diff
-}
-
-function formatUtcHm(d: Date): string {
-  const h = d.getUTCHours().toString().padStart(2, "0")
-  const m = d.getUTCMinutes().toString().padStart(2, "0")
-  return `${h}:${m}`
 }
 
 function decodeRoomType(code: number): string {
@@ -518,8 +514,8 @@ export async function GET(request: Request) {
           .map((sa) => ({
             slotId: sa.slotId,
             days: sa.days.join(", "),
-            startTime: formatUtcHm(sa.startTime),
-            endTime: formatUtcHm(sa.endTime),
+            startTime: formatPrismaTimeAsHhMm(sa.startTime),
+            endTime: formatPrismaTimeAsHhMm(sa.endTime),
             sections: sa.sections,
             roomsUsed: sa.roomsUsed.size,
             totalEnrollment: sa.totalEnrollment,

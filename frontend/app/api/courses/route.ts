@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { formatPrismaTimeAsHhMm } from '@/lib/db-time'
 import { prisma } from '@/lib/prisma'
 import { proxyToBackend } from '@/lib/proxy-backend'
 import { requireAdminFromRefreshOrBearer } from '@/lib/server-auth'
@@ -13,7 +14,8 @@ function decodeSemesterType(type: number): string {
   return map[type] ?? `Semester ${type}`
 }
 
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Sat']
+/** PSUT workweek (Sun–Thu); Friday/Saturday bitmask bits are ignored. */
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu']
 function decodeDaysMask(mask: number | string | bigint | null | undefined): string {
   const numericMask =
     typeof mask === 'bigint'
@@ -24,20 +26,6 @@ function decodeDaysMask(mask: number | string | bigint | null | undefined): stri
 
   if (!Number.isFinite(numericMask as number)) return ''
   return DAY_LABELS.filter((_, i) => ((numericMask as number) >> i) & 1).join(' ')
-}
-
-function formatTime(value: Date | string | null | undefined): string {
-  if (!value) return ''
-
-  if (typeof value === 'string') {
-    const m = value.match(/^(\d{1,2}):(\d{2})/)
-    if (!m) return ''
-    return `${m[1].padStart(2, '0')}:${m[2]}`
-  }
-
-  const h = value.getUTCHours().toString().padStart(2, '0')
-  const m = value.getUTCMinutes().toString().padStart(2, '0')
-  return `${h}:${m}`
 }
 
 /**
@@ -116,7 +104,7 @@ export async function GET(request: Request) {
           Lecturer_ID: entry.user_id == null ? "" : String(entry.user_id),
           Department: entry.course.department.dept_name,
           Day: decodeDaysMask(entry.timeslot.days_mask),
-          Time: `${formatTime(entry.timeslot.start_time)} - ${formatTime(entry.timeslot.end_time)}`,
+          Time: `${formatPrismaTimeAsHhMm(entry.timeslot.start_time)} - ${formatPrismaTimeAsHhMm(entry.timeslot.end_time)}`,
           Room: entry.room.room_number,
           Room_ID: String(entry.room_id),
           Registered_Students: entry.registered_students,
@@ -128,8 +116,8 @@ export async function GET(request: Request) {
               : entry.course.delivery_mode === 'BLENDED'
                 ? 'Blended'
                 : 'Face To Face',
-          Start_Time: formatTime(entry.timeslot.start_time),
-          End_Time: formatTime(entry.timeslot.end_time),
+          Start_Time: formatPrismaTimeAsHhMm(entry.timeslot.start_time),
+          End_Time: formatPrismaTimeAsHhMm(entry.timeslot.end_time),
           islab: entry.course.is_lab,
           Department_ID: String(entry.course.dept_id),
         },
